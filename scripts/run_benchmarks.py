@@ -188,7 +188,7 @@ def run_benchmarks(
 
     # Process the data
     processor = Processor(visit_arrays=True)
-    result = processor.process_many(data)
+    result = processor.process(data, entity_name="benchmark")
 
     # Dictionary to store benchmark results
     benchmarks = {}

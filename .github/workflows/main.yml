@@ -9,10 +9,10 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
-        python-version: ['3.7', '3.8', '3.9', '3.10', '3.11']
+        python-version: ['3.8', '3.9', '3.10', '3.11']
     
     steps:
     - uses: actions/checkout@v3
@@ -48,7 +48,7 @@ jobs:
 
         # Process data
         processor = Processor()
-        result = processor.process(data)
+        result = processor.process(data, entity_name='test_entity')
 
         # Test all output methods
         tables = result.to_dict()
@@ -75,7 +75,7 @@ jobs:
         cd docs && make html
     
     - name: Upload docs
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: matrix.python-version == '3.9'
       with:
         name: docs-html
@@ -108,7 +108,7 @@ jobs:
         python -m twine check dist/*
     
     - name: Upload package artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: dist
         path: dist/ 
