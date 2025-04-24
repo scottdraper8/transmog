@@ -1,0 +1,69 @@
+/* Custom CSS for Transmogrify documentation */
+
+/* Improve code block styling */
+div.highlight {
+    border-left: 3px solid #2980B9;
+    background-color: #f8f8f8;
+}
+
+/* Improve table styling */
+table.docutils {
+    border: 1px solid #e1e4e5;
+    border-collapse: collapse;
+    border-spacing: 0;
+    width: 100%;
+    margin-bottom: 24px;
+}
+
+table.docutils td,
+table.docutils th {
+    padding: 8px 16px;
+    border: 1px solid #e1e4e5;
+}
+
+table.docutils th {
+    background-color: #f3f6f6;
+    font-weight: bold;
+}
+
+/* Headings */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    color: #2c3e50;
+    font-weight: 700;
+}
+
+/* Add a bit more spacing to list items */
+ul li,
+ol li {
+    margin-bottom: 0.5em;
+}
+
+/* Improve note and warning boxes */
+.admonition.note {
+    background-color: #e7f2fa;
+    border-left-color: #2980B9;
+}
+
+.admonition.warning {
+    background-color: #ffedcc;
+    border-left-color: #f0b37e;
+}
+
+/* API documentation parameter styling */
+dl.field-list>dt {
+    font-weight: bold;
+    background-color: #f3f6f6;
+    padding: 3px 8px;
+    border-radius: 3px;
+}
+
+/* Improve mermaid diagram styling */
+.mermaid {
+    margin: 1.5em 0;
+    text-align: center;
+}

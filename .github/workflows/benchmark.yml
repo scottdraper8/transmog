@@ -1,0 +1,45 @@
+name: Performance Benchmarks
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9']
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -e ".[dev]"
+    
+    - name: Run pytest benchmarks
+      run: |
+        pytest tests/unit/test_output_format_benchmarks.py -v
+    
+    - name: Run standalone benchmarks
+      run: |
+        mkdir -p benchmark_results
+        python scripts/run_benchmarks.py --records 1000 --complexity medium --output benchmark_results/medium.json
+        python scripts/run_benchmarks.py --records 100 --complexity complex --output benchmark_results/complex.json
+    
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v3
+      with:
+        name: benchmark-results
+        path: benchmark_results/ 

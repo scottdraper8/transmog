@@ -1,0 +1,163 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "transmogrify"
+version = "0.1.0"
+description = "An ETL/ELT transformation library for converting nested JSON structures into flat, tabular formats"
+readme = "README.md"
+requires-python = ">=3.7"
+license = { text = "MIT" }
+authors = [{ name = "Scott Draper", email = "admin@scottdraper.io" }]
+keywords = [
+    "json",
+    "parquet",
+    "csv",
+    "pyarrow",
+    "normalization",
+    "flattening",
+    "etl",
+    "elt",
+    "data-pipeline",
+    "data-transformation",
+    "data-processing",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: Database Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Database :: Database Engines/Servers",
+    "Topic :: Data Processing",
+]
+dependencies = ["pyarrow>=7.0.0", "orjson>=3.8.0"]
+
+[project.optional-dependencies]
+# For users who want the absolute minimum dependencies
+minimal = []
+
+# Additional optional features
+test = ["pytest>=7.0.0", "pytest-cov>=3.0.0", "pytest-benchmark>=4.0.0"]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=3.0.0",
+    "pytest-benchmark>=4.0.0",
+    "mypy>=0.9.0",
+    "ruff>=0.3.0",
+    "pre-commit>=3.5.0",
+    "interrogate>=1.5.0",
+    "bandit>=1.7.5",
+    "safety>=2.3.5",
+    "pyproject-fmt>=1.5.1",
+    "memory-profiler>=0.60.0",
+]
+
+# Documentation dependencies
+docs = [
+    "sphinx>=7.2.0",
+    "sphinx-rtd-theme>=2.0.0",
+    "sphinx-design>=0.5.0",
+    "myst-parser>=2.0.0",
+    "sphinx-copybutton>=0.5.0",
+    "sphinx-autodoc-typehints>=1.24.0",
+    "sphinxcontrib-napoleon>=0.7",
+    "sphinx-autobuild>=2021.3.14",
+    "sphinxcontrib-mermaid>=0.8.1",
+    "sphinxcontrib-applehelp>=1.0.0",
+    "sphinxcontrib-htmlhelp>=2.0.0",
+    "sphinxcontrib-jsmath>=1.0.0",
+    "sphinxcontrib-qthelp>=1.0.0",
+    "sphinxcontrib-serializinghtml>=1.0.0",
+    "pyproject-parser>=0.7.0",
+    "linkify-it-py>=2.0.0",
+]
+
+# Data integration dependencies - Optional packages for working with other data formats (empty now)
+data = []
+
+[project.urls]
+"Homepage" = "https://github.com/scottdraper8/transmogrify"
+"Documentation" = "https://transmogrify.readthedocs.io"
+"Bug Tracker" = "https://github.com/scottdraper8/transmogrify/issues"
+
+[tool.ruff]
+target-version = "py37"
+line-length = 88
+select = ["E", "F", "I", "C4", "B", "N", "D", "UP", "S", "A"]
+ignore = ["D203", "D213"]
+
+[tool.ruff.per-file-ignores]
+"tests/*" = ["S101", "D"]
+
+# Ruff format configuration (similar to Black)
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+skip-magic-trailing-comma = false
+
+# Ruff isort configuration
+[tool.ruff.isort]
+known-first-party = ["transmogrify"]
+combine-as-imports = true
+section-order = [
+    "future",
+    "standard-library",
+    "third-party",
+    "first-party",
+    "local-folder",
+]
+
+[tool.ruff.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+python_version = "3.7"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+strict_optional = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[tool.interrogate]
+ignore-init-method = true
+ignore-init-module = true
+ignore-magic = true
+ignore-semiprivate = true
+ignore-private = true
+ignore-property-decorators = true
+ignore-module = true
+ignore-nested-functions = true
+fail-under = 80
+exclude = ["setup.py", "docs", "build"]
+verbose = 0
+quiet = false
+color = true
+
+[tool.bandit]
+exclude_dirs = ["tests", "examples"]
+skips = ["B101"]
+target-version = "py37"
+
+[tool.pytest.ini_options]
+markers = [
+    "benchmark: mark test as a performance benchmark",
+    "memory: mark test as a memory usage test",
+]

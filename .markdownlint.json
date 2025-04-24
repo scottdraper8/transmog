@@ -1,0 +1,29 @@
+{
+    "default": true,
+    "MD013": {
+        "line_length": 120
+    },
+    "MD033": {
+        "allowed_elements": [
+            "mermaid",
+            "br",
+            "details",
+            "summary"
+        ]
+    },
+    "MD048": {
+        "style": "backtick"
+    },
+    "MD024": {
+        "allow_different_nesting": true
+    },
+    "MD026": {
+        "punctuation": ".,;:!"
+    },
+    "MD029": {
+        "style": "ordered"
+    },
+    "MD046": {
+        "style": "consistent"
+    }
+}
