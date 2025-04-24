@@ -1,5 +1,5 @@
 """
-Error handling utilities for the Transmogrify package.
+Error handling utilities for the Transmog package.
 
 This module provides decorators and utility functions for consistent error handling,
 logging, and recovery strategies throughout the package.
@@ -19,7 +19,7 @@ from ..exceptions import (
     ConfigurationError,
     FileError,
     MissingDependencyError,
-    TransmogrifyError,
+    TransmogError,
     OutputError,
     ParsingError,
     ProcessingError,
@@ -27,7 +27,7 @@ from ..exceptions import (
 )
 
 # Set up logging
-logger = logging.getLogger("transmogrify")
+logger = logging.getLogger("transmog")
 
 # Type variables for function signatures
 T = TypeVar("T")
@@ -40,7 +40,7 @@ def setup_logging(
     log_format: Optional[str] = None,
 ) -> None:
     """
-    Set up logging for the Transmogrify package.
+    Set up logging for the Transmog package.
 
     Args:
         level: Logging level (default: INFO)
@@ -54,7 +54,7 @@ def setup_logging(
     formatter = logging.Formatter(log_format)
 
     # Configure root logger
-    root_logger = logging.getLogger("transmogrify")
+    root_logger = logging.getLogger("transmog")
     root_logger.setLevel(level)
 
     # Remove existing handlers
@@ -224,7 +224,7 @@ def error_context(
                 # Log the exception if requested
                 if log_exceptions:
                     logger.error(error_msg)
-                    if not isinstance(e, TransmogrifyError):
+                    if not isinstance(e, TransmogError):
                         logger.debug(
                             "".join(
                                 traceback.format_exception(type(e), e, e.__traceback__)

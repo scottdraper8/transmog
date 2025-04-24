@@ -1,13 +1,13 @@
 # In-Memory Processing
 
-Transmogrify offers robust in-memory processing capabilities for JSON data. This guide explains how to use the library to process JSON objects or arrays in memory efficiently.
+Transmog offers robust in-memory processing capabilities for JSON data. This guide explains how to use the library to process JSON objects or arrays in memory efficiently.
 
 ## Basic In-Memory Processing
 
 The simplest way to process JSON data in memory is using the `process` method:
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 processor = Processor()
 
@@ -35,13 +35,13 @@ result = processor.process(data_list, entity_name="customers")
 
 ## Memory Optimization Modes
 
-Transmogrify supports different processing modes to optimize memory usage and performance based on your specific needs.
+Transmog supports different processing modes to optimize memory usage and performance based on your specific needs.
 
 ### Available Processing Modes
 
 ```python
-from transmogrify import Processor
-from transmogrify.processor import ProcessingMode
+from transmog import Processor
+from transmog.processor import ProcessingMode
 
 # Create a processor with default settings
 processor = Processor()
@@ -79,7 +79,7 @@ result = processor._process_data(
 For large datasets that might not fit in memory, use the `process_chunked` method:
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 processor = Processor()
 
@@ -114,7 +114,7 @@ result = processor.process_chunked(
 
 ## Processing JSON Files
 
-Transmogrify can process JSON files directly, handling both single JSON objects and JSON arrays:
+Transmog can process JSON files directly, handling both single JSON objects and JSON arrays:
 
 ```python
 # Process a file containing a JSON object or array
@@ -144,7 +144,7 @@ result = processor.process_chunked(
 
 ## Unified Data Interface
 
-Transmogrify provides a unified interface for handling various data sources. The system automatically detects the input format:
+Transmog provides a unified interface for handling various data sources. The system automatically detects the input format:
 
 ```python
 # These all work seamlessly with the same API:

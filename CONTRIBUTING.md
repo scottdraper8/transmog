@@ -1,6 +1,10 @@
-# Contributing to Transmogrify
+# Contributing to Transmog
 
-Thank you for your interest in contributing to Transmogrify! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to Transmog! This document provides guidelines and instructions for contributing.
+
+## Code of Conduct
+
+Please note that this project is released with a [Contributor Code of Conduct](CODE_OF_CONDUCT.md). By participating in this project, you agree to abide by its terms.
 
 ## Getting Started
 
@@ -8,6 +12,33 @@ Thank you for your interest in contributing to Transmogrify! This document provi
 2. **Clone your fork** to your local machine
 3. **Create a feature branch**: `git checkout -b feature/your-feature-name`
 4. **Install development dependencies**: `pip install -e ".[dev]"`
+
+## Development Environment
+
+We recommend using a virtual environment for development:
+
+```bash
+python -m venv .env
+source .env/bin/activate  # On Windows: .env\Scripts\activate
+pip install -e ".[dev]"
+```
+
+## Project Structure
+
+- `src/transmog/` - Main package code
+- `tests/` - Test suite
+- `docs/` - Documentation
+- `examples/` - Example scripts
+
+## Core Development Principles
+
+When contributing to Transmog, please keep these principles in mind:
+
+1. **Memory efficiency**: Transmog works with large datasets, so memory usage is a key concern
+2. **Performance**: Code should be optimized for performance where possible
+3. **Clean API**: Public APIs should be intuitive and well-documented
+4. **Error handling**: Robust error handling with informative messages
+5. **Testing**: All code should be well-tested
 
 ## Development Workflow
 
@@ -37,7 +68,7 @@ Thank you for your interest in contributing to Transmogrify! This document provi
 
 When implementing features, please consider:
 
-1. **Memory efficiency**: Transmogrify works with large datasets
+1. **Memory efficiency**: Transmog works with large datasets
 2. **Error handling**: Provide meaningful error messages and recovery options
 3. **Backward compatibility**: Avoid breaking existing APIs if possible
 4. **Documentation**: Update relevant documentation with examples
@@ -139,4 +170,12 @@ python examples/basic_flattening.py
 python examples/large_dataset_processing.py
 ```
 
-These examples are meant to be educational and provide real-world usage patterns. 
+These examples are meant to be educational and provide real-world usage patterns.
+
+## Versioning
+
+We follow [Semantic Versioning](https://semver.org/). The version is specified in `pyproject.toml`.
+
+## License
+
+By contributing to Transmog, you agree that your contributions will be licensed under the project's [MIT License](LICENSE). 

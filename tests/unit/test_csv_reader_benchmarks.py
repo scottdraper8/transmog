@@ -12,7 +12,7 @@ import pytest
 import time
 from unittest import mock
 
-from src.transmogrify.io.csv_reader import (
+from src.transmog.io.csv_reader import (
     read_csv_file,
     read_csv_stream,
     CSVReader,
@@ -68,7 +68,7 @@ class TestCsvReaderBenchmarks:
                 start_time = time.time()
                 # Force using the built-in implementation by setting PYARROW_AVAILABLE to False
                 with mock.patch(
-                    "src.transmogrify.io.csv_reader.PYARROW_AVAILABLE", False
+                    "src.transmog.io.csv_reader.PYARROW_AVAILABLE", False
                 ):
                     result_builtin = read_csv_file(csv_path)
                 builtin_time = time.time() - start_time
@@ -216,7 +216,7 @@ class TestCsvReaderBenchmarks:
             if PYARROW_AVAILABLE:
                 start_time = time.time()
                 with mock.patch(
-                    "src.transmogrify.io.csv_reader.PYARROW_AVAILABLE", True
+                    "src.transmog.io.csv_reader.PYARROW_AVAILABLE", True
                 ):
                     result_pa = read_csv_file(csv_path)
                 pa_time = time.time() - start_time
@@ -229,7 +229,7 @@ class TestCsvReaderBenchmarks:
 
             # Test built-in
             start_time = time.time()
-            with mock.patch("src.transmogrify.io.csv_reader.PYARROW_AVAILABLE", False):
+            with mock.patch("src.transmog.io.csv_reader.PYARROW_AVAILABLE", False):
                 result_builtin = read_csv_file(csv_path)
             builtin_time = time.time() - start_time
 

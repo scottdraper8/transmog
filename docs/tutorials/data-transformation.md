@@ -1,13 +1,13 @@
 # Data Transformation Tutorial
 
-This tutorial demonstrates how to use Transmogrify to transform data from one format to another, apply transformations, and handle various data scenarios.
+This tutorial demonstrates how to use Transmog to transform data from one format to another, apply transformations, and handle various data scenarios.
 
 ## Basic Transformation
 
 Let's start with a simple example of transforming a CSV file to JSON:
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 # Initialize the processor
 processor = Processor()
@@ -21,10 +21,10 @@ result.write_json("output.json")
 
 ## Data Transformation with Custom Functions
 
-Transmogrify allows you to apply custom transformations during processing:
+Transmog allows you to apply custom transformations during processing:
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 def transform_data(record):
     # Convert names to uppercase
@@ -52,10 +52,10 @@ result.write_json("transformed_sales.json")
 
 ## Converting Between Multiple Formats
 
-You can convert between different formats with Transmogrify:
+You can convert between different formats with Transmog:
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 processor = Processor()
 
@@ -69,10 +69,10 @@ result.write_parquet("output.parquet")
 
 ## Working with Relations and Nested Data
 
-Transmogrify can handle nested data structures:
+Transmog can handle nested data structures:
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 processor = Processor()
 
@@ -95,7 +95,7 @@ result.write_all_csv("output_dir")
 Example of data cleaning and validation:
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 def validate_and_clean(record):
     # Data validation
@@ -125,7 +125,7 @@ result.write_csv("clean_contacts.csv")
 Here's how to handle missing or null values:
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 # Define values that should be treated as null
 null_values = ["", "NULL", "NA", "N/A", "-"]
@@ -161,10 +161,10 @@ result_filled.write_csv("data_filled.csv")
 
 ## Combining Multiple Data Sources
 
-Transmogrify can process multiple files and combine them:
+Transmog can process multiple files and combine them:
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 processor = Processor()
 
@@ -205,7 +205,7 @@ combined_result.write_csv("combined_data.csv")
 For large files, use streaming processing:
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 # Process a large CSV file with chunks
 processor = Processor()
@@ -220,10 +220,10 @@ result.write_parquet("large_dataset.parquet")
 
 ## Advanced Type Handling
 
-Control how Transmogrify handles data types:
+Control how Transmog handles data types:
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 processor = Processor()
 
@@ -267,7 +267,7 @@ result_with_types.write_json("typed_data.json")
 
 ## Conclusion
 
-This tutorial has demonstrated various data transformation capabilities in Transmogrify, including format conversion, data cleaning, validation, and handling different data scenarios.
+This tutorial has demonstrated various data transformation capabilities in Transmog, including format conversion, data cleaning, validation, and handling different data scenarios.
 
 For more information, refer to:
 

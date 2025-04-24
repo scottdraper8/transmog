@@ -1,13 +1,13 @@
 # Basic Examples
 
-This section contains examples of common usage patterns for Transmogrify.
+This section contains examples of common usage patterns for Transmog.
 
 ## Simple Flattening
 
 The most basic use case is flattening a nested structure:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 # Sample nested data
 data = {
@@ -234,8 +234,8 @@ result = processor.process_chunked(
 You can configure how errors are handled:
 
 ```python
-import transmogrify as tm
-from transmogrify.recovery import SkipAndLogRecovery
+import transmog as tm
+from transmog.recovery import SkipAndLogRecovery
 
 # Create a processor with a recovery strategy
 processor = tm.Processor(

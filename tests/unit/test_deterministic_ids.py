@@ -5,12 +5,12 @@ Tests for deterministic ID generation functionality.
 import uuid
 import pytest
 
-from src.transmogrify import Processor
-from src.transmogrify.core.metadata import (
+from src.transmog import Processor
+from src.transmog.core.metadata import (
     generate_extract_id,
     generate_deterministic_id,
     generate_composite_id,
-    TRANSMOGRIFY_NAMESPACE,
+    TRANSMOG_NAMESPACE,
 )
 
 
@@ -36,7 +36,7 @@ class TestDeterministicIds:
         assert uuid_obj.version == 5
 
         # Verify it matches direct UUID5 generation
-        expected = str(uuid.uuid5(TRANSMOGRIFY_NAMESPACE, value))
+        expected = str(uuid.uuid5(TRANSMOG_NAMESPACE, value))
         assert id1 == expected
 
     def test_different_values_produce_different_ids(self):

@@ -1,7 +1,7 @@
 """
-Example demonstrating parallel processing with Transmogrify.
+Example demonstrating parallel processing with Transmog.
 
-This example shows how to use concurrent.futures with Transmogrify
+This example shows how to use concurrent.futures with Transmog
 to process data in parallel for better performance.
 """
 
@@ -12,10 +12,10 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List
 
-# Add parent directory to path to import transmogrify without installing
+# Add parent directory to path to import transmog without installing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.transmogrify import Processor, ProcessingResult
+from src.transmog import Processor, ProcessingResult
 
 
 def generate_sample_data(count: int = 100) -> List[Dict]:

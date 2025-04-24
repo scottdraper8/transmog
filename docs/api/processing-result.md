@@ -1,11 +1,11 @@
 # ProcessingResult API Reference
 
-The `ProcessingResult` class encapsulates the result of processing data with Transmogrify. It provides access to the processed data in various formats.
+The `ProcessingResult` class encapsulates the result of processing data with Transmog. It provides access to the processed data in various formats.
 
 ## Import
 
 ```python
-from transmogrify import ProcessingResult
+from transmog import ProcessingResult
 ```
 
 ## Properties and Methods
@@ -91,7 +91,7 @@ def combine_results(
 ### Accessing Tables
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 # Process some data
 processor = tm.Processor()

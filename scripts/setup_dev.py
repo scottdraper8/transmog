@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Setup script for Transmogrify development environment.
+Setup script for Transmog development environment.
 
 This script:
 1. Creates a virtual environment if it doesn't exist
@@ -28,7 +28,7 @@ from pathlib import Path
 
 MIN_PYTHON_VERSION = (3, 7)
 VENV_DIR = ".env"
-PROJECT_NAME = "transmogrify"
+PROJECT_NAME = "transmog"
 
 
 def check_python_version():

@@ -1,13 +1,13 @@
 # CSV Processing
 
-Transmogrify provides functionality for processing CSV files, supporting various configurations for reading and writing CSV data.
+Transmog provides functionality for processing CSV files, supporting various configurations for reading and writing CSV data.
 
 ## Reading CSV Files
 
 The primary method for processing CSV files is `process_csv`:
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 processor = Processor()
 
@@ -44,7 +44,7 @@ result = processor.process_csv(
 
 ### Type Inference
 
-When `infer_types` is set to `True`, Transmogrify attempts to convert string values to appropriate types:
+When `infer_types` is set to `True`, Transmog attempts to convert string values to appropriate types:
 
 - Numeric strings (e.g., "123", "45.67") → integers or floats
 - Boolean strings (e.g., "true", "false", "1", "0") → booleans
@@ -102,7 +102,7 @@ result = processor.process_csv(
 
 ### Edge Cases
 
-Transmogrify handles several edge cases in CSV processing:
+Transmog handles several edge cases in CSV processing:
 
 - **Empty Files**: Returns an empty result with no error
 - **Files without Headers**: Use `has_header=False` and optionally provide headers with a separate parameter
@@ -111,7 +111,7 @@ Transmogrify handles several edge cases in CSV processing:
 
 ## Writing CSV Files
 
-Transmogrify provides methods for writing processed data to CSV format:
+Transmog provides methods for writing processed data to CSV format:
 
 ### Writing to Files
 
@@ -185,7 +185,7 @@ When writing empty tables:
 
 ### PyArrow Integration
 
-When PyArrow is available, Transmogrify uses it for CSV processing, providing:
+When PyArrow is available, Transmog uses it for CSV processing, providing:
 
 - Faster processing of large files
 - Parallel processing capabilities
@@ -226,7 +226,7 @@ For detailed API information and examples:
 
 ## CSV Processing Options
 
-Transmogrify provides several options to customize CSV processing:
+Transmog provides several options to customize CSV processing:
 
 ```python
 result = processor.process_csv(
@@ -260,7 +260,7 @@ result = processor.process_csv(
 
 ## Memory-Optimized CSV Processing
 
-For large CSV files, Transmogrify offers memory-optimized processing:
+For large CSV files, Transmog offers memory-optimized processing:
 
 ```python
 # Create a processor optimized for memory usage
@@ -277,7 +277,7 @@ result = processor.process_csv(
 
 ## Processing CSV with Nested Data
 
-Transmogrify can handle CSV files containing nested data in JSON format:
+Transmog can handle CSV files containing nested data in JSON format:
 
 ```python
 # Example CSV with a JSON column
@@ -330,7 +330,7 @@ result = processor.process_csv(
 
 ## Handling CSV Errors
 
-Transmogrify provides options for handling CSV parsing errors:
+Transmog provides options for handling CSV parsing errors:
 
 ```python
 result = processor.process_csv(
@@ -376,7 +376,7 @@ for file_path in ["data1.csv", "data2.csv", "data3.csv"]:
     results.append(result)
 
 # Combine the results
-from transmogrify.processing_result import ProcessingResult
+from transmog.processing_result import ProcessingResult
 combined_result = ProcessingResult.combine(results)
 
 # Access the combined data

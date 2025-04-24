@@ -1,16 +1,16 @@
 # Installation Guide
 
-This guide covers the different ways to install Transmogrify.
+This guide covers the different ways to install Transmog.
 
 ## Basic Installation
 
 For most users, the standard installation is recommended:
 
 ```bash
-pip install transmogrify
+pip install transmog
 ```
 
-This installs Transmogrify with its required dependencies.
+This installs Transmog with its required dependencies.
 
 ## Installation Options
 
@@ -19,17 +19,17 @@ This installs Transmogrify with its required dependencies.
 For environments with strict dependency requirements:
 
 ```bash
-pip install transmogrify[minimal]
+pip install transmog[minimal]
 ```
 
-This installs Transmogrify with minimal dependencies.
+This installs Transmog with minimal dependencies.
 
 ### Development Installation
 
 For contributors and developers:
 
 ```bash
-pip install transmogrify[dev]
+pip install transmog[dev]
 ```
 
 This includes additional tools for testing, development, and linting.
@@ -39,7 +39,7 @@ This includes additional tools for testing, development, and linting.
 To install all optional dependencies:
 
 ```bash
-pip install transmogrify[all]
+pip install transmog[all]
 ```
 
 ## Installing from Source
@@ -47,14 +47,14 @@ pip install transmogrify[all]
 To install the latest development version:
 
 ```bash
-git clone https://github.com/scottdraper8/transmogrify.git
-cd transmogrify
+git clone https://github.com/scottdraper8/transmog.git
+cd transmog
 pip install -e .
 ```
 
 ## Optional Dependencies
 
-Transmogrify can use these optional packages:
+Transmog can use these optional packages:
 
 - **pyarrow**: For Parquet file support
 - **orjson**: For faster JSON processing
@@ -75,10 +75,10 @@ pip install pyarrow
 To verify your installation:
 
 ```python
-import transmogrify
+import transmog
 
 # Check version
-print(transmogrify.__version__)
+print(transmog.__version__)
 ```
 
 ## Troubleshooting
@@ -101,8 +101,8 @@ If you encounter build errors, you may need compiler tools:
 If you experience dependency conflicts:
 
 ```bash
-pip install --upgrade transmogrify --no-deps
-pip install -r <(pip freeze | grep -v transmogrify)
+pip install --upgrade transmog --no-deps
+pip install -r <(pip freeze | grep -v transmog)
 ```
 
 ### Memory Errors During Installation
@@ -110,7 +110,7 @@ pip install -r <(pip freeze | grep -v transmogrify)
 For memory-limited environments:
 
 ```bash
-pip install --no-cache-dir transmogrify
+pip install --no-cache-dir transmog
 ```
 
 ## Next Steps

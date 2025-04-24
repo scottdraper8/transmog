@@ -1,13 +1,13 @@
 # Flattening Nested Data
 
-Transmogrify's core functionality is flattening nested data structures into tabular formats.
+Transmog's core functionality is flattening nested data structures into tabular formats.
 
 ## Basic Flattening
 
-By default, Transmogrify flattens nested structures by concatenating the keys at each level:
+By default, Transmog flattens nested structures by concatenating the keys at each level:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 data = {
     "user": {
@@ -40,7 +40,7 @@ Output:
 
 ## Custom Separators
 
-By default, Transmogrify uses an underscore (`_`) as the separator between nested keys. You can customize this with the `separator` parameter:
+By default, Transmog uses an underscore (`_`) as the separator between nested keys. You can customize this with the `separator` parameter:
 
 ```python
 # Use a forward slash as the separator
@@ -136,7 +136,7 @@ Orders table: [
 
 ## Flattening Options
 
-Transmogrify provides several options to control the flattening process:
+Transmog provides several options to control the flattening process:
 
 ### Value Handling
 
@@ -175,10 +175,10 @@ processor = tm.Processor(
 
 ## Processing Modes
 
-Transmogrify offers different processing modes for balancing memory usage and performance:
+Transmog offers different processing modes for balancing memory usage and performance:
 
 ```python
-from transmogrify.processor import ProcessingMode
+from transmog.processor import ProcessingMode
 
 # Standard mode (default)
 processor = tm.Processor()
@@ -189,7 +189,7 @@ processor = tm.Processor(
 )
 
 # Using the ProcessingMode enum
-from transmogrify.processor import ProcessingMode
+from transmog.processor import ProcessingMode
 
 result = processor._process_data(
     data=[record1, record2, record3],

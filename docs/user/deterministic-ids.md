@@ -1,6 +1,6 @@
 # Deterministic ID Generation
 
-Transmogrify generates an ID for every record during processing. By default, these IDs are random UUIDs, but in many scenarios, you may want to ensure that the same logical record always gets the same ID, even when processed multiple times. This is where deterministic ID generation comes in.
+Transmog generates an ID for every record during processing. By default, these IDs are random UUIDs, but in many scenarios, you may want to ensure that the same logical record always gets the same ID, even when processed multiple times. This is where deterministic ID generation comes in.
 
 ## Why Use Deterministic IDs?
 
@@ -26,7 +26,7 @@ Deterministic IDs are especially valuable in these scenarios:
 
 ## ID Generation Strategies
 
-Transmogrify supports three approaches for ID generation:
+Transmog supports three approaches for ID generation:
 
 ### 1. Random UUIDs (Default)
 
@@ -96,7 +96,7 @@ Paths are matched based on the nested structure of your data:
 ### Basic Example: Root-level Deterministic IDs
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 # Configure for deterministic IDs at the root level
 processor = Processor(
@@ -115,7 +115,7 @@ assert result.to_dict()["main"][0]["__extract_id"] == result2.to_dict()["main"][
 ### Advanced Example: Nested Structure with Different ID Fields
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 # Configure for deterministic IDs at multiple levels
 processor = Processor(
@@ -163,7 +163,7 @@ products_table = tables.get("store_products", [])
 ### Example: Custom ID Strategy
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 # Define a custom ID generation strategy
 def custom_id_strategy(record):
@@ -215,7 +215,7 @@ When selecting fields for deterministic IDs:
 
 If a record doesn't have the specified field for deterministic ID generation:
 
-1. Transmogrify will fall back to generating a random UUID
+1. Transmog will fall back to generating a random UUID
 2. You can implement fallback logic in a custom ID generation function
 3. Consider data validation or preprocessing to ensure ID fields are always present
 

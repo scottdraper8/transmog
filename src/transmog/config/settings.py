@@ -1,8 +1,8 @@
 """
-Configuration settings for Transmogrify.
+Configuration settings for Transmog.
 
 This module provides default settings, configuration profiles, and utilities
-for customizing Transmogrify's behavior.
+for customizing Transmog's behavior.
 """
 
 import os
@@ -13,12 +13,12 @@ from typing import Any, Dict, List, Optional, Union, Set, Callable
 from ..exceptions import ConfigurationError
 
 # Create logger for settings module
-logger = logging.getLogger("transmogrify.settings")
+logger = logging.getLogger("transmog.settings")
 
 
-class TransmogrifySettings:
+class TransmogSettings:
     """
-    Settings manager for Transmogrify.
+    Settings manager for Transmog.
 
     Provides access to configuration settings with support for defaults,
     environment variables, and configuration profiles.
@@ -161,7 +161,7 @@ class TransmogrifySettings:
     }
 
     # Environment variable prefix
-    ENV_PREFIX = "TRANSMOGRIFY_"
+    ENV_PREFIX = "TRANSMOG_"
 
     def __init__(
         self,
@@ -445,7 +445,7 @@ class TransmogrifySettings:
 
 # Extension point registration system
 class ExtensionRegistry:
-    """Registry for Transmogrify extensions and custom handlers."""
+    """Registry for Transmog extensions and custom handlers."""
 
     def __init__(self):
         """Initialize empty registry."""
@@ -491,7 +491,7 @@ class ExtensionRegistry:
 
 
 # Singleton instances
-settings = TransmogrifySettings()
+settings = TransmogSettings()
 extensions = ExtensionRegistry()
 
 
@@ -506,7 +506,7 @@ def load_profile(profile_name: str):
         Updated settings object
     """
     global settings
-    settings = TransmogrifySettings(profile=profile_name)
+    settings = TransmogSettings(profile=profile_name)
     print(f"Loaded profile {profile_name}: {settings.as_dict()}")
     return settings
 
@@ -524,7 +524,7 @@ def load_config(config_file: str):
     global settings
 
     # Create a new settings object to load the file
-    temp_settings = TransmogrifySettings()
+    temp_settings = TransmogSettings()
     temp_settings._load_from_file(config_file)
 
     # Update the global settings with the file settings

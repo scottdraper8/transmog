@@ -1,75 +1,70 @@
-# Transmogrify Roadmap
+# Transmog Roadmap
 
-This roadmap outlines the planned development trajectory for Transmogrify.
+This roadmap outlines the planned development trajectory for Transmog.
 
-## Current State (0.1.0)
+## Current Features
 
-Transmogrify currently provides the following capabilities:
+Transmog currently provides the following capabilities:
 
-- Core JSON flattening and normalization
-- Nested array extraction with parent-child relationships
-- Memory-efficient processing for large datasets
-- Multiple output formats (JSON, Parquet, CSV)
-- High-performance tiered I/O implementations
-- Advanced configuration system
+- JSON flattening and normalization
+- Nested array extraction to separate tables
+- Multiple output formats (JSON, CSV, Parquet)
+- Error recovery mechanisms
+- Metadata generation
+- Deterministic ID generation
+- Memory-optimized processing for large datasets
 
-## Upcoming in 0.2.0
+## Short-term Goals (0-3 months)
 
-### Enhanced Input/Output Capabilities
+1. **Performance Optimization**
+   - Improve memory efficiency for very large datasets
+   - Implement lazy loading for large input files
+   - Optimize array extraction for high-cardinality data
 
-- Support additional input formats:
-  - CSV files with nested JSON columns
-  - Parquet files with nested structures
-- Add more output formats:
-  - Avro format support
-  - ORC format support
-- Improve existing format writers:
-  - Add chunked writing for large datasets
-  - Add table schema inference and validation
-- Add direct DataFrame output:
-  - Zero-copy output to PyArrow Tables
+2. **Extended Format Support**
+   - Add support for Apache Arrow IPC format
+   - Implement direct database export connectors
+   - Support for hierarchical Parquet datasets
 
-### Performance Improvements
+3. **Enhanced Schema Features**
+   - Schema inference and validation
+   - Type casting and normalization
+   - Support for complex validation rules
 
-- Further optimize memory usage for very large datasets
-- Add streaming processing mode (process while reading)
-- Improve path handling for deep nested structures
-- Provide examples for external parallelization approaches
+## Mid-term Goals (3-6 months)
 
-### Developer Experience
+1. **Advanced Transformation Features**
+   - Custom value transformation hooks
+   - Path-based transformation rules
+   - Conditional processing logic
 
-- Add command-line interface for standalone usage
-- Improve error messages and diagnostics
-- Add more comprehensive validation options
-- Implement schema inference and validation
+2. **Streaming Capabilities**
+   - Stream processing for infinite data sources
+   - Checkpoint support for resumable processing
+   - Back-pressure handling for data pipelines
 
-## Long-term Vision (0.3.0 and beyond)
+3. **Integration Improvements**
+   - Native integrations with popular data processing frameworks
+   - Cloud storage support (S3, GCS, Azure)
+   - Container-friendly configuration
 
-### Advanced Transformation Features
+## Long-term Vision (6+ months)
 
-- Bidirectional transformation (rebuild nested structure from flattened tables)
-- Schema-aware transformation with validation
-- Custom transformation pipelines
-- Advanced data type handling
-- Integration with data validation frameworks
-- Record grouping and windowing operations
+1. **Distributed Processing**
+   - Support for distributed workloads
+   - Integration with processing frameworks (Spark, Dask)
+   - Sharding and partitioning strategies
 
-### Ecosystem Integration
+2. **Ecosystem Development**
+   - Extension framework for custom processors
+   - Plugin system for format handlers
+   - Community-contributed transformers
 
-- Integration with popular data processing frameworks:
-  - Enhance PyArrow integration with native APIs
-- Transformation pipeline connectors
-- API for custom format writers
-- Efficient transformation hooks for streaming data
+3. **Enterprise Features**
+   - Data lineage tracking
+   - Compliance and audit capabilities
+   - Enhanced security features
 
-### Documentation and Examples
+## Feature Requests and Contributions
 
-- Comprehensive documentation with practical examples
-- Benchmark suite for performance monitoring
-- Interactive examples and tutorials
-- Examples of integration with parallelization frameworks
-- Usage patterns for large-scale data processing
-
-## Contributing
-
-We welcome contributions to help realize this roadmap. If you're interested in working on any of these features, please see our [CONTRIBUTING.md](CONTRIBUTING.md) for guidance on how to get started. 
+Feature requests and contributions are welcome! Please feel free to open issues or submit pull requests on GitHub to help shape the future of Transmog. 

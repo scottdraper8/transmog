@@ -1,5 +1,5 @@
 """
-Custom exceptions for the Transmogrify package.
+Custom exceptions for the Transmog package.
 
 This module defines specific exception types to improve error handling
 and provide more informative error messages for common failure scenarios.
@@ -8,16 +8,21 @@ and provide more informative error messages for common failure scenarios.
 from typing import Any, Dict, List, Optional, Union
 
 
-class TransmogrifyError(Exception):
-    """Base exception class for all Transmogrify errors."""
+class TransmogError(Exception):
+    """Base exception class for all Transmog errors."""
 
     def __init__(self, message: str):
         self.message = message
         super().__init__(self.message)
 
 
-class ProcessingError(TransmogrifyError):
-    """Exception raised when there's an error during data processing."""
+class ProcessingError(TransmogError):
+    """Exception raised when an error occurs during data processing.
+
+    This exception is typically raised when there's an issue with the data
+    processing pipeline, such as encountering malformed data or when a
+    transformation fails.
+    """
 
     def __init__(
         self,
@@ -34,8 +39,13 @@ class ProcessingError(TransmogrifyError):
         super().__init__(full_message)
 
 
-class ValidationError(TransmogrifyError):
-    """Exception raised when input data validation fails."""
+class ValidationError(TransmogError):
+    """Exception raised when data validation fails.
+
+    This exception is raised when input data fails validation checks,
+    such as required fields missing, invalid data types, or values
+    outside acceptable ranges.
+    """
 
     def __init__(self, message: str, errors: Optional[Dict[str, str]] = None):
         self.errors = errors or {}
@@ -47,8 +57,13 @@ class ValidationError(TransmogrifyError):
         super().__init__(f"Validation error: {message}{error_details}")
 
 
-class ParsingError(TransmogrifyError):
-    """Exception raised when JSON parsing fails."""
+class ParsingError(TransmogError):
+    """Exception raised when parsing input data fails.
+
+    This exception is raised when there's an issue parsing input data,
+    such as invalid JSON, CSV formatting errors, or other syntax issues
+    with the input data.
+    """
 
     def __init__(
         self, message: str, source: Optional[str] = None, line: Optional[int] = None
@@ -63,8 +78,13 @@ class ParsingError(TransmogrifyError):
         super().__init__(f"JSON parsing error{location_info}: {message}")
 
 
-class FileError(TransmogrifyError):
-    """Exception raised for file-related errors."""
+class FileError(TransmogError):
+    """Exception raised when file operations fail.
+
+    This exception is raised for file-related issues, such as when a file
+    cannot be read, written, or when there are permission or access problems.
+    It provides context about which file operation failed and where.
+    """
 
     def __init__(
         self,
@@ -79,8 +99,12 @@ class FileError(TransmogrifyError):
         super().__init__(f"File error{op_info}{path_info}: {message}")
 
 
-class CircularReferenceError(TransmogrifyError):
-    """Exception raised when a circular reference is detected."""
+class CircularReferenceError(TransmogError):
+    """Exception raised when a circular reference is detected.
+
+    This exception is raised when processing detects a circular reference
+    in the data structure that would cause infinite recursion.
+    """
 
     def __init__(self, message: str, path: Optional[List[str]] = None):
         self.path = path
@@ -90,18 +114,20 @@ class CircularReferenceError(TransmogrifyError):
         super().__init__(f"Circular reference detected: {message}.{path_info}")
 
 
-class MissingDependencyError(TransmogrifyError):
+class MissingDependencyError(TransmogError):
     """Exception raised when an optional dependency is missing."""
 
     def __init__(self, message: str, package: str, feature: Optional[str] = None):
         self.package = package
         self.feature = feature
         feature_info = f" for {feature}" if feature else ""
-        install_info = f"\nPlease install {package} with: pip install transmogrify[{feature or 'all'}]"
+        install_info = (
+            f"\nPlease install {package} with: pip install transmog[{feature or 'all'}]"
+        )
         super().__init__(f"Missing dependency{feature_info}: {message}.{install_info}")
 
 
-class ConfigurationError(TransmogrifyError):
+class ConfigurationError(TransmogError):
     """Exception raised when there's a configuration error."""
 
     def __init__(
@@ -118,7 +144,7 @@ class ConfigurationError(TransmogrifyError):
         super().__init__(f"Configuration error{param_info}: {message}")
 
 
-class OutputError(TransmogrifyError):
+class OutputError(TransmogError):
     """Exception raised when there's an error writing output."""
 
     def __init__(

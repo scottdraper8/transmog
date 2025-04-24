@@ -1,6 +1,6 @@
 # Streaming Data Processing
 
-Transmogrify provides powerful streaming capabilities for processing large datasets efficiently with minimal memory usage. This guide explains how to use Transmogrify's streaming features to process data from various sources.
+Transmog provides powerful streaming capabilities for processing large datasets efficiently with minimal memory usage. This guide explains how to use Transmog's streaming features to process data from various sources.
 
 ## Overview
 
@@ -13,10 +13,10 @@ Streaming data processing allows you to:
 
 ## Processing Modes
 
-Transmogrify supports different processing modes that determine the memory/performance tradeoff:
+Transmog supports different processing modes that determine the memory/performance tradeoff:
 
 ```python
-from transmogrify import Processor, ProcessingMode
+from transmog import Processor, ProcessingMode
 
 # Standard mode (default) - balances memory and performance
 processor = Processor()
@@ -40,7 +40,7 @@ result = processor._process_data(
 [JSONL (JSON Lines)](https://jsonlines.org/) files contain one JSON object per line, making them ideal for streaming:
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 processor = Processor()
 result = processor.process_file("data.jsonl", entity_name="records")
@@ -126,7 +126,7 @@ To optimize memory usage during streaming:
 
 ## Input Format Detection
 
-Transmogrify can automatically detect input formats:
+Transmog can automatically detect input formats:
 
 ```python
 # Automatic format detection
@@ -143,7 +143,7 @@ result = processor.process_chunked(
 
 ## Unified Data Iterator Interface
 
-Under the hood, Transmogrify uses a unified data iterator interface that handles different data sources consistently:
+Under the hood, Transmog uses a unified data iterator interface that handles different data sources consistently:
 
 ```python
 # Get an iterator for any data source
@@ -169,7 +169,7 @@ When processing data in chunks, results are automatically combined:
 result = processor.process_chunked(large_data, entity_name="combined")
 
 # You can also manually combine results
-from transmogrify import ProcessingResult
+from transmog import ProcessingResult
 
 result1 = processor.process_batch(batch1, entity_name="entity")
 result2 = processor.process_batch(batch2, entity_name="entity")
@@ -189,7 +189,7 @@ combined = ProcessingResult.combine_results([result1, result2], entity_name="ent
 ### Process a Large JSONL File
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 processor = Processor(optimize_for_memory=True)
 result = processor.process_file(
@@ -226,7 +226,7 @@ result = processor.process_chunked(
 
 ```python
 import json
-from transmogrify import Processor
+from transmog import Processor
 
 # Create a processor with memory optimization
 processor = Processor(optimize_for_memory=True)

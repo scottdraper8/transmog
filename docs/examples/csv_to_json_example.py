@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Example script demonstrating how to convert CSV to JSON with transformations using Transmogrify.
+Example script demonstrating how to convert CSV to JSON with transformations using Transmog.
 """
 
-from transmogrify import Processor
+from transmog import Processor
 
 
 def transform_customer_data(record):

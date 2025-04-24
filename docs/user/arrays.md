@@ -1,10 +1,10 @@
 # Working with Arrays
 
-This guide explains how to handle arrays effectively when processing nested JSON with Transmogrify.
+This guide explains how to handle arrays effectively when processing nested JSON with Transmog.
 
 ## Array Handling Options
 
-Transmogrify offers several strategies for handling arrays in your nested data:
+Transmog offers several strategies for handling arrays in your nested data:
 
 1. **Default (flatten)**: Flattens arrays into indexed paths
 2. **Extract**: Extracts arrays into separate tables
@@ -12,10 +12,10 @@ Transmogrify offers several strategies for handling arrays in your nested data:
 
 ## Flattening Arrays (Default)
 
-By default, Transmogrify flattens arrays by including the array index in the path:
+By default, Transmog flattens arrays by including the array index in the path:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 # Sample data with arrays
 data = {
@@ -137,7 +137,7 @@ Array extraction is especially useful when:
 
 ### Metadata in Extracted Arrays
 
-When arrays are extracted, Transmogrify adds metadata fields to help maintain relationships:
+When arrays are extracted, Transmog adds metadata fields to help maintain relationships:
 
 - `_parent_key`: The path to the parent object containing the array
 - `_array_index`: The original position in the array

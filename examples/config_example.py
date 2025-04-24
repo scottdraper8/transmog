@@ -1,8 +1,8 @@
 """
-Example demonstrating Transmogrify configuration functionality.
+Example demonstrating Transmog configuration functionality.
 
 This example shows how to use profiles, configuration files, and
-direct setting configuration with Transmogrify.
+direct setting configuration with Transmog.
 """
 
 import json
@@ -10,12 +10,12 @@ import os
 import sys
 from pprint import pprint
 
-# Add parent directory to path to import transmogrify without installing
+# Add parent directory to path to import transmog without installing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import from src package
-from src.transmogrify import Processor, ProcessingResult
-from src.transmogrify.config import settings, load_profile, configure, extensions
+from src.transmog import Processor, ProcessingResult
+from src.transmog.config import settings, load_profile, configure, extensions
 
 
 def create_sample_config_file():
@@ -33,7 +33,7 @@ def create_sample_config_file():
     os.makedirs(output_dir, exist_ok=True)
 
     # Write config to file
-    config_path = os.path.join(output_dir, "transmogrify_config.json")
+    config_path = os.path.join(output_dir, "transmog_config.json")
     with open(config_path, "w") as f:
         json.dump(config, f, indent=2)
 
@@ -118,7 +118,7 @@ def main():
     # Example 3: Load from config file
     print("\n=== Example 3: Config File ===")
     config_file = create_sample_config_file()
-    from src.transmogrify.config import load_config
+    from src.transmog.config import load_config
 
     load_config(config_file)
     processor = Processor()  # Will use settings from config file
@@ -147,9 +147,9 @@ def main():
     print(
         "To use environment variables, you would set them before running your script:"
     )
-    print("export TRANSMOGRIFY_SEPARATOR='::'")
-    print("export TRANSMOGRIFY_BATCH_SIZE=250")
-    print("export TRANSMOGRIFY_OPTIMIZE_FOR_MEMORY=true")
+    print("export TRANSMOG_SEPARATOR='::'")
+    print("export TRANSMOG_BATCH_SIZE=250")
+    print("export TRANSMOG_OPTIMIZE_FOR_MEMORY=true")
 
     # Example 6: Custom extensions
     print("\n=== Example 6: Custom Extensions ===")

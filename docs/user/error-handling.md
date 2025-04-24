@@ -1,10 +1,10 @@
 # Error Handling and Recovery
 
-This guide explains the error handling system in Transmogrify and how to implement robust error recovery strategies in your applications.
+This guide explains the error handling system in Transmog and how to implement robust error recovery strategies in your applications.
 
 ## Overview
 
-Transmogrify provides a comprehensive error handling system that:
+Transmog provides a comprehensive error handling system that:
 
 1. Defines specific exception types for different error categories
 2. Provides detailed error messages with context
@@ -13,10 +13,10 @@ Transmogrify provides a comprehensive error handling system that:
 
 ## Exception Hierarchy
 
-All Transmogrify exceptions inherit from the base `TransmogrifyError` class:
+All Transmog exceptions inherit from the base `TransmogError` class:
 
 ```
-TransmogrifyError
+TransmogError
 ├── ProcessingError      - Errors during data processing
 ├── ValidationError      - Input validation failures
 ├── ParsingError         - JSON parsing problems
@@ -29,11 +29,11 @@ TransmogrifyError
 
 ## Basic Error Handling
 
-Here's a simple example of handling Transmogrify errors:
+Here's a simple example of handling Transmog errors:
 
 ```python
-import transmogrify as tm
-from transmogrify.exceptions import TransmogrifyError, ProcessingError, ParsingError
+import transmog as tm
+from transmog.exceptions import TransmogError, ProcessingError, ParsingError
 
 try:
     processor = tm.Processor()
@@ -44,9 +44,9 @@ except ParsingError as e:
 except ProcessingError as e:
     print(f"Processing error: {e}")
     # Handle processing error specifically
-except TransmogrifyError as e:
-    print(f"Other Transmogrify error: {e}")
-    # Handle other Transmogrify errors
+except TransmogError as e:
+    print(f"Other Transmog error: {e}")
+    # Handle other Transmog errors
 except Exception as e:
     print(f"Unexpected error: {e}")
     # Handle unexpected errors
@@ -54,14 +54,14 @@ except Exception as e:
 
 ## Built-in Recovery Strategies
 
-Transmogrify includes several built-in recovery strategies:
+Transmog includes several built-in recovery strategies:
 
 ### `StrictRecovery`
 
 The default strategy that raises all errors without recovery, ensuring data integrity.
 
 ```python
-from transmogrify.recovery import StrictRecovery
+from transmog.recovery import StrictRecovery
 
 processor = tm.Processor(
     recovery_strategy=StrictRecovery(),
@@ -74,7 +74,7 @@ processor = tm.Processor(
 Logs errors and skips problematic records, continuing with the remaining data.
 
 ```python
-from transmogrify.recovery import SkipAndLogRecovery
+from transmog.recovery import SkipAndLogRecovery
 
 processor = tm.Processor(
     recovery_strategy=SkipAndLogRecovery(log_level="WARNING"),
@@ -88,7 +88,7 @@ processor = tm.Processor(
 Attempts to process parts of records while skipping problematic sections.
 
 ```python
-from transmogrify.recovery import PartialProcessingRecovery
+from transmog.recovery import PartialProcessingRecovery
 
 processor = tm.Processor(
     recovery_strategy=PartialProcessingRecovery(),
@@ -99,7 +99,7 @@ processor = tm.Processor(
 
 ## The Recovery Context
 
-When an error occurs, Transmogrify provides a context dictionary containing information about the error:
+When an error occurs, Transmog provides a context dictionary containing information about the error:
 
 ```python
 context = {
@@ -119,7 +119,7 @@ Not all fields are available for all errors, but this context can help determine
 To implement a custom recovery strategy, subclass `RecoveryStrategy` and implement the `recover` method:
 
 ```python
-from transmogrify.recovery import RecoveryStrategy
+from transmog.recovery import RecoveryStrategy
 from typing import Any, Dict, Optional, Tuple
 
 class CustomRecoveryStrategy(RecoveryStrategy):
@@ -180,7 +180,7 @@ class MyCustomRecovery(RecoveryStrategy):
 For fine-grained control, you can use the `with_recovery` decorator on specific functions:
 
 ```python
-from transmogrify.recovery import with_recovery
+from transmog.recovery import with_recovery
 
 @with_recovery
 def process_zip_codes(data):
@@ -194,7 +194,7 @@ def process_zip_codes(data):
 You can also specify a custom recovery strategy for specific functions:
 
 ```python
-from transmogrify.recovery import with_recovery, SkipAndLogRecovery
+from transmog.recovery import with_recovery, SkipAndLogRecovery
 
 # Create a specific recovery strategy for this function
 zip_recovery = SkipAndLogRecovery(log_level="WARNING")
@@ -266,16 +266,16 @@ except FileError as e:
 
 ## Configuring Logging
 
-Transmogrify uses Python's standard logging module. You can configure it like this:
+Transmog uses Python's standard logging module. You can configure it like this:
 
 ```python
 import logging
-from transmogrify.core.error_handling import setup_logging
+from transmog.core.error_handling import setup_logging
 
 # Configure logging with custom level and file
 setup_logging(
     level=logging.DEBUG,
-    log_file="transmogrify.log",
+    log_file="transmog.log",
     log_format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 ```
@@ -285,7 +285,7 @@ setup_logging(
 The `error_context` decorator adds context to exceptions:
 
 ```python
-from transmogrify.core.error_handling import error_context
+from transmog.core.error_handling import error_context
 
 @error_context("Failed during customer import")
 def import_customers(data):
@@ -314,9 +314,9 @@ Here's a complete example of a custom recovery strategy:
 
 ```python
 import logging
-import transmogrify as tm
-from transmogrify.recovery import RecoveryStrategy
-from transmogrify.exceptions import CircularReferenceError, ValidationError
+import transmog as tm
+from transmog.recovery import RecoveryStrategy
+from transmog.exceptions import CircularReferenceError, ValidationError
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

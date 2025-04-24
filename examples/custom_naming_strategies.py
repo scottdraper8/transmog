@@ -1,5 +1,5 @@
 """
-Example demonstrating custom naming strategies in Transmogrify.
+Example demonstrating custom naming strategies in Transmog.
 
 This example shows how to implement and use custom naming strategies
 for table and field names when processing complex JSON structures.
@@ -13,14 +13,14 @@ import sys
 import re
 from typing import Any, Dict, List, Tuple, Optional
 
-# Add parent directory to path to import transmogrify without installing
+# Add parent directory to path to import transmog without installing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import from src package
-from src.transmogrify import Processor
-from src.transmogrify.config import extensions
-from src.transmogrify.config.settings import settings
-from src.transmogrify.config import configure
+from src.transmog import Processor
+from src.transmog.config import extensions
+from src.transmog.config.settings import settings
+from src.transmog.config import configure
 
 
 # Sample complex nested JSON with deeply nested fields
@@ -230,7 +230,7 @@ class DomainSpecificTableStrategy:
         Returns:
             The strategy instance for method chaining
         """
-        from src.transmogrify.core import extractor
+        from src.transmog.core import extractor
 
         # Store the original function
         self.original_extract_arrays = extractor.extract_arrays
@@ -248,7 +248,7 @@ class DomainSpecificTableStrategy:
             The strategy instance for method chaining
         """
         if self.original_extract_arrays:
-            from src.transmogrify.core import extractor
+            from src.transmog.core import extractor
 
             extractor.extract_arrays = self.original_extract_arrays
 
@@ -263,7 +263,7 @@ class DomainSpecificTableStrategy:
 
 
 def register_custom_strategies() -> None:
-    """Register custom naming strategies with Transmogrify."""
+    """Register custom naming strategies with Transmog."""
     # Register field naming strategies
     extensions.register_naming_strategy("camelCase", camel_case_strategy)
     extensions.register_naming_strategy("snake_case", snake_case_strategy)
@@ -282,7 +282,7 @@ def process_with_camel_case() -> Dict[str, Any]:
         Processing result
     """
     # Set the naming strategy - create a monkey-patched function that uses camelCase
-    from src.transmogrify.naming import conventions
+    from src.transmog.naming import conventions
 
     # Store the original function if we haven't already
     if not hasattr(settings, "_original_field_name"):
@@ -321,7 +321,7 @@ def process_with_snake_case() -> Dict[str, Any]:
         Processing result
     """
     # Set the naming strategy - create a monkey-patched function that uses snake_case
-    from src.transmogrify.naming import conventions
+    from src.transmog.naming import conventions
 
     # Store the original function if we haven't already
     if not hasattr(settings, "_original_field_name"):

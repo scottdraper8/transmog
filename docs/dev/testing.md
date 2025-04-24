@@ -1,10 +1,10 @@
 # Testing Guide
 
-This guide provides instructions and best practices for testing contributions to Transmogrify.
+This guide provides instructions and best practices for testing contributions to Transmog.
 
 ## Testing Approach
 
-Transmogrify uses these testing practices:
+Transmog uses these testing practices:
 
 1. **Test coverage**: Test key functionalities and code paths
 2. **Test-driven development**: Consider writing tests before implementing features
@@ -64,10 +64,10 @@ To check test coverage:
 
 ```bash
 # Run tests with coverage
-pytest --cov=transmogrify
+pytest --cov=transmog
 
 # Generate a coverage report
-pytest --cov=transmogrify --cov-report=html
+pytest --cov=transmog --cov-report=html
 
 # Open the coverage report
 open htmlcov/index.html  # On macOS
@@ -97,8 +97,8 @@ Unit tests focus on testing individual components in isolation. Here's an exampl
 
 ```python
 import pytest
-from transmogrify import Transformer
-from transmogrify.processors import string_processor
+from transmog import Transformer
+from transmog.processors import string_processor
 
 def test_string_processor():
     """Test that the string processor correctly handles strings."""
@@ -129,9 +129,9 @@ Integration tests check how components work together:
 
 ```python
 import pytest
-from transmogrify import Transformer
-from transmogrify.path import PathResolver
-from transmogrify.processors import default_processors
+from transmog import Transformer
+from transmog.path import PathResolver
+from transmog.processors import default_processors
 
 def test_end_to_end_transformation():
     """Test a complete transformation process."""
@@ -213,8 +213,8 @@ Test how your code handles errors:
 
 ```python
 import pytest
-from transmogrify import Transformer
-from transmogrify.errors import TransformError
+from transmog import Transformer
+from transmog.errors import TransformError
 
 def test_invalid_input():
     """Test that appropriate errors are raised for invalid inputs."""
@@ -244,7 +244,7 @@ Use parametrization to test multiple cases efficiently:
 
 ```python
 import pytest
-from transmogrify.path import parse_path
+from transmog.path import parse_path
 
 @pytest.mark.parametrize("path_string,expected_parts", [
     ("user.name", ["user", "name"]),
@@ -267,7 +267,7 @@ import pytest
 import time
 import random
 import string
-from transmogrify import Transformer
+from transmog import Transformer
 
 def generate_large_dataset(size=1000, depth=5, width=5):
     """Generate a large nested dataset for performance testing."""
@@ -323,12 +323,12 @@ Use mocks to isolate the code being tested:
 ```python
 import pytest
 from unittest.mock import patch, MagicMock
-from transmogrify.io import ParquetWriter
+from transmog.io import ParquetWriter
 
 def test_parquet_writing():
     """Test Parquet writing with mocked pyarrow."""
     # Mock the pyarrow module
-    with patch("transmogrify.io.parquet.pa") as mock_pa:
+    with patch("transmog.io.parquet.pa") as mock_pa:
         # Set up mock behavior
         mock_table = MagicMock()
         mock_pa.Table.from_pydict.return_value = mock_table

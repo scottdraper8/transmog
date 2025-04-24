@@ -2,13 +2,13 @@
 hide-toc: false
 ---
 
-# Transmogrify Documentation
+# Transmog Documentation
 
-Welcome to the Transmogrify documentation. Transmogrify is a Python library for transforming complex nested JSON data into flat, structured formats.
+Welcome to the Transmog documentation. Transmog is a Python library for transforming complex nested JSON data into flat, structured formats.
 
 ## Overview
 
-Transmogrify enables you to:
+Transmog enables you to:
 
 - Flatten complex nested JSON/dict structures
 - Extract arrays into separate tables with parent-child relationships
@@ -56,16 +56,16 @@ Transmogrify enables you to:
 - [Contributing](dev/contributing.md)
 - [Development Guide](dev/development-guide.md)
 - [Testing Guide](dev/testing.md)
-- [Architecture](dev/architecture.md) - Learn about Transmogrify's internal design
+- [Architecture](dev/architecture.md) - Learn about Transmog's internal design
 
 ## Roadmap
 
-See our [ROADMAP.md](https://github.com/scottdraper8/transmogrify/blob/main/ROADMAP.md) file for upcoming features and enhancements.
+See our [ROADMAP.md](https://github.com/scottdraper8/transmog/blob/main/ROADMAP.md) file for upcoming features and enhancements.
 
 ## Support & Community
 
-- [GitHub Issues](https://github.com/scottdraper8/transmogrify/issues)
-- [Discussions](https://github.com/scottdraper8/transmogrify/discussions)
+- [GitHub Issues](https://github.com/scottdraper8/transmog/issues)
+- [Discussions](https://github.com/scottdraper8/transmog/discussions)
 
 ## Key Features
 

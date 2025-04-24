@@ -34,7 +34,7 @@ def _get_writer_registry():
     if _WRITERS_REGISTRY is None and not _WRITERS_AVAILABLE:
         try:
             # Use importlib for lazy loading to avoid circular imports
-            io_module = importlib.import_module("src.transmogrify.io.writer_registry")
+            io_module = importlib.import_module("src.transmog.io.writer_registry")
             _WRITERS_REGISTRY = io_module.WriterRegistry
             _WRITERS_AVAILABLE = True
         except (ImportError, AttributeError):
@@ -410,7 +410,7 @@ class ProcessingResult:
 
         import pyarrow as pa
         import pyarrow.csv as pa_csv
-        from src.transmogrify.naming.conventions import sanitize_column_names
+        from src.transmog.naming.conventions import sanitize_column_names
 
         # Get PyArrow tables
         tables = self.to_pyarrow_tables()
@@ -471,7 +471,7 @@ class ProcessingResult:
             return _conversion_cache[cache_key]
 
         import csv
-        from src.transmogrify.naming.conventions import sanitize_column_names
+        from src.transmog.naming.conventions import sanitize_column_names
 
         # Get options
         separator = kwargs.get("separator", "_")
@@ -667,7 +667,7 @@ class ProcessingResult:
 
         if writer_registry is None:
             raise ImportError(
-                "Writer registry not available. Make sure transmogrify[io] is installed."
+                "Writer registry not available. Make sure transmog[io] is installed."
             )
 
         # Check if the format is available

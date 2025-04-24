@@ -1,13 +1,13 @@
 # Schema Definition and Validation
 
-Transmogrify provides a flexible schema system that allows you to define the structure of your data, apply validations, and enforce constraints. This guide explains how to leverage schemas for more controlled and predictable data processing.
+Transmog provides a flexible schema system that allows you to define the structure of your data, apply validations, and enforce constraints. This guide explains how to leverage schemas for more controlled and predictable data processing.
 
 ## Basic Schema Definition
 
-Schemas in Transmogrify are defined using a dictionary-like structure where keys represent field names and values define field properties:
+Schemas in Transmog are defined using a dictionary-like structure where keys represent field names and values define field properties:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 # Define a schema
 user_schema = {
@@ -35,7 +35,7 @@ result = processor.process(valid_data, entity_name="user")
 
 ## Field Types and Validation
 
-Transmogrify supports various field types and validation rules:
+Transmog supports various field types and validation rules:
 
 ### Basic Types
 
@@ -161,7 +161,7 @@ processor = tm.Processor(
 
 ## Field Type Coercion
 
-When `coerce_types` is enabled, Transmogrify will attempt to convert values to the correct type:
+When `coerce_types` is enabled, Transmog will attempt to convert values to the correct type:
 
 ```python
 schema = {
@@ -193,8 +193,8 @@ result = processor.process(data, entity_name="item")
 When validation fails and `fail_on_error` is `True`, a `ValidationError` is raised:
 
 ```python
-import transmogrify as tm
-from transmogrify.exceptions import ValidationError
+import transmog as tm
+from transmog.exceptions import ValidationError
 
 schema = {
     "age": {"type": "integer", "min": 0, "required": True}

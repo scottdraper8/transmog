@@ -7,25 +7,25 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock
 
-from src.transmogrify.exceptions import (
+from src.transmog.exceptions import (
     CircularReferenceError,
     ConfigurationError,
     FileError,
     MissingDependencyError,
-    TransmogrifyError,
+    TransmogError,
     OutputError,
     ParsingError,
     ProcessingError,
     ValidationError,
 )
-from src.transmogrify.core.error_handling import (
+from src.transmog.core.error_handling import (
     error_context,
     handle_circular_reference,
     recover_or_raise,
     safe_json_loads,
     validate_input,
 )
-from src.transmogrify.recovery import (
+from src.transmog.recovery import (
     RecoveryStrategy,
     StrictRecovery,
     SkipAndLogRecovery,
@@ -38,8 +38,8 @@ class TestExceptions:
     """Tests for custom exception classes."""
 
     def test_base_error(self):
-        """Test the base TransmogrifyError class."""
-        error = TransmogrifyError("Test error")
+        """Test the base TransmogError class."""
+        error = TransmogError("Test error")
         assert str(error) == "Test error"
         assert error.message == "Test error"
 
@@ -269,7 +269,7 @@ class TestRecoveryStrategies:
                 CircularReferenceError("Test error"), path=["path", "to", "error"]
             )
 
-    @patch("src.transmogrify.recovery.logger")
+    @patch("src.transmog.recovery.logger")
     def test_skip_and_log_recovery(self, mock_logger):
         """Test SkipAndLogRecovery strategy."""
         strategy = SkipAndLogRecovery()
@@ -293,7 +293,7 @@ class TestRecoveryStrategies:
         result = strategy.handle_file_error(FileError("File not found"))
         assert result is None
 
-    @patch("src.transmogrify.recovery.logger")
+    @patch("src.transmog.recovery.logger")
     def test_partial_recovery(self, mock_logger):
         """Test PartialProcessingRecovery strategy."""
         strategy = PartialProcessingRecovery()

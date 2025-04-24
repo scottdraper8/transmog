@@ -1,12 +1,12 @@
 # Processor API Reference
 
-The `Processor` class is the main entry point for processing JSON data in Transmogrify.
+The `Processor` class is the main entry point for processing JSON data in Transmog.
 
 ## Import
 
 ```python
-from transmogrify import Processor
-from transmogrify.processor import ProcessingMode  # For memory mode options
+from transmog import Processor
+from transmog.processor import ProcessingMode  # For memory mode options
 ```
 
 ## Constructor
@@ -67,10 +67,10 @@ Processor(
 
 ### Processing Modes
 
-Transmogrify supports different processing modes that determine memory usage and performance tradeoffs:
+Transmog supports different processing modes that determine memory usage and performance tradeoffs:
 
 ```python
-from transmogrify.processor import ProcessingMode
+from transmog.processor import ProcessingMode
 
 # Available modes
 ProcessingMode.STANDARD           # Default - balances memory and performance
@@ -80,7 +80,7 @@ ProcessingMode.HIGH_PERFORMANCE   # Optimizes for processing speed
 
 ### ID Generation Options
 
-Transmogrify supports three approaches for ID generation:
+Transmog supports three approaches for ID generation:
 
 1. **Random UUIDs (Default)**: When `deterministic_id_fields` and `id_generation_strategy` are both `None`, random UUIDs are generated for each record.
 
@@ -326,10 +326,10 @@ result = processor.process_chunked(
 
 ## Recovery Strategies
 
-Transmogrify provides several recovery strategies for handling errors:
+Transmog provides several recovery strategies for handling errors:
 
 ```python
-from transmogrify.recovery import (
+from transmog.recovery import (
     StrictRecovery,              # Fail on any error
     SkipAndLogRecovery,          # Log errors and skip problematic records
     PartialProcessingRecovery    # Try to extract partial data from problematic records

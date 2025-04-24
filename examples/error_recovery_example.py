@@ -1,5 +1,5 @@
 """
-Example demonstrating advanced error recovery strategies in Transmogrify.
+Example demonstrating advanced error recovery strategies in Transmog.
 
 This example shows how to implement and use custom error recovery strategies
 when processing problematic JSON data that might have inconsistencies or errors.
@@ -13,13 +13,13 @@ import traceback
 import functools
 from typing import Any, Dict, List, Optional, Tuple, Callable
 
-# Add parent directory to path to import transmogrify without installing
+# Add parent directory to path to import transmog without installing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import from src package
-from src.transmogrify import Processor
-from src.transmogrify.recovery import RecoveryStrategy, STRICT
-from src.transmogrify.exceptions import (
+from src.transmog import Processor
+from src.transmog.recovery import RecoveryStrategy, STRICT
+from src.transmog.exceptions import (
     ProcessingError,
     ValidationError,
     ParsingError,

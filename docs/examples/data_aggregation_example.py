@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Example script demonstrating data aggregation with Transmogrify.
+Example script demonstrating data aggregation with Transmog.
 This example shows how to group and aggregate data for analysis.
 """
 
-from transmogrify import Processor, AggregateOperation, GroupBy
+from transmog import Processor, AggregateOperation, GroupBy
 import os
 
 

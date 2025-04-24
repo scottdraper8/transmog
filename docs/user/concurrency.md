@@ -1,22 +1,22 @@
 # Concurrency and Parallel Processing
 
-Transmogrify provides features to effectively utilize parallel processing for handling large datasets.
+Transmog provides features to effectively utilize parallel processing for handling large datasets.
 
 ## Overview
 
-Transmogrify can be used with various concurrency methods:
+Transmog can be used with various concurrency methods:
 
 1. **Multithreading**: Using Python's `threading` or `concurrent.futures.ThreadPoolExecutor`
 2. **Multiprocessing**: Using Python's `multiprocessing` or `concurrent.futures.ProcessPoolExecutor`
 
-This guide demonstrates how to implement different concurrency patterns with Transmogrify.
+This guide demonstrates how to implement different concurrency patterns with Transmog.
 
 ## Basic Parallel Processing
 
-For simple parallel processing, you can use Python's `concurrent.futures` module with Transmogrify:
+For simple parallel processing, you can use Python's `concurrent.futures` module with Transmog:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 from concurrent.futures import ThreadPoolExecutor
 import json
 
@@ -60,7 +60,7 @@ combined_result.write_all_parquet(base_path="output/data")
 For very large datasets that don't fit in memory, use chunked processing:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 import json
 
 # Initialize processor
@@ -83,7 +83,7 @@ result = processor.process_chunked(
 For the best performance with very large datasets, combine chunking with parallelism:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 import json
 from concurrent.futures import ProcessPoolExecutor
 import os
@@ -158,7 +158,7 @@ When using concurrency, consider these factors:
 
 ## Thread Safety
 
-All Transmogrify methods are thread-safe and can be safely called from multiple threads. The library uses:
+All Transmog methods are thread-safe and can be safely called from multiple threads. The library uses:
 
 1. Thread-safe caching mechanisms
 2. No shared mutable state between threads

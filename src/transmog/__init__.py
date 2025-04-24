@@ -1,5 +1,5 @@
 """
-Transmogrify: JSON to tabular normalization and flattening utility
+Transmog: JSON to tabular normalization and flattening utility
 
 A library for transforming nested JSON structures into flattened formats
 with parent-child relationship preservation and metadata annotation.
@@ -8,25 +8,25 @@ with parent-child relationship preservation and metadata annotation.
 __version__ = "0.1.0"
 
 # Imports for use within the package itself
-from src.transmogrify.core.flattener import flatten_json
-from src.transmogrify.core.extractor import extract_arrays
-from src.transmogrify.core.hierarchy import (
+from src.transmog.core.flattener import flatten_json
+from src.transmog.core.extractor import extract_arrays
+from src.transmog.core.hierarchy import (
     process_structure,
     process_record_batch,
     process_records_in_single_pass,
 )
-from src.transmogrify.core.metadata import (
+from src.transmog.core.metadata import (
     generate_extract_id,
     annotate_with_metadata,
     get_current_timestamp,
     create_batch_metadata,
 )
-from src.transmogrify.naming.conventions import (
+from src.transmog.naming.conventions import (
     get_table_name,
     sanitize_name,
     get_standard_field_name,
 )
-from src.transmogrify.naming.abbreviator import (
+from src.transmog.naming.abbreviator import (
     abbreviate_table_name,
     abbreviate_field_name,
     get_common_abbreviations,
@@ -34,10 +34,10 @@ from src.transmogrify.naming.abbreviator import (
 )
 
 # High-level processor class for one-step processing
-from src.transmogrify.processor import Processor, ProcessingResult
+from src.transmog.processor import Processor, ProcessingResult
 
 # Configuration functionality
-from src.transmogrify.config import (
+from src.transmog.config import (
     settings,
     extensions,
     load_profile,
@@ -70,7 +70,7 @@ def _ensure_io_module():
     if not _io_module_checked:
         try:
             # Use importlib for lazy loading
-            io_module = importlib.import_module("src.transmogrify.io")
+            io_module = importlib.import_module("src.transmog.io")
             _writer_registry = io_module.WriterRegistry
             _io_module_available = True
         except (ImportError, AttributeError):

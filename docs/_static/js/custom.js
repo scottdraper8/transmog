@@ -1,4 +1,4 @@
-// Custom JavaScript for Transmogrify documentation
+// Custom JavaScript for Transmog documentation
 
 document.addEventListener('DOMContentLoaded', function () {
     // Add copy buttons to all code blocks that don't already have them

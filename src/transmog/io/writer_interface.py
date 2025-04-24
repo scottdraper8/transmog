@@ -1,5 +1,5 @@
 """
-Writer interface for Transmogrify output formats.
+Writer interface for Transmog output formats.
 
 This module defines the interface that all format writers must implement.
 """

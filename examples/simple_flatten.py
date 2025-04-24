@@ -1,5 +1,5 @@
 """
-Simple example demonstrating Transmogrify functionality.
+Simple example demonstrating Transmog functionality.
 
 This example shows how to flatten a nested JSON structure,
 extract child arrays, and save them to Parquet files.
@@ -10,11 +10,11 @@ import os
 import sys
 from pprint import pprint
 
-# Add parent directory to path to import transmogrify without installing
+# Add parent directory to path to import transmog without installing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import from src package
-from src.transmogrify import Processor
+from src.transmog import Processor
 
 
 def main():

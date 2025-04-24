@@ -1,5 +1,5 @@
 """
-JSON writer for Transmogrify output.
+JSON writer for Transmog output.
 
 This module provides a JSON writer with tiered performance based on available libraries.
 """
@@ -7,7 +7,7 @@ This module provides a JSON writer with tiered performance based on available li
 import os
 from typing import Any, Dict, List, Optional, Union
 
-from src.transmogrify.io.writer_interface import DataWriter
+from src.transmog.io.writer_interface import DataWriter
 
 
 class JsonWriter(DataWriter):
@@ -56,7 +56,7 @@ class JsonWriter(DataWriter):
         os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
         # Create a temporary ProcessingResult to use its conversion methods
-        from src.transmogrify.core.processing_result import ProcessingResult
+        from src.transmog.core.processing_result import ProcessingResult
 
         temp_result = ProcessingResult(
             main_table=table_data, child_tables={}, entity_name="temp"
@@ -120,7 +120,7 @@ class JsonWriter(DataWriter):
             Dict mapping table names to output file paths
         """
         # Create a ProcessingResult object to use its conversion and writing methods
-        from src.transmogrify.core.processing_result import ProcessingResult
+        from src.transmog.core.processing_result import ProcessingResult
 
         result = ProcessingResult(
             main_table=main_table, child_tables=child_tables, entity_name=entity_name

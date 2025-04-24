@@ -1,16 +1,16 @@
 """
-Configuration package for Transmogrify.
+Configuration package for Transmog.
 
 Provides settings management, profile configuration, and extension points.
 """
 
-from src.transmogrify.config.settings import (
+from src.transmog.config.settings import (
     settings,
     extensions,
     load_profile,
     load_config,
     configure,
-    TransmogrifySettings,
+    TransmogSettings,
     ExtensionRegistry,
 )
 
@@ -20,6 +20,6 @@ __all__ = [
     "load_profile",
     "load_config",
     "configure",
-    "TransmogrifySettings",
+    "TransmogSettings",
     "ExtensionRegistry",
 ]

@@ -1,5 +1,5 @@
 """
-Performance comparison example demonstrating Transmogrify optimizations.
+Performance comparison example demonstrating Transmog optimizations.
 
 This example compares different configuration options and their impact
 on performance for processing nested JSON data.
@@ -12,10 +12,10 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List
 
-# Add parent directory to path to import transmogrify without installing
+# Add parent directory to path to import transmog without installing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.transmogrify import Processor, ProcessingResult
+from src.transmog import Processor, ProcessingResult
 
 
 def generate_complex_data(count: int = 100) -> List[Dict]:
@@ -101,9 +101,9 @@ def test_standard_processing(data: List[Dict]) -> ProcessingResult:
 
     This uses direct extraction without any optimizations.
     """
-    from src.transmogrify.core.extractor import extract_arrays
-    from src.transmogrify.core.flattener import flatten_json
-    from src.transmogrify.core.metadata import (
+    from src.transmog.core.extractor import extract_arrays
+    from src.transmog.core.flattener import flatten_json
+    from src.transmog.core.metadata import (
         annotate_with_metadata,
         get_current_timestamp,
     )

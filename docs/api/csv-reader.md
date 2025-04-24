@@ -1,11 +1,11 @@
 # CSV Reader API Reference
 
-The CSV Reader functionality in Transmogrify provides capabilities for processing CSV files and converting them into structured data.
+The CSV Reader functionality in Transmog provides capabilities for processing CSV files and converting them into structured data.
 
 ## Import
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 ```
 
 ## Methods
@@ -55,7 +55,7 @@ A `ProcessingResult` object containing the CSV data as the main table (no child 
 #### Example: Basic Usage
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 processor = tm.Processor()
 
@@ -72,7 +72,7 @@ data = result.to_dict()["main"]
 #### Example: Custom Configuration
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 processor = tm.Processor()
 
@@ -91,7 +91,7 @@ result = processor.process_csv(
 #### Example: Handling Tab-Separated Values
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 processor = tm.Processor()
 
@@ -109,7 +109,7 @@ result = processor.process_csv(
 
 ### Type Inference
 
-When `infer_types` is set to `True`, Transmogrify converts string values to appropriate data types:
+When `infer_types` is set to `True`, Transmog converts string values to appropriate data types:
 
 - Numeric strings → integers or floats
 - Boolean strings → booleans (True/False)
@@ -172,7 +172,7 @@ The selection is automatic based on available dependencies.
 
 ### PyArrow Implementation
 
-When PyArrow is available, Transmogrify uses it for CSV processing, providing:
+When PyArrow is available, Transmog uses it for CSV processing, providing:
 
 - Memory-efficient processing of large files
 - Parallel processing capabilities
@@ -194,7 +194,7 @@ The standard library implementation is suitable for smaller files and environmen
 
 ### Chunked Processing
 
-For large files, Transmogrify processes data in chunks to minimize memory usage:
+For large files, Transmog processes data in chunks to minimize memory usage:
 
 1. The file is read in chunks of `chunk_size` rows
 2. Each chunk is processed separately

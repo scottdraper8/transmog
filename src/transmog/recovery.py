@@ -14,7 +14,7 @@ Key concepts:
 
 Usage example:
     ```python
-    from transmogrify.recovery import SkipAndLogRecovery, with_recovery
+    from transmog.recovery import SkipAndLogRecovery, with_recovery
 
     # Create a recovery strategy
     recovery = SkipAndLogRecovery(log_level=logging.WARNING)
@@ -41,7 +41,7 @@ from .exceptions import (
     FileError,
     ParsingError,
     ProcessingError,
-    TransmogrifyError,
+    TransmogError,
     ValidationError,
 )
 from .core.error_handling import logger
@@ -148,7 +148,7 @@ class StrictRecovery(RecoveryStrategy):
         processor = Processor(recovery_strategy=StrictRecovery())
         try:
             result = processor.process(data)
-        except TransmogrifyError as e:
+        except TransmogError as e:
             print(f"Processing failed: {e}")
         ```
     """
@@ -470,7 +470,7 @@ def with_recovery(
                 data=input_data,
                 entity_name="customer"
             )
-        except TransmogrifyError:
+        except TransmogError:
             # Only raised for errors the strategy didn't handle
             print("Critical error occurred")
 
@@ -521,8 +521,8 @@ def with_recovery(
         return strategy.handle_file_error(e, file_path=file_path)
     except Exception as e:
         # For any other exception, wrap it in a ProcessingError and handle
-        if not isinstance(e, TransmogrifyError):
-            # Only wrap non-Transmogrify errors
+        if not isinstance(e, TransmogError):
+            # Only wrap non-Transmog errors
             error = ProcessingError(f"Unexpected error: {str(e)}", cause=e)
         else:
             error = e

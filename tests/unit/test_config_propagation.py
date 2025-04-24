@@ -2,17 +2,17 @@
 Tests for configuration propagation through the entire pipeline.
 
 These tests verify that configuration options are properly applied
-throughout all components of the Transmogrify system.
+throughout all components of the Transmog system.
 """
 
 import os
 import json
 import pytest
 import tempfile
-from src.transmogrify import Processor
-from src.transmogrify.config import settings, configure, load_profile
-from src.transmogrify.core.flattener import flatten_json
-from src.transmogrify.core.extractor import extract_arrays
+from src.transmog import Processor
+from src.transmog.config import settings, configure, load_profile
+from src.transmog.core.flattener import flatten_json
+from src.transmog.core.extractor import extract_arrays
 
 
 class TestConfigPropagation:
@@ -241,13 +241,13 @@ class TestConfigPropagation:
     def _test_environment_variable_conversion(self):
         """Test that environment variables are properly converted to the right type."""
         # Set environment variables
-        os.environ["TRANSMOGRIFY_BATCH_SIZE"] = "300"
-        os.environ["TRANSMOGRIFY_CAST_TO_STRING"] = "false"
+        os.environ["TRANSMOG_BATCH_SIZE"] = "300"
+        os.environ["TRANSMOG_CAST_TO_STRING"] = "false"
 
         # Create a fresh settings object to load environment variables
-        from src.transmogrify.config.settings import TransmogrifySettings
+        from src.transmog.config.settings import TransmogSettings
 
-        test_settings = TransmogrifySettings()
+        test_settings = TransmogSettings()
 
         # Check conversion to integer
         batch_size = test_settings.get_option("batch_size")
@@ -260,5 +260,5 @@ class TestConfigPropagation:
         assert cast_to_string is False
 
         # Clean up
-        del os.environ["TRANSMOGRIFY_BATCH_SIZE"]
-        del os.environ["TRANSMOGRIFY_CAST_TO_STRING"]
+        del os.environ["TRANSMOG_BATCH_SIZE"]
+        del os.environ["TRANSMOG_CAST_TO_STRING"]

@@ -10,10 +10,10 @@ import csv
 import tempfile
 import pytest
 import json
-from src.transmogrify import Processor
-from src.transmogrify.core.processing_result import ProcessingResult
-from src.transmogrify.io.csv_reader import read_csv_file, CSVReader, PYARROW_AVAILABLE
-from src.transmogrify.exceptions import FileError, ParsingError, ProcessingError
+from src.transmog import Processor
+from src.transmog.core.processing_result import ProcessingResult
+from src.transmog.io.csv_reader import read_csv_file, CSVReader, PYARROW_AVAILABLE
+from src.transmog.exceptions import FileError, ParsingError, ProcessingError
 
 # Check if pyarrow is available
 try:

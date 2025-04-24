@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Example script demonstrating data validation with Transmogrify.
+Example script demonstrating data validation with Transmog.
 This example shows how to validate data against defined rules and constraints.
 """
 
-from transmogrify import Processor, ValidationRule, ValidationSeverity
+from transmog import Processor, ValidationRule, ValidationSeverity
 import os
 
 

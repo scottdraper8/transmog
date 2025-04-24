@@ -1,5 +1,5 @@
 """
-Example demonstrating native output format capabilities in Transmogrify.
+Example demonstrating native output format capabilities in Transmog.
 
 This example shows how to use the new output format methods:
 - to_dict()
@@ -15,11 +15,11 @@ import sys
 import io
 from pprint import pprint
 
-# Add parent directory to path to import transmogrify without installing
+# Add parent directory to path to import transmog without installing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import from src package
-from src.transmogrify import Processor
+from src.transmog import Processor
 
 
 def main():

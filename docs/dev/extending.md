@@ -1,6 +1,6 @@
-# Extending Transmogrify
+# Extending Transmog
 
-This guide explains how to extend Transmogrify with custom components.
+This guide explains how to extend Transmog with custom components.
 
 ## Custom Value Processors
 
@@ -29,7 +29,7 @@ def format_currency(value, path=None, context=None):
 You can use custom processors by passing them to the `Transformer`:
 
 ```python
-from transmogrify import Transformer
+from transmog import Transformer
 
 # Create transformer with custom processors
 transformer = Transformer(
@@ -78,7 +78,7 @@ You can create custom path resolvers to handle specialized path expressions.
 To create a custom path resolver, subclass `BasePathResolver`:
 
 ```python
-from transmogrify.path import BasePathResolver
+from transmog.path import BasePathResolver
 
 class RegexPathResolver(BasePathResolver):
     """Resolve paths using regular expressions."""
@@ -105,10 +105,10 @@ class RegexPathResolver(BasePathResolver):
 
 ### Registering a Custom Resolver
 
-Register your custom resolver with Transmogrify:
+Register your custom resolver with Transmog:
 
 ```python
-from transmogrify import register_path_resolver
+from transmog import register_path_resolver
 
 # Register your custom resolver
 register_path_resolver("regex", RegexPathResolver())
@@ -129,7 +129,7 @@ You can create custom output formatters to support additional formats.
 Create a custom formatter by subclassing `BaseFormatter`:
 
 ```python
-from transmogrify.io import BaseFormatter
+from transmog.io import BaseFormatter
 
 class CustomFormatter(BaseFormatter):
     """Format results in a custom format."""
@@ -154,10 +154,10 @@ class CustomFormatter(BaseFormatter):
 
 ### Registering a Custom Formatter
 
-Register your formatter with Transmogrify:
+Register your formatter with Transmog:
 
 ```python
-from transmogrify import register_formatter
+from transmog import register_formatter
 
 # Register your custom formatter
 register_formatter("custom", CustomFormatter())
@@ -179,13 +179,13 @@ You can create custom recovery strategies to handle errors during transformation
 Subclass `RecoveryStrategy` to create a custom recovery approach:
 
 ```python
-from transmogrify.recovery import RecoveryStrategy
+from transmog.recovery import RecoveryStrategy
 
 class AuditingRecoveryStrategy(RecoveryStrategy):
     """Recovery strategy that audits errors before handling them."""
     
     def __init__(self, audit_log_path=None):
-        self.audit_log_path = audit_log_path or "transmogrify_audit.log"
+        self.audit_log_path = audit_log_path or "transmog_audit.log"
         self.errors = []
     
     def recover(self, error, context=None):
@@ -229,7 +229,7 @@ class AuditingRecoveryStrategy(RecoveryStrategy):
 Use your custom recovery strategy:
 
 ```python
-from transmogrify import Transformer
+from transmog import Transformer
 
 # Create the recovery strategy
 recovery = AuditingRecoveryStrategy(audit_log_path="errors.log")
@@ -252,7 +252,7 @@ You can extend the configuration system to add custom settings.
 Register custom settings with the configuration system:
 
 ```python
-from transmogrify.config import register_option
+from transmog.config import register_option
 
 # Register a custom option
 register_option(
@@ -263,7 +263,7 @@ register_option(
 )
 
 # Use the custom option
-from transmogrify.config import get_option
+from transmog.config import get_option
 
 my_setting = get_option("my_custom_setting")
 ```
@@ -273,7 +273,7 @@ my_setting = get_option("my_custom_setting")
 For more complex needs, create a configuration extension:
 
 ```python
-from transmogrify.config import ConfigExtension
+from transmog.config import ConfigExtension
 
 class MyConfigExtension(ConfigExtension):
     """Custom configuration extension for specialized needs."""
@@ -283,7 +283,7 @@ class MyConfigExtension(ConfigExtension):
         
     def register_options(self):
         """Register all options for this extension."""
-        from transmogrify.config import register_option
+        from transmog.config import register_option
         
         register_option(
             name="my_extension.enabled",
@@ -301,7 +301,7 @@ class MyConfigExtension(ConfigExtension):
         
     def get_settings(self):
         """Get all settings for this extension."""
-        from transmogrify.config import get_option
+        from transmog.config import get_option
         
         return {
             "enabled": get_option("my_extension.enabled"),
@@ -326,9 +326,9 @@ For more extensive extensions, you can create a plugin package.
 A basic plugin structure:
 
 ```
-transmogrify-myplugin/
+transmog-myplugin/
 ├── src/
-│   └── transmogrify_myplugin/
+│   └── transmog_myplugin/
 │       ├── __init__.py
 │       ├── formatters.py
 │       ├── processors.py
@@ -343,7 +343,7 @@ transmogrify-myplugin/
 In your plugin's `__init__.py`, register your extensions when the plugin is imported:
 
 ```python
-from transmogrify import register_formatter, register_path_resolver
+from transmog import register_formatter, register_path_resolver
 from .formatters import CustomFormatter
 from .resolvers import RegexPathResolver
 
@@ -353,7 +353,7 @@ register_path_resolver("regex", RegexPathResolver())
 
 # Define a convenience function to register all processors
 def register_processors():
-    from transmogrify import register_processor
+    from transmog import register_processor
     from .processors import uppercase_strings, format_currency
     
     register_processor("uppercase", uppercase_strings)
@@ -366,14 +366,14 @@ Users can then use your plugin:
 
 ```python
 # Install your plugin
-# pip install transmogrify-myplugin
+# pip install transmog-myplugin
 
 # Use your plugin
-import transmogrify as tm
-import transmogrify_myplugin
+import transmog as tm
+import transmog_myplugin
 
 # Register processors if needed
-transmogrify_myplugin.register_processors()
+transmog_myplugin.register_processors()
 
 # Use the extensions
 transformer = tm.Transformer(
@@ -387,7 +387,7 @@ custom_output = result.to_format("custom")
 
 ## Hook System
 
-Transmogrify provides a hook system for more advanced extensions.
+Transmog provides a hook system for more advanced extensions.
 
 ### Available Hooks
 
@@ -403,7 +403,7 @@ Transmogrify provides a hook system for more advanced extensions.
 Register hooks using the hook registration system:
 
 ```python
-from transmogrify import register_hook
+from transmog import register_hook
 
 def my_pre_transform_hook(data, context=None):
     """Pre-transform hook to add metadata."""
@@ -430,7 +430,7 @@ register_hook("post_transform", my_post_transform_hook)
 
 ## Best Practices
 
-When extending Transmogrify, follow these best practices:
+When extending Transmog, follow these best practices:
 
 1. **Test thoroughly**: Write comprehensive tests for your extensions
 2. **Document clearly**: Provide clear documentation with examples
@@ -440,4 +440,4 @@ When extending Transmogrify, follow these best practices:
 6. **Provide sensible defaults**: Make your extensions work reasonably well out of the box
 7. **Consider edge cases**: Handle special cases appropriately
 
-By following these guidelines, you can create powerful extensions that enhance Transmogrify's capabilities. 
+By following these guidelines, you can create powerful extensions that enhance Transmog's capabilities. 

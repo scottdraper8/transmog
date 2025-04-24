@@ -1,10 +1,10 @@
 # Release Process
 
-This document outlines the process for creating and publishing new releases of Transmogrify.
+This document outlines the process for creating and publishing new releases of Transmog.
 
 ## Version Numbering
 
-Transmogrify follows [Semantic Versioning](https://semver.org/) (SemVer):
+Transmog follows [Semantic Versioning](https://semver.org/) (SemVer):
 
 - **MAJOR** version for incompatible API changes
 - **MINOR** version for new functionality in a backward-compatible manner
@@ -39,7 +39,7 @@ Before releasing a new version, complete the following checklist:
    - Include PR numbers and credit contributors
 
 5. **Update version number:**
-   - Update version in `src/transmogrify/__init__.py`
+   - Update version in `src/transmog/__init__.py`
    - Update version in `pyproject.toml`
 
 ## Creating a Release
@@ -99,10 +99,10 @@ python -m twine upload dist/*
 
 ### 6. Create a GitHub Release
 
-1. Go to the [GitHub releases page](https://github.com/username/transmogrify/releases)
+1. Go to the [GitHub releases page](https://github.com/username/transmog/releases)
 2. Click "Draft a new release"
 3. Select the tag you created
-4. Title the release "Transmogrify X.Y.Z"
+4. Title the release "Transmog X.Y.Z"
 5. Copy the relevant section from CHANGELOG.md as the description
 6. Attach the built distributions
 7. Publish the release
@@ -112,7 +112,7 @@ python -m twine upload dist/*
 After the release is published:
 
 1. **Update development version:**
-   - Increment version number in `src/transmogrify/__init__.py` with `.dev0` suffix
+   - Increment version number in `src/transmog/__init__.py` with `.dev0` suffix
    - Example: After releasing `1.2.0`, update to `1.3.0.dev0`
 
 2. **Announce the release:**

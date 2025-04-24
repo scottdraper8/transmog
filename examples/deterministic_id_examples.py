@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Examples of deterministic ID generation in Transmogrify.
+Examples of deterministic ID generation in Transmog.
 
 This script demonstrates the different approaches to ID generation:
 1. Default random UUIDs
@@ -15,7 +15,7 @@ import uuid
 import json
 from datetime import datetime
 import pandas as pd
-from src.transmogrify import Processor
+from src.transmog import Processor
 
 
 def print_header(title):
@@ -442,7 +442,7 @@ def main():
     """Run all examples."""
     print("\nDeterministic ID Generation Examples")
     print(
-        "\nThis script demonstrates different approaches to ID generation in Transmogrify,"
+        "\nThis script demonstrates different approaches to ID generation in Transmog,"
     )
     print("including random UUIDs, deterministic IDs, and custom ID generation.")
 

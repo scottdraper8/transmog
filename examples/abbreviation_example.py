@@ -1,7 +1,7 @@
 """
-Example demonstrating field and table name abbreviation in Transmogrify.
+Example demonstrating field and table name abbreviation in Transmog.
 
-This example shows how field and table name abbreviation works in Transmogrify,
+This example shows how field and table name abbreviation works in Transmog,
 including custom abbreviation and component length settings.
 """
 
@@ -10,12 +10,12 @@ import os
 import sys
 from pprint import pprint
 
-# Add parent directory to path to import transmogrify without installing
+# Add parent directory to path to import transmog without installing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import from src package
-from src.transmogrify import Processor, configure
-from src.transmogrify.naming.abbreviator import get_common_abbreviations
+from src.transmog import Processor, configure
+from src.transmog.naming.abbreviator import get_common_abbreviations
 
 
 def main():

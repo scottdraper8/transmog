@@ -1,4 +1,4 @@
-"""Setup script for transmogrify package."""
+"""Setup script for transmog package."""
 
 import setuptools
 

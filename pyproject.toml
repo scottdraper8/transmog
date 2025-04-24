@@ -83,9 +83,9 @@ docs = [
 data = []
 
 [project.urls]
-"Homepage" = "https://github.com/scottdraper8/transmogrify"
-"Documentation" = "https://transmogrify.readthedocs.io"
-"Bug Tracker" = "https://github.com/scottdraper8/transmogrify/issues"
+"Homepage" = "https://github.com/scottdraper8/transmog"
+"Documentation" = "https://transmog.readthedocs.io"
+"Bug Tracker" = "https://github.com/scottdraper8/transmog/issues"
 
 [tool.ruff]
 target-version = "py37"
@@ -105,7 +105,7 @@ skip-magic-trailing-comma = false
 
 # Ruff isort configuration
 [tool.ruff.isort]
-known-first-party = ["transmogrify"]
+known-first-party = ["transmog"]
 combine-as-imports = true
 section-order = [
     "future",

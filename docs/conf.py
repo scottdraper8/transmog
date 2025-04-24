@@ -1,5 +1,5 @@
 """
-Sphinx configuration for Transmogrify documentation.
+Sphinx configuration for Transmog documentation.
 """
 
 import os
@@ -10,14 +10,14 @@ import datetime
 sys.path.insert(0, os.path.abspath(".."))
 
 # -- Project information -----------------------------------------------------
-project = "Transmogrify"
+project = "Transmog"
 author = "Scott Draper"
 copyright = f"{datetime.datetime.now().year}, {author}"
 
 # The full version, including alpha/beta/rc tags
 # Import the version from the package
 try:
-    from src.transmogrify import __version__ as release
+    from src.transmog import __version__ as release
 except ImportError:
     release = "0.1.0"  # Default if import fails
 
@@ -131,7 +131,7 @@ linkcheck_ignore = [
 linkcheck_timeout = 30
 
 # -- Options for HTMLHelp output ---------------------------------------------
-htmlhelp_basename = "TransmogrifyDoc"
+htmlhelp_basename = "TransmogDoc"
 
 # -- Options for LaTeX output ------------------------------------------------
 latex_elements = {
@@ -143,8 +143,8 @@ latex_elements = {
 latex_documents = [
     (
         "index",  # Source start file
-        "Transmogrify.tex",  # Target file
-        "Transmogrify Documentation",  # Title
+        "Transmog.tex",  # Target file
+        "Transmog Documentation",  # Title
         "Scott Draper",  # Author
         "manual",  # Document class
     ),
@@ -154,8 +154,8 @@ latex_documents = [
 man_pages = [
     (
         "index",  # Source start file
-        "transmogrify",  # Name
-        "Transmogrify Documentation",  # Title
+        "transmog",  # Name
+        "Transmog Documentation",  # Title
         ["Scott Draper"],  # Authors
         1,  # Manual section
     ),
@@ -165,10 +165,10 @@ man_pages = [
 texinfo_documents = [
     (
         "index",  # Source start file
-        "Transmogrify",  # Target name
-        "Transmogrify Documentation",  # Title
+        "Transmog",  # Target name
+        "Transmog Documentation",  # Title
         "Scott Draper",  # Author
-        "Transmogrify",  # Dir menu entry
+        "Transmog",  # Dir menu entry
         "JSON transformation library",  # Description
         "Miscellaneous",  # Category
     ),

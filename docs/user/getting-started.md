@@ -1,23 +1,23 @@
-# Getting Started with Transmogrify
+# Getting Started with Transmog
 
-This guide will help you get started with Transmogrify to transform nested JSON into flattened formats.
+This guide will help you get started with Transmog to transform nested JSON into flattened formats.
 
 ## Installation
 
 ```bash
 # Basic installation
-pip install transmogrify
+pip install transmog
 
 # With optional dependencies
-pip install transmogrify[all]
+pip install transmog[all]
 ```
 
 ## Basic Usage
 
-A common use case for Transmogrify is flattening nested JSON structures:
+A common use case for Transmog is flattening nested JSON structures:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 # Sample nested data
 data = {
@@ -62,7 +62,7 @@ This will output a list containing the flattened record:
 
 ## Core Concepts
 
-Transmogrify is built around a few key concepts:
+Transmog is built around a few key concepts:
 
 - **Processor**: The main entry point for transforming data
 - **ProcessingResult**: Contains the output tables after processing
@@ -99,7 +99,7 @@ Output would include paths separated by forward slashes:
 
 ### Handling Arrays
 
-By default, Transmogrify extracts arrays into separate child tables:
+By default, Transmog extracts arrays into separate child tables:
 
 ```python
 processor = tm.Processor()
@@ -154,7 +154,7 @@ Orders: [
 
 ### Processing Options
 
-Transmogrify provides several processing options:
+Transmog provides several processing options:
 
 ```python
 processor = tm.Processor(
@@ -174,7 +174,7 @@ processor = tm.Processor(
 
 ## Exporting Data
 
-Transmogrify supports exporting to multiple formats:
+Transmog supports exporting to multiple formats:
 
 ```python
 # Get structured output
@@ -194,10 +194,10 @@ result.write_all_parquet("output_dir/parquet")
 
 ## Error Handling
 
-Transmogrify provides error recovery strategies:
+Transmog provides error recovery strategies:
 
 ```python
-from transmogrify.recovery import SkipAndLogRecovery
+from transmog.recovery import SkipAndLogRecovery
 
 # Create a processor with error recovery
 processor = tm.Processor(

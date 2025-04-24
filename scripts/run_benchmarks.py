@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Performance benchmarking script for Transmogrify output formats.
+Performance benchmarking script for Transmog output formats.
 
 This script runs benchmarks for the various output format methods to
 compare their performance characteristics.
@@ -14,10 +14,10 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-# Add parent directory to path to import transmogrify
+# Add parent directory to path to import transmog
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.transmogrify import Processor
+from src.transmog import Processor
 
 
 def generate_test_data(
@@ -275,7 +275,7 @@ def save_results(results: Dict[str, Dict[str, float]], output_path: str) -> None
 def main() -> None:
     """Run the benchmark suite."""
     parser = argparse.ArgumentParser(
-        description="Run performance benchmarks for Transmogrify output formats"
+        description="Run performance benchmarks for Transmog output formats"
     )
     parser.add_argument(
         "--records",

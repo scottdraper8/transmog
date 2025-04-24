@@ -1,6 +1,6 @@
 # Deterministic ID Generation Examples
 
-This page demonstrates how to use Transmogrify's deterministic ID generation features to maintain consistent identifiers across multiple processing runs.
+This page demonstrates how to use Transmog's deterministic ID generation features to maintain consistent identifiers across multiple processing runs.
 
 ## Why Use Deterministic IDs?
 
@@ -16,7 +16,7 @@ Deterministic IDs are especially useful in scenarios where you:
 The simplest use case is to generate consistent IDs for the root-level records using a specific field.
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 # Sample data with an ID field
 data = {
@@ -50,7 +50,7 @@ print(f"Extract ID: {id1}")
 For more complex data structures with nested arrays, you can specify different ID fields at different levels.
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 # Complex nested data
 data = {
@@ -118,7 +118,7 @@ print("All IDs are consistent across processing runs!")
 You can use wildcard patterns to apply the same ID field to multiple paths.
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 # Data with consistent ID field names
 data = {
@@ -156,7 +156,7 @@ For complex ID generation requirements, you can provide a custom function.
 
 ```python
 import uuid
-from transmogrify import Processor
+from transmog import Processor
 
 # Define custom ID generation function
 def custom_id_generator(record):
@@ -204,7 +204,7 @@ print("Product ID:", tables["store_products"][0]["__extract_id"])  # PROD-PROD00
 This example demonstrates how deterministic IDs help with incremental data processing.
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 # Initial data batch
 initial_data = {
@@ -266,7 +266,7 @@ print("Incremental processing succeeded with consistent IDs!")
 1. **Choose stable fields** for deterministic IDs that don't change between processing runs
 2. **Use business keys** when available (e.g., customer IDs, order numbers)
 3. **Test with a small dataset first** to verify ID consistency
-4. **Be aware of missing fields** - if a specified ID field is missing, Transmogrify will fall back to random UUIDs
+4. **Be aware of missing fields** - if a specified ID field is missing, Transmog will fall back to random UUIDs
 5. **Consider using a custom ID function** for complex scenarios where multiple fields need to be combined or special formatting is required
 
 For more details, see the [Deterministic IDs user guide](../user/deterministic-ids.md). 

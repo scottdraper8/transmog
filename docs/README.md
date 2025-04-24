@@ -1,6 +1,6 @@
-# Transmogrify Documentation
+# Transmog Documentation
 
-This directory contains the documentation for the Transmogrify project. The documentation is built using Sphinx with MyST Markdown.
+This directory contains the documentation for the Transmog project. The documentation is built using Sphinx with MyST Markdown.
 
 ## Documentation Structure
 
@@ -12,7 +12,7 @@ This directory contains the documentation for the Transmogrify project. The docu
   - `user/flattening.md`: Guide to JSON flattening
   - `user/arrays.md`: Working with arrays
   - `user/error-handling.md`: Error handling and recovery strategies
-  - `user/concurrency.md`: Parallel processing with Transmogrify
+  - `user/concurrency.md`: Parallel processing with Transmog
   
 - **API Reference**
   - `api/processor.md`: Processor class documentation
@@ -22,7 +22,7 @@ This directory contains the documentation for the Transmogrify project. The docu
   - `../CONTRIBUTING.md`: Contributing guidelines (main file in repository root)
   - `dev/architecture.md`: Architectural overview
   - `dev/code-style.md`: Code style guidelines
-  - `dev/extending.md`: How to extend Transmogrify
+  - `dev/extending.md`: How to extend Transmog
   - `dev/release-process.md`: Release process documentation
   - `dev/testing.md`: Testing guidelines
 
@@ -84,4 +84,4 @@ If you'd like to improve the documentation:
 2. Follow the contributing guidelines in the main CONTRIBUTING.md file
 3. Submit a pull request with your documentation changes
 
-Thank you for helping improve Transmogrify's documentation! 
+Thank you for helping improve Transmog's documentation! 

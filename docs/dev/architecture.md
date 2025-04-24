@@ -1,10 +1,10 @@
 # Architecture Overview
 
-This document provides an overview of Transmogrify's internal architecture to help contributors understand how the components fit together.
+This document provides an overview of Transmog's internal architecture to help contributors understand how the components fit together.
 
 ## High-Level Architecture
 
-Transmogrify follows a modular design with several core components:
+Transmog follows a modular design with several core components:
 
 ```{mermaid}
 graph TD
@@ -29,8 +29,8 @@ The `Transformer` class is the main entry point for users. It orchestrates the t
 4. Building the result object
 
 Key files:
-- `src/transmogrify/transformer.py` - Main implementation
-- `src/transmogrify/config.py` - Configuration options
+- `src/transmog/transformer.py` - Main implementation
+- `src/transmog/config.py` - Configuration options
 
 ### Path Resolution
 
@@ -42,8 +42,8 @@ The path resolution system handles the traversal of nested data structures based
 - Advanced selectors: `data[?(@.active==true)].name` (JSONPath-like)
 
 Key files:
-- `src/transmogrify/path.py` - Path expression parsing
-- `src/transmogrify/resolver.py` - Path resolution logic
+- `src/transmog/path.py` - Path expression parsing
+- `src/transmog/resolver.py` - Path resolution logic
 
 ### Value Processing
 
@@ -55,8 +55,8 @@ Value processors transform raw data values during extraction. This system allows
 - Custom transformations
 
 Key files:
-- `src/transmogrify/processors.py` - Built-in processors
-- `src/transmogrify/hooks.py` - Extension points for custom processors
+- `src/transmog/processors.py` - Built-in processors
+- `src/transmog/hooks.py` - Extension points for custom processors
 
 ### Result Management
 
@@ -68,8 +68,8 @@ The `TransformResult` class manages the output data and provides methods to:
 - Stream results for large datasets
 
 Key files:
-- `src/transmogrify/result.py` - Result implementation
-- `src/transmogrify/io/` - Output format handlers
+- `src/transmog/result.py` - Result implementation
+- `src/transmog/io/` - Output format handlers
 
 ### I/O System
 
@@ -80,9 +80,9 @@ The I/O system handles reading input data and writing output in various formats:
 - Parquet (via PyArrow)
 
 Key files:
-- `src/transmogrify/io/json.py` - JSON handling
-- `src/transmogrify/io/csv.py` - CSV handling
-- `src/transmogrify/io/parquet.py` - Parquet handling
+- `src/transmog/io/json.py` - JSON handling
+- `src/transmog/io/csv.py` - CSV handling
+- `src/transmog/io/parquet.py` - Parquet handling
 
 ### Error Handling
 
@@ -93,8 +93,8 @@ The error handling system provides configurable strategies for dealing with erro
 - Custom recovery strategies
 
 Key files:
-- `src/transmogrify/errors.py` - Error definitions
-- `src/transmogrify/recovery.py` - Recovery strategies
+- `src/transmog/errors.py` - Error definitions
+- `src/transmog/recovery.py` - Recovery strategies
 
 ## Data Flow
 
@@ -122,7 +122,7 @@ A typical data flow through the system works as follows:
 
 ## Extension Points
 
-Transmogrify provides several extension points for customization:
+Transmog provides several extension points for customization:
 
 1. **Custom Value Processors**: 
    ```python
@@ -157,7 +157,7 @@ Transmogrify provides several extension points for customization:
 
 ## Performance Considerations
 
-Transmogrify includes several performance techniques:
+Transmog includes several performance techniques:
 
 1. **Implementation Approaches**: 
    - Specific optimizations for common cases

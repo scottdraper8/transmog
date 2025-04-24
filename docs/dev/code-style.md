@@ -1,6 +1,6 @@
 # Code Style Guide
 
-This document outlines the coding standards and style conventions for the Transmogrify project.
+This document outlines the coding standards and style conventions for the Transmog project.
 
 ## Coding Principles
 
@@ -177,8 +177,8 @@ from typing import Dict, List, Optional
 
 import pyarrow as pa
 
-from transmogrify.core import flattener
-from transmogrify.io import csv_writer
+from transmog.core import flattener
+from transmog.io import csv_writer
 ```
 
 ## Type Hints

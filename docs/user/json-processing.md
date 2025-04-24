@@ -1,13 +1,13 @@
 # JSON Processing
 
-Transmogrify provides comprehensive support for processing JSON data, with powerful features for handling complex nested structures, arrays, and large datasets.
+Transmog provides comprehensive support for processing JSON data, with powerful features for handling complex nested structures, arrays, and large datasets.
 
 ## Basic JSON Processing
 
 The simplest way to process JSON data is using the `process` method:
 
 ```python
-from transmogrify import Processor
+from transmog import Processor
 
 processor = Processor()
 
@@ -31,7 +31,7 @@ print(f"Processed {len(main_table)} records")
 
 ## Processing JSON Files
 
-Transmogrify can directly process JSON files:
+Transmog can directly process JSON files:
 
 ```python
 # Process a JSON file
@@ -60,7 +60,7 @@ result = processor.process_jsonl_file(
 
 ## Processing Nested JSON Structures
 
-Transmogrify excels at handling deeply nested JSON data:
+Transmog excels at handling deeply nested JSON data:
 
 ```python
 # Complex nested JSON example
@@ -102,13 +102,13 @@ nested_json = {
 
 result = processor.process(nested_json, entity_name="orders")
 
-# Transmogrify automatically flattens nested structures
+# Transmog automatically flattens nested structures
 # and creates relationships between parent and child objects
 ```
 
 ## Memory-Optimized JSON Processing
 
-For large JSON files, Transmogrify offers memory-optimized processing:
+For large JSON files, Transmog offers memory-optimized processing:
 
 ```python
 # Create a processor optimized for memory usage
@@ -124,7 +124,7 @@ result = processor.process_json_file(
 
 ## Processing JSON Arrays
 
-Transmogrify can handle JSON arrays of objects:
+Transmog can handle JSON arrays of objects:
 
 ```python
 # JSON array of objects
@@ -249,7 +249,7 @@ with open("very_large.json", "r") as f:
         results.append(chunk)
     
     # Combine the results if needed
-    from transmogrify.processing_result import ProcessingResult
+    from transmog.processing_result import ProcessingResult
     combined_result = ProcessingResult.combine(results)
 ```
 

@@ -1,39 +1,43 @@
-# Transmogrify
+# Transmog
 
-[![PyPI version](https://img.shields.io/pypi/v/transmogrify.svg)](https://pypi.org/project/transmogrify/)
-[![Python versions](https://img.shields.io/pypi/pyversions/transmogrify.svg)](https://pypi.org/project/transmogrify/)
-[![License](https://img.shields.io/github/license/scottdraper8/transmogrify.svg)](https://github.com/scottdraper8/transmogrify/blob/main/LICENSE)
+[![PyPI version](https://img.shields.io/pypi/v/transmog.svg)](https://pypi.org/project/transmog/)
+[![Python versions](https://img.shields.io/pypi/pyversions/transmog.svg)](https://pypi.org/project/transmog/)
+[![License](https://img.shields.io/github/license/scottdraper8/transmog.svg)](https://github.com/scottdraper8/transmog/blob/main/LICENSE)
 
-A Python library for transforming complex nested JSON data into flat, structured formats.
+A Python library for transforming complex nested JSON data into flat, structured formats while preserving parent-child relationships.
 
 ## Features
 
-- Flatten deeply nested JSON/dict structures with customizable delimiter options
-- Transform values during processing with custom functions
-- Native Formats: output to PyArrow Tables, Python dictionaries, or JSON objects
-- Bytes Output: serialize directly to Parquet, CSV, or JSON bytes
-- File Export: write to various file formats (JSON, CSV, Parquet)
-- Recover from errors in malformed data with customizable strategies
-- Optimize for performance with optional dependencies
-- Stream large datasets efficiently
-- Deterministic ID generation for data consistency across processing runs
+- **Multiple Input Formats**: Process JSON, JSONL (line-delimited JSON), and CSV files
+- **Flattening**: Flatten deeply nested structures with customizable delimiter options
+- **Output Flexibility**: 
+  - Native formats: Python dictionaries, JSON objects, PyArrow Tables
+  - Bytes output: Serialize directly to Parquet, CSV, or JSON bytes
+  - File export: Write to various file formats (JSON, CSV, Parquet)
+- **Performance Optimization**:
+  - Process large datasets with configurable memory management  
+  - Single-pass or chunked processing depending on data size
+  - Stream data from files efficiently
+- **Metadata Generation**: Track data lineage with automatic ID generation and parent-child relationships
+- **Error Recovery**: Recover from malformed data with customizable strategies
+- **Consistent IDs**: Deterministic ID generation for data consistency across processing runs
 
 ## Installation
 
 ```bash
-pip install transmogrify
+pip install transmog
 ```
 
 For minimal installation without optional dependencies:
 
 ```bash
-pip install transmogrify[minimal]
+pip install transmog[minimal]
 ```
 
 For development installation:
 
 ```bash
-pip install transmogrify[dev]
+pip install transmog[dev]
 ```
 
 See the [installation guide](docs/installation.md) for more details.
@@ -41,7 +45,7 @@ See the [installation guide](docs/installation.md) for more details.
 ## Quick Example
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 # Sample nested data
 data = {
@@ -89,9 +93,54 @@ result.write_all_csv("output_dir/csv")
 result.write_all_parquet("output_dir/parquet")
 ```
 
+## Input Formats
+
+Transmog supports multiple input formats:
+
+```python
+# Process standard JSON file
+result = processor.process_file("data.json", entity_name="entity")
+
+# Process JSONL (line-delimited JSON)
+result = processor.process_file("data.jsonl", entity_name="entity")
+
+# Process CSV file with options
+result = processor.process_csv(
+    "data.csv",
+    entity_name="records",
+    delimiter=",",
+    has_header=True,
+    infer_types=True
+)
+```
+
+## Processing Large Datasets
+
+For large datasets, use memory-optimized processing:
+
+```python
+# Memory-optimized processor
+processor = tm.Processor(optimize_for_memory=True)
+
+# Process a large file in chunks
+result = processor.process_chunked(
+    "large_data.jsonl",
+    entity_name="records",
+    chunk_size=1000  # Process 1000 records at a time
+)
+```
+
+## Metadata Generation
+
+Transmog automatically adds metadata to processed records:
+
+- `__extract_id` - Unique identifier for each record
+- `__parent_extract_id` - Reference to parent record (for child tables)
+- `__extract_datetime` - Processing timestamp
+
 ## Deterministic ID Generation
 
-Transmogrify can now ensure consistent IDs for records across multiple processing runs:
+Ensure consistent IDs across processing runs:
 
 ```python
 # Configure deterministic IDs based on specific fields
@@ -119,7 +168,7 @@ See the [deterministic IDs guide](docs/user/deterministic-ids.md) for more infor
 
 ## Output Format Options
 
-Transmogrify provides three main categories of output formats:
+Transmog provides three main categories of output formats:
 
 1. **Native Data Structures** - Python objects like dictionaries and PyArrow Tables
    ```python
@@ -141,6 +190,32 @@ Transmogrify provides three main categories of output formats:
    result.write_all_csv()        # Write to CSV files
    result.write_all_parquet()    # Write to Parquet files
    ```
+
+## Configurable Options
+
+Transmog offers many configuration options:
+
+```python
+processor = tm.Processor(
+    # Data formatting
+    separator="_",                # Separator for flattened field names
+    cast_to_string=True,         # Cast all values to strings
+    include_empty=False,         # Include empty values
+    skip_null=True,              # Skip null values
+    
+    # Performance
+    optimize_for_memory=False,   # Prioritize memory efficiency over speed
+    batch_size=1000,             # Default batch size for large datasets
+    path_parts_optimization=True, # Optimize path handling for deep structures
+    
+    # Naming options
+    abbreviate_table_names=True, # Abbreviate table names
+    abbreviate_field_names=True, # Abbreviate field names
+    
+    # Error handling
+    allow_malformed_data=False   # Attempt to recover from malformed data
+)
+```
 
 ## Documentation
 

@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Union, Callable
 
 
 # Define a consistent namespace for deterministic IDs
-TRANSMOGRIFY_NAMESPACE = uuid.UUID("a9b8c7d6-e5f4-1234-abcd-0123456789ab")
+TRANSMOG_NAMESPACE = uuid.UUID("a9b8c7d6-e5f4-1234-abcd-0123456789ab")
 
 
 def generate_extract_id(
@@ -73,7 +73,7 @@ def generate_deterministic_id(value: Any) -> str:
     value_str = str(value)
 
     # Create UUID5 using the namespace and the value
-    deterministic_uuid = uuid.uuid5(TRANSMOGRIFY_NAMESPACE, value_str)
+    deterministic_uuid = uuid.uuid5(TRANSMOG_NAMESPACE, value_str)
 
     return str(deterministic_uuid)
 

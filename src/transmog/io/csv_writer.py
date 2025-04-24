@@ -1,5 +1,5 @@
 """
-CSV writer for Transmogrify output.
+CSV writer for Transmog output.
 
 This module provides a CSV writer with PyArrow and standard library implementations.
 """
@@ -14,9 +14,9 @@ import lzma
 from typing import Any, Dict, List, Optional, Union, BinaryIO, Tuple
 from io import StringIO
 
-from src.transmogrify.io.writer_interface import DataWriter
-from src.transmogrify.naming.conventions import sanitize_column_names
-from src.transmogrify.config.settings import settings
+from src.transmog.io.writer_interface import DataWriter
+from src.transmog.naming.conventions import sanitize_column_names
+from src.transmog.config.settings import settings
 
 # Configure logger
 logger = logging.getLogger(__name__)

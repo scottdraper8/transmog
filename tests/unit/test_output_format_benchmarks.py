@@ -8,7 +8,7 @@ added to ProcessingResult.
 import pytest
 from typing import Dict, List, Any
 
-from src.transmogrify import Processor
+from src.transmog import Processor
 
 
 def generate_test_data(num_records: int = 100) -> List[Dict[str, Any]]:

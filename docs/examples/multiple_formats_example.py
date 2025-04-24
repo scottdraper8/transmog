@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Example script demonstrating how to convert between multiple formats using Transmogrify.
+Example script demonstrating how to convert between multiple formats using Transmog.
 This example shows converting from JSON to CSV, Parquet, and Excel formats.
 """
 
-from transmogrify import Processor
+from transmog import Processor
 
 
 def main():

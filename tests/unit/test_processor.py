@@ -6,8 +6,8 @@ import os
 import json
 import tempfile
 import pytest
-from src.transmogrify import Processor, ProcessingResult
-from src.transmogrify.processor import ProcessingMode
+from src.transmog import Processor, ProcessingResult
+from src.transmog.processor import ProcessingMode
 
 
 class TestProcessor:

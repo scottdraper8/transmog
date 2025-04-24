@@ -1,5 +1,5 @@
 """
-Integration tests for the Transmogrify package.
+Integration tests for the Transmog package.
 
 These tests verify the end-to-end functionality of the package with
 realistic scenarios.
@@ -9,7 +9,7 @@ import os
 import json
 import tempfile
 import pytest
-from src.transmogrify import Processor
+from src.transmog import Processor
 
 # Check if pyarrow is available
 try:
@@ -22,7 +22,7 @@ except ImportError:
 
 
 class TestEndToEndScenarios:
-    """End-to-end integration tests for Transmogrify."""
+    """End-to-end integration tests for Transmog."""
 
     @pytest.mark.skipif(
         not PYARROW_AVAILABLE, reason="PyArrow required for Parquet output"

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Example script demonstrating data cleanup with Transmogrify.
+Example script demonstrating data cleanup with Transmog.
 This example shows how to clean messy data using various methods and filters.
 """
 
-from transmogrify import Processor, Field, CleanupRule
+from transmog import Processor, Field, CleanupRule
 import os
 
 

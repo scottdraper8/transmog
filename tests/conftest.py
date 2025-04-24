@@ -1,5 +1,5 @@
 """
-Pytest configuration file for Transmogrify tests.
+Pytest configuration file for Transmog tests.
 
 This file contains fixtures and configuration for pytest tests.
 """
@@ -13,7 +13,7 @@ from typing import Dict, List, Any
 # Add the package root to sys.path for importing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.transmogrify import Processor
+from src.transmog import Processor
 
 
 @pytest.fixture

@@ -1,5 +1,5 @@
 """
-Main processor for Transmogrify package.
+Main processor for Transmog package.
 
 This module contains the Processor class which is the main entry point
 for processing nested JSON data.
@@ -484,7 +484,7 @@ class Processor:
 
         # Create CSV reader with specified options and consistent configuration
         try:
-            from src.transmogrify.io.csv_reader import CSVReader
+            from src.transmog.io.csv_reader import CSVReader
 
             reader = CSVReader(
                 delimiter=delimiter,
@@ -536,11 +536,11 @@ class Processor:
         Returns:
             ProcessingResult object
         """
-        from src.transmogrify.core.hierarchy import (
+        from src.transmog.core.hierarchy import (
             process_records_in_single_pass,
             process_record_batch,
         )
-        from src.transmogrify.core.metadata import (
+        from src.transmog.core.metadata import (
             generate_extract_id,
             generate_deterministic_id,
         )
@@ -1186,7 +1186,7 @@ class Processor:
         Raises:
             FileError: If file cannot be read
         """
-        from src.transmogrify.io.csv_reader import CSVReader
+        from src.transmog.io.csv_reader import CSVReader
 
         if not os.path.exists(file_path):
             raise FileError(f"File not found: {file_path}")

@@ -1,5 +1,5 @@
 """
-JSON Reader module for Transmogrify.
+JSON Reader module for Transmog.
 
 This module provides functions for reading JSON data from various sources
 and in different formats, with support for streaming and chunking.

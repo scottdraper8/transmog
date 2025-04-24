@@ -1,10 +1,10 @@
 # Working with Output Formats
 
-Transmogrify provides options for outputting processed data in different formats. This guide explains how to use these output methods to fit your specific use case.
+Transmog provides options for outputting processed data in different formats. This guide explains how to use these output methods to fit your specific use case.
 
 ## Output Format Categories
 
-Transmogrify offers three main categories of output formats:
+Transmog offers three main categories of output formats:
 
 1. **Native Data Structures** - Python objects like dictionaries and PyArrow Tables
 2. **Bytes Serialization** - Raw bytes in JSON, CSV, or Parquet format for direct writing
@@ -17,7 +17,7 @@ Transmogrify offers three main categories of output formats:
 The simplest way to access processed data is as Python dictionaries:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 # Process data
 processor = tm.Processor()
@@ -189,7 +189,7 @@ if "amount" in main_table.column_names:
 For processing large datasets:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 import json
 import io
 

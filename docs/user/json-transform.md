@@ -1,13 +1,13 @@
 # JSON Transform
 
-Transmogrify provides powerful capabilities for transforming JSON data before processing. This feature allows you to modify, restructure, augment, or filter your data prior to extraction.
+Transmog provides powerful capabilities for transforming JSON data before processing. This feature allows you to modify, restructure, augment, or filter your data prior to extraction.
 
 ## Basic Usage
 
 The JSON transform feature allows you to apply transformations to your JSON data using custom Python functions:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 def add_full_name(data):
     """Add a full_name field by combining first and last name."""
@@ -36,7 +36,7 @@ print(result.get_main_table()[0]['full_name'])  # Output: John Doe
 For more targeted transformations, you can specify paths where the transform should be applied:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 def uppercase_name(data):
     """Convert name fields to uppercase."""
@@ -87,7 +87,7 @@ Transform functions must:
 You can chain multiple transforms together by using a list:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 def add_full_name(data):
     if isinstance(data, dict) and 'first_name' in data and 'last_name' in data:
@@ -127,7 +127,7 @@ print(main_table[0]['num_transactions'])  # Output: 3
 
 ## Path Specification Format
 
-Transmogrify uses JSONPath syntax for specifying paths:
+Transmog uses JSONPath syntax for specifying paths:
 
 - `$` represents the root object
 - `.property` accesses a property

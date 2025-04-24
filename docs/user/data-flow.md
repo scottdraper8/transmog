@@ -1,10 +1,10 @@
 # Data Processing Flow
 
-Transmogrify organizes data processing into a structured flow that ensures predictable and controllable transformations. This guide explains how data flows through the system and the various stages available.
+Transmog organizes data processing into a structured flow that ensures predictable and controllable transformations. This guide explains how data flows through the system and the various stages available.
 
 ## Overview
 
-When processing data with Transmogrify, your data goes through several well-defined stages:
+When processing data with Transmog, your data goes through several well-defined stages:
 
 1. **Input** - Data enters the system from various sources
 2. **Preprocessing** - Initial standardization and validation
@@ -20,10 +20,10 @@ When processing data with Transmogrify, your data goes through several well-defi
 
 ## Creating a Processor
 
-The main entry point for working with Transmogrify is the `Processor` class:
+The main entry point for working with Transmog is the `Processor` class:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 # Create a basic processor
 processor = tm.Processor()
@@ -217,10 +217,10 @@ print(f"Output size: {stats.output_size} bytes")
 
 ## Combining Multiple Stages
 
-A typical Transmogrify processor will combine multiple stages:
+A typical Transmog processor will combine multiple stages:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 def calculate_total(data):
     """Calculate order total from items."""
@@ -291,7 +291,7 @@ result = processor.process(order_data, entity_name="order")
 
 ## Processing Collections
 
-Transmogrify can process collections of data:
+Transmog can process collections of data:
 
 ```python
 # Process a list of users
@@ -327,7 +327,7 @@ result2 = user_processor.process_file("users.json", entity_name="users")
 
 ## Error Handling
 
-Transmogrify provides flexible error handling:
+Transmog provides flexible error handling:
 
 ```python
 # Non-strict mode to collect errors instead of failing

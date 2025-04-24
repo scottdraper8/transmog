@@ -1,13 +1,13 @@
-# CSV Processing with Transmogrify
+# CSV Processing with Transmog
 
-This guide demonstrates how to process CSV files using Transmogrify.
+This guide demonstrates how to process CSV files using Transmog.
 
 ## Basic CSV Processing
 
 To process a CSV file:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 # Initialize processor
 processor = tm.Processor()
@@ -112,7 +112,7 @@ result = processor.process_csv(
 For handling less-than-perfect CSV files:
 
 ```python
-from transmogrify.recovery import SkipAndLogRecovery
+from transmog.recovery import SkipAndLogRecovery
 
 # Create processor with recovery strategy
 processor = tm.Processor(

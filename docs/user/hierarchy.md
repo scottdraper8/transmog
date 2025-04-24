@@ -1,10 +1,10 @@
 # Working with Data Hierarchies
 
-Transmogrify excels at handling nested data structures and preserving parent-child relationships when flattening complex hierarchical data.
+Transmog excels at handling nested data structures and preserving parent-child relationships when flattening complex hierarchical data.
 
 ## Understanding the Extraction Process
 
-When processing nested data, Transmogrify:
+When processing nested data, Transmog:
 
 1. Flattens the main entity (root level)
 2. Extracts arrays into separate child tables
@@ -12,14 +12,14 @@ When processing nested data, Transmogrify:
 
 ## Parent-Child Relationships
 
-Transmogrify automatically maintains relationships between tables through ID fields:
+Transmog automatically maintains relationships between tables through ID fields:
 
 - Each record in the main table gets a unique `__extract_id` field
 - Child records contain a `__parent_id` field that references their parent's `__extract_id`
 - Each child table is named based on the parent entity name and the array field's path
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 data = {
     "id": "user123",
@@ -50,7 +50,7 @@ for order in child_table:
 
 ## Nested Arrays
 
-Transmogrify handles multiple levels of nesting by creating a separate table for each array:
+Transmog handles multiple levels of nesting by creating a separate table for each array:
 
 ```python
 data = {
@@ -86,7 +86,7 @@ for item in items_table:
 
 ## ID Generation Strategies
 
-Transmogrify offers several strategies for generating IDs:
+Transmog offers several strategies for generating IDs:
 
 ### Random UUID Strategy (default)
 
@@ -100,7 +100,7 @@ result = processor.process(data, entity_name="customer")
 This ensures the same data always produces the same IDs:
 
 ```python
-from transmogrify.id_generation import DeterministicIdStrategy
+from transmog.id_generation import DeterministicIdStrategy
 
 processor = tm.Processor(
     id_generation_strategy=DeterministicIdStrategy(
@@ -116,7 +116,7 @@ result = processor.process(data, entity_name="customer")
 You can implement your own ID generation strategy:
 
 ```python
-from transmogrify.id_generation import IdGenerationStrategy
+from transmog.id_generation import IdGenerationStrategy
 
 class SequentialIdStrategy(IdGenerationStrategy):
     def __init__(self):
@@ -140,7 +140,7 @@ result1 = processor.process_batch(batch1, entity_name="customer")
 result2 = processor.process_batch(batch2, entity_name="customer")
 
 # Combine the results
-from transmogrify import ProcessingResult
+from transmog import ProcessingResult
 combined = ProcessingResult.combine_results([result1, result2])
 
 # Access the combined data

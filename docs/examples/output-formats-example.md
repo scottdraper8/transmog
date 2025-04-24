@@ -1,13 +1,13 @@
 # Output Format Examples
 
-This guide demonstrates the various output formats available in Transmogrify.
+This guide demonstrates the various output formats available in Transmog.
 
 ## Sample Data
 
 We'll use this sample data for all examples:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 # Sample nested data
 data = {

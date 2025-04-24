@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Example script demonstrating data transformation with Transmogrify.
+Example script demonstrating data transformation with Transmog.
 This example shows how to map fields and convert data types during transformation.
 """
 
-from transmogrify import Processor, FieldMap, DataType
+from transmog import Processor, FieldMap, DataType
 
 
 def main():

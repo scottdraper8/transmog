@@ -9,11 +9,11 @@ import sys
 import os
 from pprint import pprint
 
-# Add parent directory to path to import transmogrify
+# Add parent directory to path to import transmog
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# Import from transmogrify
-from src.transmogrify.naming.abbreviator import (
+# Import from transmog
+from src.transmog.naming.abbreviator import (
     abbreviate_table_name,
     abbreviate_field_name,
     get_common_abbreviations,

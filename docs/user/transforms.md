@@ -1,10 +1,10 @@
 # Data Transforms
 
-Transmogrify offers powerful data transformation capabilities that allow you to modify, enrich, clean, and restructure your data during processing. This guide explains the various transform options available and how to use them effectively.
+Transmog offers powerful data transformation capabilities that allow you to modify, enrich, clean, and restructure your data during processing. This guide explains the various transform options available and how to use them effectively.
 
 ## Transform Types
 
-Transmogrify supports several types of transforms:
+Transmog supports several types of transforms:
 
 1. **Global Transforms** - Applied to the entire data structure
 2. **Path-Specific Transforms** - Applied only to values at specific paths
@@ -17,7 +17,7 @@ Transmogrify supports several types of transforms:
 Global transforms are functions that process the entire data structure:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 def add_metadata(data):
     """Add metadata fields to the record."""
@@ -49,7 +49,7 @@ Global transform functions must:
 Path transforms are applied only to values that match specific paths:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 def capitalize_name(value):
     """Capitalize a name string."""
@@ -98,8 +98,8 @@ Path transform functions must:
 Field mappings transform data while also renaming fields:
 
 ```python
-import transmogrify as tm
-from transmogrify import FieldMap, DataType
+import transmog as tm
+from transmog import FieldMap, DataType
 
 # Define field mappings
 field_maps = [
@@ -158,7 +158,7 @@ A `FieldMap` can include:
 Type transforms convert values to specific data types:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 from datetime import datetime
 
 def type_transformer(record):
@@ -192,7 +192,7 @@ processor = tm.Processor(transforms=[type_transformer])
 You can chain multiple transforms together to apply them in sequence:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 def clean_data(data):
     """Remove null values and whitespace from strings."""
@@ -366,7 +366,7 @@ def normalize_keys(data):
 Here's an example of a complete transformation pipeline:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 from datetime import datetime
 
 def clean_input(data):
@@ -535,7 +535,7 @@ def conditional_transform(data):
 You can pass context to transforms for more complex scenarios:
 
 ```python
-import transmogrify as tm
+import transmog as tm
 
 def transform_with_context(data, context=None):
     """Use context information in the transform."""

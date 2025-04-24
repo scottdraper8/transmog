@@ -1,5 +1,5 @@
 """
-CSV reader for Transmogrify input.
+CSV reader for Transmog input.
 
 This module provides functions for reading CSV data with PyArrow and built-in CSV module
 implementations, with support for type inference, null value handling, and column sanitization.

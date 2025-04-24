@@ -1,5 +1,5 @@
 """
-IO module for Transmogrify.
+IO module for Transmog.
 
 This module provides utilities for reading and writing data in different formats.
 """
@@ -37,11 +37,11 @@ except ImportError:
     # CSV reader will fall back to built-in if PyArrow not available
 
 # Import the writer registry
-from src.transmogrify.io.writer_registry import WriterRegistry
+from src.transmog.io.writer_registry import WriterRegistry
 
 # Import reader functions for convenience
 try:
-    from src.transmogrify.io.json_reader import (
+    from src.transmog.io.json_reader import (
         read_json_file,
         read_jsonl_file,
         read_json_stream,
@@ -50,7 +50,7 @@ except ImportError:
     logger.debug("Could not import JSON reader functions")
 
 try:
-    from src.transmogrify.io.csv_reader import (
+    from src.transmog.io.csv_reader import (
         read_csv_file,
         read_csv_stream,
         CSVReader,
@@ -65,19 +65,19 @@ def _register_default_writers():
     """Register default writers with the registry."""
     # Always register JSON writer (no external dependencies)
     WriterRegistry.register_format(
-        "json", "src.transmogrify.io.json_writer", "JsonWriter"
+        "json", "src.transmog.io.json_writer", "JsonWriter"
     )
 
     # Register CSV writer if available
     if _available_formats.get("csv"):
         WriterRegistry.register_format(
-            "csv", "src.transmogrify.io.csv_writer", "CsvWriter"
+            "csv", "src.transmog.io.csv_writer", "CsvWriter"
         )
 
     # Register Parquet writer if available
     if _available_formats.get("parquet"):
         WriterRegistry.register_format(
-            "parquet", "src.transmogrify.io.parquet_writer", "ParquetWriter"
+            "parquet", "src.transmog.io.parquet_writer", "ParquetWriter"
         )
 
 
