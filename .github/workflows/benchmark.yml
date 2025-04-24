@@ -1,4 +1,4 @@
-name: Performance Benchmarks
+name: Benchmark (3.9)
 
 on:
   push:
