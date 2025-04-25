@@ -37,11 +37,11 @@ except ImportError:
     # CSV reader will fall back to built-in if PyArrow not available
 
 # Import the writer registry
-from src.transmog.io.writer_registry import WriterRegistry
+from transmog.io.writer_registry import WriterRegistry
 
 # Import reader functions for convenience
 try:
-    from src.transmog.io.json_reader import (
+    from transmog.io.json_reader import (
         read_json_file,
         read_jsonl_file,
         read_json_stream,
@@ -50,7 +50,7 @@ except ImportError:
     logger.debug("Could not import JSON reader functions")
 
 try:
-    from src.transmog.io.csv_reader import (
+    from transmog.io.csv_reader import (
         read_csv_file,
         read_csv_stream,
         CSVReader,

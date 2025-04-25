@@ -9,8 +9,8 @@ import os
 import json
 import tempfile
 import pytest
-from src.transmog.config import settings, load_profile, load_config, configure
-from src.transmog import Processor
+from transmog.config import settings, load_profile, load_config, configure
+from transmog import Processor
 
 
 class TestSettings:

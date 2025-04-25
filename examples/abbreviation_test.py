@@ -13,7 +13,7 @@ from pprint import pprint
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import from transmog
-from src.transmog.naming.abbreviator import (
+from transmog.naming.abbreviator import (
     abbreviate_table_name,
     abbreviate_field_name,
     get_common_abbreviations,

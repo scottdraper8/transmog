@@ -7,7 +7,7 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock
 
-from src.transmog.exceptions import (
+from transmog.exceptions import (
     CircularReferenceError,
     ConfigurationError,
     FileError,
@@ -18,14 +18,14 @@ from src.transmog.exceptions import (
     ProcessingError,
     ValidationError,
 )
-from src.transmog.core.error_handling import (
+from transmog.core.error_handling import (
     error_context,
     handle_circular_reference,
     recover_or_raise,
     safe_json_loads,
     validate_input,
 )
-from src.transmog.recovery import (
+from transmog.recovery import (
     RecoveryStrategy,
     StrictRecovery,
     SkipAndLogRecovery,

@@ -5,28 +5,28 @@ A library for transforming nested JSON structures into flattened formats
 with parent-child relationship preservation and metadata annotation.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.2"
 
 # Imports for use within the package itself
-from src.transmog.core.flattener import flatten_json
-from src.transmog.core.extractor import extract_arrays
-from src.transmog.core.hierarchy import (
+from transmog.core.flattener import flatten_json
+from transmog.core.extractor import extract_arrays
+from transmog.core.hierarchy import (
     process_structure,
     process_record_batch,
     process_records_in_single_pass,
 )
-from src.transmog.core.metadata import (
+from transmog.core.metadata import (
     generate_extract_id,
     annotate_with_metadata,
     get_current_timestamp,
     create_batch_metadata,
 )
-from src.transmog.naming.conventions import (
+from transmog.naming.conventions import (
     get_table_name,
     sanitize_name,
     get_standard_field_name,
 )
-from src.transmog.naming.abbreviator import (
+from transmog.naming.abbreviator import (
     abbreviate_table_name,
     abbreviate_field_name,
     get_common_abbreviations,
@@ -34,10 +34,10 @@ from src.transmog.naming.abbreviator import (
 )
 
 # High-level processor class for one-step processing
-from src.transmog.processor import Processor, ProcessingResult
+from transmog.processor import Processor, ProcessingResult
 
 # Configuration functionality
-from src.transmog.config import (
+from transmog.config import (
     settings,
     extensions,
     load_profile,

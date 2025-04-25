@@ -7,14 +7,14 @@ and transform them into separate table structures with relationship preservation
 
 from typing import Any, Dict, List, Optional, Set, Tuple, Callable
 
-from src.transmog.core.flattener import flatten_json
-from src.transmog.core.metadata import annotate_with_metadata
-from src.transmog.naming.conventions import sanitize_name, split_path, join_path
-from src.transmog.naming.abbreviator import (
+from transmog.core.flattener import flatten_json
+from transmog.core.metadata import annotate_with_metadata
+from transmog.naming.conventions import sanitize_name, split_path, join_path
+from transmog.naming.abbreviator import (
     abbreviate_table_name,
     get_common_abbreviations,
 )
-from src.transmog.config.settings import settings
+from transmog.config.settings import settings
 
 # Type aliases
 JsonDict = Dict[str, Any]

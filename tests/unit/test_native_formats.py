@@ -14,8 +14,8 @@ import pytest
 from typing import Dict, List, Any
 import io
 
-from src.transmog import Processor
-from src.transmog.core.processing_result import ProcessingResult
+from transmog import Processor
+from transmog.core.processing_result import ProcessingResult
 
 # Sample test data
 SAMPLE_DATA = {

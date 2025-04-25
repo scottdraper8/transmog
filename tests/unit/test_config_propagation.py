@@ -9,10 +9,10 @@ import os
 import json
 import pytest
 import tempfile
-from src.transmog import Processor
-from src.transmog.config import settings, configure, load_profile
-from src.transmog.core.flattener import flatten_json
-from src.transmog.core.extractor import extract_arrays
+from transmog import Processor
+from transmog.config import settings, configure, load_profile
+from transmog.core.flattener import flatten_json
+from transmog.core.extractor import extract_arrays
 
 
 class TestConfigPropagation:
@@ -245,7 +245,7 @@ class TestConfigPropagation:
         os.environ["TRANSMOG_CAST_TO_STRING"] = "false"
 
         # Create a fresh settings object to load environment variables
-        from src.transmog.config.settings import TransmogSettings
+        from transmog.config.settings import TransmogSettings
 
         test_settings = TransmogSettings()
 

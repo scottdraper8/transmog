@@ -13,13 +13,13 @@ import bz2
 import pytest
 from typing import List, Dict, Any
 
-from src.transmog.io.csv_reader import (
+from transmog.io.csv_reader import (
     read_csv_file,
     read_csv_stream,
     CSVReader,
     PYARROW_AVAILABLE,
 )
-from src.transmog.exceptions import FileError, ParsingError
+from transmog.exceptions import FileError, ParsingError
 
 # Skip PyArrow-specific tests if not available
 pytestmark = pytest.mark.skipif(

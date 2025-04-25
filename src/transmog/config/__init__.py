@@ -4,7 +4,7 @@ Configuration package for Transmog.
 Provides settings management, profile configuration, and extension points.
 """
 
-from src.transmog.config.settings import (
+from transmog.config.settings import (
     settings,
     extensions,
     load_profile,

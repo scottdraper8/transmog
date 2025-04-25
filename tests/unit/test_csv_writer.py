@@ -9,7 +9,7 @@ from unittest import mock
 
 import pytest
 
-from src.transmog.io.csv_writer import CsvWriter
+from transmog.io.csv_writer import CsvWriter
 
 
 class TestCsvWriter:

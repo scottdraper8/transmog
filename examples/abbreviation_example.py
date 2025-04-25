@@ -14,8 +14,8 @@ from pprint import pprint
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import from src package
-from src.transmog import Processor, configure
-from src.transmog.naming.abbreviator import get_common_abbreviations
+from transmog import Processor, configure
+from transmog.naming.abbreviator import get_common_abbreviations
 
 
 def main():

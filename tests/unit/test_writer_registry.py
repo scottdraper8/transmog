@@ -11,7 +11,7 @@ from unittest import mock
 
 import pytest
 
-from src.transmog.io.writer_registry import WriterRegistry
+from transmog.io.writer_registry import WriterRegistry
 
 
 class MockWriter:

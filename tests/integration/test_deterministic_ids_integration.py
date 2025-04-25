@@ -10,8 +10,8 @@ import json
 import uuid
 import pytest
 
-from src.transmog import Processor
-from src.transmog.core.metadata import generate_deterministic_id
+from transmog import Processor
+from transmog.core.metadata import generate_deterministic_id
 
 
 class TestDeterministicIdsIntegration:

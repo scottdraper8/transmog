@@ -410,7 +410,7 @@ class ProcessingResult:
 
         import pyarrow as pa
         import pyarrow.csv as pa_csv
-        from src.transmog.naming.conventions import sanitize_column_names
+        from transmog.naming.conventions import sanitize_column_names
 
         # Get PyArrow tables
         tables = self.to_pyarrow_tables()
@@ -471,7 +471,7 @@ class ProcessingResult:
             return _conversion_cache[cache_key]
 
         import csv
-        from src.transmog.naming.conventions import sanitize_column_names
+        from transmog.naming.conventions import sanitize_column_names
 
         # Get options
         separator = kwargs.get("separator", "_")

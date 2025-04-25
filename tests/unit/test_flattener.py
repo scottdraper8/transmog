@@ -3,7 +3,7 @@ Unit tests for the flattener module.
 """
 
 import pytest
-from src.transmog.core.flattener import (
+from transmog.core.flattener import (
     flatten_json,
     _process_value,
     _process_value_cached,
@@ -262,7 +262,7 @@ class TestFlattener:
         data["self_ref"] = data  # Create circular reference
 
         # CircularReferenceError is wrapped in ProcessingError by the error_context decorator
-        from src.transmog.exceptions import ProcessingError
+        from transmog.exceptions import ProcessingError
 
         with pytest.raises(ProcessingError):
             flatten_json(data)

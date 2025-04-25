@@ -5,8 +5,8 @@ Tests for deterministic ID generation functionality.
 import uuid
 import pytest
 
-from src.transmog import Processor
-from src.transmog.core.metadata import (
+from transmog import Processor
+from transmog.core.metadata import (
     generate_extract_id,
     generate_deterministic_id,
     generate_composite_id,

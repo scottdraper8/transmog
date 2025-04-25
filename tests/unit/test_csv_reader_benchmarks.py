@@ -12,7 +12,7 @@ import pytest
 import time
 from unittest import mock
 
-from src.transmog.io.csv_reader import (
+from transmog.io.csv_reader import (
     read_csv_file,
     read_csv_stream,
     CSVReader,

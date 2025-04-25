@@ -9,7 +9,7 @@ import os
 import json
 import tempfile
 import pytest
-from src.transmog import Processor
+from transmog import Processor
 
 # Check if pyarrow is available
 try:

@@ -15,7 +15,7 @@ from typing import Dict, List
 # Add parent directory to path to import transmog without installing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.transmog import Processor, ProcessingResult
+from transmog import Processor, ProcessingResult
 
 
 def generate_sample_data(count: int = 100) -> List[Dict]:

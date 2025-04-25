@@ -17,9 +17,9 @@ from typing import Any, Dict, List, Optional, Tuple, Callable
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import from src package
-from src.transmog import Processor
-from src.transmog.recovery import RecoveryStrategy, STRICT
-from src.transmog.exceptions import (
+from transmog import Processor
+from transmog.recovery import RecoveryStrategy, STRICT
+from transmog.exceptions import (
     ProcessingError,
     ValidationError,
     ParsingError,

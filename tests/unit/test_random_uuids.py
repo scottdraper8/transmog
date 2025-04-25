@@ -9,8 +9,8 @@ import uuid
 import re
 import pytest
 
-from src.transmog import Processor
-from src.transmog.core.metadata import generate_extract_id
+from transmog import Processor
+from transmog.core.metadata import generate_extract_id
 
 
 class TestRandomUuids:

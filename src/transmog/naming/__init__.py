@@ -5,7 +5,7 @@ This package provides utilities for naming conventions, path handling,
 and abbreviation of field and table names.
 """
 
-from src.transmog.naming.conventions import (
+from transmog.naming.conventions import (
     get_table_name,
     sanitize_name,
     get_standard_field_name,
@@ -13,7 +13,7 @@ from src.transmog.naming.conventions import (
     join_path,
 )
 
-from src.transmog.naming.abbreviator import (
+from transmog.naming.abbreviator import (
     abbreviate_component,
     abbreviate_table_name,
     abbreviate_field_name,

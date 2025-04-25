@@ -7,14 +7,14 @@ parent-child relationship preservation.
 
 from typing import Any, Dict, List, Optional, Set, Tuple, Callable
 
-from src.transmog.core.extractor import extract_arrays
-from src.transmog.core.flattener import flatten_json
-from src.transmog.core.metadata import (
+from transmog.core.extractor import extract_arrays
+from transmog.core.flattener import flatten_json
+from transmog.core.metadata import (
     annotate_with_metadata,
     create_batch_metadata,
     generate_deterministic_id,
 )
-from src.transmog.config.settings import settings
+from transmog.config.settings import settings
 
 # Type aliases
 JsonDict = Dict[str, Any]

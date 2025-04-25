@@ -13,7 +13,7 @@ from typing import Dict, List, Any
 # Add the package root to sys.path for importing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.transmog import Processor
+from transmog import Processor
 
 
 @pytest.fixture

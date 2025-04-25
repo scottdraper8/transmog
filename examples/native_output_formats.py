@@ -19,7 +19,7 @@ from pprint import pprint
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import from src package
-from src.transmog import Processor
+from transmog import Processor
 
 
 def main():

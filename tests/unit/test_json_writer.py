@@ -9,7 +9,7 @@ from unittest import mock
 
 import pytest
 
-from src.transmog.io.json_writer import JsonWriter
+from transmog.io.json_writer import JsonWriter
 
 
 class TestJsonWriter:

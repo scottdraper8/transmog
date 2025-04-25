@@ -8,12 +8,12 @@ allowing for format-specific writers to be registered and used.
 import importlib
 from typing import Any, Dict, List, Optional, Type, Callable
 
-from src.transmog.exceptions import ConfigurationError
+from transmog.exceptions import ConfigurationError
 
 # Import this in a way that avoids circular imports
 # The class will be properly typed at runtime
 if False:  # for type checking only
-    from src.transmog.io.writer_interface import DataWriter
+    from transmog.io.writer_interface import DataWriter
 
 
 class WriterRegistry:

@@ -14,9 +14,9 @@ import lzma
 from typing import Any, Dict, List, Optional, Union, BinaryIO, Tuple
 from io import StringIO
 
-from src.transmog.io.writer_interface import DataWriter
-from src.transmog.naming.conventions import sanitize_column_names
-from src.transmog.config.settings import settings
+from transmog.io.writer_interface import DataWriter
+from transmog.naming.conventions import sanitize_column_names
+from transmog.config.settings import settings
 
 # Configure logger
 logger = logging.getLogger(__name__)

@@ -15,7 +15,7 @@ import uuid
 import json
 from datetime import datetime
 import pandas as pd
-from src.transmog import Processor
+from transmog import Processor
 
 
 def print_header(title):

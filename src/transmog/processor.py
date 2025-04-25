@@ -484,7 +484,7 @@ class Processor:
 
         # Create CSV reader with specified options and consistent configuration
         try:
-            from src.transmog.io.csv_reader import CSVReader
+            from transmog.io.csv_reader import CSVReader
 
             reader = CSVReader(
                 delimiter=delimiter,
@@ -536,11 +536,11 @@ class Processor:
         Returns:
             ProcessingResult object
         """
-        from src.transmog.core.hierarchy import (
+        from transmog.core.hierarchy import (
             process_records_in_single_pass,
             process_record_batch,
         )
-        from src.transmog.core.metadata import (
+        from transmog.core.metadata import (
             generate_extract_id,
             generate_deterministic_id,
         )
@@ -1186,7 +1186,7 @@ class Processor:
         Raises:
             FileError: If file cannot be read
         """
-        from src.transmog.io.csv_reader import CSVReader
+        from transmog.io.csv_reader import CSVReader
 
         if not os.path.exists(file_path):
             raise FileError(f"File not found: {file_path}")

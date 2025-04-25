@@ -16,9 +16,9 @@ from typing import Dict, List, Any
 import pytest
 
 # Import the writer module to access module-level variables
-from src.transmog.io import parquet_writer
-from src.transmog import Processor
-from src.transmog.io.parquet_writer import ParquetWriter
+from transmog.io import parquet_writer
+from transmog import Processor
+from transmog.io.parquet_writer import ParquetWriter
 
 # Try to import pyarrow for enhanced tests
 try:

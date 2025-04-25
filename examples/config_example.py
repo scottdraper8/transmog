@@ -14,8 +14,8 @@ from pprint import pprint
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import from src package
-from src.transmog import Processor, ProcessingResult
-from src.transmog.config import settings, load_profile, configure, extensions
+from transmog import Processor, ProcessingResult
+from transmog.config import settings, load_profile, configure, extensions
 
 
 def create_sample_config_file():
@@ -118,7 +118,7 @@ def main():
     # Example 3: Load from config file
     print("\n=== Example 3: Config File ===")
     config_file = create_sample_config_file()
-    from src.transmog.config import load_config
+    from transmog.config import load_config
 
     load_config(config_file)
     processor = Processor()  # Will use settings from config file

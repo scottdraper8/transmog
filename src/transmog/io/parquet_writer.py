@@ -8,7 +8,7 @@ import os
 import importlib.util
 from typing import Any, Dict, List, Optional
 
-from src.transmog.io.writer_interface import DataWriter
+from transmog.io.writer_interface import DataWriter
 
 # Try to import PyArrow at module level, but don't fail if it's not available
 # Instead, set these variables to None so we can check them later
@@ -73,7 +73,7 @@ class ParquetWriter(DataWriter):
         import pyarrow.parquet as pq
 
         # Create a temporary ProcessingResult to use its conversion methods
-        from src.transmog.core.processing_result import ProcessingResult
+        from transmog.core.processing_result import ProcessingResult
 
         temp_result = ProcessingResult(
             main_table=table_data, child_tables={}, entity_name="temp"
@@ -143,7 +143,7 @@ class ParquetWriter(DataWriter):
             )
 
         # Create a ProcessingResult object to use its conversion and writing methods
-        from src.transmog.core.processing_result import ProcessingResult
+        from transmog.core.processing_result import ProcessingResult
 
         result = ProcessingResult(
             main_table=main_table, child_tables=child_tables, entity_name=entity_name
