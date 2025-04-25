@@ -5,7 +5,7 @@ A library for transforming nested JSON structures into flattened formats
 with parent-child relationship preservation and metadata annotation.
 """
 
-__version__ = "0.1.2"
+__version__ = "0.1.2.5"
 
 # Imports for use within the package itself
 from transmog.core.flattener import flatten_json
@@ -70,7 +70,7 @@ def _ensure_io_module():
     if not _io_module_checked:
         try:
             # Use importlib for lazy loading
-            io_module = importlib.import_module("src.transmog.io")
+            io_module = importlib.import_module("transmog.io")
             _writer_registry = io_module.WriterRegistry
             _io_module_available = True
         except (ImportError, AttributeError):

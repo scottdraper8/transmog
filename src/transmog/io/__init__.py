@@ -64,20 +64,16 @@ except ImportError:
 def _register_default_writers():
     """Register default writers with the registry."""
     # Always register JSON writer (no external dependencies)
-    WriterRegistry.register_format(
-        "json", "src.transmog.io.json_writer", "JsonWriter"
-    )
+    WriterRegistry.register_format("json", "transmog.io.json_writer", "JsonWriter")
 
     # Register CSV writer if available
     if _available_formats.get("csv"):
-        WriterRegistry.register_format(
-            "csv", "src.transmog.io.csv_writer", "CsvWriter"
-        )
+        WriterRegistry.register_format("csv", "transmog.io.csv_writer", "CsvWriter")
 
     # Register Parquet writer if available
     if _available_formats.get("parquet"):
         WriterRegistry.register_format(
-            "parquet", "src.transmog.io.parquet_writer", "ParquetWriter"
+            "parquet", "transmog.io.parquet_writer", "ParquetWriter"
         )
 
 

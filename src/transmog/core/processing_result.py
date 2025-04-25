@@ -34,7 +34,7 @@ def _get_writer_registry():
     if _WRITERS_REGISTRY is None and not _WRITERS_AVAILABLE:
         try:
             # Use importlib for lazy loading to avoid circular imports
-            io_module = importlib.import_module("src.transmog.io.writer_registry")
+            io_module = importlib.import_module("transmog.io.writer_registry")
             _WRITERS_REGISTRY = io_module.WriterRegistry
             _WRITERS_AVAILABLE = True
         except (ImportError, AttributeError):

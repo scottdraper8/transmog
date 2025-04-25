@@ -269,7 +269,7 @@ class TestRecoveryStrategies:
                 CircularReferenceError("Test error"), path=["path", "to", "error"]
             )
 
-    @patch("src.transmog.recovery.logger")
+    @patch("transmog.recovery.logger")
     def test_skip_and_log_recovery(self, mock_logger):
         """Test SkipAndLogRecovery strategy."""
         strategy = SkipAndLogRecovery()
@@ -293,7 +293,7 @@ class TestRecoveryStrategies:
         result = strategy.handle_file_error(FileError("File not found"))
         assert result is None
 
-    @patch("src.transmog.recovery.logger")
+    @patch("transmog.recovery.logger")
     def test_partial_recovery(self, mock_logger):
         """Test PartialProcessingRecovery strategy."""
         strategy = PartialProcessingRecovery()
