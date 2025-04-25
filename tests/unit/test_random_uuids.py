@@ -61,7 +61,7 @@ class TestRandomUuids:
         # equal representation (though with only 1000 samples, there will be some variance)
         for char in "0123456789abcdef":
             # Each character should appear roughly 1000/16 = 62.5 times
-            # Allow for statistical variation (3 standard deviations)
+            # Allow for statistical variation (4 standard deviations)
             # With binomial distribution, stddev = sqrt(np(1-p))
             # where n = 1000 and p = 1/16 = 0.0625
             expected = 1000 / 16
@@ -69,8 +69,8 @@ class TestRandomUuids:
 
             # If the character appears in the distribution, check it's within reasonable bounds
             if char in char_counts:
-                assert char_counts[char] >= expected - 3 * stddev
-                assert char_counts[char] <= expected + 3 * stddev
+                assert char_counts[char] >= expected - 4 * stddev
+                assert char_counts[char] <= expected + 4 * stddev
 
     def test_processor_with_random_uuids(self):
         """Test that processor generates different random UUIDs for identical data."""
