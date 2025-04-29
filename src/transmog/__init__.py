@@ -37,7 +37,13 @@ from transmog.naming.abbreviator import (
 from transmog.processor import Processor, ProcessingResult
 
 # Configuration functionality
-from transmog.config import (
+from .config import (
+    TransmogConfig,
+    ProcessingMode,
+    NamingConfig,
+    ProcessingConfig,
+    MetadataConfig,
+    ErrorHandlingConfig,
     settings,
     extensions,
     load_profile,
@@ -106,3 +112,19 @@ def is_format_available(format_name: str) -> bool:
     if _ensure_io_module() and _writer_registry is not None:
         return _writer_registry.is_format_available(format_name)
     return False
+
+
+__all__ = [
+    "Processor",
+    "TransmogConfig",
+    "ProcessingMode",
+    "NamingConfig",
+    "ProcessingConfig",
+    "MetadataConfig",
+    "ErrorHandlingConfig",
+    "settings",
+    "extensions",
+    "load_profile",
+    "load_config",
+    "configure",
+]

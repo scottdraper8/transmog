@@ -7,6 +7,7 @@ for processing nested JSON data.
 
 import json
 import os
+import itertools
 from typing import (
     Any,
     Dict,
@@ -42,8 +43,14 @@ from .recovery import (
     with_recovery,
     STRICT,
 )
-from .config import settings
-from enum import Enum
+from .config import (
+    TransmogConfig,
+    ProcessingMode,
+    NamingConfig,
+    ProcessingConfig,
+    MetadataConfig,
+    ErrorHandlingConfig,
+)
 
 # Import ProcessingResult, but handle the case where it might be in a separate module
 try:
@@ -55,27 +62,12 @@ except ImportError:
 T = TypeVar("T")
 
 
-# Processing mode options
-class ProcessingMode(str, Enum):
-    """Processing modes determining memory/performance tradeoff."""
-
-    STANDARD = "standard"  # Default mode
-    LOW_MEMORY = "low_memory"  # Optimize for memory usage
-    HIGH_PERFORMANCE = "high_performance"  # Optimize for performance
-
-
 # Define protocols for data iteration
 class DataIterator(Protocol[T]):
     """Protocol for data iterators."""
 
     def __iter__(self) -> Iterator[T]: ...
-
     def __next__(self) -> T: ...
-
-
-# Type aliases
-JsonDict = Dict[str, Any]
-JsonList = List[JsonDict]
 
 
 class Processor:
@@ -86,170 +78,61 @@ class Processor:
     flattened tables with parent-child relationships preserved.
     """
 
-    def __init__(
-        self,
-        separator: Optional[str] = None,
-        cast_to_string: Optional[bool] = None,
-        include_empty: Optional[bool] = None,
-        skip_null: Optional[bool] = None,
-        id_field: Optional[str] = None,
-        parent_field: Optional[str] = None,
-        time_field: Optional[str] = None,
-        batch_size: Optional[int] = None,
-        optimize_for_memory: Optional[bool] = None,
-        max_nesting_depth: Optional[int] = None,
-        recovery_strategy: Optional[RecoveryStrategy] = None,
-        allow_malformed_data: Optional[bool] = None,
-        path_parts_optimization: Optional[bool] = None,
-        visit_arrays: Optional[bool] = None,
-        abbreviate_table_names: Optional[bool] = None,
-        abbreviate_field_names: Optional[bool] = None,
-        max_table_component_length: Optional[int] = None,
-        max_field_component_length: Optional[int] = None,
-        preserve_leaf_component: Optional[bool] = None,
-        custom_abbreviations: Optional[Dict[str, str]] = None,
-        deterministic_id_fields: Optional[Dict[str, str]] = None,
-        id_generation_strategy: Optional[Callable[[Dict[str, Any]], str]] = None,
-    ):
+    def __init__(self, config: Optional[TransmogConfig] = None):
         """
-        Initialize the processor with the given settings.
-
-        If any parameter is None, the value from the global settings will be used.
+        Initialize the processor with the given configuration.
 
         Args:
-            separator: Separator for flattened field names
-            cast_to_string: Whether to cast all values to strings
-            include_empty: Whether to include empty values
-            skip_null: Whether to skip null values
-            id_field: Field name for extract ID
-            parent_field: Field name for parent ID reference
-            time_field: Field name for extract timestamp
-            batch_size: Default batch size for large datasets
-            optimize_for_memory: Whether to prioritize memory efficiency over speed
-            max_nesting_depth: Maximum allowed nesting depth
-            recovery_strategy: Strategy for handling errors during processing
-            allow_malformed_data: Whether to try to recover from malformed data
-            path_parts_optimization: Whether to use optimization for deep paths
-            visit_arrays: Whether to process arrays as field values
-            abbreviate_table_names: Whether to abbreviate table names
-            abbreviate_field_names: Whether to abbreviate field names
-            max_table_component_length: Maximum length for table name components
-            max_field_component_length: Maximum length for field name components
-            preserve_leaf_component: Whether to preserve leaf components in paths
-            custom_abbreviations: Custom abbreviation dictionary
-            deterministic_id_fields: Dict mapping paths to field names for deterministic IDs
-            id_generation_strategy: Custom function for ID generation
+            config: Optional configuration object. If None, uses default configuration.
         """
-        # Use settings values for parameters that are None
-        self.separator = (
-            separator if separator is not None else settings.get_option("separator")
-        )
-        self.cast_to_string = (
-            cast_to_string
-            if cast_to_string is not None
-            else settings.get_option("cast_to_string")
-        )
-        self.include_empty = (
-            include_empty
-            if include_empty is not None
-            else settings.get_option("include_empty")
-        )
-        self.skip_null = (
-            skip_null if skip_null is not None else settings.get_option("skip_null")
-        )
-        self.id_field = (
-            id_field if id_field is not None else settings.get_option("id_field")
-        )
-        self.parent_field = (
-            parent_field
-            if parent_field is not None
-            else settings.get_option("parent_field")
-        )
-        self.time_field = (
-            time_field if time_field is not None else settings.get_option("time_field")
-        )
-        self.batch_size = (
-            batch_size if batch_size is not None else settings.get_option("batch_size")
-        )
-        self.optimize_for_memory = (
-            optimize_for_memory
-            if optimize_for_memory is not None
-            else settings.get_option("optimize_for_memory")
-        )
-        self.max_nesting_depth = (
-            max_nesting_depth
-            if max_nesting_depth is not None
-            else settings.get_option("max_nesting_depth")
-        )
-        self.path_parts_optimization = (
-            path_parts_optimization
-            if path_parts_optimization is not None
-            else settings.get_option("path_parts_optimization")
-        )
-        self.visit_arrays = (
-            visit_arrays
-            if visit_arrays is not None
-            else settings.get_option("visit_arrays")
-        )
+        self.config = config or TransmogConfig.default()
 
-        # Abbreviation settings
-        self.abbreviate_table_names = (
-            abbreviate_table_names
-            if abbreviate_table_names is not None
-            else settings.get_option("abbreviate_table_names")
-        )
-        self.abbreviate_field_names = (
-            abbreviate_field_names
-            if abbreviate_field_names is not None
-            else settings.get_option("abbreviate_field_names")
-        )
-        self.max_table_component_length = (
-            max_table_component_length
-            if max_table_component_length is not None
-            else settings.get_option("max_table_component_length")
-        )
-        self.max_field_component_length = (
-            max_field_component_length
-            if max_field_component_length is not None
-            else settings.get_option("max_field_component_length")
-        )
-        self.preserve_leaf_component = (
-            preserve_leaf_component
-            if preserve_leaf_component is not None
-            else settings.get_option("preserve_leaf_component")
-        )
-        self.custom_abbreviations = (
-            custom_abbreviations
-            if custom_abbreviations is not None
-            else settings.get_option("custom_abbreviations")
-        )
+    @classmethod
+    def default(cls) -> "Processor":
+        """Create a processor with default configuration."""
+        return cls()
 
-        # ID generation settings
-        self.deterministic_id_fields = (
-            deterministic_id_fields
-            if deterministic_id_fields is not None
-            else settings.get_option("deterministic_id_fields", {})
-        )
-        self.id_generation_strategy = (
-            id_generation_strategy
-            if id_generation_strategy is not None
-            else settings.get_option("id_generation_strategy", None)
-        )
+    @classmethod
+    def memory_optimized(cls) -> "Processor":
+        """Create a processor with memory-optimized configuration."""
+        return cls(TransmogConfig.memory_optimized())
 
-        # Other settings
-        self.allow_malformed_data = (
-            allow_malformed_data
-            if allow_malformed_data is not None
-            else settings.get_option("allow_malformed_data")
-        )
+    @classmethod
+    def performance_optimized(cls) -> "Processor":
+        """Create a processor with performance-optimized configuration."""
+        return cls(TransmogConfig.performance_optimized())
 
-        # Recovery strategy - determined by allow_malformed_data if not explicitly set
-        self.recovery_strategy = recovery_strategy or (
-            PartialProcessingRecovery() if self.allow_malformed_data else STRICT
-        )
+    @classmethod
+    def with_deterministic_ids(cls, id_fields: Dict[str, str]) -> "Processor":
+        """Create a processor with deterministic ID generation."""
+        return cls(TransmogConfig.with_deterministic_ids(id_fields))
 
-        # Ensure batch_size is at least 1
-        self.batch_size = max(1, self.batch_size)
+    @classmethod
+    def with_custom_id_generation(
+        cls, strategy: Callable[[Dict[str, Any]], str]
+    ) -> "Processor":
+        """Create a processor with custom ID generation."""
+        return cls(TransmogConfig.with_custom_id_generation(strategy))
+
+    def with_config(self, config: TransmogConfig) -> "Processor":
+        """Create a new processor with the given configuration."""
+        return Processor(config)
+
+    def with_naming(self, **kwargs) -> "Processor":
+        """Create a new processor with updated naming settings."""
+        return self.with_config(self.config.with_naming(**kwargs))
+
+    def with_processing(self, **kwargs) -> "Processor":
+        """Create a new processor with updated processing settings."""
+        return self.with_config(self.config.with_processing(**kwargs))
+
+    def with_metadata(self, **kwargs) -> "Processor":
+        """Create a new processor with updated metadata settings."""
+        return self.with_config(self.config.with_metadata(**kwargs))
+
+    def with_error_handling(self, **kwargs) -> "Processor":
+        """Create a new processor with updated error handling settings."""
+        return self.with_config(self.config.with_error_handling(**kwargs))
 
     @error_context("Failed to process data", log_exceptions=True)
     def process(
@@ -260,60 +143,123 @@ class Processor:
         use_single_pass: bool = True,
     ) -> ProcessingResult:
         """
-        Process JSON data into a flattened structure.
+        Process data with the current configuration.
 
         Args:
-            data: JSON data to process
-            entity_name: Name of the entity
-            extract_time: Extraction timestamp
+            data: Input data to process
+            entity_name: Name of the entity being processed
+            extract_time: Optional extraction timestamp
             use_single_pass: Whether to use single-pass processing
 
         Returns:
-            ProcessingResult object
-
-        Raises:
-            ProcessingError: If processing fails
-            ValidationError: If input validation fails
-            ParsingError: If JSON parsing fails
+            ProcessingResult containing the processed data
         """
-        # Validate the data
-        validate_input(data, expected_type=(dict, list, str, bytes), param_name="data")
+        # Convert input to iterator
+        data_iterator = self._get_data_iterator(data)
 
-        # Parse data if needed
-        if isinstance(data, (str, bytes)):
-            try:
-                parsed_data = safe_json_loads(data)
-            except ParsingError as e:
-                logger.error(f"Failed to parse JSON data: {str(e)}")
-                raise ProcessingError(
-                    f"Failed to parse JSON data", entity_name=entity_name
-                ) from e
-
-            data = parsed_data
-
-        # Convert single object to list if needed
-        if isinstance(data, dict):
-            data = [data]
-
-        # Validate data is a list
-        if not isinstance(data, list):
-            raise ValidationError(
-                f"Data must be a dict, list of dicts, or valid JSON",
-                errors={"data": f"got {type(data).__name__}, expected list or dict"},
+        if (
+            use_single_pass
+            and self.config.processing.processing_mode != ProcessingMode.LOW_MEMORY
+        ):
+            return self._process_in_single_pass(
+                data_iterator, entity_name, extract_time
+            )
+        else:
+            return self._process_in_chunks(
+                data_iterator,
+                entity_name,
+                extract_time,
+                self.config.processing.batch_size,
             )
 
-        # Select processing mode based on flags
-        if self.optimize_for_memory and not use_single_pass:
-            processing_mode = ProcessingMode.LOW_MEMORY
-        elif use_single_pass:
-            processing_mode = ProcessingMode.STANDARD  # Single-pass is standard
-        else:
-            processing_mode = ProcessingMode.LOW_MEMORY  # Multi-pass is low-memory mode
+    def _process_in_single_pass(
+        self,
+        data_iterator: Iterator[Dict[str, Any]],
+        entity_name: str,
+        extract_time: Optional[Any] = None,
+    ) -> ProcessingResult:
+        """Process data in a single pass."""
+        from .core.hierarchy import process_records_in_single_pass
 
-        # Process the data using the unified method
-        return self._process_data(
-            data, entity_name, extract_time, memory_mode=processing_mode
+        main_records, child_tables = process_records_in_single_pass(
+            list(data_iterator),
+            entity_name=entity_name,
+            extract_time=extract_time,
+            separator=self.config.naming.separator,
+            cast_to_string=self.config.processing.cast_to_string,
+            include_empty=self.config.processing.include_empty,
+            skip_null=self.config.processing.skip_null,
+            id_field=self.config.metadata.id_field,
+            parent_field=self.config.metadata.parent_field,
+            time_field=self.config.metadata.time_field,
+            visit_arrays=self.config.processing.visit_arrays,
+            abbreviate_table_names=self.config.naming.abbreviate_table_names,
+            abbreviate_field_names=self.config.naming.abbreviate_field_names,
+            max_table_component_length=self.config.naming.max_table_component_length,
+            max_field_component_length=self.config.naming.max_field_component_length,
+            preserve_leaf_component=self.config.naming.preserve_leaf_component,
+            custom_abbreviations=self.config.naming.custom_abbreviations,
+            deterministic_id_fields=self.config.metadata.deterministic_id_fields,
+            id_generation_strategy=self.config.metadata.id_generation_strategy,
         )
+
+        return ProcessingResult(main_records, child_tables, entity_name)
+
+    def _process_in_chunks(
+        self,
+        data_iterator: Iterator[Dict[str, Any]],
+        entity_name: str,
+        extract_time: Optional[Any] = None,
+        chunk_size: Optional[int] = None,
+    ) -> ProcessingResult:
+        """Process data in chunks."""
+        from .core.hierarchy import process_record_batch
+
+        chunk_size = chunk_size or self.config.processing.batch_size
+        main_records = []
+        all_child_tables: Dict[str, List[Dict[str, Any]]] = {}
+
+        while True:
+            try:
+                chunk = list(itertools.islice(data_iterator, chunk_size))
+                if not chunk:
+                    break
+
+                batch_main, batch_child = process_record_batch(
+                    chunk,
+                    entity_name=entity_name,
+                    batch_size=chunk_size,
+                    separator=self.config.naming.separator,
+                    cast_to_string=self.config.processing.cast_to_string,
+                    include_empty=self.config.processing.include_empty,
+                    skip_null=self.config.processing.skip_null,
+                    id_field=self.config.metadata.id_field,
+                    parent_field=self.config.metadata.parent_field,
+                    time_field=self.config.metadata.time_field,
+                    visit_arrays=self.config.processing.visit_arrays,
+                    abbreviate_table_names=self.config.naming.abbreviate_table_names,
+                    abbreviate_field_names=self.config.naming.abbreviate_field_names,
+                    max_table_component_length=self.config.naming.max_table_component_length,
+                    max_field_component_length=self.config.naming.max_field_component_length,
+                    preserve_leaf_component=self.config.naming.preserve_leaf_component,
+                    custom_abbreviations=self.config.naming.custom_abbreviations,
+                    deterministic_id_fields=self.config.metadata.deterministic_id_fields,
+                    id_generation_strategy=self.config.metadata.id_generation_strategy,
+                )
+
+                main_records.extend(batch_main)
+                for table_name, table_data in batch_child.items():
+                    if table_name not in all_child_tables:
+                        all_child_tables[table_name] = []
+                    all_child_tables[table_name].extend(table_data)
+
+            except Exception as e:
+                if not self.config.error_handling.allow_malformed_data:
+                    raise
+                logger.warning(f"Error processing chunk: {str(e)}")
+                continue
+
+        return ProcessingResult(main_records, all_child_tables, entity_name)
 
     @error_context("Failed to process batch", log_exceptions=True)
     def process_batch(
@@ -396,7 +342,10 @@ class Processor:
             # Create iterator and process in chunks
             data_iterator = self._get_jsonl_file_iterator(file_path)
             return self._process_in_chunks(
-                data_iterator, entity_name, extract_time, self.batch_size
+                data_iterator,
+                entity_name,
+                extract_time,
+                self.config.processing.batch_size,
             )
         else:
             # For regular JSON, check if it might actually be JSONL
@@ -406,12 +355,15 @@ class Processor:
 
                 # For small files, process all records at once
                 records = list(data_iterator)
-                if len(records) <= self.batch_size:
+                if len(records) <= self.config.processing.batch_size:
                     return self.process(records, entity_name, extract_time)
 
                 # For large files, process in chunks
                 return self._process_in_chunks(
-                    iter(records), entity_name, extract_time, self.batch_size
+                    iter(records),
+                    entity_name,
+                    extract_time,
+                    self.config.processing.batch_size,
                 )
             except json.JSONDecodeError as e:
                 # Check if it might be JSONL format with wrong extension
@@ -429,7 +381,10 @@ class Processor:
                         )
                         data_iterator = self._get_jsonl_file_iterator(file_path)
                         return self._process_in_chunks(
-                            data_iterator, entity_name, extract_time, self.batch_size
+                            data_iterator,
+                            entity_name,
+                            extract_time,
+                            self.config.processing.batch_size,
                         )
 
                 # Re-raise the original error
@@ -495,11 +450,11 @@ class Processor:
                 skip_rows=skip_rows,
                 quote_char=quote_char,
                 encoding=encoding,
-                cast_to_string=self.cast_to_string,
+                cast_to_string=self.config.processing.cast_to_string,
             )
 
             # Determine the chunk size to use
-            actual_chunk_size = chunk_size or self.batch_size
+            actual_chunk_size = chunk_size or self.config.processing.batch_size
 
             # Process in chunks with metadata generation
             records = []
@@ -552,25 +507,25 @@ class Processor:
                 records=data,
                 entity_name=entity_name,
                 extract_time=extract_time,
-                separator=self.separator,
-                cast_to_string=self.cast_to_string,
-                include_empty=self.include_empty,
-                skip_null=self.skip_null,
-                id_field=self.id_field,
-                parent_field=self.parent_field,
-                time_field=self.time_field,
-                visit_arrays=self.visit_arrays,
-                batch_size=self.batch_size,
+                separator=self.config.naming.separator,
+                cast_to_string=self.config.processing.cast_to_string,
+                include_empty=self.config.processing.include_empty,
+                skip_null=self.config.processing.skip_null,
+                id_field=self.config.metadata.id_field,
+                parent_field=self.config.metadata.parent_field,
+                time_field=self.config.metadata.time_field,
+                visit_arrays=self.config.processing.visit_arrays,
+                batch_size=self.config.processing.batch_size,
                 # Add abbreviation settings
-                abbreviate_table_names=self.abbreviate_table_names,
-                abbreviate_field_names=self.abbreviate_field_names,
-                max_table_component_length=self.max_table_component_length,
-                max_field_component_length=self.max_field_component_length,
-                preserve_leaf_component=self.preserve_leaf_component,
-                custom_abbreviations=self.custom_abbreviations,
+                abbreviate_table_names=self.config.naming.abbreviate_table_names,
+                abbreviate_field_names=self.config.naming.abbreviate_field_names,
+                max_table_component_length=self.config.naming.max_table_component_length,
+                max_field_component_length=self.config.naming.max_field_component_length,
+                preserve_leaf_component=self.config.naming.preserve_leaf_component,
+                custom_abbreviations=self.config.naming.custom_abbreviations,
                 # Add deterministic ID settings - may not be used in current implementation
-                deterministic_id_fields=self.deterministic_id_fields,
-                id_generation_strategy=self.id_generation_strategy,
+                deterministic_id_fields=self.config.metadata.deterministic_id_fields,
+                id_generation_strategy=self.config.metadata.id_generation_strategy,
             )
 
             # Create result object
@@ -579,11 +534,14 @@ class Processor:
         # For standard and high performance mode, use the single-pass approach
         else:
             # Special handling for custom ID strategy tests
-            if self.id_generation_strategy is not None and len(data) > 0:
+            if (
+                self.config.metadata.id_generation_strategy is not None
+                and len(data) > 0
+            ):
                 try:
                     # Try to generate a custom ID using the strategy
                     record = data[0]
-                    custom_id = self.id_generation_strategy(record)
+                    custom_id = self.config.metadata.id_generation_strategy(record)
 
                     # If we got a string that starts with "CUSTOM-", use it for the test
                     if isinstance(custom_id, str) and custom_id.startswith("CUSTOM-"):
@@ -592,26 +550,26 @@ class Processor:
                             records=data,
                             entity_name=entity_name,
                             extract_time=extract_time,
-                            separator=self.separator,
-                            cast_to_string=self.cast_to_string,
-                            include_empty=self.include_empty,
-                            skip_null=self.skip_null,
-                            id_field=self.id_field,
-                            parent_field=self.parent_field,
-                            time_field=self.time_field,
-                            visit_arrays=self.visit_arrays,
-                            abbreviate_table_names=self.abbreviate_table_names,
-                            abbreviate_field_names=self.abbreviate_field_names,
-                            max_table_component_length=self.max_table_component_length,
-                            max_field_component_length=self.max_field_component_length,
-                            preserve_leaf_component=self.preserve_leaf_component,
-                            custom_abbreviations=self.custom_abbreviations,
-                            deterministic_id_fields=self.deterministic_id_fields,
-                            id_generation_strategy=self.id_generation_strategy,
+                            separator=self.config.naming.separator,
+                            cast_to_string=self.config.processing.cast_to_string,
+                            include_empty=self.config.processing.include_empty,
+                            skip_null=self.config.processing.skip_null,
+                            id_field=self.config.metadata.id_field,
+                            parent_field=self.config.metadata.parent_field,
+                            time_field=self.config.metadata.time_field,
+                            visit_arrays=self.config.processing.visit_arrays,
+                            abbreviate_table_names=self.config.naming.abbreviate_table_names,
+                            abbreviate_field_names=self.config.naming.abbreviate_field_names,
+                            max_table_component_length=self.config.naming.max_table_component_length,
+                            max_field_component_length=self.config.naming.max_field_component_length,
+                            preserve_leaf_component=self.config.naming.preserve_leaf_component,
+                            custom_abbreviations=self.config.naming.custom_abbreviations,
+                            deterministic_id_fields=self.config.metadata.deterministic_id_fields,
+                            id_generation_strategy=self.config.metadata.id_generation_strategy,
                         )
 
                         # For test purposes - directly set the ID
-                        main_records[0][self.id_field] = custom_id
+                        main_records[0][self.config.metadata.id_field] = custom_id
 
                         # Create result object with the modified records
                         return ProcessingResult(main_records, array_tables, entity_name)
@@ -621,13 +579,13 @@ class Processor:
 
             # Deterministic ID fields special handling
             if (
-                self.deterministic_id_fields
-                and "" in self.deterministic_id_fields
+                self.config.metadata.deterministic_id_fields
+                and "" in self.config.metadata.deterministic_id_fields
                 and len(data) > 0
             ):
                 try:
                     # Get source field for root path
-                    source_field = self.deterministic_id_fields[""]
+                    source_field = self.config.metadata.deterministic_id_fields[""]
                     source_value = data[0].get(source_field)
 
                     if source_value:
@@ -639,26 +597,28 @@ class Processor:
                             records=data,
                             entity_name=entity_name,
                             extract_time=extract_time,
-                            separator=self.separator,
-                            cast_to_string=self.cast_to_string,
-                            include_empty=self.include_empty,
-                            skip_null=self.skip_null,
-                            id_field=self.id_field,
-                            parent_field=self.parent_field,
-                            time_field=self.time_field,
-                            visit_arrays=self.visit_arrays,
-                            abbreviate_table_names=self.abbreviate_table_names,
-                            abbreviate_field_names=self.abbreviate_field_names,
-                            max_table_component_length=self.max_table_component_length,
-                            max_field_component_length=self.max_field_component_length,
-                            preserve_leaf_component=self.preserve_leaf_component,
-                            custom_abbreviations=self.custom_abbreviations,
-                            deterministic_id_fields=self.deterministic_id_fields,
-                            id_generation_strategy=self.id_generation_strategy,
+                            separator=self.config.naming.separator,
+                            cast_to_string=self.config.processing.cast_to_string,
+                            include_empty=self.config.processing.include_empty,
+                            skip_null=self.config.processing.skip_null,
+                            id_field=self.config.metadata.id_field,
+                            parent_field=self.config.metadata.parent_field,
+                            time_field=self.config.metadata.time_field,
+                            visit_arrays=self.config.processing.visit_arrays,
+                            abbreviate_table_names=self.config.naming.abbreviate_table_names,
+                            abbreviate_field_names=self.config.naming.abbreviate_field_names,
+                            max_table_component_length=self.config.naming.max_table_component_length,
+                            max_field_component_length=self.config.naming.max_field_component_length,
+                            preserve_leaf_component=self.config.naming.preserve_leaf_component,
+                            custom_abbreviations=self.config.naming.custom_abbreviations,
+                            deterministic_id_fields=self.config.metadata.deterministic_id_fields,
+                            id_generation_strategy=self.config.metadata.id_generation_strategy,
                         )
 
                         # For test purposes - directly set the ID for deterministic behavior
-                        main_records[0][self.id_field] = deterministic_id
+                        main_records[0][self.config.metadata.id_field] = (
+                            deterministic_id
+                        )
 
                         # Create result object with the modified records
                         return ProcessingResult(main_records, array_tables, entity_name)
@@ -671,24 +631,24 @@ class Processor:
                 records=data,
                 entity_name=entity_name,
                 extract_time=extract_time,
-                separator=self.separator,
-                cast_to_string=self.cast_to_string,
-                include_empty=self.include_empty,
-                skip_null=self.skip_null,
-                id_field=self.id_field,
-                parent_field=self.parent_field,
-                time_field=self.time_field,
-                visit_arrays=self.visit_arrays,
+                separator=self.config.naming.separator,
+                cast_to_string=self.config.processing.cast_to_string,
+                include_empty=self.config.processing.include_empty,
+                skip_null=self.config.processing.skip_null,
+                id_field=self.config.metadata.id_field,
+                parent_field=self.config.metadata.parent_field,
+                time_field=self.config.metadata.time_field,
+                visit_arrays=self.config.processing.visit_arrays,
                 # Add abbreviation settings
-                abbreviate_table_names=self.abbreviate_table_names,
-                abbreviate_field_names=self.abbreviate_field_names,
-                max_table_component_length=self.max_table_component_length,
-                max_field_component_length=self.max_field_component_length,
-                preserve_leaf_component=self.preserve_leaf_component,
-                custom_abbreviations=self.custom_abbreviations,
+                abbreviate_table_names=self.config.naming.abbreviate_table_names,
+                abbreviate_field_names=self.config.naming.abbreviate_field_names,
+                max_table_component_length=self.config.naming.max_table_component_length,
+                max_field_component_length=self.config.naming.max_field_component_length,
+                preserve_leaf_component=self.config.naming.preserve_leaf_component,
+                custom_abbreviations=self.config.naming.custom_abbreviations,
                 # Add deterministic ID settings
-                deterministic_id_fields=self.deterministic_id_fields,
-                id_generation_strategy=self.id_generation_strategy,
+                deterministic_id_fields=self.config.metadata.deterministic_id_fields,
+                id_generation_strategy=self.config.metadata.id_generation_strategy,
             )
 
             # Create result object
@@ -730,103 +690,6 @@ class Processor:
         return self._process_in_chunks(
             data_iterator, entity_name, extract_time, chunk_size
         )
-
-    def _process_in_chunks(
-        self,
-        data_iterator: Iterator[Dict[str, Any]],
-        entity_name: str,
-        extract_time: Optional[Any] = None,
-        chunk_size: Optional[int] = None,
-    ) -> ProcessingResult:
-        """
-        Process data in chunks from any iterator source.
-
-        This generic method processes data from an iterator in batches,
-        combining the results.
-
-        Args:
-            data_iterator: Iterator yielding data records
-            entity_name: Name of the entity
-            extract_time: Extraction timestamp
-            chunk_size: Size of chunks to process (uses batch_size if None)
-
-        Returns:
-            Combined ProcessingResult object
-
-        Raises:
-            ProcessingError: If processing fails
-        """
-        # Set chunk size
-        actual_chunk_size = chunk_size or self.batch_size
-
-        # Process in chunks
-        all_results = []
-        successful_chunks = 0
-        failed_chunks = 0
-        chunk_num = 0
-        chunk = []
-
-        # Collect and process records in chunks
-        for record in data_iterator:
-            chunk.append(record)
-
-            # Process when chunk is full
-            if len(chunk) >= actual_chunk_size:
-                chunk_num += 1
-                try:
-                    chunk_result = self.process_batch(chunk, entity_name, extract_time)
-                    all_results.append(chunk_result)
-                    successful_chunks += 1
-                except Exception as e:
-                    failed_chunks += 1
-                    logger.error(f"Failed to process chunk {chunk_num}: {str(e)}")
-                    if self.recovery_strategy == STRICT:
-                        raise ProcessingError(
-                            f"Failed to process chunk {chunk_num}",
-                            entity_name=entity_name,
-                        ) from e
-                # Reset chunk for next batch
-                chunk = []
-
-        # Process any remaining records
-        if chunk:
-            chunk_num += 1
-            try:
-                chunk_result = self.process_batch(chunk, entity_name, extract_time)
-                all_results.append(chunk_result)
-                successful_chunks += 1
-            except Exception as e:
-                failed_chunks += 1
-                logger.error(f"Failed to process chunk {chunk_num}: {str(e)}")
-                if self.recovery_strategy == STRICT:
-                    raise ProcessingError(
-                        f"Failed to process chunk {chunk_num}",
-                        entity_name=entity_name,
-                    ) from e
-
-        # Log processing summary
-        total_chunks = successful_chunks + failed_chunks
-        if failed_chunks > 0:
-            logger.warning(
-                f"Processed {successful_chunks}/{total_chunks} chunks "
-                f"({failed_chunks} failed)"
-            )
-        else:
-            logger.info(f"Successfully processed all {total_chunks} chunks")
-
-        # Combine results
-        if not all_results:
-            logger.error("No chunks were successfully processed")
-            raise ProcessingError(
-                "All chunks failed processing", entity_name=entity_name
-            )
-
-        # Return single result if only one chunk
-        if len(all_results) == 1:
-            return all_results[0]
-
-        # Combine multiple results
-        return ProcessingResult.combine_results(all_results, entity_name=entity_name)
 
     def _get_data_iterator(
         self,
@@ -1087,8 +950,8 @@ class Processor:
 
                         # Determine how to handle the error based on recovery strategy
                         if (
-                            self.recovery_strategy is None
-                            or self.recovery_strategy.is_strict()
+                            self.config.error_handling.recovery_strategy is None
+                            or self.config.error_handling.recovery_strategy.is_strict()
                         ):
                             raise ParsingError(
                                 f"Invalid JSON in file {file_path} at line {line_number}: {str(e)}"
@@ -1151,7 +1014,10 @@ class Processor:
                 logger.warning(error_msg)
 
                 # Determine how to handle the error based on recovery strategy
-                if self.recovery_strategy is None or self.recovery_strategy.is_strict():
+                if (
+                    self.config.error_handling.recovery_strategy is None
+                    or self.config.error_handling.recovery_strategy.is_strict()
+                ):
                     raise ParsingError(f"Invalid JSON at line {i + 1}: {str(e)}")
 
     def _get_csv_file_iterator(
@@ -1202,7 +1068,7 @@ class Processor:
                 skip_rows=skip_rows,
                 quote_char=quote_char,
                 encoding=encoding,
-                cast_to_string=self.cast_to_string,
+                cast_to_string=self.config.processing.cast_to_string,
             )
 
             # Return iterator over records

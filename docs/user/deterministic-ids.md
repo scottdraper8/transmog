@@ -34,7 +34,7 @@ By default, each record gets a random UUID:
 
 ```python
 # Default - uses random UUIDs
-processor = Processor()
+processor = tm.Processor()
 ```
 
 This is suitable for one-time processing but can create issues in incremental loading scenarios.
@@ -44,14 +44,15 @@ This is suitable for one-time processing but can create issues in incremental lo
 You can specify which fields to use for generating deterministic IDs at different paths in your data:
 
 ```python
-# Deterministic IDs based on specific fields
-processor = Processor(
-    deterministic_id_fields={
-        "": "id",                     # Root level uses "id" field
-        "customers": "customer_id",   # Customer records use "customer_id" field
-        "orders": "order_number"      # Order records use "order_number" field
-    }
-)
+# Configure deterministic IDs based on specific fields
+config = tm.TransmogConfig.with_deterministic_ids({
+    "": "id",                     # Root level uses "id" field
+    "customers": "customer_id",   # Customer records use "customer_id" field
+    "orders": "order_number"      # Order records use "order_number" field
+})
+
+# Use the configuration
+processor = tm.Processor(config=config)
 ```
 
 This ensures that as long as the specified field values stay the same, the generated IDs will also remain consistent.
@@ -61,7 +62,7 @@ This ensures that as long as the specified field values stay the same, the gener
 For complex requirements, you can provide a custom function to generate IDs:
 
 ```python
-def custom_id_generator(record):
+def custom_id_strategy(record):
     # Generate ID based on multiple fields or complex logic
     company = record.get("company", "")
     record_id = record.get("id", "")
@@ -69,7 +70,11 @@ def custom_id_generator(record):
     
     return f"{company}-{record_type}-{record_id}"
 
-processor = Processor(id_generation_strategy=custom_id_generator)
+# Configure with custom ID generation
+config = tm.TransmogConfig.with_custom_id_generation(custom_id_strategy)
+
+# Use the configuration
+processor = tm.Processor(config=config)
 ```
 
 ## Path Patterns in Deterministic ID Configuration
@@ -96,12 +101,11 @@ Paths are matched based on the nested structure of your data:
 ### Basic Example: Root-level Deterministic IDs
 
 ```python
-from transmog import Processor
+import transmog as tm
 
 # Configure for deterministic IDs at the root level
-processor = Processor(
-    deterministic_id_fields={"": "id"}
-)
+config = tm.TransmogConfig.with_deterministic_ids({"": "id"})
+processor = tm.Processor(config=config)
 
 # Process data - the root record will use "id" field for deterministic ID
 data = {"id": "12345", "name": "Example", "value": 100}
@@ -115,17 +119,18 @@ assert result.to_dict()["main"][0]["__extract_id"] == result2.to_dict()["main"][
 ### Advanced Example: Nested Structure with Different ID Fields
 
 ```python
-from transmog import Processor
+import transmog as tm
 
 # Configure for deterministic IDs at multiple levels
-processor = Processor(
-    deterministic_id_fields={
-        "": "id",                        # Root uses "id" field
-        "customers": "customer_id",      # Customers use "customer_id" field
-        "customers_orders": "order_id",  # Orders use "order_id" field
-        "products": "sku"                # Products use "sku" field
-    }
-)
+config = tm.TransmogConfig.with_deterministic_ids({
+    "": "id",                        # Root uses "id" field
+    "customers": "customer_id",      # Customers use "customer_id" field
+    "customers_orders": "order_id",  # Orders use "order_id" field
+    "products": "sku"                # Products use "sku" field
+})
+
+# Use the configuration
+processor = tm.Processor(config=config)
 
 # Complex nested data
 data = {
@@ -163,7 +168,7 @@ products_table = tables.get("store_products", [])
 ### Example: Custom ID Strategy
 
 ```python
-from transmog import Processor
+import transmog as tm
 
 # Define a custom ID generation strategy
 def custom_id_strategy(record):
@@ -187,8 +192,11 @@ def custom_id_strategy(record):
     else:
         return str(uuid.uuid4())  # Random UUID for other records
 
-# Create processor with custom strategy
-processor = Processor(id_generation_strategy=custom_id_strategy)
+# Configure with custom ID generation
+config = tm.TransmogConfig.with_custom_id_generation(custom_id_strategy)
+
+# Use the configuration
+processor = tm.Processor(config=config)
 
 # Process data
 data = {

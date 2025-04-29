@@ -62,7 +62,7 @@ data = {
     }
 }
 
-# Process the data
+# Process the data with default configuration
 processor = tm.Processor()
 result = processor.process(data)
 
@@ -93,34 +93,51 @@ result.write_all_csv("output_dir/csv")
 result.write_all_parquet("output_dir/parquet")
 ```
 
-## Input Formats
+## Configuration
 
-Transmog supports multiple input formats:
+Transmog provides a flexible configuration system through the `TransmogConfig` class:
 
 ```python
-# Process standard JSON file
-result = processor.process_file("data.json", entity_name="entity")
+import transmog as tm
 
-# Process JSONL (line-delimited JSON)
-result = processor.process_file("data.jsonl", entity_name="entity")
+# Use pre-configured modes
+config = tm.TransmogConfig.memory_optimized()  # For large datasets
+# or
+config = tm.TransmogConfig.performance_optimized()  # For speed-critical processing
 
-# Process CSV file with options
-result = processor.process_csv(
-    "data.csv",
-    entity_name="records",
-    delimiter=",",
-    has_header=True,
-    infer_types=True
+# Create custom configuration
+config = (
+    tm.TransmogConfig.default()
+    .with_naming(
+        separator=".",
+        abbreviate_table_names=False
+    )
+    .with_processing(
+        batch_size=5000,
+        cast_to_string=True
+    )
+    .with_metadata(
+        id_field="custom_id"
+    )
+    .with_error_handling(
+        max_retries=3
+    )
 )
+
+# Use the configuration
+processor = tm.Processor(config=config)
 ```
+
+See the [configuration guide](docs/user/configuration.md) for more details.
 
 ## Processing Large Datasets
 
-For large datasets, use memory-optimized processing:
+For large datasets, use memory-optimized configuration:
 
 ```python
 # Memory-optimized processor
-processor = tm.Processor(optimize_for_memory=True)
+config = tm.TransmogConfig.memory_optimized()
+processor = tm.Processor(config=config)
 
 # Process a large file in chunks
 result = processor.process_chunked(
@@ -130,38 +147,26 @@ result = processor.process_chunked(
 )
 ```
 
-## Metadata Generation
-
-Transmog automatically adds metadata to processed records:
-
-- `__extract_id` - Unique identifier for each record
-- `__parent_extract_id` - Reference to parent record (for child tables)
-- `__extract_datetime` - Processing timestamp
-
 ## Deterministic ID Generation
 
-Ensure consistent IDs across processing runs:
+Configure deterministic IDs using the new configuration system:
 
 ```python
 # Configure deterministic IDs based on specific fields
-processor = tm.Processor(
-    deterministic_id_fields={
-        "": "id",                     # Root level uses "id" field
-        "user_orders": "id"           # Order records use "id" field
-    }
-)
+config = tm.TransmogConfig.with_deterministic_ids({
+    "": "id",                     # Root level uses "id" field
+    "user_orders": "id"           # Order records use "id" field
+})
 
-# Process the data - IDs will be consistent across runs
+# Or use a custom ID generation strategy
+def custom_id_strategy(record):
+    return f"CUSTOM-{record['id']}"
+
+config = tm.TransmogConfig.with_custom_id_generation(custom_id_strategy)
+
+# Use the configuration
+processor = tm.Processor(config=config)
 result = processor.process(data)
-
-# For complex ID generation logic, use a custom function
-def custom_id_generator(record):
-    # Generate custom ID based on record contents
-    if "id" in record:
-        return f"CUSTOM-{record['id']}"
-    return str(uuid.uuid4())  # Fallback
-
-processor = tm.Processor(id_generation_strategy=custom_id_generator)
 ```
 
 See the [deterministic IDs guide](docs/user/deterministic-ids.md) for more information.
@@ -191,36 +196,11 @@ Transmog provides three main categories of output formats:
    result.write_all_parquet()    # Write to Parquet files
    ```
 
-## Configurable Options
-
-Transmog offers many configuration options:
-
-```python
-processor = tm.Processor(
-    # Data formatting
-    separator="_",                # Separator for flattened field names
-    cast_to_string=True,         # Cast all values to strings
-    include_empty=False,         # Include empty values
-    skip_null=True,              # Skip null values
-    
-    # Performance
-    optimize_for_memory=False,   # Prioritize memory efficiency over speed
-    batch_size=1000,             # Default batch size for large datasets
-    path_parts_optimization=True, # Optimize path handling for deep structures
-    
-    # Naming options
-    abbreviate_table_names=True, # Abbreviate table names
-    abbreviate_field_names=True, # Abbreviate field names
-    
-    # Error handling
-    allow_malformed_data=False   # Attempt to recover from malformed data
-)
-```
-
 ## Documentation
 
 - [Installation Guide](docs/installation.md)
 - [Getting Started](docs/getting_started.md)
+- [Configuration Guide](docs/user/configuration.md)
 - [Output Formats](docs/user/output-formats.md)
 - [In-Memory Processing](docs/user/in-memory-processing.md)
 - [Deterministic IDs](docs/user/deterministic-ids.md)

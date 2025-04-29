@@ -35,7 +35,7 @@ data = {
     }
 }
 
-# Create a processor
+# Create a processor with default configuration
 processor = tm.Processor()
 
 # Process the data
@@ -66,18 +66,34 @@ Transmog is built around a few key concepts:
 
 - **Processor**: The main entry point for transforming data
 - **ProcessingResult**: Contains the output tables after processing
+- **Configuration**: Flexible system for customizing processing behavior
 - **ID Generation**: Methods for consistent record identification
 - **Output formats**: Different ways to export your transformed data
 
 ## Common Customizations
+
+### Using Pre-configured Modes
+
+Transmog provides pre-configured modes for common use cases:
+
+```python
+# Memory-optimized configuration
+config = tm.TransmogConfig.memory_optimized()
+processor = tm.Processor(config=config)
+
+# Performance-optimized configuration
+config = tm.TransmogConfig.performance_optimized()
+processor = tm.Processor(config=config)
+```
 
 ### Custom Separators
 
 Change the character used to separate nested keys:
 
 ```python
-# Use a forward slash as the separator
-processor = tm.Processor(separator="/")
+# Create a custom configuration with a forward slash separator
+config = tm.TransmogConfig.default().with_naming(separator="/")
+processor = tm.Processor(config=config)
 result = processor.process(data, entity_name="test")
 print(result.get_main_table())
 ```
@@ -154,22 +170,25 @@ Orders: [
 
 ### Processing Options
 
-Transmog provides several processing options:
+Transmog provides a flexible configuration system:
 
 ```python
-processor = tm.Processor(
-    # Value handling
-    cast_to_string=True,  # Convert all values to strings
-    include_empty=False,  # Skip empty strings
-    skip_null=True,       # Skip null values
-    
-    # Performance options
-    optimize_for_memory=True,  # Optimize for memory usage
-    batch_size=500,            # Process in batches of 500
-    
-    # Formatting
-    separator="_",             # Use underscore as path separator
+# Create a custom configuration
+config = (
+    tm.TransmogConfig.default()
+    .with_processing(
+        cast_to_string=True,  # Convert all values to strings
+        include_empty=False,  # Skip empty strings
+        skip_null=True,       # Skip null values
+        batch_size=500        # Process in batches of 500
+    )
+    .with_naming(
+        separator="_"         # Use underscore as path separator
+    )
 )
+
+# Use the configuration
+processor = tm.Processor(config=config)
 ```
 
 ## Exporting Data
@@ -194,15 +213,21 @@ result.write_all_parquet("output_dir/parquet")
 
 ## Error Handling
 
-Transmog provides error recovery strategies:
+Transmog provides error recovery strategies through configuration:
 
 ```python
-from transmog.recovery import SkipAndLogRecovery
-
-# Create a processor with error recovery
-processor = tm.Processor(
-    recovery_strategy=SkipAndLogRecovery()
+# Create a configuration with error handling
+config = (
+    tm.TransmogConfig.default()
+    .with_error_handling(
+        allow_malformed_data=True,
+        recovery_strategy="skip",
+        max_retries=3
+    )
 )
+
+# Use the configuration
+processor = tm.Processor(config=config)
 
 # Process potentially problematic data
 result = processor.process(data, entity_name="test")
@@ -210,22 +235,29 @@ result = processor.process(data, entity_name="test")
 
 ## Deterministic IDs
 
-For consistent IDs across processing runs:
+Configure deterministic IDs using the new configuration system:
 
 ```python
-processor = tm.Processor(
-    deterministic_id_fields={
-        "": "id",                     # Root level uses "id" field
-        "user_orders": "id"           # Order records use "id" field
-    }
-)
+# Configure deterministic IDs based on specific fields
+config = tm.TransmogConfig.with_deterministic_ids({
+    "": "id",                     # Root level uses "id" field
+    "user_orders": "id"           # Order records use "id" field
+})
 
-# Process data - IDs will be consistent across runs
+# Or use a custom ID generation strategy
+def custom_id_strategy(record):
+    return f"CUSTOM-{record['id']}"
+
+config = tm.TransmogConfig.with_custom_id_generation(custom_id_strategy)
+
+# Use the configuration
+processor = tm.Processor(config=config)
 result = processor.process(data, entity_name="test")
 ```
 
 ## Next Steps
 
+- [Configuration Guide](configuration.md) - Learn about the configuration system
 - [Flattening Options](flattening.md) - More details on flattening options
 - [Working with Arrays](arrays.md) - Deep dive into array handling
 - [Deterministic IDs](deterministic-ids.md) - Learn about ID generation options
