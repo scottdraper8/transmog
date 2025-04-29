@@ -9,6 +9,7 @@ import pytest
 from typing import Dict, List, Any
 
 from transmog import Processor
+from transmog.config import TransmogConfig
 
 
 def generate_test_data(num_records: int = 100) -> List[Dict[str, Any]]:
@@ -51,7 +52,8 @@ def processed_result():
     data = generate_test_data(100)
 
     # Process the data
-    processor = Processor(visit_arrays=True)
+    config = TransmogConfig.default().with_processing(visit_arrays=True)
+    processor = Processor(config=config)
     return processor.process(data, entity_name="benchmark")
 
 

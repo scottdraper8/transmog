@@ -22,20 +22,16 @@ from typing import (
     Protocol,
 )
 
-from .exceptions import (
+from ..error import (
     ConfigurationError,
     FileError,
     ParsingError,
     ProcessingError,
     ValidationError,
-)
-from .core.error_handling import (
     error_context,
     logger,
     safe_json_loads,
     validate_input,
-)
-from .recovery import (
     RecoveryStrategy,
     StrictRecovery,
     SkipAndLogRecovery,
@@ -43,7 +39,7 @@ from .recovery import (
     with_recovery,
     STRICT,
 )
-from .config import (
+from ..config import (
     TransmogConfig,
     ProcessingMode,
     NamingConfig,
@@ -54,9 +50,9 @@ from .config import (
 
 # Import ProcessingResult, but handle the case where it might be in a separate module
 try:
-    from .processing_result import ProcessingResult
+    from .result import ProcessingResult
 except ImportError:
-    from .core.processing_result import ProcessingResult
+    from ..core.processing_result import ProcessingResult
 
 # Type for data records
 T = TypeVar("T")
@@ -179,7 +175,7 @@ class Processor:
         extract_time: Optional[Any] = None,
     ) -> ProcessingResult:
         """Process data in a single pass."""
-        from .core.hierarchy import process_records_in_single_pass
+        from ..core.hierarchy import process_records_in_single_pass
 
         main_records, child_tables = process_records_in_single_pass(
             list(data_iterator),
@@ -213,7 +209,7 @@ class Processor:
         chunk_size: Optional[int] = None,
     ) -> ProcessingResult:
         """Process data in chunks."""
-        from .core.hierarchy import process_record_batch
+        from ..core.hierarchy import process_record_batch
 
         chunk_size = chunk_size or self.config.processing.batch_size
         main_records = []
@@ -439,7 +435,7 @@ class Processor:
 
         # Create CSV reader with specified options and consistent configuration
         try:
-            from transmog.io.csv_reader import CSVReader
+            from transmog.io.readers.csv import CSVReader
 
             reader = CSVReader(
                 delimiter=delimiter,
@@ -1052,7 +1048,7 @@ class Processor:
         Raises:
             FileError: If file cannot be read
         """
-        from transmog.io.csv_reader import CSVReader
+        from transmog.io.readers.csv import CSVReader
 
         if not os.path.exists(file_path):
             raise FileError(f"File not found: {file_path}")

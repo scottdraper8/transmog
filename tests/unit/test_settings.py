@@ -9,7 +9,13 @@ import os
 import json
 import tempfile
 import pytest
-from transmog.config import settings, load_profile, load_config, configure
+from transmog.config import (
+    settings,
+    load_profile,
+    load_config,
+    configure,
+    TransmogConfig,
+)
 from transmog import Processor
 
 
@@ -87,15 +93,21 @@ class TestSettings:
         custom_id = "__custom_id"
         custom_separator = "|"
 
-        processor = Processor(id_field=custom_id, separator=custom_separator)
+        # Create config with custom values
+        config = (
+            TransmogConfig.default()
+            .with_metadata(id_field=custom_id)
+            .with_naming(separator=custom_separator)
+        )
+        processor = Processor(config=config)
 
         # Check that explicit values are used
-        assert processor.id_field == custom_id
-        assert processor.separator == custom_separator
+        assert processor.config.metadata.id_field == custom_id
+        assert processor.config.naming.separator == custom_separator
 
         # Verify default values for non-specified parameters
-        assert processor.batch_size is not None
-        assert processor.cast_to_string is not None
+        assert processor.config.processing.batch_size is not None
+        assert processor.config.processing.cast_to_string is not None
 
     def test_attribute_access(self):
         """Test attribute access for settings."""

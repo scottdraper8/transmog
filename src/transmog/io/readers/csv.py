@@ -35,9 +35,9 @@ try:
 except ImportError:
     PYARROW_AVAILABLE = False
 
-from ..naming.conventions import sanitize_name, sanitize_column_names
-from ..exceptions import FileError, ParsingError, ProcessingError
-from ..config.settings import settings
+from transmog.naming.conventions import sanitize_name, sanitize_column_names
+from transmog.error import FileError, ParsingError, ProcessingError
+from transmog.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -732,3 +732,97 @@ class CSVReader:
             return lzma.open, "rt"
         else:
             return open, f"r"
+
+
+def normalize_column_names(column_names, separator="_"):
+    """
+    Normalize column names by sanitizing and deduplicating.
+
+    Args:
+        column_names: List of column names to normalize
+        separator: Separator to use for sanitization
+
+    Returns:
+        List of normalized column names
+    """
+    # First, sanitize the column names
+    sanitized = [sanitize_name(col, separator) for col in column_names]
+
+    # Handle duplicate column names by adding a suffix
+    result = []
+    seen = {}
+
+    for name in sanitized:
+        if name in seen:
+            seen[name] += 1
+            result.append(f"{name}{separator}{seen[name]}")
+        else:
+            seen[name] = 0
+            result.append(name)
+
+    return result
+
+
+def detect_delimiter(file_path, sample_size=4096, possible_delimiters=",;\t|"):
+    """
+    Detect the delimiter used in a CSV file.
+
+    Args:
+        file_path: Path to the CSV file
+        sample_size: Number of bytes to sample for detection
+        possible_delimiters: String of possible delimiters to check
+
+    Returns:
+        Most likely delimiter character
+    """
+    if not os.path.exists(file_path):
+        raise FileError(f"File not found: {file_path}", file_path=file_path)
+
+    # Get file opener based on extension
+    opener, mode = (
+        _get_file_opener(file_path)
+        if hasattr(CSVReader, "_get_file_opener")
+        else (open, "rt")
+    )
+
+    try:
+        with opener(file_path, mode) as f:
+            sample = f.read(sample_size)
+
+        # Count occurrences of each delimiter
+        counts = {delim: sample.count(delim) for delim in possible_delimiters}
+
+        # Return the delimiter with the highest count
+        most_common = max(counts.items(), key=lambda x: x[1])
+
+        # If no delimiter was found with a significant count, default to comma
+        if most_common[1] <= 5:
+            return ","
+
+        return most_common[0]
+    except Exception as e:
+        logger.warning(f"Failed to detect delimiter: {e}")
+        return ","
+
+
+def _get_file_opener(file_path: str) -> Tuple[Any, str]:
+    """
+    Get the appropriate file opener and mode based on file extension.
+
+    Args:
+        file_path: Path to the file
+
+    Returns:
+        Tuple of (opener_function, mode)
+    """
+    _, ext = os.path.splitext(file_path)
+    ext = ext.lower()
+
+    if ext == ".gz":
+        return gzip.open, "rt"
+    elif ext == ".bz2":
+        return bz2.open, "rt"
+    elif ext in (".xz", ".lzma"):
+        return lzma.open, "rt"
+    else:
+        return open, "r"

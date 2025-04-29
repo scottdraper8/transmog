@@ -11,9 +11,10 @@ import tempfile
 import pytest
 import json
 from transmog import Processor
-from transmog.core.processing_result import ProcessingResult
-from transmog.io.csv_reader import read_csv_file, CSVReader, PYARROW_AVAILABLE
-from transmog.exceptions import FileError, ParsingError, ProcessingError
+from transmog.process.result import ProcessingResult
+from transmog.io.readers.csv import CSVReader, read_csv_file, PYARROW_AVAILABLE
+from transmog.error import FileError, ParsingError, ProcessingError
+from transmog.config import TransmogConfig
 
 # Check if pyarrow is available
 try:
@@ -163,7 +164,8 @@ class TestCsvIntegration:
 
         try:
             # Initialize processor with cast_to_string=True
-            processor = Processor(cast_to_string=True)
+            config = TransmogConfig.default().with_processing(cast_to_string=True)
+            processor = Processor(config=config)
 
             # Process with specific options
             result = processor.process_csv(
@@ -327,10 +329,10 @@ class TestCsvIntegration:
 
         try:
             # Process with optimized settings for memory usage
-            processor = Processor(
-                cast_to_string=True,
-                optimize_for_memory=True,
+            config = TransmogConfig.memory_optimized().with_processing(
+                cast_to_string=True
             )
+            processor = Processor(config=config)
 
             # Process in chunks
             result = processor.process_csv(

@@ -329,7 +329,7 @@ result = processor.process_chunked(
 Transmog provides several recovery strategies for handling errors:
 
 ```python
-from transmog.recovery import (
+from transmog.error import (
     StrictRecovery,              # Fail on any error
     SkipAndLogRecovery,          # Log errors and skip problematic records
     PartialProcessingRecovery    # Try to extract partial data from problematic records

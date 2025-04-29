@@ -17,9 +17,12 @@ copyright = f"{datetime.datetime.now().year}, {author}"
 # The full version, including alpha/beta/rc tags
 # Import the version from the package
 try:
-    from src.transmog import __version__ as release
+    from transmog import __version__ as release
 except ImportError:
-    release = "0.1.0"  # Default if import fails
+    try:
+        from src.transmog import __version__ as release
+    except ImportError:
+        release = "0.1.0"  # Default if import fails
 
 # -- General configuration ---------------------------------------------------
 extensions = [
@@ -206,3 +209,6 @@ def setup(app):
 
     # Add custom CSS
     app.add_css_file("css/custom.css")
+
+    # Add the consolidated examples path for Sphinx to find
+    app.config.html_context = {"examples_path": "../examples"}

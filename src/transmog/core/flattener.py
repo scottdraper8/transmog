@@ -8,10 +8,15 @@ with proper error handling and recovery mechanisms.
 import functools
 from typing import Any, Dict, List, Optional, Set, Tuple, cast
 
-from ..exceptions import CircularReferenceError, ProcessingError
+from ..error import (
+    CircularReferenceError,
+    ProcessingError,
+    error_context,
+    handle_circular_reference,
+    logger,
+)
 from ..naming.abbreviator import abbreviate_field_name, get_common_abbreviations
 from ..config.settings import settings
-from .error_handling import error_context, handle_circular_reference, logger
 
 
 def _process_value(

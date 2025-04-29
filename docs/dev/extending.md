@@ -179,7 +179,7 @@ You can create custom recovery strategies to handle errors during transformation
 Subclass `RecoveryStrategy` to create a custom recovery approach:
 
 ```python
-from transmog.recovery import RecoveryStrategy
+from transmog.error import RecoveryStrategy
 
 class AuditingRecoveryStrategy(RecoveryStrategy):
     """Recovery strategy that audits errors before handling them."""

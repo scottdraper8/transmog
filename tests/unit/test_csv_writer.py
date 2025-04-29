@@ -1,19 +1,20 @@
 """
-Tests for the CSV writer component.
+Tests for the CSV writer functionality.
+
+These tests verify that the CSV writer works correctly with various
+output formats and configurations.
 """
 
-import csv
 import os
+import csv
 import tempfile
 from unittest import mock
-
 import pytest
-
-from transmog.io.csv_writer import CsvWriter
+from transmog.io.writers.csv import CsvWriter
 
 
 class TestCsvWriter:
-    """Test class for the CSV Writer."""
+    """Tests for the CSV writer functionality."""
 
     def test_initialization(self):
         """Test that the writer initializes correctly."""

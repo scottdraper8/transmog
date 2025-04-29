@@ -9,7 +9,7 @@ import os
 import json
 import tempfile
 import pytest
-from transmog.io.json_reader import (
+from transmog.io.readers.json import (
     read_json_file,
     read_jsonl_file,
     detect_json_format,

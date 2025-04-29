@@ -205,7 +205,7 @@ Transmog provides three main categories of output formats:
 - [In-Memory Processing](docs/user/in-memory-processing.md)
 - [Deterministic IDs](docs/user/deterministic-ids.md)
 - [API Reference](docs/api/index.md)
-- [Examples](docs/examples/)
+- [Examples](examples/README.md)
 
 ## Use Cases
 

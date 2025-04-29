@@ -1,19 +1,20 @@
 """
-Tests for the JSON writer component.
+Tests for the JSON writer functionality.
+
+These tests verify that the JSON writer works correctly with various
+output formats and configurations.
 """
 
-import json
 import os
+import json
 import tempfile
 from unittest import mock
-
 import pytest
-
-from transmog.io.json_writer import JsonWriter
+from transmog.io.writers.json import JsonWriter
 
 
 class TestJsonWriter:
-    """Test class for the JSON Writer."""
+    """Tests for the JSON writer functionality."""
 
     def test_initialization(self):
         """Test that the writer initializes correctly."""

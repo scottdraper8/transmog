@@ -9,7 +9,7 @@ import uuid
 import re
 import pytest
 
-from transmog import Processor
+from transmog import Processor, TransmogConfig
 from transmog.core.metadata import generate_extract_id
 
 
@@ -154,7 +154,10 @@ class TestRandomUuids:
         }
 
         # Create processor with deterministic ID fields
-        processor = Processor(deterministic_id_fields=deterministic_id_fields)
+        config = TransmogConfig.default().with_metadata(
+            deterministic_id_fields=deterministic_id_fields
+        )
+        processor = Processor(config=config)
 
         # Process the data multiple times
         result1 = processor.process(data, entity_name="store")
@@ -207,7 +210,10 @@ class TestRandomUuids:
         }
 
         # Create processor with deterministic ID fields
-        processor = Processor(deterministic_id_fields=deterministic_id_fields)
+        config = TransmogConfig.default().with_metadata(
+            deterministic_id_fields=deterministic_id_fields
+        )
+        processor = Processor(config=config)
 
         # Process the data multiple times
         result1 = processor.process(data, entity_name="test")
@@ -216,53 +222,52 @@ class TestRandomUuids:
         tables1 = result1.to_dict()
         tables2 = result2.to_dict()
 
-        # Check that only root has deterministic ID
+        # Root level should have deterministic ID
         assert tables1["main"][0]["__extract_id"] == tables2["main"][0]["__extract_id"]
 
-        # All other tables should have random IDs
-        for table_name in tables1.keys():
-            if table_name != "main":
-                table1 = tables1[table_name]
-                table2 = tables2[table_name]
+        # All nested arrays should have random IDs
+        # Get table names excluding "main"
+        array_tables1 = [name for name in tables1.keys() if name != "main"]
+        array_tables2 = [name for name in tables2.keys() if name != "main"]
 
-                # Sort by some common field like name if available
-                if table1 and "name" in table1[0]:
-                    table1 = sorted(table1, key=lambda x: x["name"])
-                    table2 = sorted(table2, key=lambda x: x["name"])
+        # Check each array table
+        for table_name in array_tables1:
+            if table_name in array_tables2:
+                items1 = sorted(tables1[table_name], key=lambda x: x.get("name", ""))
+                items2 = sorted(tables2[table_name], key=lambda x: x.get("name", ""))
 
-                # Check that IDs are different
-                for i in range(len(table1)):
-                    assert table1[i]["__extract_id"] != table2[i]["__extract_id"]
+                for i in range(min(len(items1), len(items2))):
+                    # IDs should be different (random)
+                    assert items1[i]["__extract_id"] != items2[i]["__extract_id"]
 
     def test_uuid_version_and_variant(self):
-        """Test that generated UUIDs are Version 4 random UUIDs with correct variant."""
-        # Generate multiple UUIDs
-        for _ in range(100):
-            id_str = generate_extract_id()
+        """Test that UUIDs have correct version and variant."""
+        # Generate a random UUID
+        random_id = generate_extract_id()
 
-            # Convert string to UUID object for inspection
-            id_obj = uuid.UUID(id_str)
+        # Parse as UUID object
+        uuid_obj = uuid.UUID(random_id)
 
-            # Check UUID version (should be 4 for random UUIDs)
-            assert id_obj.version == 4
+        # Verify it's UUID version 4 (random)
+        assert uuid_obj.version == 4
 
-            # Check UUID variant (should be RFC 4122 variant)
-            # For RFC 4122 variant, the most significant bits of the 8th octet
-            # should be '10xx' in binary, which is checked by the variant property
-            assert id_obj.variant == uuid.RFC_4122
+        # Verify variant is RFC 4122
+        assert uuid_obj.variant == uuid.RFC_4122
 
     def test_uuid_with_custom_namespace(self):
-        """Test handling of custom namespace parameters if supported."""
-        # This is a theoretical test - if your generate_random_id supports
-        # custom namespace parameters or other configuration options,
-        # those would be tested here.
+        """Test deterministic UUID generation with custom namespace."""
+        # Use a custom namespace UUID
+        custom_namespace = uuid.uuid4()
 
-        # For now, just ensure the basic function works without parameters
-        id1 = generate_extract_id()
-        assert id1 is not None
+        # Generate deterministic IDs with custom namespace
+        value = "test_value"
+        id1 = str(uuid.uuid5(custom_namespace, value))
+        id2 = str(uuid.uuid5(custom_namespace, value))
 
-        # If your implementation supports custom namespaces, test those here
-        # For example:
-        # id2 = generate_extract_id(namespace="custom")
-        # assert id2 is not None
-        # assert id2 != id1
+        # IDs should be the same
+        assert id1 == id2
+
+        # ID should match UUID5 pattern
+        uuid_obj = uuid.UUID(id1)
+        assert uuid_obj.version == 5
+        assert uuid_obj.variant == uuid.RFC_4122

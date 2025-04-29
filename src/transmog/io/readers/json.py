@@ -21,6 +21,112 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+class JsonReader:
+    """
+    Reader class for standard JSON files.
+
+    Provides methods to read standard JSON files and convert them into dictionaries or lists.
+    """
+
+    def __init__(self):
+        """Initialize the JSON reader."""
+        pass
+
+    def read_file(self, file_path: str) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+        """
+        Read a JSON file and return its contents.
+
+        Args:
+            file_path: Path to the JSON file
+
+        Returns:
+            Parsed JSON content as dictionary or list
+        """
+        return read_json_file(file_path)
+
+    def read_stream(
+        self, file_path: str, chunk_size: int = 100
+    ) -> Generator[List[Dict[str, Any]], None, None]:
+        """
+        Read a JSON file in chunks for memory-efficient processing.
+
+        Args:
+            file_path: Path to the JSON file
+            chunk_size: Number of records to yield in each chunk
+
+        Yields:
+            Lists of JSON records in chunks of chunk_size
+        """
+        for chunk in read_json_stream(file_path, chunk_size=chunk_size):
+            yield chunk
+
+    def parse_data(
+        self, data: Union[str, bytes]
+    ) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+        """
+        Parse JSON data.
+
+        Args:
+            data: JSON content as string or bytes
+
+        Returns:
+            Parsed JSON as dictionary or list of dictionaries
+        """
+        return parse_json_data(data, format_hint="json")
+
+
+class JsonlReader:
+    """
+    Reader class for JSON Lines (JSONL) files.
+
+    Provides methods to read JSONL files (newline-delimited JSON) and convert them into lists of dictionaries.
+    """
+
+    def __init__(self):
+        """Initialize the JSONL reader."""
+        pass
+
+    def read_file(self, file_path: str) -> List[Dict[str, Any]]:
+        """
+        Read a JSON Lines file and return its contents.
+
+        Args:
+            file_path: Path to the JSONL file
+
+        Returns:
+            List of parsed JSON records
+        """
+        return read_jsonl_file(file_path)
+
+    def read_stream(
+        self, file_path: str, chunk_size: int = 100
+    ) -> Generator[List[Dict[str, Any]], None, None]:
+        """
+        Read a JSONL file in chunks for memory-efficient processing.
+
+        Args:
+            file_path: Path to the JSONL file
+            chunk_size: Number of records to yield in each chunk
+
+        Yields:
+            Lists of JSON records in chunks of chunk_size
+        """
+        for chunk in read_json_stream(file_path, chunk_size=chunk_size):
+            yield chunk
+
+    def parse_data(self, data: Union[str, bytes]) -> List[Dict[str, Any]]:
+        """
+        Parse JSONL data.
+
+        Args:
+            data: JSONL content as string or bytes
+
+        Returns:
+            List of parsed JSON records
+        """
+        return parse_json_data(data, format_hint="jsonl")
+
+
 def read_json_file(file_path: str) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
     """
     Read a JSON file and return its contents.

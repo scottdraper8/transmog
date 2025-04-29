@@ -1,8 +1,8 @@
 """
-Unit tests for the CSV reader module.
+Tests for the CSV reader functionality.
 
-These tests verify the functionality of the CSV reader components,
-based on the current implementation behavior.
+These tests verify that the CSV reader works correctly with various
+input formats and configurations.
 """
 
 import os
@@ -13,13 +13,22 @@ import bz2
 import pytest
 from typing import List, Dict, Any
 
-from transmog.io.csv_reader import (
+from transmog.io.readers.csv import (
     read_csv_file,
     read_csv_stream,
     CSVReader,
-    PYARROW_AVAILABLE,
+    normalize_column_names,
+    detect_delimiter,
 )
-from transmog.exceptions import FileError, ParsingError
+from transmog.error import FileError, ParsingError
+
+# Check if PyArrow is available
+try:
+    import pyarrow
+
+    PYARROW_AVAILABLE = True
+except ImportError:
+    PYARROW_AVAILABLE = False
 
 # Skip PyArrow-specific tests if not available
 pytestmark = pytest.mark.skipif(
@@ -27,8 +36,8 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-class TestCsvReader:
-    """Tests for the CSV reader module."""
+class TestCSVReader:
+    """Tests for the CSV reader functionality."""
 
     def create_test_csv(self, data: List[List[str]], has_header: bool = True) -> str:
         """Helper to create a test CSV file."""

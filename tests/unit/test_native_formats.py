@@ -15,7 +15,8 @@ from typing import Dict, List, Any
 import io
 
 from transmog import Processor
-from transmog.core.processing_result import ProcessingResult
+from transmog.process.result import ProcessingResult
+from transmog.config import TransmogConfig
 
 # Sample test data
 SAMPLE_DATA = {
@@ -30,7 +31,10 @@ SAMPLE_DATA = {
 def processing_result() -> ProcessingResult:
     """Create a ProcessingResult with test data."""
     # Process sample data
-    processor = Processor(visit_arrays=True)
+    config = TransmogConfig.default().with_processing(
+        cast_to_string=True, visit_arrays=True
+    )
+    processor = Processor(config=config)
     return processor.process(SAMPLE_DATA, entity_name="test")
 
 

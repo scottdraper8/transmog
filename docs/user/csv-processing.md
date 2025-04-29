@@ -357,9 +357,6 @@ json_data = result.to_json()
 
 # Export back to CSV
 csv_data = result.to_csv()
-
-# Get as a pandas DataFrame (if pandas is installed)
-df = result.to_pandas()
 ```
 
 ## Advanced CSV Processing
@@ -382,43 +379,4 @@ combined_result = ProcessingResult.combine(results)
 # Access the combined data
 combined_data = combined_result.get_main_table()
 print(f"Processed {len(combined_data)} total records")
-```
-
-### CSV to Database Integration
-
-Easily move CSV data into databases:
-
-```python
-import sqlite3
-
-# Process the CSV file
-result = processor.process_csv("sales.csv", entity_name="sales")
-
-# Get the data as a list of dictionaries
-sales_data = result.get_main_table()
-
-# Connect to a database
-conn = sqlite3.connect("sales_data.db")
-cursor = conn.cursor()
-
-# Create a table (example schema)
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS sales (
-    id TEXT PRIMARY KEY,
-    product_id TEXT,
-    quantity INTEGER,
-    price REAL,
-    date TEXT
-)
-''')
-
-# Insert the processed data
-for row in sales_data:
-    cursor.execute(
-        "INSERT INTO sales VALUES (?, ?, ?, ?, ?)",
-        (row["id"], row["product_id"], row["quantity"], row["price"], row["date"])
-    )
-
-conn.commit()
-conn.close()
 ```

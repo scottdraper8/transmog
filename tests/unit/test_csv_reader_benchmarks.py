@@ -12,12 +12,19 @@ import pytest
 import time
 from unittest import mock
 
-from transmog.io.csv_reader import (
+from transmog.io.readers.csv import (
     read_csv_file,
     read_csv_stream,
     CSVReader,
-    PYARROW_AVAILABLE,
 )
+
+# Check if PyArrow is available
+try:
+    import pyarrow
+
+    PYARROW_AVAILABLE = True
+except ImportError:
+    PYARROW_AVAILABLE = False
 
 
 @pytest.mark.benchmark
@@ -67,7 +74,7 @@ class TestCsvReaderBenchmarks:
                 # Do a manual timing of the built-in implementation for comparison
                 start_time = time.time()
                 # Force using the built-in implementation by setting PYARROW_AVAILABLE to False
-                with mock.patch("transmog.io.csv_reader.PYARROW_AVAILABLE", False):
+                with mock.patch("transmog.io.readers.csv.PYARROW_AVAILABLE", False):
                     result_builtin = read_csv_file(csv_path)
                 builtin_time = time.time() - start_time
 
@@ -213,7 +220,7 @@ class TestCsvReaderBenchmarks:
             # Test PyArrow if available
             if PYARROW_AVAILABLE:
                 start_time = time.time()
-                with mock.patch("transmog.io.csv_reader.PYARROW_AVAILABLE", True):
+                with mock.patch("transmog.io.readers.csv.PYARROW_AVAILABLE", True):
                     result_pa = read_csv_file(csv_path)
                 pa_time = time.time() - start_time
 
@@ -225,7 +232,7 @@ class TestCsvReaderBenchmarks:
 
             # Test built-in
             start_time = time.time()
-            with mock.patch("transmog.io.csv_reader.PYARROW_AVAILABLE", False):
+            with mock.patch("transmog.io.readers.csv.PYARROW_AVAILABLE", False):
                 result_builtin = read_csv_file(csv_path)
             builtin_time = time.time() - start_time
 

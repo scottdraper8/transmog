@@ -73,7 +73,7 @@ class ParquetWriter(DataWriter):
         import pyarrow.parquet as pq
 
         # Create a temporary ProcessingResult to use its conversion methods
-        from transmog.core.processing_result import ProcessingResult
+        from transmog.process.result import ProcessingResult
 
         temp_result = ProcessingResult(
             main_table=table_data, child_tables={}, entity_name="temp"
@@ -143,7 +143,7 @@ class ParquetWriter(DataWriter):
             )
 
         # Create a ProcessingResult object to use its conversion and writing methods
-        from transmog.core.processing_result import ProcessingResult
+        from transmog.process.result import ProcessingResult
 
         result = ProcessingResult(
             main_table=main_table, child_tables=child_tables, entity_name=entity_name

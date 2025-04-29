@@ -10,7 +10,7 @@ import json
 import pytest
 import tempfile
 from transmog import Processor
-from transmog.config import settings, configure, load_profile
+from transmog.config import settings, configure, load_profile, TransmogConfig
 from transmog.core.flattener import flatten_json
 from transmog.core.extractor import extract_arrays
 
@@ -24,7 +24,8 @@ class TestConfigPropagation:
         custom_separator = "."
 
         # Create a processor with the custom separator
-        processor = Processor(separator=custom_separator)
+        config = TransmogConfig.default().with_naming(separator=custom_separator)
+        processor = Processor(config=config)
 
         # Test data with nested structure
         test_data = {"id": 123, "nested": {"field": "value"}}
@@ -55,7 +56,8 @@ class TestConfigPropagation:
     def test_cast_to_string_propagation(self):
         """Test that cast_to_string configuration is properly propagated."""
         # Create processor with cast_to_string=False
-        processor = Processor(cast_to_string=False)
+        config = TransmogConfig.default().with_processing(cast_to_string=False)
+        processor = Processor(config=config)
 
         # Test data with non-string values
         test_data = {"number": 42, "boolean": True}
@@ -69,7 +71,8 @@ class TestConfigPropagation:
         assert isinstance(main_table[0]["boolean"], bool)
 
         # Now test with cast_to_string=True
-        processor = Processor(cast_to_string=True)
+        config = TransmogConfig.default().with_processing(cast_to_string=True)
+        processor = Processor(config=config)
         result = processor.process(test_data, entity_name="test")
 
         # Verify values were cast to strings
@@ -80,7 +83,10 @@ class TestConfigPropagation:
     def test_skip_null_propagation(self):
         """Test that skip_null configuration is properly propagated."""
         # Create processor with skip_null=False
-        processor = Processor(skip_null=False, cast_to_string=True)
+        config = TransmogConfig.default().with_processing(
+            skip_null=False, cast_to_string=True
+        )
+        processor = Processor(config=config)
 
         # Test data with null values
         test_data = {"id": 123, "null_field": None}
@@ -94,7 +100,8 @@ class TestConfigPropagation:
         assert main_table[0]["null_field"] == ""
 
         # Now test with skip_null=True
-        processor = Processor(skip_null=True)
+        config = TransmogConfig.default().with_processing(skip_null=True)
+        processor = Processor(config=config)
         result = processor.process(test_data, entity_name="test")
 
         # Verify null fields are skipped
@@ -104,11 +111,12 @@ class TestConfigPropagation:
     def test_abbreviation_propagation(self):
         """Test that abbreviation settings are properly propagated."""
         # Create processor with abbreviation settings
-        processor = Processor(
+        config = TransmogConfig.default().with_naming(
             abbreviate_field_names=True,
             max_field_component_length=3,
             custom_abbreviations={"information": "inf"},
         )
+        processor = Processor(config=config)
 
         # Test data with long field names
         test_data = {"information": "test data", "very_long_field_name": "test value"}
@@ -140,7 +148,8 @@ class TestConfigPropagation:
     def test_config_propagation_to_io(self, tmpdir):
         """Test that configuration options reach the IO layer."""
         # Set up configuration with specific options
-        processor = Processor(cast_to_string=True)
+        config = TransmogConfig.default().with_processing(cast_to_string=True)
+        processor = Processor(config=config)
 
         # Test data
         test_data = {"id": 42, "name": "Test"}
@@ -223,10 +232,15 @@ class TestConfigPropagation:
         assert settings.get_option("separator") == custom_separator
         assert settings.get_option("max_field_component_length") == custom_max_length
 
-        # Test with processor
-        processor = Processor()
-        assert processor.separator == custom_separator
-        assert processor.max_field_component_length == custom_max_length
+        # Test with processor - create a processor with a specific config
+        config = TransmogConfig.default().with_naming(
+            separator=custom_separator, max_field_component_length=custom_max_length
+        )
+        processor = Processor(config=config)
+
+        # Now assert on the processor's config
+        assert processor.config.naming.separator == custom_separator
+        assert processor.config.naming.max_field_component_length == custom_max_length
 
         # Test with a direct call to flatten_json - should use global settings
         test_data = {"nested": {"field": "value"}}

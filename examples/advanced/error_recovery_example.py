@@ -14,7 +14,7 @@ import functools
 from typing import Any, Dict, List, Optional, Tuple, Callable
 
 # Add parent directory to path to import transmog without installing
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 # Import from src package
 from transmog import Processor

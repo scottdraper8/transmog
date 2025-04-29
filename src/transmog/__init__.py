@@ -7,7 +7,11 @@ with parent-child relationship preservation and metadata annotation.
 
 __version__ = "0.1.2.5"
 
-# Imports for use within the package itself
+# Import dependencies and features early to enable detection
+from .dependencies import DependencyManager
+from .features import Features
+
+# Core functionality
 from transmog.core.flattener import flatten_json
 from transmog.core.extractor import extract_arrays
 from transmog.core.hierarchy import (
@@ -21,6 +25,8 @@ from transmog.core.metadata import (
     get_current_timestamp,
     create_batch_metadata,
 )
+
+# Naming utilities
 from transmog.naming.conventions import (
     get_table_name,
     sanitize_name,
@@ -34,10 +40,10 @@ from transmog.naming.abbreviator import (
 )
 
 # High-level processor class for one-step processing
-from transmog.processor import Processor, ProcessingResult
+from transmog.process import Processor, ProcessingResult
 
 # Configuration functionality
-from .config import (
+from transmog.config import (
     TransmogConfig,
     ProcessingMode,
     NamingConfig,
@@ -51,80 +57,96 @@ from .config import (
     configure,
 )
 
-# IO utilities - using lazy imports to avoid circular dependencies
-import importlib.util
-import logging
-from typing import List, Optional
+# Error handling and exceptions
+from transmog.error import (
+    # Exceptions
+    TransmogError,
+    ProcessingError,
+    ValidationError,
+    ParsingError,
+    FileError,
+    CircularReferenceError,
+    MissingDependencyError,
+    ConfigurationError,
+    OutputError,
+    # Error handling utilities
+    error_context,
+    setup_logging,
+    # Recovery strategies
+    RecoveryStrategy,
+    StrictRecovery,
+    SkipAndLogRecovery,
+    PartialProcessingRecovery,
+    with_recovery,
+    STRICT,
+    DEFAULT,
+    LENIENT,
+)
 
-logger = logging.getLogger(__name__)
+# IO utilities
+from transmog.io import (
+    initialize_io_features,
+    get_available_reader_formats,
+    get_available_writer_formats,
+    has_reader_format,
+    has_writer_format,
+    detect_format,
+    create_writer,
+    DataWriter,
+)
 
-# Track IO module availability
-_io_module_checked = False
-_io_module_available = False
-_writer_registry = None
+# Initialize IO features
+initialize_io_features()
 
-
-def _ensure_io_module():
-    """
-    Lazily import the IO module to avoid circular imports.
-
-    Returns:
-        bool: Whether the IO module is available
-    """
-    global _io_module_checked, _io_module_available, _writer_registry
-
-    if not _io_module_checked:
-        try:
-            # Use importlib for lazy loading
-            io_module = importlib.import_module("transmog.io")
-            _writer_registry = io_module.WriterRegistry
-            _io_module_available = True
-        except (ImportError, AttributeError):
-            _io_module_available = False
-
-        _io_module_checked = True
-
-    return _io_module_available
-
-
-def list_available_formats() -> List[str]:
-    """
-    List all available output formats.
-
-    Returns:
-        List of available format names
-    """
-    if _ensure_io_module() and _writer_registry is not None:
-        return _writer_registry.list_available_formats()
-    return []
-
-
-def is_format_available(format_name: str) -> bool:
-    """
-    Check if a specific output format is available.
-
-    Args:
-        format_name: Name of the format to check
-
-    Returns:
-        Whether the format is available
-    """
-    if _ensure_io_module() and _writer_registry is not None:
-        return _writer_registry.is_format_available(format_name)
-    return False
-
-
+# Public API
 __all__ = [
+    # Main classes
     "Processor",
+    "ProcessingResult",
+    # Configuration
     "TransmogConfig",
     "ProcessingMode",
     "NamingConfig",
     "ProcessingConfig",
     "MetadataConfig",
     "ErrorHandlingConfig",
+    # Configuration utilities
     "settings",
     "extensions",
     "load_profile",
     "load_config",
     "configure",
+    # Format utilities
+    "get_available_reader_formats",
+    "get_available_writer_formats",
+    "has_reader_format",
+    "has_writer_format",
+    "detect_format",
+    "create_writer",
+    "DataWriter",
+    # Features and dependencies
+    "Features",
+    "DependencyManager",
+    # Exceptions
+    "TransmogError",
+    "ProcessingError",
+    "ValidationError",
+    "ParsingError",
+    "FileError",
+    "CircularReferenceError",
+    "MissingDependencyError",
+    "ConfigurationError",
+    "OutputError",
+    # Error handling
+    "error_context",
+    "setup_logging",
+    # Recovery strategies
+    "RecoveryStrategy",
+    "StrictRecovery",
+    "SkipAndLogRecovery",
+    "PartialProcessingRecovery",
+    "with_recovery",
+    "STRICT",
+    "DEFAULT",
+    "LENIENT",
 ]

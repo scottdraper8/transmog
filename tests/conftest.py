@@ -14,6 +14,7 @@ from typing import Dict, List, Any
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from transmog import Processor
+from transmog.config import TransmogConfig
 
 
 @pytest.fixture
@@ -131,11 +132,15 @@ def complex_batch() -> List[Dict[str, Any]]:
 @pytest.fixture
 def processor():
     """Fixture for a basic processor."""
-    return Processor(
-        cast_to_string=True,
-        abbreviate_field_names=False,
-        separator="_",  # Explicitly set separator to ensure consistency in tests
+    config = (
+        TransmogConfig.default()
+        .with_processing(cast_to_string=True)
+        .with_naming(
+            abbreviate_field_names=False,
+            separator="_",  # Explicitly set separator to ensure consistency in tests
+        )
     )
+    return Processor(config=config)
 
 
 @pytest.fixture

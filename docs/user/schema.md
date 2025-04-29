@@ -8,6 +8,7 @@ Schemas in Transmog are defined using a dictionary-like structure where keys rep
 
 ```python
 import transmog as tm
+from transmog.error import ValidationError
 
 # Define a schema
 user_schema = {
@@ -194,7 +195,7 @@ When validation fails and `fail_on_error` is `True`, a `ValidationError` is rais
 
 ```python
 import transmog as tm
-from transmog.exceptions import ValidationError
+from transmog.error import ValidationError
 
 schema = {
     "age": {"type": "integer", "min": 0, "required": True}
@@ -207,9 +208,9 @@ try:
     result = processor.process({"age": -5}, entity_name="person")
 except ValidationError as e:
     print(f"Validation failed: {e}")
-    # Access details about the error
-    for error in e.errors:
-        print(f"Field: {error.field}, Error: {error.message}")
+    print(f"Path: {e.path}")
+    print(f"Value: {e.value}")
+    print(f"Schema: {e.schema}")
 ```
 
 When `fail_on_error` is `False`, errors are included in the processing result:
@@ -289,3 +290,5 @@ user_schema = {
 - Use schemas to document your data structures
 - Consider breaking complex schemas into reusable components
 - Test your schemas with both valid and invalid data to ensure they behave as expected 
+
+For examples of error handling with schema validation, see the [error handling examples](../../examples/advanced/error_recovery_example.py) and [data validation examples](../../examples/data/data_validation_example.py). 

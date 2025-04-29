@@ -5,12 +5,17 @@ This module provides default settings, configuration profiles, and utilities
 for customizing Transmog's behavior.
 """
 
-import os
 import json
+import os
 import logging
-from typing import Any, Dict, List, Optional, Union, Set, Callable
+from enum import Enum
+from types import MappingProxyType
+from typing import Any, Dict, List, Optional, Set, Type, TypeVar, Union, cast
 
-from ..exceptions import ConfigurationError
+import importlib
+import importlib.util
+
+from ..error import ConfigurationError
 
 # Create logger for settings module
 logger = logging.getLogger("transmog.settings")

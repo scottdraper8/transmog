@@ -14,7 +14,7 @@ import sys
 import traceback
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar, Union, cast
 
-from ..exceptions import (
+from .exceptions import (
     CircularReferenceError,
     ConfigurationError,
     FileError,
@@ -248,23 +248,27 @@ def error_context(
     return decorator
 
 
-def recover_or_raise(
+def try_with_recovery(
     func: Callable[..., T],
     recovery_func: Callable[[Exception], T],
     *args: Any,
     **kwargs: Any,
 ) -> T:
     """
-    Execute a function with automatic recovery option.
+    Execute a function with recovery handling.
+
+    This function executes the given function with the specified arguments,
+    and if an exception is raised, calls the recovery function with the
+    exception as its argument.
 
     Args:
-        func: Function to execute
-        recovery_func: Function to call for recovery if an exception occurs
-        *args: Arguments to pass to func
+        func: The function to execute
+        recovery_func: Function to call if an exception is raised
+        *args: Positional arguments to pass to func
         **kwargs: Keyword arguments to pass to func
 
     Returns:
-        Result of func or recovery_func
+        The result of func or recovery_func if an exception occurred
     """
     try:
         return func(*args, **kwargs)
@@ -280,44 +284,42 @@ def validate_input(
     validation_func: Optional[Callable[[Any], Tuple[bool, Optional[str]]]] = None,
 ) -> None:
     """
-    Validate input parameters with detailed error messages.
+    Validate input data against expected type and custom validation.
 
     Args:
         data: Data to validate
         expected_type: Expected type or tuple of types
         param_name: Parameter name for error messages
-        allow_none: Whether to allow None values
-        validation_func: Optional additional validation function
+        allow_none: Whether None is allowed
+        validation_func: Optional custom validation function
 
     Raises:
         ValidationError: If validation fails
     """
-    # Check for None if not allowed
+    # Check if None is allowed
     if data is None:
         if allow_none:
             return
-        raise ValidationError(
-            f"Parameter '{param_name}' cannot be None", errors={param_name: "required"}
-        )
+        raise ValidationError(f"Parameter '{param_name}' cannot be None")
 
-    # Type checking
+    # Check type
     if not isinstance(data, expected_type):
-        actual_type = type(data).__name__
-        expected_names = (
-            expected_type.__name__
-            if isinstance(expected_type, type)
-            else " or ".join(t.__name__ for t in expected_type)
+        type_names = (
+            [t.__name__ for t in expected_type]
+            if isinstance(expected_type, tuple)
+            else [expected_type.__name__]
         )
+        expected_type_str = " or ".join(type_names)
+        actual_type = type(data).__name__
         raise ValidationError(
-            f"Parameter '{param_name}' has invalid type",
-            errors={param_name: f"expected {expected_names}, got {actual_type}"},
+            f"Parameter '{param_name}' must be of type {expected_type_str}, "
+            f"got {actual_type}"
         )
 
-    # Additional validation if provided
+    # Run custom validation if provided
     if validation_func is not None:
-        is_valid, error_msg = validation_func(data)
+        is_valid, error_message = validation_func(data)
         if not is_valid:
             raise ValidationError(
-                f"Parameter '{param_name}' validation failed",
-                errors={param_name: error_msg or "invalid value"},
+                f"Validation failed for parameter '{param_name}': {error_message}"
             )

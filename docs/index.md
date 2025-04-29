@@ -46,10 +46,10 @@ Transmog enables you to:
 
 ## Examples
 
-- [Basic Examples](examples/basic.md)
-- [Output Formats Example](examples/output-formats-example.md) - Demonstrates all output formats
-- [CSV Processing Example](examples/csv-processing.md) - Process and transform CSV data
-- [Deterministic ID Generation](examples/deterministic-id-example.md) - Generate consistent IDs across processing runs
+- [Basic Usage](../examples/basic/simple_flatten.py)
+- [Output Formats](../examples/basic/native_output_formats.py)
+- [Data Processing](../examples/data/data_cleanup_example.py)
+- [Advanced Features](../examples/advanced/advanced_usage.py)
 
 ## For Developers
 
@@ -159,14 +159,11 @@ dev/release-process
 :hidden:
 :caption: Examples
 
-examples/basic
-examples/csv-processing
-examples/deterministic-id-example
-examples/streaming-example
+../examples/README
 ```
 
 ## Indices and Tables
 
 * {ref}`genindex`
 * {ref}`modindex`
-* {ref}`search` 
+* {ref}`search`

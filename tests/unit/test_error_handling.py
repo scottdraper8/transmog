@@ -7,7 +7,7 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock
 
-from transmog.exceptions import (
+from transmog.error import (
     CircularReferenceError,
     ConfigurationError,
     FileError,
@@ -17,20 +17,20 @@ from transmog.exceptions import (
     ParsingError,
     ProcessingError,
     ValidationError,
-)
-from transmog.core.error_handling import (
     error_context,
     handle_circular_reference,
-    recover_or_raise,
+    try_with_recovery as recover_or_raise,
     safe_json_loads,
     validate_input,
-)
-from transmog.recovery import (
     RecoveryStrategy,
     StrictRecovery,
     SkipAndLogRecovery,
     PartialProcessingRecovery,
     with_recovery,
+    logger,
+    STRICT,
+    DEFAULT,
+    LENIENT,
 )
 
 
@@ -231,7 +231,7 @@ class TestErrorHandlingUtilities:
         # Wrong type
         with pytest.raises(ValidationError) as exc_info:
             validate_input(123, str, "string_param")
-        assert "expected str, got int" in str(exc_info.value)
+        assert "must be of type str, got int" in str(exc_info.value)
 
         # Multiple accepted types
         validate_input(123, (int, str), "multi_type_param")
@@ -251,117 +251,258 @@ class TestErrorHandlingUtilities:
 
 
 class TestRecoveryStrategies:
-    """Tests for recovery strategies."""
+    """Test the recovery strategy classes."""
 
     def test_strict_recovery(self):
-        """Test StrictRecovery strategy."""
+        """Test that StrictRecovery raises the original exception."""
         strategy = StrictRecovery()
+        error = ValueError("test error")
 
-        # All methods should re-raise their exceptions
-        with pytest.raises(ParsingError):
-            strategy.handle_parsing_error(ParsingError("Test error"))
+        # Test handling of a generic error wrapped as ProcessingError
+        with pytest.raises(ValueError) as exc_info:
+            strategy.handle_processing_error(error)
+        assert str(exc_info.value) == "test error"
 
-        with pytest.raises(ProcessingError):
-            strategy.handle_processing_error(ProcessingError("Test error"))
+        # Test parsing error handling
+        parse_error = ParsingError("Invalid JSON")
+        with pytest.raises(ParsingError) as exc_info:
+            strategy.handle_parsing_error(parse_error)
+        assert (
+            exc_info.value is parse_error
+        )  # Check identity instead of string comparison
 
-        with pytest.raises(CircularReferenceError):
-            strategy.handle_circular_reference(
-                CircularReferenceError("Test error"), path=["path", "to", "error"]
-            )
+        # Test file error handling
+        file_error = FileError("File not found")
+        with pytest.raises(FileError) as exc_info:
+            strategy.handle_file_error(file_error)
+        assert (
+            exc_info.value is file_error
+        )  # Check identity instead of string comparison
 
-    @patch("transmog.recovery.logger")
-    def test_skip_and_log_recovery(self, mock_logger):
-        """Test SkipAndLogRecovery strategy."""
+        # Test circular reference handling
+        circular_error = CircularReferenceError("Circular reference")
+        with pytest.raises(CircularReferenceError) as exc_info:
+            strategy.handle_circular_reference(circular_error, ["path", "to", "error"])
+        assert (
+            exc_info.value is circular_error
+        )  # Check identity instead of string comparison
+
+    def test_skip_and_log_recovery(self):
+        """Test that SkipAndLogRecovery logs and returns empty values."""
         strategy = SkipAndLogRecovery()
+        mock_logger = MagicMock()
 
-        # Test handling parsing error
-        result = strategy.handle_parsing_error(ParsingError("Bad JSON"))
-        assert result is None
-        mock_logger.log.assert_called()
+        with patch.object(logger, "log", mock_logger):
+            # Test processing error handling
+            error = ProcessingError("Process failed", entity_name="test_entity")
+            result = strategy.handle_processing_error(error, entity_name="test_entity")
 
-        # Test handling processing error
-        result = strategy.handle_processing_error(ProcessingError("Failed to process"))
-        assert result == {}
+            # Just check that logger was called with the right level
+            mock_logger.assert_called_once()
+            assert mock_logger.call_args[0][0] == strategy.log_level
+            # Check that the error message contains key parts
+            log_msg = mock_logger.call_args[0][1]
+            assert "Skipping record due to processing error" in log_msg
+            assert "test_entity" in log_msg
+            assert "Process failed" in log_msg
 
-        # Test handling circular reference
-        result = strategy.handle_circular_reference(
-            CircularReferenceError("Circular reference"), path=["root", "items", "0"]
-        )
-        assert result == {}
+            # Verify correct return value
+            assert result == {}
 
-        # Test handling file error
-        result = strategy.handle_file_error(FileError("File not found"))
-        assert result is None
+            # Test parsing error handling
+            mock_logger.reset_mock()
+            parse_error = ParsingError("Invalid JSON", source="test.json")
+            result = strategy.handle_parsing_error(parse_error, source="test.json")
 
-    @patch("transmog.recovery.logger")
-    def test_partial_recovery(self, mock_logger):
-        """Test PartialProcessingRecovery strategy."""
-        strategy = PartialProcessingRecovery()
+            # Verify logger was called
+            mock_logger.assert_called_once()
+            assert mock_logger.call_args[0][0] == strategy.log_level
+            log_msg = mock_logger.call_args[0][1]
+            assert "Skipping record due to parsing error" in log_msg
+            assert "test.json" in log_msg
+            assert "Invalid JSON" in log_msg
 
-        # Test handling processing error with recoverable data
-        test_data = {"id": 123, "name": "Test", "items": [{"invalid": "structure"}]}
-        error = ProcessingError("Failed processing nested structure")
-        error.data = test_data
+            # Verify correct return value
+            assert result == {}
 
-        result = strategy.handle_processing_error(error)
-        # Should extract top-level scalar fields
-        assert "id" in result
-        assert "name" in result
-        assert "items" not in result  # Should skip the array
-
-        # Test handling circular reference
-        result = strategy.handle_circular_reference(
-            CircularReferenceError("Circular reference"), path=["root", "items", "0"]
-        )
-        assert result["__circular_reference"] is True
-        assert "root > items > 0" in result["__reference_path"]
-
-    def test_with_recovery(self):
-        """Test the with_recovery utility function."""
-
-        def problematic_func(data):
-            if "error_type" not in data:
-                return data["value"] * 2
-
-            if data["error_type"] == "parsing":
-                raise ParsingError("Parse error")
-            elif data["error_type"] == "processing":
-                raise ProcessingError("Process error")
-            elif data["error_type"] == "circular":
-                e = CircularReferenceError("Circular error")
-                e.path = ["a", "b"]
-                raise e
-            elif data["error_type"] == "file":
-                raise FileError("File error")
-            else:
-                raise ValueError("Unknown error")
-
-        # Test with StrictRecovery - should re-raise
-        with pytest.raises(ParsingError):
-            with_recovery(
-                problematic_func,
-                strategy=StrictRecovery(),
-                data={"error_type": "parsing"},
+            # Test file error handling
+            mock_logger.reset_mock()
+            file_error = FileError("Cannot read file", file_path="/path/to/file.json")
+            result = strategy.handle_file_error(
+                file_error, file_path="/path/to/file.json"
             )
+
+            # Verify logger was called
+            mock_logger.assert_called_once()
+            assert mock_logger.call_args[0][0] == strategy.log_level
+            log_msg = mock_logger.call_args[0][1]
+            assert "File operation failed" in log_msg
+            assert "/path/to/file.json" in log_msg
+            assert "Cannot read file" in log_msg
+
+            # Verify correct return value
+            assert result == []
+
+    def test_partial_recovery(self):
+        """Test that PartialProcessingRecovery returns partial results."""
+        strategy = PartialProcessingRecovery()
+        mock_logger = MagicMock()
+
+        with patch.object(logger, "log", mock_logger):
+            # Test processing error with data
+            data = {"id": 123, "name": "Test"}
+            error = ProcessingError("Process failed", data=data)
+            result = strategy.handle_processing_error(error)
+
+            # Verify logger was called
+            mock_logger.assert_called_once()
+            assert mock_logger.call_args[0][0] == strategy.log_level
+            log_msg = mock_logger.call_args[0][1]
+            assert "Attempting partial recovery from processing error" in log_msg
+            assert "Process failed" in log_msg
+
+            # Verify correct return value contains original data with error marker
+            assert result == {"id": 123, "name": "Test", "_error": str(error)}
+
+            # Test circular reference handling
+            mock_logger.reset_mock()
+            path = ["root", "items", "0", "parent"]
+            circular_error = CircularReferenceError(
+                "Circular reference detected", path=path
+            )
+            result = strategy.handle_circular_reference(circular_error, path)
+
+            # Verify logger was called
+            mock_logger.assert_called_once()
+            assert mock_logger.call_args[0][0] == strategy.log_level
+            log_msg = mock_logger.call_args[0][1]
+            assert "Truncating circular reference at path" in log_msg
+            assert "root > items > 0 > parent" in log_msg
+            assert "Circular reference detected" in log_msg
+
+            # Verify correct return value
+            assert result["_circular_reference"] is True
+            assert result["_path"] == "root > items > 0 > parent"
+            assert "_error" in result
+
+            # Test file error for a file that exists
+            mock_logger.reset_mock()
+            file_error = FileError("Format error")
+
+            # Create a temporary file for testing
+            with patch("os.path.exists", return_value=True):
+                with patch("builtins.open", create=True) as mock_open:
+                    mock_open.return_value.__enter__.return_value.read.return_value = (
+                        "line1\nline2\nline3"
+                    )
+                    result = strategy.handle_file_error(
+                        file_error, file_path="test.txt"
+                    )
+
+                    # Verify logger was called
+                    mock_logger.assert_called_once()
+                    assert mock_logger.call_args[0][0] == strategy.log_level
+                    log_msg = mock_logger.call_args[0][1]
+                    assert "Attempting partial recovery from file error" in log_msg
+                    assert "test.txt" in log_msg
+                    assert "Format error" in log_msg
+
+                    # Verify correct return value is a list of lines with line numbers
+                    assert len(result) == 3
+                    assert result[0]["_line"] == 1
+                    assert result[0]["_content"] == "line1"
+
+
+class TestWithRecovery:
+    """Test the with_recovery decorator."""
+
+    def test_decorator_usage(self):
+        """Test using with_recovery as a decorator."""
+
+        # Set up test function with decorator
+        @with_recovery(strategy=SkipAndLogRecovery())
+        def process_data(data):
+            if data < 0:
+                raise ValidationError("Data must be positive")
+            elif data == 0:
+                raise ParsingError("Cannot process zero")
+            return data * 2
+
+        # Test successful execution
+        assert process_data(5) == 10
+
+        # Test recovery from validation error
+        result = process_data(-1)
+        assert result == {}  # SkipAndLogRecovery returns empty dict
+
+        # Test recovery from parsing error
+        result = process_data(0)
+        assert result == {}  # SkipAndLogRecovery returns empty dict
+
+    def test_function_wrapper_usage(self):
+        """Test using with_recovery as a function wrapper."""
+
+        # Set up test function
+        def process_data(data):
+            if isinstance(data, dict) and "id" not in data:
+                raise ProcessingError("Missing ID field", data=data)
+            elif isinstance(data, str) and not data:
+                raise ParsingError("Empty string")
+            return data
+
+        # Test successful execution
+        test_data = {"id": 123, "name": "Test"}
+        assert with_recovery(process_data, strategy=STRICT, data=test_data) == test_data
 
         # Test with SkipAndLogRecovery
-        result = with_recovery(
-            problematic_func,
-            strategy=SkipAndLogRecovery(),
-            data={"error_type": "processing"},
-        )
-        assert result == {}
+        bad_data = {"name": "Test", "value": 42}  # Missing ID
+        result = with_recovery(process_data, strategy=DEFAULT, data=bad_data)
+        assert result == {}  # SkipAndLogRecovery returns empty dict
 
-        # Test with PartialProcessingRecovery and circular reference
-        result = with_recovery(
-            problematic_func,
-            strategy=PartialProcessingRecovery(),
-            data={"error_type": "circular"},
-        )
-        assert result["__circular_reference"] is True
+        # Test with PartialProcessingRecovery
+        result = with_recovery(process_data, strategy=LENIENT, data=bad_data)
+        assert result["name"] == "Test"  # Original data is preserved
+        assert result["value"] == 42  # Original data is preserved
+        assert "_error" in result  # Error info is added
 
-        # Test with successful execution
+    def test_different_error_types(self):
+        """Test recovery from different error types."""
+
+        # Test function that raises different error types
+        def complex_process(input_type, path=None):
+            if input_type == "parsing":
+                raise ParsingError("Parse failed", source="test.json")
+            elif input_type == "circular":
+                raise CircularReferenceError("Circle detected", path=path or ["a", "b"])
+            elif input_type == "file":
+                raise FileError("File error", file_path="test.txt")
+            elif input_type == "generic":
+                raise ValueError("Generic error")
+            return "Success"
+
+        # Test with PartialProcessingRecovery
+        strategy = PartialProcessingRecovery()
+
+        # Test parsing error recovery
+        result = with_recovery(complex_process, strategy=strategy, input_type="parsing")
+        assert isinstance(result, dict)
+
+        # Test circular reference recovery
         result = with_recovery(
-            problematic_func, strategy=StrictRecovery(), data={"value": 5}
+            complex_process, strategy=strategy, input_type="circular"
         )
-        assert result == 10
+        assert result["_circular_reference"] is True
+
+        # Test file error recovery
+        with patch("os.path.exists", return_value=False):
+            result = with_recovery(
+                complex_process, strategy=strategy, input_type="file"
+            )
+            assert result == []  # Empty list for file errors when file doesn't exist
+
+        # Test generic error recovery (wrapped as ProcessingError)
+        # When a generic error is wrapped as ProcessingError,
+        # it will have no associated data, so it becomes an empty dict with an error marker
+        result = with_recovery(complex_process, strategy=strategy, input_type="generic")
+        # Since we don't have data to recover, we'll just verify we get a dict of some kind
+        assert isinstance(result, dict)

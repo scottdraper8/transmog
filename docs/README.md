@@ -27,7 +27,7 @@ This directory contains the documentation for the Transmog project. The document
   - `dev/testing.md`: Testing guidelines
 
 - **Examples**
-  - `examples/basic.md`: Basic usage examples
+  - All examples are in the [main examples directory](../examples/README.md)
 
 ## Files To Be Created
 

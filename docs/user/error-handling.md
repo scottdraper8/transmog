@@ -1,30 +1,25 @@
-# Error Handling and Recovery
+---
+title: Error Handling
+---
 
-This guide explains the error handling system in Transmog and how to implement robust error recovery strategies in your applications.
+# Error Handling
 
-## Overview
+Transmog provides comprehensive error handling to help you manage errors during data processing. This guide covers strategies for handling different types of errors.
 
-Transmog provides a comprehensive error handling system that:
+## Error Types
 
-1. Defines specific exception types for different error categories
-2. Provides detailed error messages with context
-3. Offers recovery strategies for common error scenarios
-4. Includes utilities for configuring error handling behavior
-
-## Exception Hierarchy
-
-All Transmog exceptions inherit from the base `TransmogError` class:
+Transmog defines several exception types for specific error conditions:
 
 ```
-TransmogError
-├── ProcessingError      - Errors during data processing
-├── ValidationError      - Input validation failures
-├── ParsingError         - JSON parsing problems
-├── FileError            - File operations issues
+TransmogError              - Base class for all Transmog errors
+├── ProcessingError        - Errors during data processing
+├── ValidationError        - Input validation failures
+├── ParsingError           - JSON parsing problems
+├── FileError              - File operations issues
 ├── CircularReferenceError - Circular reference detection
 ├── MissingDependencyError - Missing optional dependencies
-├── ConfigurationError   - Configuration problems
-└── OutputError          - Errors writing output
+├── ConfigurationError     - Configuration problems
+└── OutputError            - Errors writing output
 ```
 
 ## Basic Error Handling
@@ -33,7 +28,7 @@ Here's a simple example of handling Transmog errors:
 
 ```python
 import transmog as tm
-from transmog.exceptions import TransmogError, ProcessingError, ParsingError
+from transmog.error import TransmogError, ProcessingError, ParsingError
 
 try:
     processor = tm.Processor()
@@ -156,7 +151,7 @@ processor = tm.Processor(config=config)
 For fine-grained control, you can use the `with_recovery` decorator on specific functions:
 
 ```python
-from transmog.recovery import with_recovery
+from transmog.error import with_recovery
 
 @with_recovery
 def process_zip_codes(data):
@@ -169,7 +164,7 @@ def process_zip_codes(data):
 You can also specify a custom recovery strategy for specific functions:
 
 ```python
-from transmog.recovery import with_recovery
+from transmog.error import with_recovery
 
 def custom_recovery(error, context):
     print(f"Error at {context.get('path', 'unknown')}: {error}")
@@ -262,8 +257,7 @@ Here's a complete example of a custom recovery strategy:
 ```python
 import logging
 import transmog as tm
-from transmog.recovery import RecoveryStrategy
-from transmog.exceptions import CircularReferenceError, ValidationError
+from transmog.error import RecoveryStrategy, CircularReferenceError, ValidationError
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -318,4 +312,4 @@ recovery.report()
 
 ## Example: Customized Error Handling
 
-For a complete working example, see the [error handling examples](../examples/basic.md#error-handling) in the examples directory. 
+For a complete working example, see the [error handling examples](../../examples/advanced/error_recovery_example.py). 

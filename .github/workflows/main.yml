@@ -31,13 +31,13 @@ jobs:
     
     - name: Run tests
       run: |
-        pytest tests/ --cov=src/transmog
+        pytest tests/ --cov=transmog
     
     - name: Test output format methods
       run: |
         cat > test_output_formats.py << 'EOF'
         import sys
-        from src.transmog import Processor
+        from transmog import Processor
 
         # Sample data
         data = {

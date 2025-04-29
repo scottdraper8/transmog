@@ -11,6 +11,7 @@ import uuid
 import pytest
 
 from transmog import Processor
+from transmog.config import TransmogConfig
 from transmog.core.metadata import generate_deterministic_id
 
 
@@ -90,7 +91,10 @@ class TestDeterministicIdsIntegration:
         }
 
         # Create processor with deterministic ID fields
-        processor = Processor(deterministic_id_fields=deterministic_id_fields)
+        config = TransmogConfig.default().with_metadata(
+            deterministic_id_fields=deterministic_id_fields
+        )
+        processor = Processor(config=config)
 
         # Process the data three times to verify stability
         results = []
@@ -190,7 +194,10 @@ class TestDeterministicIdsIntegration:
         }
 
         # Create processor with deterministic ID fields
-        processor = Processor(deterministic_id_fields=deterministic_id_fields)
+        config = TransmogConfig.default().with_metadata(
+            deterministic_id_fields=deterministic_id_fields
+        )
+        processor = Processor(config=config)
 
         # Process initial data
         initial_result = processor.process(initial_data, entity_name="store")
@@ -260,10 +267,14 @@ class TestDeterministicIdsIntegration:
         }
 
         # Create processor with deterministic IDs
-        processor = Processor(
-            deterministic_id_fields=deterministic_id_fields,
-            batch_size=100,  # Process in batches of 100
+        config = (
+            TransmogConfig.default()
+            .with_metadata(deterministic_id_fields=deterministic_id_fields)
+            .with_processing(
+                batch_size=100  # Process in batches of 100
+            )
         )
+        processor = Processor(config=config)
 
         # Process data in one go
         full_result = processor.process(records, entity_name="records")
@@ -323,7 +334,10 @@ class TestDeterministicIdsIntegration:
             return f"SIMPLE-{record.get('id', 'unknown')}"
 
         # Create processor with the custom strategy
-        processor = Processor(id_generation_strategy=composite_id_strategy)
+        config = TransmogConfig.default().with_metadata(
+            id_generation_strategy=composite_id_strategy
+        )
+        processor = Processor(config=config)
 
         # Process data with some manual preparation to simulate parent context
         enriched_data = copy.deepcopy(data)
@@ -399,7 +413,10 @@ class TestDeterministicIdsIntegration:
             return "CUSTOM-FALLBACK"
 
         # Create processor with the robust custom strategy
-        processor = Processor(id_generation_strategy=robust_strategy)
+        config = TransmogConfig.default().with_metadata(
+            id_generation_strategy=robust_strategy
+        )
+        processor = Processor(config=config)
 
         # Process each record individually and verify the results
         for record in edge_case_data:

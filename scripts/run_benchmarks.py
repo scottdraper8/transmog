@@ -14,10 +14,13 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-# Add parent directory to path to import transmog
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from src.transmog import Processor
+# Try to import from installed package first, fall back to development setup
+try:
+    from transmog import Processor
+except ImportError:
+    # Add parent directory to path for development mode
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from transmog import Processor
 
 
 def generate_test_data(

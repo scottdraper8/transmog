@@ -195,7 +195,6 @@ def check_optional_dependencies(python_path):
     performance_packages = [
         "ujson",
         "orjson",
-        "pandas",
         "fastparquet",
         "pyarrow",
     ]
