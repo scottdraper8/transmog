@@ -13,11 +13,13 @@ from .features import Features
 
 # Core functionality
 from transmog.core.flattener import flatten_json
-from transmog.core.extractor import extract_arrays
+from transmog.core.extractor import extract_arrays, stream_extract_arrays
 from transmog.core.hierarchy import (
     process_structure,
     process_record_batch,
     process_records_in_single_pass,
+    stream_process_records,
+    stream_process_structure,
 )
 from transmog.core.metadata import (
     generate_extract_id,
@@ -40,7 +42,16 @@ from transmog.naming.abbreviator import (
 )
 
 # High-level processor class for one-step processing
-from transmog.process import Processor, ProcessingResult
+from transmog.process import (
+    Processor,
+    ProcessingResult,
+    ProcessingStrategy,
+    InMemoryStrategy,
+    FileStrategy,
+    BatchStrategy,
+    ChunkedStrategy,
+    CSVStrategy,
+)
 
 # Configuration functionality
 from transmog.config import (
@@ -86,13 +97,16 @@ from transmog.error import (
 # IO utilities
 from transmog.io import (
     initialize_io_features,
-    get_available_reader_formats,
-    get_available_writer_formats,
-    has_reader_format,
-    has_writer_format,
+    FormatRegistry,
     detect_format,
     create_writer,
     DataWriter,
+    # Streaming writer interface
+    StreamingWriter,
+    create_streaming_writer,
+    get_supported_streaming_formats,
+    is_streaming_format_available,
+    DependencyManager as IoDependencyManager,
 )
 
 # Initialize IO features
@@ -103,6 +117,13 @@ __all__ = [
     # Main classes
     "Processor",
     "ProcessingResult",
+    # Strategy pattern classes
+    "ProcessingStrategy",
+    "InMemoryStrategy",
+    "FileStrategy",
+    "BatchStrategy",
+    "ChunkedStrategy",
+    "CSVStrategy",
     # Configuration
     "TransmogConfig",
     "ProcessingMode",
@@ -117,16 +138,19 @@ __all__ = [
     "load_config",
     "configure",
     # Format utilities
-    "get_available_reader_formats",
-    "get_available_writer_formats",
-    "has_reader_format",
-    "has_writer_format",
+    "FormatRegistry",
     "detect_format",
     "create_writer",
     "DataWriter",
+    # Streaming features
+    "StreamingWriter",
+    "create_streaming_writer",
+    "get_supported_streaming_formats",
+    "is_streaming_format_available",
     # Features and dependencies
     "Features",
     "DependencyManager",
+    "IoDependencyManager",
     # Exceptions
     "TransmogError",
     "ProcessingError",

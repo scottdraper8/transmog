@@ -11,16 +11,17 @@ import json
 import os
 import sys
 import time
+import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 
 # Try to import from installed package first, fall back to development setup
 try:
-    from transmog import Processor
+    from transmog import Processor, TransmogConfig, ProcessingMode
 except ImportError:
     # Add parent directory to path for development mode
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from transmog import Processor
+    from transmog import Processor, TransmogConfig, ProcessingMode
 
 
 def generate_test_data(
@@ -169,8 +170,29 @@ def benchmark_method(
     return execution_time, memory_size_mb, result
 
 
+def get_processor_for_strategy(strategy: str) -> Processor:
+    """
+    Get processor configured for a specific strategy.
+
+    Args:
+        strategy: The strategy to use (standard, memory, performance)
+
+    Returns:
+        Configured Processor instance
+    """
+    if strategy == "memory":
+        return Processor.memory_optimized()
+    elif strategy == "performance":
+        return Processor.performance_optimized()
+    else:  # standard
+        return Processor()
+
+
 def run_benchmarks(
-    num_records: int = 1000, complexity: str = "medium"
+    num_records: int = 1000,
+    complexity: str = "medium",
+    mode: str = "standard",
+    strategy: str = "standard",
 ) -> Dict[str, Dict[str, float]]:
     """
     Run benchmarks for all output format methods.
@@ -178,6 +200,8 @@ def run_benchmarks(
     Args:
         num_records: Number of records to use for benchmarking
         complexity: Complexity level of the test data
+        mode: Processing mode (standard or streaming)
+        strategy: Processing strategy (standard, memory, or performance)
 
     Returns:
         Dictionary of benchmark results
@@ -185,76 +209,144 @@ def run_benchmarks(
     print(
         f"Running benchmarks with {num_records} records of {complexity} complexity..."
     )
+    print(f"Mode: {mode}, Strategy: {strategy}")
 
     # Generate test data
     data = generate_test_data(num_records, complexity)
 
-    # Process the data
-    processor = Processor(visit_arrays=True)
-    result = processor.process(data, entity_name="benchmark")
+    # Get processor based on strategy
+    processor = get_processor_for_strategy(strategy)
 
-    # Dictionary to store benchmark results
     benchmarks = {}
 
-    # Benchmark to_dict()
-    print("\nBenchmarking to_dict()...")
-    exec_time, memory_mb, _ = benchmark_method("to_dict", result.to_dict)
-    benchmarks["to_dict"] = {"execution_time": exec_time, "memory_mb": memory_mb}
-    print(f"  Execution time: {exec_time:.4f} seconds")
-    print(f"  Memory usage: {memory_mb:.2f} MB")
+    if mode == "streaming":
+        # Benchmark streaming processing
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Measure execution time for streaming to JSON
+            print("\nBenchmarking streaming to JSON...")
+            start_time = time.time()
+            processor.stream_process(
+                data=data,
+                entity_name="benchmark",
+                output_format="json",
+                output_destination=os.path.join(temp_dir, "output.json"),
+            )
+            json_time = time.time() - start_time
+            benchmarks["stream_to_json"] = {"execution_time": json_time}
+            print(f"  Execution time: {json_time:.4f} seconds")
 
-    # Benchmark to_json_objects()
-    print("\nBenchmarking to_json_objects()...")
-    exec_time, memory_mb, _ = benchmark_method(
-        "to_json_objects", result.to_json_objects
-    )
-    benchmarks["to_json_objects"] = {
-        "execution_time": exec_time,
-        "memory_mb": memory_mb,
+            # Measure execution time for streaming to CSV
+            print("\nBenchmarking streaming to CSV...")
+            start_time = time.time()
+            processor.stream_process(
+                data=data,
+                entity_name="benchmark",
+                output_format="csv",
+                output_destination=os.path.join(temp_dir, "output.csv"),
+            )
+            csv_time = time.time() - start_time
+            benchmarks["stream_to_csv"] = {"execution_time": csv_time}
+            print(f"  Execution time: {csv_time:.4f} seconds")
+
+            # Measure execution time for streaming to Parquet
+            try:
+                print("\nBenchmarking streaming to Parquet...")
+                start_time = time.time()
+                processor.stream_process(
+                    data=data,
+                    entity_name="benchmark",
+                    output_format="parquet",
+                    output_destination=os.path.join(temp_dir, "output"),
+                )
+                parquet_time = time.time() - start_time
+                benchmarks["stream_to_parquet"] = {"execution_time": parquet_time}
+                print(f"  Execution time: {parquet_time:.4f} seconds")
+            except ImportError:
+                print("PyArrow not available. Skipping Parquet streaming benchmark.")
+
+    else:  # standard mode
+        # Process the data
+        result = processor.process(data, entity_name="benchmark")
+
+        # Dictionary to store benchmark results
+        benchmarks = {}
+
+        # Benchmark to_dict()
+        print("\nBenchmarking to_dict()...")
+        exec_time, memory_mb, _ = benchmark_method("to_dict", result.to_dict)
+        benchmarks["to_dict"] = {"execution_time": exec_time, "memory_mb": memory_mb}
+        print(f"  Execution time: {exec_time:.4f} seconds")
+        print(f"  Memory usage: {memory_mb:.2f} MB")
+
+        # Benchmark to_json_objects()
+        print("\nBenchmarking to_json_objects()...")
+        exec_time, memory_mb, _ = benchmark_method(
+            "to_json_objects", result.to_json_objects
+        )
+        benchmarks["to_json_objects"] = {
+            "execution_time": exec_time,
+            "memory_mb": memory_mb,
+        }
+        print(f"  Execution time: {exec_time:.4f} seconds")
+        print(f"  Memory usage: {memory_mb:.2f} MB")
+
+        # Benchmark to_json_bytes()
+        print("\nBenchmarking to_json_bytes()...")
+        exec_time, memory_mb, _ = benchmark_method(
+            "to_json_bytes", result.to_json_bytes
+        )
+        benchmarks["to_json_bytes"] = {
+            "execution_time": exec_time,
+            "memory_mb": memory_mb,
+        }
+        print(f"  Execution time: {exec_time:.4f} seconds")
+        print(f"  Memory usage: {memory_mb:.2f} MB")
+
+        # Benchmark to_csv_bytes()
+        print("\nBenchmarking to_csv_bytes()...")
+        exec_time, memory_mb, _ = benchmark_method("to_csv_bytes", result.to_csv_bytes)
+        benchmarks["to_csv_bytes"] = {
+            "execution_time": exec_time,
+            "memory_mb": memory_mb,
+        }
+        print(f"  Execution time: {exec_time:.4f} seconds")
+        print(f"  Memory usage: {memory_mb:.2f} MB")
+
+        try:
+            # Benchmark to_pyarrow_tables()
+            print("\nBenchmarking to_pyarrow_tables()...")
+            exec_time, memory_mb, _ = benchmark_method(
+                "to_pyarrow_tables", result.to_pyarrow_tables
+            )
+            benchmarks["to_pyarrow_tables"] = {
+                "execution_time": exec_time,
+                "memory_mb": memory_mb,
+            }
+            print(f"  Execution time: {exec_time:.4f} seconds")
+            print(f"  Memory usage: {memory_mb:.2f} MB")
+
+            # Benchmark to_parquet_bytes()
+            print("\nBenchmarking to_parquet_bytes()...")
+            exec_time, memory_mb, _ = benchmark_method(
+                "to_parquet_bytes", result.to_parquet_bytes
+            )
+            benchmarks["to_parquet_bytes"] = {
+                "execution_time": exec_time,
+                "memory_mb": memory_mb,
+            }
+            print(f"  Execution time: {exec_time:.4f} seconds")
+            print(f"  Memory usage: {memory_mb:.2f} MB")
+        except ImportError:
+            print("PyArrow not available. Skipping PyArrow-dependent benchmarks.")
+
+    # Add benchmark metadata
+    benchmarks["__metadata__"] = {
+        "num_records": num_records,
+        "complexity": complexity,
+        "mode": mode,
+        "strategy": strategy,
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
-    print(f"  Execution time: {exec_time:.4f} seconds")
-    print(f"  Memory usage: {memory_mb:.2f} MB")
-
-    # Benchmark to_json_bytes()
-    print("\nBenchmarking to_json_bytes()...")
-    exec_time, memory_mb, _ = benchmark_method("to_json_bytes", result.to_json_bytes)
-    benchmarks["to_json_bytes"] = {"execution_time": exec_time, "memory_mb": memory_mb}
-    print(f"  Execution time: {exec_time:.4f} seconds")
-    print(f"  Memory usage: {memory_mb:.2f} MB")
-
-    # Benchmark to_csv_bytes()
-    print("\nBenchmarking to_csv_bytes()...")
-    exec_time, memory_mb, _ = benchmark_method("to_csv_bytes", result.to_csv_bytes)
-    benchmarks["to_csv_bytes"] = {"execution_time": exec_time, "memory_mb": memory_mb}
-    print(f"  Execution time: {exec_time:.4f} seconds")
-    print(f"  Memory usage: {memory_mb:.2f} MB")
-
-    try:
-        # Benchmark to_pyarrow_tables()
-        print("\nBenchmarking to_pyarrow_tables()...")
-        exec_time, memory_mb, _ = benchmark_method(
-            "to_pyarrow_tables", result.to_pyarrow_tables
-        )
-        benchmarks["to_pyarrow_tables"] = {
-            "execution_time": exec_time,
-            "memory_mb": memory_mb,
-        }
-        print(f"  Execution time: {exec_time:.4f} seconds")
-        print(f"  Memory usage: {memory_mb:.2f} MB")
-
-        # Benchmark to_parquet_bytes()
-        print("\nBenchmarking to_parquet_bytes()...")
-        exec_time, memory_mb, _ = benchmark_method(
-            "to_parquet_bytes", result.to_parquet_bytes
-        )
-        benchmarks["to_parquet_bytes"] = {
-            "execution_time": exec_time,
-            "memory_mb": memory_mb,
-        }
-        print(f"  Execution time: {exec_time:.4f} seconds")
-        print(f"  Memory usage: {memory_mb:.2f} MB")
-    except ImportError:
-        print("PyArrow not available. Skipping PyArrow-dependent benchmarks.")
 
     return benchmarks
 
@@ -298,10 +390,22 @@ def main() -> None:
         default="benchmark_results.json",
         help="Output file path (default: benchmark_results.json)",
     )
+    parser.add_argument(
+        "--mode",
+        choices=["standard", "streaming"],
+        default="standard",
+        help="Processing mode (default: standard)",
+    )
+    parser.add_argument(
+        "--strategy",
+        choices=["standard", "memory", "performance"],
+        default="standard",
+        help="Processing strategy (default: standard)",
+    )
     args = parser.parse_args()
 
     # Run benchmarks
-    results = run_benchmarks(args.records, args.complexity)
+    results = run_benchmarks(args.records, args.complexity, args.mode, args.strategy)
 
     # Save results
     save_results(results, args.output)
@@ -309,9 +413,11 @@ def main() -> None:
     # Print summary
     print("\nBenchmark Summary:")
     for method, metrics in results.items():
+        if method == "__metadata__":
+            continue
         print(f"  {method}:")
-        print(f"    Execution time: {metrics['execution_time']:.4f} seconds")
-        print(f"    Memory usage: {metrics['memory_mb']:.2f} MB")
+        for metric_name, metric_value in metrics.items():
+            print(f"    {metric_name}: {metric_value:.4f}")
 
 
 if __name__ == "__main__":

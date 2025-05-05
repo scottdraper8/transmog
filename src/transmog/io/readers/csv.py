@@ -704,12 +704,14 @@ class CSVReader:
         except (ValueError, TypeError):
             pass
 
-        # Try to convert to boolean
+        # Try to convert to boolean - only for non-numeric looking values
+        # to avoid converting "1" to True
         lower_value = value.lower()
-        if lower_value in ("true", "yes", "1"):
-            return True
-        elif lower_value in ("false", "no", "0"):
-            return False
+        if not value.isdigit() and lower_value not in ("0", "1"):
+            if lower_value in ("true", "yes"):
+                return True
+            elif lower_value in ("false", "no"):
+                return False
 
         # Return as string if no other type matches
         return value
@@ -745,8 +747,8 @@ def normalize_column_names(column_names, separator="_"):
     Returns:
         List of normalized column names
     """
-    # First, sanitize the column names
-    sanitized = [sanitize_name(col, separator) for col in column_names]
+    # First, sanitize the column names - use sanitize_column_names to properly handle all special characters
+    sanitized = sanitize_column_names(column_names, separator=separator, sql_safe=True)
 
     # Handle duplicate column names by adding a suffix
     result = []

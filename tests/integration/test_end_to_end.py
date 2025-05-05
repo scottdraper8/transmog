@@ -145,6 +145,7 @@ class TestEndToEndScenarios:
             .with_processing(
                 cast_to_string=True,
                 path_parts_optimization=True,
+                visit_arrays=True,
             )
             .with_naming(
                 # Disable abbreviation for test consistency
@@ -173,7 +174,9 @@ class TestEndToEndScenarios:
 
         # Since the array table name may not exist in the new structure, we'll
         # check if array fields are in the main table first
-        array_field_exists = any("array_field" in key for key in main_table[0].keys())
+        array_field_exists = any(
+            "arrayfield" in key.lower() for key in main_table[0].keys()
+        )
         assert array_field_exists, (
             "Array fields should exist either in main table or in child tables"
         )

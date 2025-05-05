@@ -15,6 +15,19 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from transmog import Processor
 from transmog.config import TransmogConfig
+from transmog.core.flattener import _clear_process_cache
+
+
+@pytest.fixture(autouse=True)
+def clear_process_caches():
+    """Clear all process caches before each test to prevent state pollution between tests."""
+    # This fixture runs automatically before each test
+    _clear_process_cache("standard")
+    _clear_process_cache("streaming")
+    yield
+    # Clear again after the test
+    _clear_process_cache("standard")
+    _clear_process_cache("streaming")
 
 
 @pytest.fixture

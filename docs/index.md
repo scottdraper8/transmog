@@ -6,6 +6,20 @@ hide-toc: false
 
 Welcome to the Transmog documentation. Transmog is a Python library for transforming complex nested JSON data into flat, structured formats.
 
+:::info Important Update
+**Transmog 0.2.0 Release - Major Refactoring**
+
+Transmog has undergone a significant refactoring in version 0.2.0 with:
+- A new `TransmogConfig` system with a fluent API
+- Processing strategies for different data sources
+- Enhanced streaming capabilities
+- Improved memory efficiency options
+- Consistent error handling strategies
+- New bytes serialization options
+
+This documentation has been updated to reflect these changes.
+:::
+
 ## Overview
 
 Transmog enables you to:
@@ -32,16 +46,26 @@ Transmog enables you to:
 - [Deterministic ID Generation](user/deterministic-ids.md)
 - [Error Handling](user/error-handling.md)
 
+### Processing Strategies
+
+- [Processing Strategies](user/strategies.md) - Learn about the different processing strategies
+- [Streaming Processing](user/streaming.md) - Process data streams efficiently
+
 ### Flexible Output Formats
 
 - [Output Format Options](user/output-formats.md) - Learn about the different output formats available
 - [In-Memory Processing](user/in-memory-processing.md) - Process data entirely in memory
-- [Streaming Processing](user/streaming.md) - Process data streams efficiently
+
+### Configuration System
+
+- [Configuration Guide](user/configuration.md) - Configure Transmog for your needs
+- [Error Recovery Strategies](user/error-handling.md) - Handle errors during processing
 
 ## API Reference
 
 - [Processor API](api/processor.md)
 - [ProcessingResult API](api/processing-result.md)
+- [Configuration API](api/config.md) - Configuration classes and options
 - [CSV Reader API](api/csv-reader.md) - Process CSV files efficiently
 
 ## Examples
@@ -50,6 +74,8 @@ Transmog enables you to:
 - [Output Formats](../examples/basic/native_output_formats.py)
 - [Data Processing](../examples/data/data_cleanup_example.py)
 - [Advanced Features](../examples/advanced/advanced_usage.py)
+- [Streaming Processing](../examples/streaming_example.py)
+- [Processing Strategies](../examples/advanced/processing_strategies.py)
 
 ## For Developers
 
@@ -68,6 +94,22 @@ See our [ROADMAP.md](https://github.com/scottdraper8/transmog/blob/main/ROADMAP.
 - [Discussions](https://github.com/scottdraper8/transmog/discussions)
 
 ## Key Features
+
+### Configuration System
+
+* Flexible configuration with `TransmogConfig` class
+* Pre-configured modes for common use cases (`memory_optimized`, `performance_optimized`)
+* Fluent API for easy configuration (`with_naming`, `with_processing`, etc.)
+* Separate configuration components for different aspects (`NamingConfig`, `ProcessingConfig`, etc.)
+
+### Processing Strategies
+
+* Different strategies for different data sources and requirements
+* `InMemoryStrategy` for small datasets
+* `FileStrategy` for processing files
+* `BatchStrategy` for batch processing
+* `ChunkedStrategy` for large datasets
+* `CSVStrategy` for CSV processing
 
 ### Flexible Input Handling
 
@@ -99,17 +141,29 @@ See our [ROADMAP.md](https://github.com/scottdraper8/transmog/blob/main/ROADMAP.
   * CSV files (`write_all_csv()`)
   * Parquet files (`write_all_parquet()`)
 
+* Memory Management with `ConversionMode`:
+  * Eager conversion - immediately converts and caches data (`EAGER`)
+  * Lazy conversion - converts only when needed (`LAZY`)
+  * Memory-efficient conversion - minimizes memory usage (`MEMORY_EFFICIENT`)
+
+### Error Recovery Strategies
+
+* Configurable approach to handling problematic data:
+  * Strict recovery - fails on any error (default)
+  * Skip and log - ignores problematic records but continues processing
+  * Partial recovery - preserves valid portions of problematic records
+* Simplified configuration with factory methods:
+  * `Processor.with_partial_recovery()` for maximizing data yield
+* Handles circular references by replacing them with reference markers
+* Recovers data from malformed JSON sources
+* Processes data with schema inconsistencies
+
 ### Performance Optimization
 
 * Memory-efficient processing with configurable modes
 * Processing modes for memory/performance trade-offs
 * Streaming data processing through iterators
 * Processing of multiple records in batches
-
-### Error Handling
-
-* Configurable error recovery strategies
-* Detailed error reporting
 
 ```{toctree}
 :maxdepth: 1
@@ -125,10 +179,14 @@ installation
 :hidden:
 :caption: User Guide
 
+user/configuration
 user/flattening
 user/arrays
-user/deterministic-ids
 user/streaming
+user/strategies
+user/output-formats
+user/in-memory-processing
+user/deterministic-ids
 user/error-handling
 ```
 
@@ -139,6 +197,7 @@ user/error-handling
 
 api/processor
 api/processing-result
+api/config
 api/csv-reader
 ```
 

@@ -13,6 +13,14 @@ from transmog import Processor, TransmogConfig
 from transmog.core.metadata import generate_extract_id
 
 
+def is_valid_uuid(id_str):
+    """Check if a string is a valid UUID format."""
+    uuid_pattern = re.compile(
+        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    )
+    return uuid_pattern.match(id_str) is not None
+
+
 class TestRandomUuids:
     """Unit tests for random UUID generation."""
 
@@ -89,11 +97,11 @@ class TestRandomUuids:
         result2 = processor.process(data, entity_name="test")
 
         # Extract IDs
-        id1 = result1.to_dict()["main"][0]["__extract_id"]
-        id2 = result2.to_dict()["main"][0]["__extract_id"]
+        id1 = result1.to_dict()["main_table"][0]["__extract_id"]
+        id2 = result2.to_dict()["main_table"][0]["__extract_id"]
 
-        # Verify IDs are different
-        assert id1 != id2
+        # Verify different IDs
+        assert id1 != id2, "Generated UUIDs should be different for identical data"
 
         # Verify IDs follow UUID format
         uuid_pattern = re.compile(
@@ -119,18 +127,17 @@ class TestRandomUuids:
         tables = result.to_dict()
 
         # Get the main table records
-        main_records = tables["main"]
+        main_records = tables["main_table"]
 
-        # Verify each record has a unique ID
+        # Verify each record has a random UUID
+        assert len(main_records) == 3
+        for record in main_records:
+            assert "__extract_id" in record
+            assert is_valid_uuid(record["__extract_id"])
+
+        # Verify all IDs are unique
         ids = [record["__extract_id"] for record in main_records]
-        assert len(ids) == len(set(ids))
-
-        # Verify each ID follows UUID format
-        uuid_pattern = re.compile(
-            r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-        )
-        for id in ids:
-            assert uuid_pattern.match(id) is not None
+        assert len(set(ids)) == len(ids), "All UUIDs should be unique"
 
     def test_mixed_deterministic_and_random_ids(self):
         """Test mixed deterministic and random ID generation."""
@@ -168,7 +175,10 @@ class TestRandomUuids:
 
         # Check deterministic IDs - should be the same across runs
         # Root record
-        assert tables1["main"][0]["__extract_id"] == tables2["main"][0]["__extract_id"]
+        assert (
+            tables1["main_table"][0]["__extract_id"]
+            == tables2["main_table"][0]["__extract_id"]
+        )
 
         # Products table - should have deterministic IDs
         products1 = sorted(tables1.get("store_products", []), key=lambda x: x["sku"])
@@ -223,22 +233,35 @@ class TestRandomUuids:
         tables2 = result2.to_dict()
 
         # Root level should have deterministic ID
-        assert tables1["main"][0]["__extract_id"] == tables2["main"][0]["__extract_id"]
+        assert (
+            tables1["main_table"][0]["__extract_id"]
+            == tables2["main_table"][0]["__extract_id"]
+        )
 
         # All nested arrays should have random IDs
-        # Get table names excluding "main"
-        array_tables1 = [name for name in tables1.keys() if name != "main"]
-        array_tables2 = [name for name in tables2.keys() if name != "main"]
+        # Get table names excluding "main_table"
+        array_tables1 = [name for name in tables1["child_tables"].keys()]
+        array_tables2 = [name for name in tables2["child_tables"].keys()]
 
         # Check each array table
         for table_name in array_tables1:
             if table_name in array_tables2:
-                items1 = sorted(tables1[table_name], key=lambda x: x.get("name", ""))
-                items2 = sorted(tables2[table_name], key=lambda x: x.get("name", ""))
+                # Ensure we're dealing with lists of records, not strings
+                if isinstance(tables1["child_tables"][table_name], list) and isinstance(
+                    tables2["child_tables"][table_name], list
+                ):
+                    items1 = sorted(
+                        tables1["child_tables"][table_name],
+                        key=lambda x: x.get("name", ""),
+                    )
+                    items2 = sorted(
+                        tables2["child_tables"][table_name],
+                        key=lambda x: x.get("name", ""),
+                    )
 
-                for i in range(min(len(items1), len(items2))):
-                    # IDs should be different (random)
-                    assert items1[i]["__extract_id"] != items2[i]["__extract_id"]
+                    # Verify each record has a different random ID across runs
+                    for i in range(min(len(items1), len(items2))):
+                        assert items1[i]["__extract_id"] != items2[i]["__extract_id"]
 
     def test_uuid_version_and_variant(self):
         """Test that UUIDs have correct version and variant."""

@@ -68,7 +68,7 @@ def main():
     }
 
     # Process the data
-    processor = Processor(visit_arrays=True)
+    processor = Processor()
     result = processor.process(data, entity_name="organization")
 
     print("\n=== 1. Native Dictionary Output ===")

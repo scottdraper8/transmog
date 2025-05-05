@@ -5,7 +5,7 @@ Provides functions to extract arrays from nested JSON objects
 and transform them into separate table structures with relationship preservation.
 """
 
-from typing import Any, Dict, List, Optional, Set, Tuple, Callable
+from typing import Any, Dict, List, Optional, Set, Tuple, Callable, Generator
 
 from transmog.core.flattener import flatten_json
 from transmog.core.metadata import annotate_with_metadata
@@ -317,3 +317,261 @@ def extract_arrays(
         visited.remove(obj_id)
 
     return arrays
+
+
+def stream_extract_arrays(
+    obj: JsonDict,
+    parent_id: Optional[str] = None,
+    parent_path: str = "",
+    entity_name: str = "root",
+    separator: str = None,
+    cast_to_string: bool = None,
+    include_empty: bool = None,
+    skip_null: bool = None,
+    extract_time: Optional[Any] = None,
+    visited: Optional[VisitedPath] = None,
+    parent_path_parts: Optional[PathParts] = None,
+    shared_flatten_cache: Optional[Dict[int, FlatDict]] = None,
+    abbreviate_enabled: Optional[bool] = None,
+    max_component_length: Optional[int] = None,
+    preserve_leaf: Optional[bool] = None,
+    custom_abbreviations: Optional[Dict[str, str]] = None,
+    deterministic_id_fields: Optional[Dict[str, str]] = None,
+    id_generation_strategy: Optional[Callable[[Dict[str, Any]], str]] = None,
+    id_field: str = "__extract_id",
+    parent_field: str = "__parent_extract_id",
+    time_field: str = "__extract_datetime",
+) -> Generator[Tuple[str, FlatDict], None, None]:
+    """
+    Stream extract arrays from JSON structure, yielding records as they are processed.
+
+    Unlike extract_arrays, this function doesn't build complete child tables in memory.
+    Instead, it yields array records as they are processed.
+
+    Args:
+        obj: JSON object potentially containing arrays
+        parent_id: UUID of parent record
+        parent_path: Path from root for naming
+        entity_name: Name of the entity
+        separator: Separator for path components
+        cast_to_string: Whether to cast all values to strings
+        include_empty: Whether to include empty values
+        skip_null: Whether to skip null values
+        extract_time: Extraction timestamp
+        visited: Set of object IDs to prevent circular references
+        parent_path_parts: Path components for efficient path building
+        shared_flatten_cache: Optional cache of already flattened objects
+        abbreviate_enabled: Whether to abbreviate table names
+        max_component_length: Maximum component length for abbreviation
+        preserve_leaf: Whether to preserve leaf components in abbreviation
+        custom_abbreviations: Custom abbreviation dictionary
+        deterministic_id_fields: Dict mapping paths to field names for deterministic IDs
+        id_generation_strategy: Custom function for ID generation
+        id_field: Field name for extract ID
+        parent_field: Field name for parent ID
+        time_field: Field name for timestamp
+
+    Yields:
+        Tuples of (table_name, flattened_record)
+    """
+    # Get default values from settings if not provided
+    if separator is None:
+        separator = settings.get_option("separator")
+
+    if cast_to_string is None:
+        cast_to_string = settings.get_option("cast_to_string")
+
+    if include_empty is None:
+        include_empty = settings.get_option("include_empty")
+
+    if skip_null is None:
+        skip_null = settings.get_option("skip_null")
+
+    if visited is None:
+        visited = set()
+
+    if shared_flatten_cache is None:
+        shared_flatten_cache = {}
+
+    # Initialize path parts if needed
+    if parent_path_parts is None:
+        if parent_path:
+            parent_path_parts = list(split_path(parent_path, separator))
+        else:
+            parent_path_parts = []
+
+    # Get abbreviation settings
+    if abbreviate_enabled is None:
+        abbreviate_enabled = settings.get_option("abbreviate_table_names")
+
+    if max_component_length is None:
+        max_component_length = settings.get_option("max_table_component_length")
+
+    if preserve_leaf is None:
+        preserve_leaf = settings.get_option("preserve_leaf_component")
+
+    if custom_abbreviations is None:
+        custom_abbreviations = settings.get_option("custom_abbreviations")
+
+    # Merge custom abbreviations with defaults if provided
+    abbreviation_dict = None
+    if custom_abbreviations:
+        default_abbrevs = get_common_abbreviations()
+        abbreviation_dict = default_abbrevs.copy()
+        abbreviation_dict.update(custom_abbreviations)
+
+    # Prevent circular references
+    obj_id = id(obj)
+    if obj_id in visited:
+        return
+
+    visited.add(obj_id)
+
+    # Process each key in the object
+    for key, value in obj.items():
+        # Create sanitized key for path building
+        sanitized_key = sanitize_name(key, separator, "")
+
+        # Build current path parts efficiently
+        current_parts = parent_path_parts.copy()
+        current_parts.append(sanitized_key)
+
+        # Create path string only when needed (for table keys)
+        current_path = (
+            join_path(tuple(current_parts), separator)
+            if current_parts
+            else sanitized_key
+        )
+
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    # Use cached flattened result if available
+                    item_obj_id = id(item)
+                    if item_obj_id in shared_flatten_cache:
+                        flat_item = shared_flatten_cache[item_obj_id]
+                    else:
+                        # Flatten the array item
+                        flat_item = flatten_json(
+                            item,
+                            separator=separator,
+                            cast_to_string=cast_to_string,
+                            include_empty=include_empty,
+                            skip_arrays=True,
+                            skip_null=skip_null,
+                        )
+                        # Cache the flattened result
+                        shared_flatten_cache[item_obj_id] = flat_item
+
+                    # Determine source field for deterministic ID generation
+                    source_field = None
+                    if deterministic_id_fields:
+                        # Normalize path for comparison
+                        normalized_path = (
+                            current_path.strip(separator) if current_path else ""
+                        )
+
+                        # Exact path match first
+                        if normalized_path in deterministic_id_fields:
+                            source_field = deterministic_id_fields[normalized_path]
+                        # Then try wildcard matches
+                        elif "*" in deterministic_id_fields:
+                            source_field = deterministic_id_fields["*"]
+                        # Try path prefix matches (most specific to least)
+                        else:
+                            path_components = (
+                                normalized_path.split(separator)
+                                if normalized_path
+                                else []
+                            )
+                            for i in range(len(path_components), 0, -1):
+                                prefix = separator.join(path_components[:i])
+                                prefix_wildcard = f"{prefix}{separator}*"
+                                if prefix_wildcard in deterministic_id_fields:
+                                    source_field = deterministic_id_fields[
+                                        prefix_wildcard
+                                    ]
+                                    break
+
+                    # Add metadata - use in_place=True for better performance
+                    annotated_item = annotate_with_metadata(
+                        flat_item,
+                        parent_id=parent_id,
+                        extract_time=extract_time,
+                        in_place=True,
+                        source_field=source_field,
+                        id_generation_strategy=id_generation_strategy,
+                        id_field=id_field,
+                        parent_field=parent_field,
+                        time_field=time_field,
+                    )
+
+                    # Create or get table name
+                    original_table_name = f"{entity_name}{separator}{current_path}"
+
+                    # Apply abbreviation if enabled
+                    if abbreviate_enabled and abbreviation_dict:
+                        table_name = abbreviate_table_name(
+                            original_table_name,
+                            separator=separator,
+                            max_component_length=max_component_length,
+                            preserve_leaf=preserve_leaf,
+                            abbreviations=abbreviation_dict,
+                        )
+                    else:
+                        table_name = original_table_name
+
+                    # Yield the record
+                    yield table_name, annotated_item
+
+                    # Process nested arrays within this item
+                    # This is a recursive generator that yields (table_name, record) tuples
+                    yield from stream_extract_arrays(
+                        item,
+                        parent_id=annotated_item.get(id_field),
+                        parent_path=current_path,
+                        entity_name=entity_name,
+                        separator=separator,
+                        cast_to_string=cast_to_string,
+                        include_empty=include_empty,
+                        skip_null=skip_null,
+                        extract_time=extract_time,
+                        visited=visited,
+                        parent_path_parts=current_parts,
+                        shared_flatten_cache=shared_flatten_cache,
+                        abbreviate_enabled=abbreviate_enabled,
+                        max_component_length=max_component_length,
+                        preserve_leaf=preserve_leaf,
+                        custom_abbreviations=custom_abbreviations,
+                        deterministic_id_fields=deterministic_id_fields,
+                        id_generation_strategy=id_generation_strategy,
+                        id_field=id_field,
+                        parent_field=parent_field,
+                        time_field=time_field,
+                    )
+
+        elif isinstance(value, dict):
+            # Recursively process nested objects (dictionaries)
+            yield from stream_extract_arrays(
+                value,
+                parent_id=parent_id,
+                parent_path=current_path,
+                entity_name=entity_name,
+                separator=separator,
+                cast_to_string=cast_to_string,
+                include_empty=include_empty,
+                skip_null=skip_null,
+                extract_time=extract_time,
+                visited=visited,
+                parent_path_parts=current_parts,
+                shared_flatten_cache=shared_flatten_cache,
+                abbreviate_enabled=abbreviate_enabled,
+                max_component_length=max_component_length,
+                preserve_leaf=preserve_leaf,
+                custom_abbreviations=custom_abbreviations,
+                deterministic_id_fields=deterministic_id_fields,
+                id_generation_strategy=id_generation_strategy,
+                id_field=id_field,
+                parent_field=parent_field,
+                time_field=time_field,
+            )

@@ -1,181 +1,407 @@
-# Working with Output Formats
+# Output Formats
 
-Transmog provides options for outputting processed data in different formats. This guide explains how to use these output methods to fit your specific use case.
+Transmog provides flexible output options for the processed data. This guide explains the various output formats available and how to use them effectively.
 
 ## Output Format Categories
 
 Transmog offers three main categories of output formats:
 
-1. **Native Data Structures** - Python objects like dictionaries and PyArrow Tables
-2. **Bytes Serialization** - Raw bytes in JSON, CSV, or Parquet format for direct writing
-3. **File Output** - Direct writing to files in different formats
+1. **Native Data Structures** - Direct access to Python objects
+2. **Bytes Serialization** - Raw bytes for direct writing to files or streams
+3. **File Output** - Direct writing to files in various formats
 
 ## Native Data Structures
 
 ### Python Dictionaries
 
-The simplest way to access processed data is as Python dictionaries:
-
 ```python
 import transmog as tm
 
-# Process data
 processor = tm.Processor()
-result = processor.process(data)
+result = processor.process(data, entity_name="records")
 
 # Get all tables as dictionaries
 tables = result.to_dict()
 
-# Access main table records
+# Access specific tables
 main_table = tables["main"]
-for record in main_table:
-    print(record["id"], record["name"])
+child_table = tables["child_items"]
 
-# Access child tables
-for table_name, records in tables.items():
-    if table_name != "main":
-        print(f"Child table {table_name}: {len(records)} records")
+# Access individual records
+first_record = main_table[0]
+child_records = tables["child_items"]
+```
+
+### JSON-Serializable Objects
+
+```python
+# Get all tables as JSON-serializable Python objects
+json_objects = result.to_json_objects()
+
+# Access specific tables
+main_table_json = json_objects["main"]
 ```
 
 ### PyArrow Tables
 
-For high-performance data processing, you can get results as PyArrow Tables:
-
 ```python
-# Get all tables as PyArrow Tables
-tables = result.to_pyarrow_tables()
+# Get all tables as PyArrow Tables (requires pyarrow)
+pa_tables = result.to_pyarrow_tables()
 
-# Access main table
-main_table = tables["main"]
-print(f"Schema: {main_table.schema}")
-print(f"Rows: {main_table.num_rows}")
+# Access a specific table
+main_pa_table = pa_tables["main"]
 
-# Perform operations on the PyArrow Table
-import pyarrow.compute as pc
-filtered = main_table.filter(pc.field("score") > 80)
-```
-
-### JSON Objects
-
-When working with JSON data, you can get JSON-serializable Python objects:
-
-```python
-# Get JSON-serializable objects
-json_data = result.to_json_objects()
-
-# Use with json module
-import json
-json_str = json.dumps(json_data["main"], indent=2)
-print(json_str)
-
-# Or directly write to a file
-with open("output.json", "w") as f:
-    json.dump(json_data["main"], f, indent=2)
+# Use PyArrow functionality
+print(f"Table has {main_pa_table.num_rows} rows and {main_pa_table.num_columns} columns")
+main_pa_table.to_pandas()  # Convert to pandas DataFrame
 ```
 
 ## Bytes Serialization
 
-### Parquet Bytes
+The bytes serialization options provide raw bytes that can be directly written to files or sent over network connections without intermediate files.
 
-Get raw Parquet bytes for direct writing or transmission:
+### JSON Bytes
 
 ```python
-# Get Parquet bytes
-parquet_bytes = result.to_parquet_bytes(compression="snappy")
+# Get all tables as JSON bytes
+json_bytes = result.to_json_bytes(indent=2)  # Pretty-printed JSON
 
-# Write to a file
-with open("output.parquet", "wb") as f:
-    f.write(parquet_bytes["main"])
+# Access bytes for a specific table
+main_table_bytes = json_bytes["main"]
 
-# Or use with an in-memory buffer
-import io
-buffer = io.BytesIO(parquet_bytes["main"])
+# Write bytes directly to a file
+with open("main_table.json", "wb") as f:
+    f.write(main_table_bytes)
 ```
 
 ### CSV Bytes
 
-Get raw CSV bytes:
-
 ```python
-# Get CSV bytes
-csv_bytes = result.to_csv_bytes(include_header=True)
+# Get all tables as CSV bytes
+csv_bytes = result.to_csv_bytes(dialect="excel", include_header=True)
 
-# Write to a file
-with open("output.csv", "wb") as f:
-    f.write(csv_bytes["main"])
+# Access bytes for a specific table
+main_table_bytes = csv_bytes["main"]
 
-# Or use in memory
-import io
-buffer = io.BytesIO(csv_bytes["main"])
+# Write bytes directly to a file
+with open("main_table.csv", "wb") as f:
+    f.write(main_table_bytes)
 ```
 
-### JSON Bytes
-
-Get raw JSON bytes:
+### Parquet Bytes
 
 ```python
-# Get JSON bytes
-json_bytes = result.to_json_bytes(indent=2)
+# Get all tables as Parquet bytes (requires pyarrow)
+parquet_bytes = result.to_parquet_bytes(compression="snappy")
 
-# Write to a file
-with open("output.json", "wb") as f:
-    f.write(json_bytes["main"])
+# Access bytes for a specific table
+main_table_bytes = parquet_bytes["main"]
+
+# Write bytes directly to a file
+with open("main_table.parquet", "wb") as f:
+    f.write(main_table_bytes)
 ```
 
 ## File Output
 
-You can write directly to files:
+### JSON Files
 
 ```python
-# Write all tables to Parquet files
-parquet_files = result.write_all_parquet(
-    base_path="output/parquet",
-    compression="snappy"
+# Write all tables to JSON files
+json_files = result.write_all_json(
+    base_path="output_dir/json",
+    indent=2,
+    ensure_ascii=False
 )
 
+# Files are returned by table name
+print(f"Main table written to {json_files['main']}")
+```
+
+### CSV Files
+
+```python
 # Write all tables to CSV files
 csv_files = result.write_all_csv(
-    base_path="output/csv",
+    base_path="output_dir/csv",
+    dialect="excel",
     include_header=True
 )
 
-# Write all tables to JSON files
-json_files = result.write_all_json(
-    base_path="output/json",
-    indent=2
+print(f"Main table written to {csv_files['main']}")
+```
+
+### Parquet Files
+
+```python
+# Write all tables to Parquet files (requires pyarrow)
+parquet_files = result.write_all_parquet(
+    base_path="output_dir/parquet",
+    compression="snappy",
+    partition_cols=None  # Optional partitioning
+)
+
+print(f"Main table written to {parquet_files['main']}")
+```
+
+## Memory-Efficient Output
+
+Transmog supports memory-efficient output through the `ConversionMode` enum:
+
+```python
+from transmog import Processor, ConversionMode
+
+processor = Processor()
+result = processor.process(data, entity_name="records")
+
+# Memory-efficient conversion
+result.write_all_csv(
+    base_path="output_dir/csv",
+    conversion_mode=ConversionMode.MEMORY_EFFICIENT
+)
+
+# Memory-efficient bytes
+parquet_bytes = result.to_parquet_bytes(
+    conversion_mode=ConversionMode.MEMORY_EFFICIENT
 )
 ```
 
-## Integration with Other Libraries
+## Conversion Modes
 
-### PyArrow Direct Usage
+Transmog offers flexible memory management through three conversion modes:
+
+### Eager Mode (Default)
+
+`ConversionMode.EAGER` converts data immediately and caches the results for faster repeated access:
 
 ```python
-# Work directly with PyArrow tables
-tables = result.to_pyarrow_tables()
-main_table = tables["main"]
+# Default mode
+result = processor.process(data, entity_name="records")
 
-# Use PyArrow functionality
-print(f"Number of rows: {main_table.num_rows}")
-print(f"Schema: {main_table.schema}")
-
-# Access specific columns
-if "category" in main_table.column_names:
-    categories = main_table.column("category").to_pylist()
-    print(f"Unique categories: {set(categories)}")
-
-# Use PyArrow compute functions
-import pyarrow.compute as pc
-if "amount" in main_table.column_names:
-    # Calculate statistics
-    total = pc.sum(main_table["amount"]).as_py()
-    average = pc.mean(main_table["amount"]).as_py()
-    print(f"Total: {total}, Average: {average}")
-    
-    # Filter data
-    high_value = main_table.filter(pc.greater(main_table["amount"], pc.scalar(1000.0)))
-    print(f"High value transactions: {high_value.num_rows}")
+# Explicitly specify eager mode
+csv_bytes1 = result.to_csv_bytes(conversion_mode=ConversionMode.EAGER)
+# Second conversion is fast as it's cached
+csv_bytes2 = result.to_csv_bytes()  # Reuses cached conversion
 ```
+
+### Lazy Mode
+
+`ConversionMode.LAZY` converts data only when needed, without caching:
+
+```python
+# Set lazy conversion mode
+result = result.with_conversion_mode(ConversionMode.LAZY)
+
+# Each conversion is performed from scratch
+json_bytes = result.to_json_bytes()
+csv_bytes = result.to_csv_bytes()  # Not reusing previous conversions
+```
+
+### Memory-Efficient Mode
+
+`ConversionMode.MEMORY_EFFICIENT` minimizes memory usage by clearing intermediate data after conversion:
+
+```python
+# Set memory-efficient conversion mode
+result = result.with_conversion_mode(ConversionMode.MEMORY_EFFICIENT)
+
+# After this conversion, intermediate data is cleared
+result.write_all_parquet("output_dir/parquet")
+
+# Still usable, but requires reconversion from source data
+result.write_all_csv("output_dir/csv")  # Reconverts from source
+```
+
+### Choosing the Right Mode
+
+- **Eager Mode**: Best for interactive use, small datasets, and when converting to multiple formats
+- **Lazy Mode**: Good for one-time conversions and moderate-sized datasets
+- **Memory-Efficient Mode**: Best for large datasets and memory-constrained environments
+
+```python
+from transmog import Processor, ConversionMode
+
+processor = Processor()
+
+# Choose strategy based on dataset size
+if dataset_size < 10_000:
+    # Small dataset - use eager mode
+    result = processor.process(data, entity_name="records")
+    # Default is EAGER mode
+elif dataset_size < 100_000:
+    # Medium dataset - use lazy mode
+    result = processor.process(data, entity_name="records")
+    result = result.with_conversion_mode(ConversionMode.LAZY)
+else:
+    # Large dataset - use memory-efficient mode
+    result = processor.process(data, entity_name="records")
+    result = result.with_conversion_mode(ConversionMode.MEMORY_EFFICIENT)
+```
+
+## Format-Specific Options
+
+### JSON Options
+
+```python
+# JSON write options
+result.write_all_json(
+    base_path="output_dir",
+    indent=2,            # Pretty-print with 2-space indentation
+    ensure_ascii=False,  # Allow non-ASCII characters
+    sort_keys=True,      # Sort keys alphabetically
+    separators=(',', ':')  # Custom separators
+)
+
+# JSON bytes options
+json_bytes = result.to_json_bytes(
+    indent=4,
+    ensure_ascii=False
+)
+```
+
+### CSV Options
+
+```python
+# CSV write options
+result.write_all_csv(
+    base_path="output_dir",
+    dialect="excel",     # CSV dialect
+    delimiter=",",       # Column delimiter
+    include_header=True, # Include header row
+    line_terminator="\n",  # Line ending
+    quote_strategy="minimal"  # When to quote fields
+)
+
+# CSV bytes options
+csv_bytes = result.to_csv_bytes(
+    dialect="excel-tab",
+    include_header=True
+)
+```
+
+### Parquet Options
+
+```python
+# Parquet write options
+result.write_all_parquet(
+    base_path="output_dir",
+    compression="snappy",  # Compression algorithm
+    partition_cols=["date"],  # Hive-style partitioning
+    row_group_size=100000,    # Row group size
+    data_page_size=1024*1024  # Data page size
+)
+
+# Parquet bytes options
+parquet_bytes = result.to_parquet_bytes(
+    compression="zstd",
+    row_group_size=50000
+)
+```
+
+## Streaming Output
+
+For processing large datasets, you can use streaming output that writes directly to the desired format:
+
+```python
+from transmog import Processor
+
+processor = Processor()
+
+# Stream directly to output format
+processor.stream_process(
+    data=large_data,
+    entity_name="records",
+    output_format="parquet",
+    output_destination="output_dir",
+    compression="snappy"  # Format-specific option
+)
+
+# Stream a file directly to output format
+processor.stream_process_file(
+    file_path="large_data.json",
+    entity_name="records",
+    output_format="csv",
+    output_destination="output_dir",
+    include_header=True  # Format-specific option
+)
+```
+
+## Writing to Memory Buffers
+
+You can write directly to memory buffers using the bytes serialization options:
+
+```python
+import io
+
+# Create a memory buffer
+buffer = io.BytesIO()
+
+# Write JSON bytes to the buffer
+json_bytes = result.to_json_bytes()["main"]
+buffer.write(json_bytes)
+
+# Or use streaming to write directly to a buffer
+processor.stream_process(
+    data=data,
+    entity_name="records",
+    output_format="json",
+    output_destination=buffer
+)
+```
+
+## Converting Between Formats
+
+You can convert from one format to another using the processing result:
+
+```python
+# Process data to get a result
+result = processor.process(data, entity_name="records")
+
+# Write to multiple formats
+result.write_all_json("output_dir/json")
+result.write_all_csv("output_dir/csv")
+result.write_all_parquet("output_dir/parquet")
+
+# Or process directly to a specific format
+processor.process_to_format(
+    data=data,
+    entity_name="records",
+    output_format="parquet",
+    output_path="output_dir"
+)
+```
+
+## Supported Format Matrix
+
+| Format | Native Objects | Bytes | File Output | Streaming |
+|--------|---------------|-------|------------|-----------|
+| JSON   | ✅            | ✅     | ✅         | ✅        |
+| CSV    | ✅            | ✅     | ✅         | ✅        |
+| Parquet| ✅            | ✅     | ✅         | ✅        |
+| PyArrow| ✅            | ❌     | ❌         | ❌        |
+| Dict   | ✅            | ❌     | ❌         | ❌        |
+
+## Best Practices
+
+1. **Choose the right output format for your needs**
+   - JSON for readability and compatibility
+   - CSV for simple tabular data and Excel compatibility
+   - Parquet for analytical workloads and efficient storage
+
+2. **Use bytes serialization for direct integration**
+   - Network transfers without intermediate files
+   - Integration with web APIs
+   - In-memory processing pipelines
+
+3. **Use memory-efficient mode for large datasets**
+   - Reduce memory usage during conversion
+   - Process data larger than available memory
+   - Stream directly to output format
+
+4. **Consider format-specific optimizations**
+   - Compression options for Parquet
+   - Indentation for JSON readability
+   - Header options for CSV
 
 ## Performance Characteristics
 

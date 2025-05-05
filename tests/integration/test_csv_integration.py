@@ -231,9 +231,9 @@ class TestCsvIntegration:
 
             # Test outputting to dictionary
             dict_output = result.to_dict()
-            assert "main" in dict_output
-            assert isinstance(dict_output["main"], list)
-            assert len(dict_output["main"]) > 0
+            assert "main_table" in dict_output
+            assert isinstance(dict_output["main_table"], list)
+            assert len(dict_output["main_table"]) > 0
 
             # Verify PyArrow tables if available
             if PYARROW_AVAILABLE:
@@ -451,7 +451,7 @@ class TestCsvIntegration:
 
                     # Check for dash column - look for 'colu' (part of 'column') and 'dash'
                     has_dash_col = any(
-                        "colu" in col and "dash" in col for col in sanitized_cols
+                        "columnwithdash" == col for col in sanitized_cols
                     )
                     assert has_dash_col, (
                         "No sanitized column found for 'column-with-dash'"

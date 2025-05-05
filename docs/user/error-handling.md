@@ -69,166 +69,321 @@ config = (
 processor = tm.Processor(config=config)
 ```
 
-### Recovery Strategies
+## Recovery Strategy Classes
 
-Transmog supports three built-in recovery strategies:
-
-1. **Strict** (`"strict"`)
-   - Raises all errors without recovery
-   - Ensures data integrity
-   - Default strategy
-
-2. **Skip** (`"skip"`)
-   - Skips problematic records
-   - Continues with remaining data
-   - Logs errors for review
-
-3. **Partial** (`"partial"`)
-   - Attempts to process parts of records
-   - Skips problematic sections
-   - Useful for complex nested data
-
-## The Recovery Context
-
-When an error occurs, Transmog provides a context dictionary containing information about the error:
+Transmog implements error recovery through dedicated strategy classes:
 
 ```python
-context = {
-    "path": "employees.0.address.zipCode",  # Path where error occurred
-    "value": "12AB34",                      # Value that caused the error
-    "record_id": "emp123",                  # ID of the record being processed
-    "parent_path": "employees.0",           # Path to parent object
-    "error_type": "validation",             # Type of error
-    "stage": "flattening"                   # Processing stage
-}
-```
-
-Not all fields are available for all errors, but this context can help determine the appropriate recovery action.
-
-## Creating Custom Recovery Strategies
-
-To implement a custom recovery strategy, create a function that handles errors and returns a tuple of (success, value):
-
-```python
-def custom_recovery_strategy(error: Exception, context: dict) -> tuple[bool, Any]:
-    """
-    Custom recovery strategy that handles specific error types.
-    
-    Args:
-        error: The exception that was raised
-        context: Additional context information
-        
-    Returns:
-        Tuple containing:
-          - Boolean indicating if recovery was successful
-          - Value to use as replacement if recovered
-    """
-    if isinstance(error, CircularReferenceError):
-        # Replace circular references with placeholder
-        return True, {"__circular_reference": True}
-        
-    elif isinstance(error, ValidationError):
-        # Skip invalid values
-        return True, None
-        
-    # Cannot recover from other types
-    return False, None
-
-# Use the custom strategy
-config = (
-    tm.TransmogConfig.default()
-    .with_error_handling(
-        recovery_strategy=custom_recovery_strategy,
-        allow_malformed_data=True
-    )
+from transmog.error import (
+    RecoveryStrategy,       # Abstract base class
+    StrictRecovery,         # No recovery (raises errors)
+    SkipAndLogRecovery,     # Skip and log problematic records 
+    PartialProcessingRecovery, # Extract valid portions of problematic records
 )
 
-processor = tm.Processor(config=config)
-```
-
-## Using the `with_recovery` Decorator
-
-For fine-grained control, you can use the `with_recovery` decorator on specific functions:
-
-```python
+# Using a recovery strategy directly
 from transmog.error import with_recovery
 
-@with_recovery
-def process_zip_codes(data):
-    # This function will use the configured recovery strategy
-    for record in data:
-        # Processing that might fail
-        pass
+@with_recovery(PartialProcessingRecovery())
+def process_data(data):
+    # Processing that might fail
+    return processed_data
 ```
 
-You can also specify a custom recovery strategy for specific functions:
+## Recovery Strategy Constants
+
+For convenience, Transmog provides constants for common recovery strategies:
 
 ```python
-from transmog.error import with_recovery
+from transmog import Processor
+from transmog.error import STRICT, DEFAULT, LENIENT
 
-def custom_recovery(error, context):
-    print(f"Error at {context.get('path', 'unknown')}: {error}")
-    return True, None
+# Create processors with different strategies
+strict_processor = Processor().with_error_handling(recovery_strategy=STRICT)
+default_processor = Processor().with_error_handling(recovery_strategy=DEFAULT)
+lenient_processor = Processor().with_error_handling(recovery_strategy=LENIENT)
+```
 
-@with_recovery(recovery_strategy=custom_recovery)
-def process_zip_codes(data):
-    # This function will use custom_recovery
-    pass
+These constants map to:
+- `STRICT`: StrictRecovery - raises all errors
+- `DEFAULT`: SkipAndLogRecovery - skips problematic records
+- `LENIENT`: PartialProcessingRecovery - extracts valid portions
+
+## Factory Method for Partial Recovery
+
+For the common case of using partial recovery, Transmog provides a factory method:
+
+```python
+# Create a processor with partial recovery configuration
+processor = tm.Processor.with_partial_recovery()
+
+# This is equivalent to:
+processor = tm.Processor(
+    config=tm.TransmogConfig.default()
+    .with_error_handling(
+        recovery_strategy=LENIENT,
+        allow_malformed_data=True
+    )
+    .with_processing(
+        cast_to_string=True  # Enable string casting to handle numeric type issues
+    )
+)
+```
+
+## Recovery Strategies in Depth
+
+Transmog provides three built-in recovery strategies, each with its own strengths and use cases:
+
+### 1. Strict Recovery (`StrictRecovery`)
+
+The strict recovery strategy re-raises all errors without attempting any recovery. This ensures complete data integrity but may fail processing if any issues are encountered.
+
+**When to use:**
+- When data integrity is critical and any errors indicate significant problems
+- During development and testing to catch all issues immediately
+- For applications where data quality must be guaranteed
+- When processing sensitive information where partial data could be misleading
+
+**Configuration:**
+```python
+# Using string configuration
+config = tm.TransmogConfig.default().with_error_handling(recovery_strategy="strict")
+
+# Or using the strategy class
+from transmog.error import StrictRecovery
+config = tm.TransmogConfig.default().with_error_handling(recovery_strategy=StrictRecovery())
+
+# Or using the direct strategy constant
+from transmog.error import STRICT
+config = tm.TransmogConfig.default().with_error_handling(recovery_strategy=STRICT)
+```
+
+### 2. Skip and Log Recovery (`SkipAndLogRecovery`)
+
+This strategy skips problematic records entirely but logs the errors for later analysis. Processing continues with the remaining records.
+
+**When to use:**
+- For batch processing of large datasets where some errors are expected
+- When you prefer to get partial results rather than no results
+- For data exploration tasks where complete coverage isn't required
+- When processing non-critical data where some loss is acceptable
+
+**Configuration:**
+```python
+# Using string configuration
+config = tm.TransmogConfig.default().with_error_handling(recovery_strategy="skip")
+
+# Or using the strategy class
+from transmog.error import SkipAndLogRecovery
+config = tm.TransmogConfig.default().with_error_handling(recovery_strategy=SkipAndLogRecovery())
+
+# Or using the direct strategy constant
+from transmog.error import DEFAULT  # DEFAULT is the skip-and-log strategy
+config = tm.TransmogConfig.default().with_error_handling(recovery_strategy=DEFAULT)
+```
+
+### 3. Partial Processing Recovery (`PartialProcessingRecovery`)
+
+The partial recovery strategy is the most sophisticated approach that attempts to salvage as much valid data as possible from problematic records. It maintains the structure of the original data while marking problematic sections.
+
+**When to use:**
+- For complex nested data structures where isolated parts may be problematic
+- During data migrations from legacy systems with inconsistent data quality
+- When processing API responses or external data sources that may contain errors
+- When you need to maximize data yield from problematic datasets
+- For exploratory data analysis where completeness is more important than perfect accuracy
+
+**Key benefits:**
+- Preserves partially valid data within problematic records
+- Maintains parent-child relationships even when some fields have errors
+- Marks error locations with explicit metadata for downstream handling
+- Handles circular references by replacing them with reference indicators
+- Can extract valid portions of malformed JSON files
+
+**Configuration:**
+```python
+# Using string configuration
+config = tm.TransmogConfig.default().with_error_handling(recovery_strategy="partial")
+
+# Or using the strategy class
+from transmog.error import PartialProcessingRecovery
+config = tm.TransmogConfig.default().with_error_handling(recovery_strategy=PartialProcessingRecovery())
+
+# Or using the direct strategy constant
+from transmog.error import LENIENT  # LENIENT is the partial recovery strategy
+config = tm.TransmogConfig.default().with_error_handling(recovery_strategy=LENIENT)
+
+# Or using the factory method
+processor = tm.Processor.with_partial_recovery()
+```
+
+**Example with partial recovery:**
+```python
+from transmog import Processor
+from transmog.error import LENIENT
+
+# Data with problematic parts
+data = {
+    "id": 123,
+    "name": "Test",
+    "metrics": {
+        "valid": 42,
+        "invalid": float('nan'),  # This would normally cause an error
+    },
+    "reference": None  # This will be set to a circular reference
+}
+
+# Create circular reference
+data["reference"] = data
+
+# Create processor with partial recovery
+processor = Processor.with_partial_recovery()
+
+# Process data - with partial recovery, this won't fail
+result = processor.process(data, entity_name="test")
+
+# Check the results
+main_table = result.get_main_table()[0]
+print(f"ID: {main_table['id']}")
+print(f"Name: {main_table['name']}")
+print(f"Valid metric: {main_table['metrics_valid']}")
+# The circular reference will have a marker
+if "_circular_reference" in main_table:
+    print("Circular reference was handled gracefully")
+# The NaN value will have an error marker
+if "_error" in main_table:
+    print(f"Error: {main_table['_error']}")
+```
+
+## Strategy Comparison Table
+
+| Feature                      | StrictRecovery    | SkipAndLogRecovery | PartialProcessingRecovery     |
+|------------------------------|-------------------|-------------------|--------------------------------|
+| **Error behavior**           | Raises exceptions | Skips entire record | Preserves valid portions        |
+| **Data integrity**           | Highest           | Medium            | Medium (marked errors)          |
+| **Data completeness**        | Lowest (fails)    | Medium            | Highest                         |
+| **Processing reliability**   | Fails on any error | Continues        | Continues                       |
+| **Error identification**     | Exception message | Log messages      | Error markers in data           |
+| **Complexity**               | Simple            | Medium            | Complex                         |
+| **Constants**                | `STRICT`          | `DEFAULT`         | `LENIENT`                       |
+| **String identifier**        | `"strict"`        | `"skip"`          | `"partial"`                     |
+| **Best for**                 | Critical data     | Batch processing  | Complex data migration          |
+
+## The Error Context
+
+Transmog provides an `error_context` decorator for wrapping functions with error handling:
+
+```python
+from transmog.error import error_context, LENIENT
+
+@error_context("Processing customer data", recovery_strategy=LENIENT)
+def process_customer_data(data):
+    # This function will use the LENIENT recovery strategy
+    # Any errors will be caught and handled according to the strategy
+    return processed_data
+```
+
+## Error Logging
+
+Transmog includes a logging framework for tracking errors:
+
+```python
+from transmog.error import setup_logging, logger
+
+# Configure logging
+setup_logging(log_file="transmog.log", level="INFO")
+
+# Use the logger
+try:
+    result = processor.process(data)
+except Exception as e:
+    logger.error(f"Failed to process data: {e}")
 ```
 
 ## Handling Specific Error Types
 
-Different types of errors require different recovery strategies:
-
-### Handling Circular References
+Different strategies for different error types:
 
 ```python
-def handle_circular_references(error: Exception, context: dict) -> tuple[bool, Any]:
-    if isinstance(error, CircularReferenceError):
-        path = context.get("path", "")
-        print(f"Circular reference detected at {path}")
-        return True, {"__circular": True}
-    return False, None
+from transmog import Processor, TransmogConfig
+from transmog.error import ParsingError, CircularReferenceError, LENIENT
 
-# Use the strategy
-config = (
-    tm.TransmogConfig.default()
+# Create a processor that handles circular references gracefully
+processor = Processor(
+    config=TransmogConfig.default()
     .with_error_handling(
-        recovery_strategy=handle_circular_references,
+        recovery_strategy=LENIENT,
         allow_malformed_data=True
     )
 )
 
-processor = tm.Processor(config=config)
-```
-
-### Handling Invalid Values
-
-```python
-def handle_invalid_values(error: Exception, context: dict) -> tuple[bool, Any]:
-    if isinstance(error, ValidationError) and "invalid number" in str(error):
-        print(f"Invalid number at {context.get('path', '')}")
-        return True, None
-    return False, None
-
-# Use the strategy
-config = (
-    tm.TransmogConfig.default()
-    .with_error_handling(
-        recovery_strategy=handle_invalid_values,
-        allow_malformed_data=True
-    )
-)
-
-processor = tm.Processor(config=config)
+try:
+    # Try processing with more lenient recovery
+    result = processor.process(data)
+except ParsingError:
+    # Fall back to text processing for parsing errors
+    result = process_as_text(data)
+except CircularReferenceError:
+    # Special handling for circular references
+    result = process_with_reference_handling(data)
 ```
 
 ## Best Practices
 
-1. **Choose Appropriate Strategy**
-   - Use "strict" for data integrity
-   - Use "skip" for large datasets
-   - Use "partial" for complex nested data
+1. **Match the strategy to the data quality**
+   - Use `STRICT` for well-structured, high-quality data
+   - Use `DEFAULT` for batch processing where some errors are acceptable
+   - Use `LENIENT` for data migration or processing external data sources
+
+2. **Add proper error logging**
+   - Configure logging to capture error contexts
+   - Log both the error and the problematic data when possible
+
+3. **Combine strategies with other options**
+   - Pair `LENIENT` with `allow_malformed_data=True` for maximum resilience
+   - Use `cast_to_string=True` to handle numeric type issues
+
+4. **Use the error context in custom code**
+   - Wrap custom processing functions with `@error_context`
+   - Specify the appropriate recovery strategy
+
+5. **Inspect error markers in recovered data**
+   - Look for fields with `_error` to identify problematic values
+   - Check for `_circular_reference` or similar markers
+
+6. **Use factory methods for common configurations**
+   - `Processor.with_partial_recovery()` for maximum data yield
+
+## Real-World Use Cases for Recovery Strategies
+
+### Strict Recovery
+- Financial data processing where accuracy is critical
+- Regulatory compliance systems
+- Critical infrastructure monitoring
+- Systems of record for master data
+
+### Skip and Log Recovery
+- Large-scale batch ETL jobs
+- Initial data exploration
+- Non-critical data collection processes
+- Scenarios where data loss is preferable to inaccurate data
+
+### Partial Recovery
+- Data migration from legacy systems
+- Processing API responses with inconsistent structures
+- Social media or user-generated content analysis
+- Cross-system data synchronization
+- Historical data integration with schema evolution
+- Extracting information from corrupted files
+- Processing data with circular relationships (e.g., organizational hierarchies)
+
+## Best Practices
+
+1. **Choose the Right Strategy for Your Use Case**
+   - Consider data criticality, volume, and structure
+   - Balance completeness vs. correctness requirements
+   - For critical data, start with strict recovery and adjust as needed
+   - Use partial recovery when data salvage is the priority
 
 2. **Configure Logging**
    - Set `error_log_path` for persistent error tracking
@@ -248,68 +403,56 @@ processor = tm.Processor(config=config)
 5. **Test Recovery Strategies**
    - Test with known problematic data
    - Verify recovery behavior
-   - Check data integrity after recovery
+   - Validate that error markers are properly handled downstream
 
-## Complete Example
+6. **Simplify Config with Strategy Constants**
+   - Use `STRICT`, `DEFAULT`, and `LENIENT` constants for clarity
+   - Document the chosen strategy in your code
 
-Here's a complete example of a custom recovery strategy:
+7. **Combine with Type Conversion**
+   - Set `cast_to_string=True` when using partial recovery to handle type mismatches
+   - This allows recovery from numeric type issues like NaN/Infinity values
+
+## Examples
+
+### Factory Usage Pattern
+
+Here's a pattern for creating pre-configured processors with different recovery strategies:
 
 ```python
-import logging
-import transmog as tm
-from transmog.error import RecoveryStrategy, CircularReferenceError, ValidationError
+from transmog import Processor, TransmogConfig
+from transmog.error import STRICT, DEFAULT, LENIENT
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("error_recovery_example")
-
-class CustomRecoveryStrategy(RecoveryStrategy):
-    def __init__(self):
-        self.error_counts = {
-            "circular": 0,
-            "validation": 0,
-            "other": 0
-        }
+def create_processor(strategy="skip", **kwargs):
+    """
+    Factory function to create processors with different error handling strategies.
     
-    def recover(self, error, context=None):
-        if isinstance(error, CircularReferenceError):
-            self.error_counts["circular"] += 1
-            path = context.get("path", "unknown") if context else "unknown"
-            logger.warning(f"Circular reference at {path}")
-            return True, {"__circular": True}
-            
-        if isinstance(error, ValidationError):
-            self.error_counts["validation"] += 1
-            path = context.get("path", "unknown") if context else "unknown"
-            logger.info(f"Validation error at {path}")
-            return True, None
+    Args:
+        strategy: One of "strict", "skip", or "partial"
+        **kwargs: Additional processor configuration options
         
-        self.error_counts["other"] += 1
-        logger.error(f"Unrecoverable error: {error}")
-        return False, None
+    Returns:
+        Configured Processor instance
+    """
+    strategy_map = {
+        "strict": STRICT,
+        "skip": DEFAULT,
+        "partial": LENIENT
+    }
     
-    def report(self):
-        """Report error statistics"""
-        total = sum(self.error_counts.values())
-        if total > 0:
-            logger.info(f"Recovery summary: {total} errors handled")
-            for error_type, count in self.error_counts.items():
-                logger.info(f"  - {error_type}: {count}")
+    recovery_strategy = strategy_map.get(strategy, DEFAULT)
+    
+    config = TransmogConfig.default().with_error_handling(
+        recovery_strategy=recovery_strategy,
+        allow_malformed_data=(strategy != "strict")
+    )
+    
+    return Processor(config=config, **kwargs)
 
 # Usage
-recovery = CustomRecoveryStrategy()
-processor = tm.Processor(
-    recovery_strategy=recovery,
-    allow_malformed_data=True
-)
-
-# Process data
-result = processor.process(complex_data)
-
-# Report error statistics
-recovery.report()
+strict_processor = create_processor("strict")
+skip_processor = create_processor("skip")
+partial_processor = create_processor("partial")
 ```
 
-## Example: Customized Error Handling
-
-For a complete working example, see the [error handling examples](../../examples/advanced/error_recovery_example.py). 
+For more examples of partial recovery in action, see the [partial_recovery_example.py](https://github.com/scottdraper8/transmog/blob/main/examples/partial_recovery_example.py) file in the examples directory. 

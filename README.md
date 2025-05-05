@@ -130,6 +130,32 @@ processor = tm.Processor(config=config)
 
 See the [configuration guide](docs/user/configuration.md) for more details.
 
+## Error Recovery Strategies
+
+Transmog provides several recovery strategies for handling problematic data:
+
+```python
+# Default strict recovery (fails on any error)
+processor = tm.Processor.default()
+
+# Skip and log recovery (skips problematic records)
+processor = tm.Processor().with_error_handling(recovery_strategy="skip")
+
+# Partial recovery (preserves valid portions of problematic records)
+processor = tm.Processor.with_partial_recovery()
+
+# Process data that may contain errors
+result = processor.process(problematic_data, entity_name="records")
+```
+
+The partial recovery strategy is particularly valuable when working with:
+- Data migration from legacy systems
+- Processing API responses with inconsistent structures
+- Handling circular references in complex objects
+- Recovering data from malformed files
+
+See the [error handling guide](docs/user/error-handling.md) for more information.
+
 ## Processing Large Datasets
 
 For large datasets, use memory-optimized configuration:

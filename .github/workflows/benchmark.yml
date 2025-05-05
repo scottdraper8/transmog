@@ -1,4 +1,4 @@
-name: Benchmark (3.9)
+name: Benchmark
 
 on:
   push:
@@ -37,6 +37,17 @@ jobs:
         mkdir -p benchmark_results
         python scripts/run_benchmarks.py --records 1000 --complexity medium --output benchmark_results/medium.json
         python scripts/run_benchmarks.py --records 100 --complexity complex --output benchmark_results/complex.json
+    
+    - name: Test memory usage
+      run: |
+        python scripts/run_benchmarks.py --records 5000 --complexity medium --output benchmark_results/memory_standard.json --mode standard
+        python scripts/run_benchmarks.py --records 5000 --complexity medium --output benchmark_results/memory_streaming.json --mode streaming
+    
+    - name: Test processing strategies
+      run: |
+        python scripts/run_benchmarks.py --records 1000 --complexity medium --output benchmark_results/strategy_standard.json --strategy standard
+        python scripts/run_benchmarks.py --records 1000 --complexity medium --output benchmark_results/strategy_memory.json --strategy memory
+        python scripts/run_benchmarks.py --records 1000 --complexity medium --output benchmark_results/strategy_performance.json --strategy performance
     
     - name: Upload benchmark results
       uses: actions/upload-artifact@v4

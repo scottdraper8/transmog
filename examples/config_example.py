@@ -1,70 +1,18 @@
 """
 Example demonstrating Transmog configuration functionality.
 
-This example shows how to use profiles, configuration files, and
-direct setting configuration with Transmog.
+This example shows how to use the TransmogConfig system with its fluent API
+to configure Transmog processing.
 """
 
-import json
 import os
 import sys
-from pprint import pprint
 
 # Add parent directory to path to import transmog without installing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import from src package
-from transmog import Processor, ProcessingResult
-from transmog.config import settings, load_profile, configure, extensions
-
-
-def create_sample_config_file():
-    """Create a sample configuration file."""
-    config = {
-        "separator": ".",
-        "cast_to_string": True,
-        "include_empty": True,
-        "batch_size": 500,
-        "log_level": 20,  # INFO level
-    }
-
-    # Create directory if it doesn't exist
-    output_dir = os.path.join(os.path.dirname(__file__), "output")
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Write config to file
-    config_path = os.path.join(output_dir, "transmog_config.json")
-    with open(config_path, "w") as f:
-        json.dump(config, f, indent=2)
-
-    return config_path
-
-
-def register_custom_extensions():
-    """Register custom extensions for demonstration."""
-
-    # Register a custom type handler for datetime values
-    def handle_datetime(value):
-        """Convert datetime values to ISO format strings."""
-        import datetime
-
-        if isinstance(value, datetime.datetime):
-            return value.isoformat()
-        return value
-
-    extensions.register_type_handler("datetime", handle_datetime)
-
-    # Register a custom naming strategy
-    def camel_case_strategy(components):
-        """Convert components to camelCase."""
-        if not components:
-            return ""
-        result = components[0].lower()
-        for comp in components[1:]:
-            result += comp.capitalize()
-        return result
-
-    extensions.register_naming_strategy("camelCase", camel_case_strategy)
+from transmog import Processor, TransmogConfig, ProcessingMode, ConversionMode
 
 
 def main():
@@ -95,70 +43,122 @@ def main():
         ],
     }
 
-    # Example 1: Use default settings
-    print("\n=== Example 1: Default Settings ===")
-    processor = Processor()
+    # Create output directory
+    output_dir = os.path.join(os.path.dirname(__file__), "output")
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Example 1: Use default configuration
+    print("\n=== Example 1: Default Configuration ===")
+    config = TransmogConfig.default()
+    processor = Processor(config=config)
     result = processor.process(data=data, entity_name="company")
     print(f"Main table record count: {len(result.get_main_table())}")
     print(f"Child tables: {result.get_table_names()}")
-    print(
-        f"Settings used: separator='{settings.separator}', batch_size={settings.batch_size}"
-    )
+    print(f"Naming separator: '{config.naming.separator}'")
+    print(f"Processing batch size: {config.processing.batch_size}")
 
-    # Example 2: Use a predefined profile
-    print("\n=== Example 2: Memory-Efficient Profile ===")
-    load_profile("memory_efficient")
-    processor = Processor()  # Will use memory_efficient profile settings
+    # Example 2: Memory-optimized configuration
+    print("\n=== Example 2: Memory-Optimized Configuration ===")
+    config = TransmogConfig.memory_optimized()
+    processor = Processor(config=config)
     result = processor.process(data=data, entity_name="company")
     print(f"Main table record count: {len(result.get_main_table())}")
-    print(
-        f"Settings used: optimize_for_memory={settings.optimize_for_memory}, batch_size={settings.batch_size}"
-    )
+    print(f"Processing mode: {config.processing.processing_mode}")
+    print(f"Batch size: {config.processing.batch_size}")
 
-    # Example 3: Load from config file
-    print("\n=== Example 3: Config File ===")
-    config_file = create_sample_config_file()
-    from transmog.config import load_config
-
-    load_config(config_file)
-    processor = Processor()  # Will use settings from config file
+    # Example 3: Performance-optimized configuration
+    print("\n=== Example 3: Performance-Optimized Configuration ===")
+    config = TransmogConfig.performance_optimized()
+    processor = Processor(config=config)
     result = processor.process(data=data, entity_name="company")
     print(f"Main table record count: {len(result.get_main_table())}")
-    print(
-        f"Settings used: separator='{settings.separator}', include_empty={settings.include_empty}"
-    )
+    print(f"Processing mode: {config.processing.processing_mode}")
+    print(f"Batch size: {config.processing.batch_size}")
 
-    # Example 4: Direct configuration
-    print("\n=== Example 4: Direct Configuration ===")
-    configure(
-        separator="/",
-        cast_to_string=False,
-        log_level=10,  # DEBUG level
+    # Example 4: Custom configuration with fluent API
+    print("\n=== Example 4: Custom Configuration with Fluent API ===")
+    config = (
+        TransmogConfig.default()
+        .with_naming(
+            separator=".", abbreviate_table_names=False, max_table_component_length=15
+        )
+        .with_processing(
+            cast_to_string=False,
+            include_empty=True,
+            batch_size=500,
+            processing_mode=ProcessingMode.STANDARD,
+        )
+        .with_metadata(
+            id_field="record_id", parent_field="parent_id", time_field="processed_at"
+        )
+        .with_error_handling(
+            recovery_strategy="skip", allow_malformed_data=True, max_retries=3
+        )
     )
-    processor = Processor()  # Will use directly configured settings
+    processor = Processor(config=config)
     result = processor.process(data=data, entity_name="company")
     print(f"Main table record count: {len(result.get_main_table())}")
-    print(
-        f"Settings used: separator='{settings.separator}', cast_to_string={settings.cast_to_string}"
+    print(f"Naming separator: '{config.naming.separator}'")
+    print(f"Allow malformed data: {config.error_handling.allow_malformed_data}")
+
+    # Save the result
+    result.write_all_json(base_path=output_dir)
+    print(f"Output written to: {output_dir}")
+
+    # Example 5: Factory methods for processor creation
+    print("\n=== Example 5: Factory Methods for Processor Creation ===")
+
+    # Demonstrate different factory methods
+    print("Default processor created")
+    Processor.default()
+
+    print("Memory-optimized processor created")
+    Processor.memory_optimized()
+
+    print("Performance-optimized processor created")
+    Processor.performance_optimized()
+
+    print("Processor with deterministic IDs created")
+    Processor.with_deterministic_ids(
+        {
+            "": "id",  # Root level uses "id" field
+            "company_contacts": "name",  # Contacts table uses "name" field
+        }
     )
 
-    # Example 5: Environment variables (demonstrating how they would be used)
-    print("\n=== Example 5: Environment Variables (demonstration) ===")
-    print(
-        "To use environment variables, you would set them before running your script:"
-    )
-    print("export TRANSMOG_SEPARATOR='::'")
-    print("export TRANSMOG_BATCH_SIZE=250")
-    print("export TRANSMOG_OPTIMIZE_FOR_MEMORY=true")
+    print("Processor with partial recovery created")
+    Processor.with_partial_recovery()
 
-    # Example 6: Custom extensions
-    print("\n=== Example 6: Custom Extensions ===")
-    register_custom_extensions()
+    # Example 6: Configuring conversion modes
+    print("\n=== Example 6: Conversion Modes for Memory Management ===")
+
+    # Process data
+    processor = Processor()
+    result = processor.process(data=data, entity_name="company")
+
+    # Default mode (EAGER) - keeps converted data in memory
+    print("Default conversion mode (EAGER):")
+    default_json = result.to_json_bytes()
+    print(f"  JSON bytes size: {len(default_json['main'])} bytes (cached for reuse)")
+
+    # LAZY mode - converts on demand
+    lazy_result = result.with_conversion_mode(ConversionMode.LAZY)
+    print("LAZY conversion mode:")
+    lazy_json = lazy_result.to_json_bytes()
+    print(f"  JSON bytes size: {len(lazy_json['main'])} bytes (not cached)")
+
+    # MEMORY_EFFICIENT mode - clear intermediate data
+    efficient_result = result.with_conversion_mode(ConversionMode.MEMORY_EFFICIENT)
+    print("MEMORY_EFFICIENT conversion mode:")
+    efficient_json = efficient_result.to_json_bytes()
     print(
-        f"Registered type handlers: {list(extensions.get_all_type_handlers().keys())}"
+        f"  JSON bytes size: {len(efficient_json['main'])} bytes (intermediate data cleared)"
     )
+
+    # Write to files with memory-efficient mode
+    efficient_result.write_all_csv(os.path.join(output_dir, "memory_efficient"))
     print(
-        f"Registered naming strategies: {list(extensions.get_all_naming_strategies().keys())}"
+        f"  Memory-efficient output written to: {os.path.join(output_dir, 'memory_efficient')}"
     )
 
 

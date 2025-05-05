@@ -20,6 +20,33 @@ from ..error import ConfigurationError
 # Create logger for settings module
 logger = logging.getLogger("transmog.settings")
 
+# Default options for Transmog
+DEFAULT_OPTIONS = {
+    "separator": "_",
+    "cast_to_string": True,
+    "include_empty": False,
+    "skip_null": True,
+    "visit_arrays": False,
+    "abbreviate_table_names": True,
+    "abbreviate_field_names": True,
+    "max_table_component_length": 8,
+    "max_field_component_length": 8,
+    "preserve_leaf_component": True,
+    "custom_abbreviations": {},
+    "path_parts_optimization": True,
+    "max_nesting_depth": 100,
+    "indent": 2,
+    "batch_size": 1000,
+    "processing_mode": "standard",
+    "memory_threshold": 100
+    * 1024
+    * 1024,  # 100MB threshold for switching to low-memory mode
+    "memory_tracking_enabled": False,  # Whether to track memory usage during processing
+}
+
+# Environment variable for config file path
+CONFIG_PATH_ENV_VAR = "TRANSMOG_CONFIG_PATH"
+
 
 class TransmogSettings:
     """

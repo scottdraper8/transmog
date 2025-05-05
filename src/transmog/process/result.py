@@ -5,11 +5,26 @@ This module contains the ProcessingResult class for managing and
 writing the results of processing nested JSON structures.
 """
 
-from typing import Any, Dict, List, Optional, Set, Tuple, Union, Callable, BinaryIO
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+    Callable,
+    BinaryIO,
+    TextIO,
+)
 import os
 import logging
 import importlib
 import io
+import json
+from enum import Enum
+
+from transmog.error import OutputError
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +108,14 @@ def _get_cache_key(table_data, format_type, **options):
     return (data_id, format_type, options_str)
 
 
+class ConversionMode(Enum):
+    """Conversion mode for ProcessingResult."""
+
+    EAGER = "eager"  # Convert immediately, keep all data in memory
+    LAZY = "lazy"  # Convert only when needed
+    MEMORY_EFFICIENT = "memory_efficient"  # Discard intermediate data after conversion
+
+
 class ProcessingResult:
     """
     Container for processing results including main and child tables.
@@ -106,7 +129,9 @@ class ProcessingResult:
         self,
         main_table: List[Dict[str, Any]],
         child_tables: Dict[str, List[Dict[str, Any]]],
-        entity_name: str = "entity",
+        entity_name: str,
+        source_info: Optional[Dict[str, Any]] = None,
+        conversion_mode: ConversionMode = ConversionMode.EAGER,
     ):
         """
         Initialize with main and child tables.
@@ -115,10 +140,16 @@ class ProcessingResult:
             main_table: List of records for the main table
             child_tables: Dictionary of child tables keyed by name
             entity_name: Name of the entity
+            source_info: Information about the source data
+            conversion_mode: How to handle data conversion
         """
         self.main_table = main_table
         self.child_tables = child_tables
         self.entity_name = entity_name
+        self.source_info = source_info or {}
+        self.conversion_mode = conversion_mode
+        self._converted_formats = {}
+        self._conversion_functions = {}
 
         # Initialize cache
         global _conversion_cache
@@ -148,17 +179,52 @@ class ProcessingResult:
         """
         return table_name.replace(".", "_").replace("/", "_")
 
-    def to_dict(self) -> Dict[str, List[Dict[str, Any]]]:
+    def to_dict(self) -> Dict[str, Any]:
         """
-        Convert all tables to a dictionary of Python dictionaries/lists.
+        Convert to a dictionary representation.
 
         Returns:
-            Dict with 'main' and child table names as keys, and lists of records as values
+            Dict with main and child tables
         """
-        result = {"main": self.main_table}
-        for table_name, table_data in self.child_tables.items():
-            result[table_name] = table_data
+        if "dict" in self._converted_formats:
+            return self._converted_formats["dict"]
+
+        result = {
+            "main_table": self.main_table,
+            "child_tables": self.child_tables,
+            "entity_name": self.entity_name,
+            "source_info": self.source_info,
+        }
+
+        if self.conversion_mode == ConversionMode.EAGER:
+            self._converted_formats["dict"] = result
+
         return result
+
+    def to_json(self, indent: Optional[int] = 2) -> str:
+        """
+        Convert to JSON string.
+
+        Args:
+            indent: Indentation level for JSON formatting
+
+        Returns:
+            JSON string representation
+        """
+        key = f"json_{indent}"
+        if key in self._converted_formats:
+            return self._converted_formats[key]
+
+        try:
+            json_string = json.dumps(self.to_dict(), indent=indent)
+
+            if self.conversion_mode == ConversionMode.EAGER:
+                self._converted_formats[key] = json_string
+
+            return json_string
+        except Exception as e:
+            logger.error(f"Error converting to JSON: {e}")
+            raise OutputError(f"Failed to convert result to JSON: {e}")
 
     def to_json_objects(self) -> Dict[str, List[Dict[str, Any]]]:
         """
@@ -914,3 +980,173 @@ class ProcessingResult:
                 combined_children[table_name].extend(table_data)
 
         return cls(combined_main, combined_children, entity_name)
+
+    def register_converter(
+        self, format_name: str, converter_func: Callable[["ProcessingResult"], Any]
+    ) -> None:
+        """
+        Register a custom converter function for a format.
+
+        Args:
+            format_name: Name of the format to convert to
+            converter_func: Function that converts this result to the format
+        """
+        self._conversion_functions[format_name] = converter_func
+
+    def convert_to(self, format_name: str, **options) -> Any:
+        """
+        Convert the result to the specified format.
+
+        Uses registered converters or custom conversion functions.
+
+        Args:
+            format_name: Format to convert to
+            **options: Format-specific options
+
+        Returns:
+            Converted result
+        """
+        # Check if we have a registered converter
+        if format_name in self._conversion_functions:
+            return self._conversion_functions[format_name](self, **options)
+
+        # Handle built-in formats
+        if format_name == "dict":
+            return self.to_dict()
+        elif format_name == "json":
+            return self.to_json(indent=options.get("indent", 2))
+        else:
+            raise ValueError(f"Unsupported format: {format_name}")
+
+    def _clear_intermediate_data(self) -> None:
+        """
+        Clear intermediate data representations to save memory.
+
+        Should only be called after final output is generated in memory-efficient mode.
+        """
+        # Clear converted format cache
+        self._converted_formats.clear()
+
+        # In extreme memory-efficient mode, we could also clear the original data
+        # but this would make the result object unusable for further operations
+        # Uncomment the following lines for extreme memory efficiency if needed:
+        # self.main_table = []
+        # self.child_tables = {}
+
+    def with_conversion_mode(self, mode: ConversionMode) -> "ProcessingResult":
+        """
+        Create a new result with a different conversion mode.
+
+        Args:
+            mode: New conversion mode to use
+
+        Returns:
+            New ProcessingResult instance with the specified mode
+        """
+        return ProcessingResult(
+            main_table=self.main_table,
+            child_tables=self.child_tables,
+            entity_name=self.entity_name,
+            source_info=self.source_info,
+            conversion_mode=mode,
+        )
+
+    def __repr__(self) -> str:
+        """Get string representation."""
+        record_counts = self.count_records()
+        main_count = record_counts.get("main", 0)
+        child_counts = {k: v for k, v in record_counts.items() if k != "main"}
+        return (
+            f"ProcessingResult(entity={self.entity_name}, "
+            f"main_records={main_count}, "
+            f"child_tables={len(child_counts)})"
+        )
+
+    def write_to_file(
+        self,
+        format_name: str,
+        output_directory: str,
+        **options,
+    ) -> Dict[str, str]:
+        """
+        Write results to files in the specified format.
+
+        Args:
+            format_name: Output format name
+            output_directory: Directory to write files to
+            **options: Format-specific options
+
+        Returns:
+            Dict mapping table names to output file paths
+        """
+        from transmog.io.writer_factory import create_writer
+
+        # Create output directory if it doesn't exist
+        os.makedirs(output_directory, exist_ok=True)
+
+        # Create writer for the format
+        writer = create_writer(format_name)
+
+        # Write the result
+        result_paths = writer.write_all_tables(
+            main_table=self.main_table,
+            child_tables=self.child_tables,
+            base_path=output_directory,
+            entity_name=self.entity_name,
+            **options,
+        )
+
+        # Clean up intermediate representations if in memory-efficient mode
+        if self.conversion_mode == ConversionMode.MEMORY_EFFICIENT:
+            self._clear_intermediate_data()
+
+        return result_paths
+
+    def stream_to_output(
+        self,
+        format_name: str,
+        output_destination: Optional[Union[str, BinaryIO, TextIO]] = None,
+        **options,
+    ) -> None:
+        """
+        Stream the result to the output destination in the specified format.
+
+        This is a memory-efficient way to output large datasets without
+        keeping everything in memory.
+
+        Args:
+            format_name: Output format name
+            output_destination: Directory path or file-like object
+            **options: Format-specific options
+
+        Returns:
+            None
+        """
+        from transmog.io.writer_factory import create_streaming_writer
+
+        # Create streaming writer for the format
+        writer = create_streaming_writer(
+            format_name=format_name,
+            destination=output_destination,
+            entity_name=self.entity_name,
+            **options,
+        )
+
+        try:
+            # Write main table
+            writer.initialize_main_table()
+            writer.write_main_records(self.main_table)
+
+            # Write child tables
+            for table_name, table_data in self.child_tables.items():
+                writer.initialize_child_table(table_name)
+                writer.write_child_records(table_name, table_data)
+
+            # Finalize output
+            writer.finalize()
+        finally:
+            writer.close()
+
+        # Clean up intermediate representations if in memory-efficient mode
+        if self.conversion_mode == ConversionMode.MEMORY_EFFICIENT:
+            self._clear_intermediate_data()

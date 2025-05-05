@@ -5,127 +5,146 @@ The `Processor` class is the main entry point for processing JSON data in Transm
 ## Import
 
 ```python
-from transmog import Processor
-from transmog.processor import ProcessingMode  # For memory mode options
+from transmog import Processor, TransmogConfig, ProcessingMode
 ```
 
 ## Constructor
 
 ```python
-Processor(
-    separator: str = "_",
-    cast_to_string: bool = True,
-    include_empty: bool = False,
-    skip_null: bool = True,
-    id_field: str = "__extract_id",
-    parent_field: str = "__parent_extract_id",
-    time_field: str = "__extract_datetime",
-    batch_size: int = 1000,
-    optimize_for_memory: bool = False,
-    max_nesting_depth: Optional[int] = None,
-    recovery_strategy: Optional[RecoveryStrategy] = None,
-    allow_malformed_data: Optional[bool] = None,
-    path_parts_optimization: Optional[bool] = None,
-    visit_arrays: Optional[bool] = None,
-    abbreviate_table_names: Optional[bool] = None,
-    abbreviate_field_names: Optional[bool] = None,
-    max_table_component_length: Optional[int] = None,
-    max_field_component_length: Optional[int] = None,
-    preserve_leaf_component: Optional[bool] = None,
-    custom_abbreviations: Optional[Dict[str, str]] = None,
-    deterministic_id_fields: Optional[Dict[str, str]] = None,
-    id_generation_strategy: Optional[Callable[[Dict[str, Any]], str]] = None,
-)
+Processor(config: Optional[TransmogConfig] = None)
 ```
 
 ### Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| separator | str | "_" | Character(s) to use as separator for nested field names |
-| cast_to_string | bool | True | Whether to cast all values to strings |
-| include_empty | bool | False | Whether to include empty strings in output |
-| skip_null | bool | True | Whether to skip null values in output |
-| id_field | str | "__extract_id" | Field name for extract ID |
-| parent_field | str | "__parent_extract_id" | Field name for parent ID reference |
-| time_field | str | "__extract_datetime" | Field name for extract timestamp |
-| batch_size | int | 1000 | Default batch size for processing large datasets |
-| optimize_for_memory | bool | False | Whether to optimize for memory over speed |
-| max_nesting_depth | int | None | Maximum nesting depth to process (None for unlimited) |
-| recovery_strategy | RecoveryStrategy | None | Strategy for handling errors during processing |
-| allow_malformed_data | bool | None | Whether to try to recover from malformed data |
-| path_parts_optimization | bool | None | Whether to use optimization for deep paths |
-| visit_arrays | bool | None | Whether to process arrays as field values |
-| abbreviate_table_names | bool | None | Whether to abbreviate table names |
-| abbreviate_field_names | bool | None | Whether to abbreviate field names |
-| max_table_component_length | int | None | Maximum length for table name components |
-| max_field_component_length | int | None | Maximum length for field name components |
-| preserve_leaf_component | bool | None | Whether to preserve leaf components in paths |
-| custom_abbreviations | Dict[str, str] | None | Custom abbreviation dictionary |
-| deterministic_id_fields | Dict[str, str] | None | Dictionary mapping paths to field names for deterministic ID generation |
-| id_generation_strategy | Callable[[Dict[str, Any]], str] | None | Custom function for ID generation |
+| config | TransmogConfig | None | Configuration object. If None, uses default configuration. |
 
-### Processing Modes
+## Configuration
 
-Transmog supports different processing modes that determine memory usage and performance tradeoffs:
+The Processor class uses the `TransmogConfig` class for configuration. Instead of providing multiple parameters to the constructor, you create and configure a `TransmogConfig` object:
 
 ```python
-from transmog.processor import ProcessingMode
+from transmog import Processor, TransmogConfig
 
-# Available modes
-ProcessingMode.STANDARD           # Default - balances memory and performance
-ProcessingMode.LOW_MEMORY         # Optimizes for memory usage
-ProcessingMode.HIGH_PERFORMANCE   # Optimizes for processing speed
+# Create with custom configuration
+config = (
+    TransmogConfig.default()
+    .with_naming(
+        separator=".",
+        abbreviate_table_names=False
+    )
+    .with_processing(
+        cast_to_string=True,
+        batch_size=5000
+    )
+    .with_metadata(
+        id_field="custom_id"
+    )
+    .with_error_handling(
+        recovery_strategy="skip"
+    )
+)
+
+processor = Processor(config=config)
 ```
 
-### ID Generation Options
+See the [Configuration API Reference](config.md) for details on all configuration options.
 
-Transmog supports three approaches for ID generation:
+## Factory Methods
 
-1. **Random UUIDs (Default)**: When `deterministic_id_fields` and `id_generation_strategy` are both `None`, random UUIDs are generated for each record.
-
-2. **Field-based Deterministic IDs**: When `deterministic_id_fields` is provided, specified fields at different paths are used to generate consistent IDs.
-
-3. **Custom ID Generation**: When `id_generation_strategy` is provided, the custom function is used to generate IDs based on the record data.
-
-#### Using Deterministic ID Fields
-
-The `deterministic_id_fields` parameter accepts a dictionary where:
-- Keys are path patterns (e.g., `""` for root, `"customers"` for customer records, `"customers_orders"` for orders)
-- Values are field names within those records that should be used for ID generation
-
-For example:
+Transmog provides convenient factory methods to create processors with common configurations:
 
 ```python
-# Root-level records use the "id" field
-# Customer records use the "customer_id" field
-# Order records use the "order_number" field
-deterministic_id_fields = {
-    "": "id",
-    "customers": "customer_id",
-    "customers_orders": "order_number"
-}
+# Create with default configuration
+processor = Processor.default()
 
-processor = Processor(deterministic_id_fields=deterministic_id_fields)
+# Create with memory optimization for large datasets
+processor = Processor.memory_optimized()
+
+# Create with performance optimization for speed-critical processing
+processor = Processor.performance_optimized()
+
+# Create with deterministic ID generation
+processor = Processor.with_deterministic_ids({
+    "": "id",                     # Root level uses "id" field
+    "user_orders": "id"           # Order records use "id" field
+})
+
+# Create with custom ID generation
+def custom_id_strategy(record):
+    return f"CUSTOM-{record['id']}"
+processor = Processor.with_custom_id_generation(custom_id_strategy)
+
+# Create with partial recovery for maximizing data yield from problematic sources
+processor = Processor.with_partial_recovery()
 ```
 
-#### Using Custom ID Generation
+### Configuration Methods
 
-For advanced scenarios, you can provide a custom function that takes a record and returns an ID string:
+You can also create a new processor with an updated configuration using the configuration methods:
 
 ```python
-def custom_id_generator(record):
-    # Generate a custom ID based on multiple fields
-    return f"CUSTOM-{record.get('id', '')}-{record.get('type', '')}"
+# Create a processor with default configuration
+processor = Processor()
 
-processor = Processor(id_generation_strategy=custom_id_generator)
+# Create a new processor with updated naming settings
+new_processor = processor.with_naming(separator=".", abbreviate_table_names=False)
+
+# Create a new processor with updated processing settings
+new_processor = processor.with_processing(cast_to_string=False, batch_size=5000)
+
+# Create a new processor with updated metadata settings
+new_processor = processor.with_metadata(id_field="custom_id")
+
+# Create a new processor with updated error handling settings
+new_processor = processor.with_error_handling(recovery_strategy="skip")
+
+# Create a new processor with a completely new configuration
+new_processor = processor.with_config(custom_config)
 ```
 
-## Methods
+### Partial Recovery Processor
+
+The `with_partial_recovery()` method creates a processor configured to maximize data yield from problematic sources by:
+
+1. Using the partial recovery strategy (LENIENT)
+2. Enabling malformed data processing
+3. Casting values to strings to handle numeric type issues
+
+This is particularly useful for:
+- Data migration from legacy systems
+- Processing API responses with inconsistent structures
+- Handling circular references in complex objects
+- Recovering data from malformed/corrupted files
+
+```python
+from transmog import Processor
+
+# Create a processor that will attempt to recover partial data from problematic records
+processor = Processor.with_partial_recovery()
+
+# Process data that may contain errors
+try:
+    result = processor.process(problematic_data, entity_name="records")
+    
+    # The output will contain markers for errors but still preserve valid parts
+    for record in result.get_main_table():
+        if "_error" in record:
+            print(f"Record with ID {record.get('id')} had errors: {record['_error']}")
+        elif "_circular_reference" in record:
+            print(f"Record with ID {record.get('id')} had circular references")
+        else:
+            print(f"Record with ID {record.get('id')} processed successfully")
+except Exception as e:
+    print(f"Processing failed despite recovery attempts: {e}")
+```
+
+## Processing Methods
 
 ### process
 
-Process JSON data and return a processing result.
+Process data with the current configuration.
 
 ```python
 process(
@@ -147,21 +166,20 @@ process(
 
 #### Returns
 
-A `ProcessingResult` object containing the main records and child tables.
+A `ProcessingResult` object containing the processed data.
 
 #### Example
 
 ```python
-data = {
-    "id": 123,
-    "name": "Example",
-    "items": [
-        {"id": 1, "name": "Item 1"},
-        {"id": 2, "name": "Item 2"}
-    ]
-}
+import transmog as tm
 
-result = processor.process(data, entity_name="orders")
+processor = tm.Processor()
+result = processor.process(data, entity_name="customers")
+
+# Access the processed data
+tables = result.to_dict()
+main_table = tables["main"]
+child_tables = {k: v for k, v in tables.items() if k != "main"}
 ```
 
 ### process_batch
@@ -180,28 +198,28 @@ process_batch(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| batch_data | List[Dict[str, Any]] | Required | Batch of JSON records |
-| entity_name | str | Required | Name of the entity |
+| batch_data | List[Dict[str, Any]] | Required | Batch of records to process |
+| entity_name | str | Required | Name of the entity (used for table naming) |
 | extract_time | Any | None | Extraction timestamp (current time if None) |
 
 #### Returns
 
-A `ProcessingResult` object containing the main records and child tables.
+A `ProcessingResult` object containing the processed data.
 
 #### Example
 
 ```python
 batch = [
     {"id": 1, "name": "Record 1"},
-    {"id": 2, "name": "Record 2"}
+    {"id": 2, "name": "Record 2"},
+    {"id": 3, "name": "Record 3"}
 ]
-
-result = processor.process_batch(batch, entity_name="customers")
+result = processor.process_batch(batch, entity_name="records")
 ```
 
 ### process_file
 
-Process a JSON or JSONL file.
+Process data from a file.
 
 ```python
 process_file(
@@ -215,23 +233,23 @@ process_file(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| file_path | str | Required | Path to JSON or JSONL file |
-| entity_name | str | Required | Name of the entity |
+| file_path | str | Required | Path to the file to process |
+| entity_name | str | Required | Name of the entity (used for table naming) |
 | extract_time | Any | None | Extraction timestamp (current time if None) |
 
 #### Returns
 
-A `ProcessingResult` object containing the main records and child tables.
+A `ProcessingResult` object containing the processed data.
 
 #### Example
 
 ```python
-result = processor.process_file("data.json", entity_name="products")
+result = processor.process_file("data.json", entity_name="records")
 ```
 
 ### process_csv
 
-Process a CSV file.
+Process data from a CSV file.
 
 ```python
 process_csv(
@@ -254,22 +272,22 @@ process_csv(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| file_path | str | Required | Path to the CSV file |
-| entity_name | str | Required | Name of the entity |
+| file_path | str | Required | Path to the CSV file to process |
+| entity_name | str | Required | Name of the entity (used for table naming) |
 | extract_time | Any | None | Extraction timestamp (current time if None) |
-| delimiter | str | None | Delimiter character (auto-detect or comma if None) |
+| delimiter | str | None | Column delimiter (auto-detected if None) |
 | has_header | bool | True | Whether the file has a header row |
-| null_values | List[str] | None | Values to interpret as NULL |
+| null_values | List[str] | None | Values to treat as null |
 | sanitize_column_names | bool | True | Whether to sanitize column names |
-| infer_types | bool | True | Whether to infer types from values |
+| infer_types | bool | True | Whether to infer column types |
 | skip_rows | int | 0 | Number of rows to skip at the beginning |
-| quote_char | str | None | Quote character (default is double quote) |
+| quote_char | str | None | Character used for quoting (auto-detected if None) |
 | encoding | str | "utf-8" | File encoding |
-| chunk_size | int | None | Size of chunks to process (default: batch_size) |
+| chunk_size | int | None | Number of rows to process at a time (None for all) |
 
 #### Returns
 
-A `ProcessingResult` object containing the main records and child tables.
+A `ProcessingResult` object containing the processed data.
 
 #### Example
 
@@ -285,7 +303,7 @@ result = processor.process_csv(
 
 ### process_chunked
 
-Process data in chunks to optimize memory usage.
+Process data in chunks to minimize memory usage.
 
 ```python
 process_chunked(
@@ -302,16 +320,16 @@ process_chunked(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| data | Dict, List[Dict], str, bytes | Required | JSON data to process |
-| entity_name | str | Required | Name of the entity |
-| extract_time | Any | None | Extraction timestamp |
-| chunk_size | int | None | Size of chunks to process (default: batch_size) |
+| data | Dict, List[Dict], str, bytes | Required | Data to process (file path, iterator, or data) |
+| entity_name | str | Required | Name of the entity (used for table naming) |
+| extract_time | Any | None | Extraction timestamp (current time if None) |
+| chunk_size | int | None | Number of records to process per chunk |
 | input_format | str | "auto" | Input format ("auto", "json", "jsonl", "csv") |
-| **format_options | Any | | Format-specific options |
+| **format_options | dict | {} | Format-specific options |
 
 #### Returns
 
-A `ProcessingResult` object containing the main records and child tables.
+A `ProcessingResult` object containing the processed data.
 
 #### Example
 
@@ -319,26 +337,244 @@ A `ProcessingResult` object containing the main records and child tables.
 # Process a large file in chunks
 result = processor.process_chunked(
     "large_data.jsonl",
-    entity_name="transactions",
+    entity_name="records",
+    chunk_size=1000  # Process 1000 records at a time
+)
+
+# Process an iterator in chunks
+def generate_records():
+    for i in range(10000):
+        yield {"id": i, "name": f"Record {i}"}
+
+result = processor.process_chunked(
+    generate_records(),
+    entity_name="records",
     chunk_size=500
 )
 ```
 
-## Recovery Strategies
+## Streaming Methods
 
-Transmog provides several recovery strategies for handling errors:
+### stream_process
+
+Process data and write directly to the specified output format.
 
 ```python
-from transmog.error import (
-    StrictRecovery,              # Fail on any error
-    SkipAndLogRecovery,          # Log errors and skip problematic records
-    PartialProcessingRecovery    # Try to extract partial data from problematic records
-)
-
-# Use with the processor
-processor = Processor(recovery_strategy=SkipAndLogRecovery())
+stream_process(
+    data: Union[Dict[str, Any], List[Dict[str, Any]], str, bytes],
+    entity_name: str,
+    output_format: str,
+    output_destination: Union[str, BinaryIO, StringIO],
+    extract_time: Optional[Any] = None,
+    **format_options,
+) -> None
 ```
 
-## Memory and Performance Considerations
+#### Parameters
 
-- The `
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| data | Dict, List[Dict], str, bytes | Required | Data to process |
+| entity_name | str | Required | Name of the entity (used for table naming) |
+| output_format | str | Required | Output format ("json", "csv", "parquet") |
+| output_destination | str, file-like | Required | Output destination (path or file-like object) |
+| extract_time | Any | None | Extraction timestamp (current time if None) |
+| **format_options | dict | {} | Format-specific options |
+
+#### Example
+
+```python
+# Stream process to CSV
+processor.stream_process(
+    data,
+    entity_name="records",
+    output_format="csv",
+    output_destination="output_dir"
+)
+
+# Stream process to a memory buffer
+import io
+buffer = io.StringIO()
+processor.stream_process(
+    data,
+    entity_name="records",
+    output_format="json",
+    output_destination=buffer,
+    indent=2
+)
+```
+
+### stream_process_file
+
+Process a file and write directly to the specified output format.
+
+```python
+stream_process_file(
+    file_path: str,
+    entity_name: str,
+    output_format: str,
+    output_destination: Union[str, BinaryIO, StringIO],
+    extract_time: Optional[Any] = None,
+    **format_options,
+) -> None
+```
+
+#### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| file_path | str | Required | Path to the file to process |
+| entity_name | str | Required | Name of the entity (used for table naming) |
+| output_format | str | Required | Output format ("json", "csv", "parquet") |
+| output_destination | str, file-like | Required | Output destination (path or file-like object) |
+| extract_time | Any | None | Extraction timestamp (current time if None) |
+| **format_options | dict | {} | Format-specific options |
+
+#### Example
+
+```python
+# Stream process a file to CSV
+processor.stream_process_file(
+    "data.json",
+    entity_name="records",
+    output_format="csv",
+    output_destination="output_dir"
+)
+```
+
+### stream_process_csv
+
+Process a CSV file and write directly to the specified output format.
+
+```python
+stream_process_csv(
+    file_path: str,
+    entity_name: str,
+    output_format: str,
+    output_destination: Union[str, BinaryIO, StringIO],
+    extract_time: Optional[Any] = None,
+    delimiter: Optional[str] = None,
+    has_header: bool = True,
+    null_values: Optional[List[str]] = None,
+    sanitize_column_names: bool = True,
+    infer_types: bool = True,
+    skip_rows: int = 0,
+    quote_char: Optional[str] = None,
+    encoding: str = "utf-8",
+    **format_options,
+) -> None
+```
+
+#### Parameters
+
+Same as `process_csv` plus:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| output_format | str | Required | Output format ("json", "csv", "parquet") |
+| output_destination | str, file-like | Required | Output destination (path or file-like object) |
+| **format_options | dict | {} | Format-specific options |
+
+#### Example
+
+```python
+# Stream process a CSV file to JSON
+processor.stream_process_csv(
+    "data.csv",
+    entity_name="records",
+    output_format="json",
+    output_destination="output_dir",
+    delimiter=",",
+    has_header=True
+)
+```
+
+## Format Conversion
+
+### process_to_format
+
+Process data and write directly to the specified output format.
+
+```python
+process_to_format(
+    data: Union[Dict[str, Any], List[Dict[str, Any]], str, bytes],
+    entity_name: str,
+    output_format: str,
+    output_path: Optional[str] = None,
+    extract_time: Optional[Any] = None,
+    auto_detect_mode: bool = True,
+    **format_options,
+) -> ProcessingResult
+```
+
+#### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| data | Dict, List[Dict], str, bytes | Required | Data to process |
+| entity_name | str | Required | Name of the entity (used for table naming) |
+| output_format | str | Required | Output format ("json", "csv", "parquet") |
+| output_path | str | None | Output path (None for no file output) |
+| extract_time | Any | None | Extraction timestamp (current time if None) |
+| auto_detect_mode | bool | True | Whether to automatically select processing mode based on data size |
+| **format_options | dict | {} | Format-specific options |
+
+#### Returns
+
+A `ProcessingResult` object containing the processed data.
+
+#### Example
+
+```python
+# Process and write to CSV files
+result = processor.process_to_format(
+    data,
+    entity_name="records",
+    output_format="csv",
+    output_path="output_dir",
+    include_header=True
+)
+```
+
+### process_file_to_format
+
+Process a file and write directly to the specified output format.
+
+```python
+process_file_to_format(
+    file_path: str,
+    entity_name: str,
+    output_format: str,
+    output_path: Optional[str] = None,
+    extract_time: Optional[Any] = None,
+    **format_options,
+) -> ProcessingResult
+```
+
+#### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| file_path | str | Required | Path to the file to process |
+| entity_name | str | Required | Name of the entity (used for table naming) |
+| output_format | str | Required | Output format ("json", "csv", "parquet") |
+| output_path | str | None | Output path (None for no file output) |
+| extract_time | Any | None | Extraction timestamp (current time if None) |
+| **format_options | dict | {} | Format-specific options |
+
+#### Returns
+
+A `ProcessingResult` object containing the processed data.
+
+#### Example
+
+```python
+# Process a file and write to Parquet files
+result = processor.process_file_to_format(
+    "data.json",
+    entity_name="records",
+    output_format="parquet",
+    output_path="output_dir",
+    compression="snappy"
+)
+```

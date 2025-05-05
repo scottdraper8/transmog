@@ -5,7 +5,7 @@ This module defines the interface that all format writers must implement.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union, BinaryIO
 
 
 class DataWriter(ABC):
@@ -59,5 +59,101 @@ class DataWriter(ABC):
 
         Returns:
             Dict mapping table names to output file paths
+        """
+        pass
+
+
+class StreamingWriter(ABC):
+    """
+    Interface for a streaming data writer.
+
+    A streaming writer accepts records in chunks rather than all at once,
+    enabling processing of large datasets with minimal memory usage.
+    """
+
+    @abstractmethod
+    def initialize_main_table(self, **options) -> None:
+        """
+        Initialize the main table for streaming.
+
+        This method should be called before writing any main records.
+
+        Args:
+            **options: Format-specific options
+
+        Returns:
+            None
+        """
+        pass
+
+    @abstractmethod
+    def initialize_child_table(self, table_name: str, **options) -> None:
+        """
+        Initialize a child table for streaming.
+
+        This method should be called before writing any records to a child table.
+
+        Args:
+            table_name: Name of the child table
+            **options: Format-specific options
+
+        Returns:
+            None
+        """
+        pass
+
+    @abstractmethod
+    def write_main_records(self, records: List[Dict[str, Any]], **options) -> None:
+        """
+        Write a batch of main records.
+
+        Args:
+            records: Batch of records to write
+            **options: Format-specific options
+
+        Returns:
+            None
+        """
+        pass
+
+    @abstractmethod
+    def write_child_records(
+        self, table_name: str, records: List[Dict[str, Any]], **options
+    ) -> None:
+        """
+        Write a batch of child records.
+
+        Args:
+            table_name: Name of the child table
+            records: Batch of records to write
+            **options: Format-specific options
+
+        Returns:
+            None
+        """
+        pass
+
+    @abstractmethod
+    def finalize(self, **options) -> None:
+        """
+        Finalize all tables.
+
+        This method should be called after all records have been written.
+
+        Args:
+            **options: Format-specific options
+
+        Returns:
+            None
+        """
+        pass
+
+    @abstractmethod
+    def close(self) -> None:
+        """
+        Close any resources used by the writer.
+
+        Returns:
+            None
         """
         pass

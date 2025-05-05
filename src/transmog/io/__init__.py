@@ -1,106 +1,68 @@
 """
-IO module for Transmog package.
+IO package for Transmog.
 
-This module provides input/output functionality for various file formats.
+This package handles input and output operations for different formats.
 """
 
-from .formats import FormatRegistry, DependencyManager, detect_format
+import logging
+from importlib import import_module
+from typing import Optional, Dict, List, Any, Union, BinaryIO
 
-# Import writer interface and factory
-from .writer_interface import DataWriter
-from .writer_factory import WriterFactory
+# Configure logging
+logger = logging.getLogger(__name__)
 
-# Import reader and writer submodules
-from . import readers
-from . import writers
+# Import core interfaces
+from transmog.io.writer_interface import DataWriter, StreamingWriter
+from transmog.io.writer_factory import (
+    create_writer,
+    register_writer,
+    create_streaming_writer,
+    register_streaming_writer,
+    get_supported_formats,
+    get_supported_streaming_formats,
+    is_format_available,
+    is_streaming_format_available,
+)
+from transmog.io.formats import (
+    FormatRegistry,
+    detect_format,
+    DependencyManager,
+)
 
 
 def initialize_io_features():
     """
-    Initialize all IO features.
+    Initialize IO features by importing writer modules.
 
-    This function ensures all IO modules are properly loaded
-    and their formats are registered.
+    This function attempts to import known writer modules to register
+    their functionality.
     """
-    # Import causes side-effects (format registration)
-    from . import readers
-    from . import writers
+    # List of known formats to try importing
+    known_formats = ["json", "csv", "parquet"]
+
+    for fmt in known_formats:
+        try:
+            import_module(f"transmog.io.writers.{fmt}")
+            logger.debug(f"Loaded {fmt} writer")
+        except ImportError as e:
+            # Log at debug level since this is expected for optional formats
+            logger.debug(f"Could not load {fmt} writer: {e}")
 
 
-# Initialize formats on import
-initialize_io_features()
-
-
-def get_available_reader_formats():
-    """
-    Get a list of all available reader formats.
-
-    Returns:
-        List of format names
-    """
-    return FormatRegistry.get_available_reader_formats()
-
-
-def get_available_writer_formats():
-    """
-    Get a list of all available writer formats.
-
-    Returns:
-        List of format names
-    """
-    return FormatRegistry.get_available_writer_formats()
-
-
-def has_reader_format(format_name):
-    """
-    Check if a reader format is available.
-
-    Args:
-        format_name: Format name to check
-
-    Returns:
-        Whether the format is available
-    """
-    return FormatRegistry.has_reader_format(format_name)
-
-
-def has_writer_format(format_name):
-    """
-    Check if a writer format is available.
-
-    Args:
-        format_name: Format name to check
-
-    Returns:
-        Whether the format is available
-    """
-    return FormatRegistry.has_writer_format(format_name)
-
-
-def create_writer(format_name, **options):
-    """
-    Create a writer for the specified format.
-
-    Args:
-        format_name: Format name
-        **options: Format-specific options
-
-    Returns:
-        Writer instance or None if not available
-    """
-    return WriterFactory.create_writer(format_name, **options)
-
-
+# Define what to export
 __all__ = [
-    "initialize_io_features",
-    "get_available_reader_formats",
-    "get_available_writer_formats",
-    "has_reader_format",
-    "has_writer_format",
-    "create_writer",
-    "detect_format",
     "DataWriter",
-    "WriterFactory",
-    "readers",
-    "writers",
+    "StreamingWriter",
+    "create_writer",
+    "register_writer",
+    "create_streaming_writer",
+    "register_streaming_writer",
+    "get_supported_formats",
+    "get_supported_streaming_formats",
+    "is_format_available",
+    "is_streaming_format_available",
+    "FormatRegistry",
+    "detect_format",
+    "DependencyManager",
+    "initialize_io_features",
 ]

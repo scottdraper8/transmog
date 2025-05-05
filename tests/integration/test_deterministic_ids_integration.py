@@ -107,7 +107,7 @@ class TestDeterministicIdsIntegration:
         # Verify that the main record has the same ID in all runs
         main_id = generate_deterministic_id(data["id"])  # Expected deterministic ID
         for result in results:
-            assert result["main"][0]["__extract_id"] == main_id
+            assert result["main_table"][0]["__extract_id"] == main_id
 
         # Verify that the customers have the same deterministic IDs in all runs
         for result in results:
@@ -209,18 +209,32 @@ class TestDeterministicIdsIntegration:
 
         # Check root record ID consistency (should be identical since id is the same)
         assert (
-            initial_tables["main"][0]["__extract_id"]
-            == additional_tables["main"][0]["__extract_id"]
+            initial_tables["main_table"][0]["__extract_id"]
+            == additional_tables["main_table"][0]["__extract_id"]
         )
 
         # Check customer records - existing ones should maintain IDs
         initial_customers = {
             c["id"]: c["__extract_id"]
-            for c in initial_tables.get("store_customers", [])
+            for c in next(
+                (
+                    tbl
+                    for name, tbl in initial_tables["child_tables"].items()
+                    if "customers" in name
+                ),
+                [],
+            )
         }
         additional_customers = {
             c["id"]: c["__extract_id"]
-            for c in additional_tables.get("store_customers", [])
+            for c in next(
+                (
+                    tbl
+                    for name, tbl in additional_tables["child_tables"].items()
+                    if "customers" in name
+                ),
+                [],
+            )
         }
 
         # CUST001 ID should be the same in both runs
@@ -237,11 +251,25 @@ class TestDeterministicIdsIntegration:
         # Check product records - existing ones should maintain IDs
         initial_products = {
             p["sku"]: p["__extract_id"]
-            for p in initial_tables.get("store_products", [])
+            for p in next(
+                (
+                    tbl
+                    for name, tbl in initial_tables["child_tables"].items()
+                    if "products" in name
+                ),
+                [],
+            )
         }
         additional_products = {
             p["sku"]: p["__extract_id"]
-            for p in additional_tables.get("store_products", [])
+            for p in next(
+                (
+                    tbl
+                    for name, tbl in additional_tables["child_tables"].items()
+                    if "products" in name
+                ),
+                [],
+            )
         }
 
         # PROD003 should only be in additional data
@@ -289,13 +317,13 @@ class TestDeterministicIdsIntegration:
             chunk_results.append(result.to_dict())
 
         # Combine chunk results
-        combined_tables = {"main": []}
+        combined_tables = {"main_table": []}
         for chunk_table in chunk_results:
-            combined_tables["main"].extend(chunk_table["main"])
+            combined_tables["main_table"].extend(chunk_table["main_table"])
 
         # Sort both result sets by id for comparison
-        full_main = sorted(full_tables["main"], key=lambda x: x["id"])
-        combined_main = sorted(combined_tables["main"], key=lambda x: x["id"])
+        full_main = sorted(full_tables["main_table"], key=lambda x: x["id"])
+        combined_main = sorted(combined_tables["main_table"], key=lambda x: x["id"])
 
         # IDs should be consistent across processing methods
         for i in range(len(full_main)):
@@ -353,7 +381,7 @@ class TestDeterministicIdsIntegration:
         tables = result.to_dict()
 
         # Verify that the main record ID follows the expected pattern
-        assert tables["main"][0]["__extract_id"] == f"SIMPLE-{data['id']}"
+        assert tables["main_table"][0]["__extract_id"] == f"SIMPLE-{data['id']}"
 
         # Find the subsections table
         subsections_table = None
@@ -424,7 +452,7 @@ class TestDeterministicIdsIntegration:
             tables = result.to_dict()
 
             # Get the extract ID
-            extract_id = tables["main"][0]["__extract_id"]
+            extract_id = tables["main_table"][0]["__extract_id"]
 
             # Verify the ID follows our expected pattern based on case
             case_type = record.get("case")

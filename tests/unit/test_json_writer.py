@@ -11,6 +11,7 @@ import tempfile
 from unittest import mock
 import pytest
 from transmog.io.writers.json import JsonWriter
+from transmog.error import OutputError
 
 
 class TestJsonWriter:
@@ -94,16 +95,31 @@ class TestJsonWriter:
         # Setup test data
         test_data = [{"id": 1, "name": "Test"}]
 
-        # Mock open to raise an error
-        with mock.patch("builtins.open", side_effect=IOError("Mock IO Error")):
+        # Instead of using mock.patch, monkeypatch the os.makedirs function temporarily
+        # to raise an IOError
+        original_makedirs = os.makedirs
+
+        try:
+            # Replace makedirs with a function that raises IOError
+            def mock_makedirs(*args, **kwargs):
+                raise IOError("Mock IO Error")
+
+            os.makedirs = mock_makedirs
+
             # Create writer
             writer = JsonWriter()
 
-            # Test that exception is raised
-            with pytest.raises(IOError):
+            # Test that exception is properly wrapped in OutputError
+            with pytest.raises(OutputError) as exc_info:
                 writer.write_table(
                     table_data=test_data, output_path="/tmp/error_table.json"
                 )
+
+            # Verify the error message contains our original error
+            assert "Mock IO Error" in str(exc_info.value)
+        finally:
+            # Restore the original function no matter what
+            os.makedirs = original_makedirs
 
     def test_write_with_empty_data(self):
         """Test writing empty data."""
