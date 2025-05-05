@@ -19,47 +19,26 @@ from typing import (
 )
 import os
 import logging
-import importlib
 import io
 import json
 from enum import Enum
 
+from transmog.types.base import JsonDict
+from transmog.types.result_types import ResultInterface, ConversionModeType
+from transmog.types.io_types import WriterProtocol
 from transmog.error import OutputError
+from transmog.io.writer_factory import (
+    create_writer,
+    is_format_available,
+)
 
 logger = logging.getLogger(__name__)
-
-# Define a global variable to track if writers have been initialized
-_WRITERS_REGISTRY = None
-_WRITERS_AVAILABLE = False
 
 # Cache for conversions to avoid redundant work
 _conversion_cache = {}
 
 
-def _get_writer_registry():
-    """
-    Lazy import the writer registry to avoid circular imports.
-
-    Returns:
-        The WriterRegistry class or None if it's not available
-    """
-    global _WRITERS_REGISTRY, _WRITERS_AVAILABLE
-
-    # Only attempt to import once
-    if _WRITERS_REGISTRY is None and not _WRITERS_AVAILABLE:
-        try:
-            # Use importlib for lazy loading to avoid circular imports
-            io_module = importlib.import_module("transmog.io.writer_registry")
-            _WRITERS_REGISTRY = io_module.WriterRegistry
-            _WRITERS_AVAILABLE = True
-        except (ImportError, AttributeError):
-            _WRITERS_AVAILABLE = False
-            logger.debug("Writer registry not available for import")
-
-    return _WRITERS_REGISTRY
-
-
-def _check_pyarrow_available():
+def _check_pyarrow_available() -> bool:
     """
     Check if PyArrow is available for use.
 
@@ -74,7 +53,7 @@ def _check_pyarrow_available():
         return False
 
 
-def _check_orjson_available():
+def _check_orjson_available() -> bool:
     """
     Check if orjson is available for use.
 
@@ -116,7 +95,7 @@ class ConversionMode(Enum):
     MEMORY_EFFICIENT = "memory_efficient"  # Discard intermediate data after conversion
 
 
-class ProcessingResult:
+class ProcessingResult(ResultInterface):
     """
     Container for processing results including main and child tables.
 
@@ -127,11 +106,13 @@ class ProcessingResult:
 
     def __init__(
         self,
-        main_table: List[Dict[str, Any]],
-        child_tables: Dict[str, List[Dict[str, Any]]],
+        main_table: List[JsonDict],
+        child_tables: Dict[str, List[JsonDict]],
         entity_name: str,
         source_info: Optional[Dict[str, Any]] = None,
-        conversion_mode: ConversionMode = ConversionMode.EAGER,
+        conversion_mode: Union[
+            ConversionMode, ConversionModeType
+        ] = ConversionMode.EAGER,
     ):
         """
         Initialize with main and child tables.
@@ -147,7 +128,20 @@ class ProcessingResult:
         self.child_tables = child_tables
         self.entity_name = entity_name
         self.source_info = source_info or {}
-        self.conversion_mode = conversion_mode
+
+        # Convert string conversion mode to enum if needed
+        if isinstance(conversion_mode, str):
+            if conversion_mode == "eager":
+                self.conversion_mode = ConversionMode.EAGER
+            elif conversion_mode == "lazy":
+                self.conversion_mode = ConversionMode.LAZY
+            elif conversion_mode == "memory_efficient":
+                self.conversion_mode = ConversionMode.MEMORY_EFFICIENT
+            else:
+                self.conversion_mode = ConversionMode.EAGER
+        else:
+            self.conversion_mode = conversion_mode
+
         self._converted_formats = {}
         self._conversion_functions = {}
 
@@ -155,11 +149,11 @@ class ProcessingResult:
         global _conversion_cache
         _conversion_cache = {}
 
-    def get_main_table(self) -> List[Dict[str, Any]]:
+    def get_main_table(self) -> List[JsonDict]:
         """Get the main table data."""
         return self.main_table
 
-    def get_child_table(self, table_name: str) -> List[Dict[str, Any]]:
+    def get_child_table(self, table_name: str) -> List[JsonDict]:
         """Get a child table by name."""
         return self.child_tables.get(table_name, [])
 
@@ -421,16 +415,15 @@ class ProcessingResult:
         if cache_key in _conversion_cache:
             return _conversion_cache[cache_key]
 
-        # Try to get the writer registry
-        writer_registry = _get_writer_registry()
-        if writer_registry and writer_registry.is_format_available("csv"):
-            # Use the writer interface to get bytes
-            writer = writer_registry.get_writer("csv")
+        # Check if we can create a CSV writer
+        if is_format_available("csv"):
+            # Use the writer to get bytes
+            writer = create_writer("csv")
             result = {}
 
             # Process main table
             buffer = io.BytesIO()
-            writer.write_table(
+            writer.write(
                 self.main_table, buffer, include_header=include_header, **kwargs
             )
             result["main"] = buffer.getvalue()
@@ -438,7 +431,7 @@ class ProcessingResult:
             # Process child tables
             for table_name, table_data in self.child_tables.items():
                 buffer = io.BytesIO()
-                writer.write_table(
+                writer.write(
                     table_data, buffer, include_header=include_header, **kwargs
                 )
                 result[table_name] = buffer.getvalue()
@@ -447,7 +440,7 @@ class ProcessingResult:
             _conversion_cache[cache_key] = result
             return result
 
-        # If writer registry not available, fall back to direct implementation
+        # If writer not available, fall back to direct implementation
         # Based on availability of PyArrow
         if _check_pyarrow_available():
             return self._to_csv_bytes_pyarrow(include_header, **kwargs)
@@ -728,37 +721,53 @@ class ProcessingResult:
             ImportError: If the required writer dependencies are not available
             ValueError: If the format is not supported
         """
-        # Get the writer registry using lazy import
-        writer_registry = _get_writer_registry()
-
-        if writer_registry is None:
-            raise ImportError(
-                "Writer registry not available. Make sure transmog[io] is installed."
-            )
-
         # Check if the format is available
-        if not writer_registry.is_format_available(format_name):
-            available = writer_registry.list_available_formats()
-            if not available:
-                available_msg = "(none - install optional dependencies)"
-            else:
-                available_msg = ", ".join(available)
+        if not is_format_available(format_name):
+            # Try to import format writers to make them available
+            from transmog.io import initialize_io_features
 
-            raise ValueError(
-                f"Format '{format_name}' is not available. "
-                f"You may need to install additional dependencies. "
-                f"Available formats: {available_msg}"
-            )
+            initialize_io_features()
+
+            # Check again after initialization
+            if not is_format_available(format_name):
+                from transmog.io import get_supported_formats
+
+                available = get_supported_formats()
+
+                if not available:
+                    available_msg = "(none - install optional dependencies)"
+                else:
+                    available_msg = ", ".join(available)
+
+                raise ValueError(
+                    f"Format '{format_name}' is not available. "
+                    f"You may need to install additional dependencies. "
+                    f"Available formats: {available_msg}"
+                )
 
         # Create the writer and use it
-        writer = writer_registry.create_writer(format_name)
-        return writer.write_all_tables(
-            main_table=self.main_table,
-            child_tables=self.child_tables,
-            base_path=base_path,
-            entity_name=self.entity_name,
-            **format_options,
-        )
+        writer = create_writer(format_name)
+
+        # Create the output directory
+        os.makedirs(base_path, exist_ok=True)
+
+        result = {}
+
+        # Write main table
+        main_path = os.path.join(base_path, f"{self.entity_name}.{format_name}")
+        with open(main_path, "wb") as f:
+            writer.write(self.main_table, f, **format_options)
+        result["main"] = main_path
+
+        # Write child tables
+        for table_name, table_data in self.child_tables.items():
+            formatted_name = self.get_formatted_table_name(table_name)
+            file_path = os.path.join(base_path, f"{formatted_name}.{format_name}")
+            with open(file_path, "wb") as f:
+                writer.write(table_data, f, **format_options)
+            result[table_name] = file_path
+
+        return result
 
     def write_all_parquet(
         self, base_path: str, compression: str = "snappy", **kwargs
@@ -899,20 +908,34 @@ class ProcessingResult:
         Returns:
             Dictionary of table names to file paths
         """
-        # Try to use the writer registry
-        writer_registry = _get_writer_registry()
-        if writer_registry and writer_registry.is_format_available("csv"):
-            writer = writer_registry.get_writer("csv")
-            return writer.write_all_tables(
-                self.main_table,
-                self.child_tables,
-                base_path,
-                self.entity_name,
-                include_header=include_header,
-                **kwargs,
-            )
+        # Try to create a CSV writer
+        if is_format_available("csv"):
+            writer = create_writer("csv")
 
-        # Fall back to direct implementation if registry not available
+            # Create the output directory
+            os.makedirs(base_path, exist_ok=True)
+
+            result = {}
+
+            # Write main table
+            main_path = os.path.join(base_path, f"{self.entity_name}.csv")
+            with open(main_path, "wb") as f:
+                writer.write(
+                    self.main_table, f, include_header=include_header, **kwargs
+                )
+            result["main"] = main_path
+
+            # Write child tables
+            for table_name, table_data in self.child_tables.items():
+                formatted_name = self.get_formatted_table_name(table_name)
+                file_path = os.path.join(base_path, f"{formatted_name}.csv")
+                with open(file_path, "wb") as f:
+                    writer.write(table_data, f, include_header=include_header, **kwargs)
+                result[table_name] = file_path
+
+            return result
+
+        # Fall back to direct implementation if writer not available
         # First get CSV bytes
         csv_data = self.to_csv_bytes(include_header=include_header, **kwargs)
 
@@ -1150,3 +1173,10 @@ class ProcessingResult:
         # Clean up intermediate representations if in memory-efficient mode
         if self.conversion_mode == ConversionMode.MEMORY_EFFICIENT:
             self._clear_intermediate_data()
+
+    def count_records(self) -> Dict[str, int]:
+        """Count records in all tables."""
+        counts = {"main": len(self.main_table)}
+        for table_name, table_data in self.child_tables.items():
+            counts[table_name] = len(table_data)
+        return counts

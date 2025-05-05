@@ -18,9 +18,12 @@ from typing import (
     BinaryIO,
     Set,
     Generator,
-    TYPE_CHECKING,
     TypeVar,
 )
+
+from transmog.types.base import JsonDict
+from transmog.types.io_types import StreamingWriterProtocol
+from transmog.io.writer_factory import create_streaming_writer
 
 from ..error import (
     ProcessingError,
@@ -43,13 +46,6 @@ from .data_iterators import (
     get_jsonl_file_iterator,
     get_csv_file_iterator,
 )
-
-# Type definitions
-if TYPE_CHECKING:
-    from ..io.writer_interface import StreamingWriter
-
-# For better type hints without circular imports
-StreamingWriterType = TypeVar("StreamingWriterType")
 
 
 def _get_streaming_params(
@@ -80,9 +76,9 @@ def _get_streaming_params(
 
 def _stream_process_batch(
     processor,
-    batch_data: List[Dict[str, Any]],
+    batch_data: List[JsonDict],
     entity_name: str,
-    writer: "StreamingWriterType",
+    writer: StreamingWriterProtocol,
     child_tables_registry: Dict[str, bool],
     extract_time: Optional[Any] = None,
     use_deterministic_ids: bool = False,
@@ -123,9 +119,9 @@ def _stream_process_batch(
 
 def _stream_process_in_batches(
     processor,
-    data_iterator: Iterator[Dict[str, Any]],
+    data_iterator: Iterator[JsonDict],
     entity_name: str,
-    writer: "StreamingWriterType",
+    writer: StreamingWriterProtocol,
     extract_time: Optional[Any] = None,
     batch_size: int = 1000,
     use_deterministic_ids: bool = False,
@@ -181,7 +177,7 @@ def _create_streaming_writer(
     output_destination: Optional[Union[str, BinaryIO]],
     entity_name: str,
     **format_options,
-) -> "StreamingWriterType":
+) -> StreamingWriterProtocol:
     """
     Create a streaming writer for the specified output format.
 
@@ -195,9 +191,6 @@ def _create_streaming_writer(
     Returns:
         StreamingWriter: A writer instance for the specified format
     """
-    # Import here to avoid circular imports
-    from ..io.writer_factory import create_streaming_writer
-
     return create_streaming_writer(
         format_name=output_format,
         destination=output_destination,

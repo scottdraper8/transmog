@@ -7,9 +7,9 @@ for different output formats.
 
 import os
 import importlib
-from typing import Any, Dict, Optional, Type, Union, BinaryIO, List, Callable
+from typing import Any, Dict, Optional, Type, Union, BinaryIO, List, Callable, Set
 
-from transmog.io.writer_interface import DataWriter, StreamingWriter
+from transmog.types.io_types import WriterProtocol, StreamingWriterProtocol
 from transmog.error import (
     ConfigurationError,
     MissingDependencyError,
@@ -18,11 +18,11 @@ from transmog.error import (
 from .formats import FormatRegistry
 
 # Registry of writer classes
-_WRITER_REGISTRY = {}
-_STREAMING_WRITER_REGISTRY = {}
+_WRITER_REGISTRY: Dict[str, Type[WriterProtocol]] = {}
+_STREAMING_WRITER_REGISTRY: Dict[str, Type[StreamingWriterProtocol]] = {}
 
 
-def register_writer(format_name: str, writer_class: Type[DataWriter]) -> None:
+def register_writer(format_name: str, writer_class: Type[WriterProtocol]) -> None:
     """
     Register a writer class for a format.
 
@@ -37,7 +37,7 @@ def register_writer(format_name: str, writer_class: Type[DataWriter]) -> None:
 
 
 def register_streaming_writer(
-    format_name: str, writer_class: Type[StreamingWriter]
+    format_name: str, writer_class: Type[StreamingWriterProtocol]
 ) -> None:
     """
     Register a streaming writer class for a format.
@@ -50,7 +50,7 @@ def register_streaming_writer(
     logger.debug(f"Registered streaming writer for {format_name}")
 
 
-def create_writer(format_name: str, **kwargs) -> DataWriter:
+def create_writer(format_name: str, **kwargs) -> WriterProtocol:
     """
     Create a writer for the given format.
 
@@ -59,7 +59,7 @@ def create_writer(format_name: str, **kwargs) -> DataWriter:
         **kwargs: Format-specific options
 
     Returns:
-        DataWriter: Writer instance
+        WriterProtocol: Writer instance
 
     Raises:
         ConfigurationError: If the format is not supported
@@ -99,7 +99,7 @@ def create_streaming_writer(
     destination: Optional[Union[str, BinaryIO]] = None,
     entity_name: str = "entity",
     **kwargs,
-) -> StreamingWriter:
+) -> StreamingWriterProtocol:
     """
     Create a streaming writer for the given format.
 
@@ -110,7 +110,7 @@ def create_streaming_writer(
         **kwargs: Format-specific options
 
     Returns:
-        StreamingWriter: Streaming writer instance
+        StreamingWriterProtocol: Streaming writer instance
 
     Raises:
         ConfigurationError: If the format is not supported
@@ -159,7 +159,7 @@ def get_supported_formats() -> Dict[str, str]:
     Returns:
         Dict[str, str]: Dictionary of format names and descriptions
     """
-    return {fmt: cls.__doc__ or "" for fmt, cls in _WRITER_REGISTRY.items()}
+    return {fmt: str(cls.__doc__ or "") for fmt, cls in _WRITER_REGISTRY.items()}
 
 
 def get_supported_streaming_formats() -> List[str]:

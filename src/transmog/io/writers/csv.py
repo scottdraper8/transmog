@@ -19,6 +19,7 @@ from transmog.naming.conventions import sanitize_column_names
 from transmog.config.settings import settings
 from transmog.error import OutputError, MissingDependencyError
 from transmog.io.writer_factory import register_writer, register_streaming_writer
+from transmog.types.base import JsonDict
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -35,9 +36,9 @@ except ImportError:
 
 class CsvWriter(DataWriter):
     """
-    Writer for CSV output.
+    CSV format writer.
 
-    Supports writing flattened tables to CSV format.
+    This writer handles writing flattened data to CSV format files.
     """
 
     @classmethod
@@ -51,120 +52,197 @@ class CsvWriter(DataWriter):
         # CSV is available in the standard library
         return True
 
-    def __init__(
-        self,
-        include_header: bool = True,
-        delimiter: str = ",",
-        quotechar: str = '"',
-        use_pyarrow: bool = True,
-        **options,
-    ):
+    def __init__(self, **options):
         """
         Initialize the CSV writer.
 
         Args:
-            include_header: Whether to include a header row
-            delimiter: CSV field delimiter
-            quotechar: CSV quote character
-            use_pyarrow: Whether to use PyArrow for CSV writing (if available)
-            **options: Additional CSV writer options
+            **options: CSV formatting options
         """
-        self.include_header = include_header
-        self.delimiter = delimiter
-        self.quotechar = quotechar
-        self.use_pyarrow = use_pyarrow and PYARROW_AVAILABLE
         self.options = options
 
-    def write_table(
-        self, table_data: List[Dict[str, Any]], output_path: str, **options
-    ) -> str:
+    def write(self, data: Any, destination: Union[str, BinaryIO], **options) -> Any:
         """
-        Write table data to a CSV file.
+        Write data to the specified destination.
 
         Args:
-            table_data: List of records to write
-            output_path: Path to write the CSV file
-            **options: Additional options to override instance options
+            data: Data to write
+            destination: Path or file-like object to write to
+            **options: Format-specific options
 
         Returns:
-            Path to the written file
+            Path to the written file or file-like object
+
+        Raises:
+            OutputError: If writing fails
         """
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+        # Combine constructor options with per-call options
+        combined_options = {**self.options, **options}
 
-        # Generate CSV content
-        merged_options = {**self.options, **options}
-        include_header = merged_options.get("include_header", self.include_header)
-        delimiter = merged_options.get("delimiter", self.delimiter)
-        quotechar = merged_options.get("quotechar", self.quotechar)
-        use_pyarrow = merged_options.get("use_pyarrow", self.use_pyarrow)
+        # Delegate to write_table for implementation
+        if isinstance(destination, str):
+            return self.write_table(data, destination, **combined_options)
+        else:
+            return self.write_table(data, destination, **combined_options)
 
-        # Try PyArrow first if enabled and available
+    def write_table(
+        self,
+        table_data: List[JsonDict],
+        output_path: Union[str, BinaryIO, TextIO],
+        include_header: bool = True,
+        delimiter: str = ",",
+        quotechar: str = '"',
+        quoting: int = csv.QUOTE_MINIMAL,
+        **options,
+    ) -> Union[str, BinaryIO, TextIO]:
+        """
+        Write a table to a CSV file.
+
+        Args:
+            table_data: The table data to write
+            output_path: Path or file-like object to write to
+            include_header: Whether to include column headers
+            delimiter: Column delimiter character
+            quotechar: Character to use for quoting
+            quoting: Quoting mode (from csv module)
+            **options: Additional options
+
+        Returns:
+            Path to the written file or file-like object
+
+        Raises:
+            OutputError: If writing fails
+        """
         try:
-            if use_pyarrow and PYARROW_AVAILABLE and table_data:
-                self._write_table_with_pyarrow(
-                    table_data,
-                    output_path,
-                    include_header=include_header,
-                    delimiter=delimiter,
-                )
-            else:
-                self._write_table_with_stdlib(
-                    table_data,
-                    output_path,
-                    include_header=include_header,
-                    delimiter=delimiter,
-                    quotechar=quotechar,
-                )
-        except Exception as e:
-            logger.error(f"Error writing CSV to {output_path}: {str(e)}")
-            raise OutputError(f"Failed to write CSV: {str(e)}")
+            # Handle empty data case
+            if not table_data:
+                if isinstance(output_path, str):
+                    # Create directory and empty file
+                    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+                    with open(output_path, "w") as f:
+                        pass
+                    return output_path
+                else:
+                    # For file-like objects, just return without writing
+                    return output_path
 
-        return output_path
+            # Extract field names from the first record
+            field_names = list(table_data[0].keys())
+
+            # Determine whether we're writing to a file or file-like object
+            if isinstance(output_path, str):
+                # Ensure directory exists
+                os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+
+                # Write to file
+                with open(output_path, "w", newline="") as f:
+                    writer = csv.DictWriter(
+                        f,
+                        fieldnames=field_names,
+                        delimiter=delimiter,
+                        quotechar=quotechar,
+                        quoting=quoting,
+                    )
+
+                    if include_header:
+                        writer.writeheader()
+
+                    writer.writerows(table_data)
+
+                return output_path
+            else:
+                # For file-like objects, we need to determine if it's a binary stream
+                # This handles BytesIO, BufferedWriter, etc.
+                is_binary = isinstance(output_path, io.BufferedIOBase) or isinstance(
+                    output_path, io.BytesIO
+                )
+
+                # Additional check for file objects with mode attribute
+                if not is_binary and hasattr(output_path, "mode"):
+                    is_binary = "b" in output_path.mode
+
+                if is_binary:
+                    # For binary streams, generate CSV in memory and write as bytes
+                    csv_buffer = io.StringIO(newline="")
+                    writer = csv.DictWriter(
+                        csv_buffer,
+                        fieldnames=field_names,
+                        delimiter=delimiter,
+                        quotechar=quotechar,
+                        quoting=quoting,
+                    )
+
+                    if include_header:
+                        writer.writeheader()
+
+                    writer.writerows(table_data)
+
+                    # Convert to bytes and write to the binary stream
+                    output_path.write(csv_buffer.getvalue().encode("utf-8"))
+                else:
+                    # Text stream
+                    writer = csv.DictWriter(
+                        output_path,
+                        fieldnames=field_names,
+                        delimiter=delimiter,
+                        quotechar=quotechar,
+                        quoting=quoting,
+                    )
+
+                    if include_header:
+                        writer.writeheader()
+
+                    writer.writerows(table_data)
+
+                return output_path
+
+        except Exception as e:
+            logger.error(f"Error writing CSV: {e}")
+            raise OutputError(f"Failed to write CSV file: {e}")
 
     def write_all_tables(
         self,
-        main_table: List[Dict[str, Any]],
-        child_tables: Dict[str, List[Dict[str, Any]]],
+        main_table: List[JsonDict],
+        child_tables: Dict[str, List[JsonDict]],
         base_path: str,
         entity_name: str,
         **options,
     ) -> Dict[str, str]:
-        """Write main and child tables to the output format.
+        """
+        Write main and child tables to CSV files.
 
         Args:
-            main_table: Main table data
-            child_tables: Dict of child table name to table data
-            base_path: Base directory for output
-            entity_name: Name of the main entity
-            **options: Format-specific options
+            main_table: The main table data
+            child_tables: Dictionary of child tables
+            base_path: Directory to write files to
+            entity_name: Name of the entity (for main table filename)
+            **options: Additional CSV formatting options
 
         Returns:
-            Dict mapping table names to output file paths
+            Dictionary mapping table names to file paths
+
+        Raises:
+            OutputError: If writing fails
         """
+        results = {}
+
         # Ensure base directory exists
         os.makedirs(base_path, exist_ok=True)
 
-        result = {}
-
         # Write main table
-        main_file_path = os.path.join(base_path, f"{entity_name}.csv")
-        result["main"] = self.write_table(
-            table_data=main_table, output_path=main_file_path, **options
-        )
+        main_path = os.path.join(base_path, f"{entity_name}.csv")
+        self.write_table(main_table, main_path, **options)
+        results["main"] = main_path
 
         # Write child tables
         for table_name, table_data in child_tables.items():
-            # Skip empty tables
-            if not table_data:
-                continue
+            # Replace dots and slashes with underscores for file names
+            safe_name = table_name.replace(".", "_").replace("/", "_")
+            file_path = os.path.join(base_path, f"{safe_name}.csv")
+            self.write_table(table_data, file_path, **options)
+            results[table_name] = file_path
 
-            child_file_path = os.path.join(base_path, f"{table_name}.csv")
-            result[table_name] = self.write_table(
-                table_data=table_data, output_path=child_file_path, **options
-            )
-
-        return result
+        return results
 
     def _write_table_with_pyarrow(
         self,

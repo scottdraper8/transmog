@@ -8,7 +8,7 @@ import os
 import sys
 import json
 import pytest
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, Union, BinaryIO
 
 # Add the package root to sys.path for importing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -16,6 +16,32 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from transmog import Processor
 from transmog.config import TransmogConfig
 from transmog.core.flattener import _clear_process_cache
+
+
+# Add helper mixin for writer classes
+class WriterMixin:
+    """Mixin to help writer classes implement the new protocol interface."""
+
+    def write(self, data: Any, destination: Union[str, BinaryIO], **options) -> Any:
+        """
+        Implement the WriterProtocol's write method.
+
+        Args:
+            data: Data to write
+            destination: File path or file-like object
+            **options: Format-specific options
+
+        Returns:
+            Path to the written file or other format-specific result
+        """
+        if isinstance(destination, str):
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(destination) or ".", exist_ok=True)
+            # Call write_table with the destination path
+            return self.write_table(data, destination, **options)
+        else:
+            # Call write_table with the file object
+            return self.write_table(data, destination, **options)
 
 
 @pytest.fixture(autouse=True)
@@ -181,3 +207,13 @@ def jsonl_file(tmpdir, batch_data) -> str:
         for record in batch_data:
             f.write(json.dumps(record) + "\n")
     return jsonl_path
+
+
+# Configure pytest
+def pytest_configure(config):
+    """Configure pytest."""
+    # Register test marks
+    config.addinivalue_line("markers", "memory: mark test as a memory test")
+    config.addinivalue_line(
+        "markers", "benchmark: mark test as a performance benchmark"
+    )

@@ -11,8 +11,13 @@ from typing import Optional, Dict, List, Any, Union, BinaryIO
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Import core interfaces
+# Import interfaces from types package
+from transmog.types.io_types import WriterProtocol, StreamingWriterProtocol
+
+# Import writer interface implementation
 from transmog.io.writer_interface import DataWriter, StreamingWriter
+
+# Import factory functions
 from transmog.io.writer_factory import (
     create_writer,
     register_writer,
@@ -23,6 +28,8 @@ from transmog.io.writer_factory import (
     is_format_available,
     is_streaming_format_available,
 )
+
+# Import format utilities
 from transmog.io.formats import (
     FormatRegistry,
     detect_format,
@@ -51,8 +58,10 @@ def initialize_io_features():
 
 # Define what to export
 __all__ = [
+    # Interface implementations
     "DataWriter",
     "StreamingWriter",
+    # Factory functions
     "create_writer",
     "register_writer",
     "create_streaming_writer",
@@ -61,6 +70,7 @@ __all__ = [
     "get_supported_streaming_formats",
     "is_format_available",
     "is_streaming_format_available",
+    # Format utilities
     "FormatRegistry",
     "detect_format",
     "DependencyManager",

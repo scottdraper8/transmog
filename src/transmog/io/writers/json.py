@@ -15,6 +15,7 @@ from transmog.io.writer_interface import DataWriter, StreamingWriter
 from transmog.config.settings import settings
 from transmog.error import OutputError, MissingDependencyError
 from transmog.io.writer_factory import register_writer, register_streaming_writer
+from transmog.types.base import JsonDict
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -30,144 +31,163 @@ except ImportError:
 
 class JsonWriter(DataWriter):
     """
-    Writer for JSON output.
+    JSON format writer.
 
-    Supports writing flattened tables to JSON format.
+    This writer handles writing data to JSON format files.
     """
 
-    @classmethod
-    def format_name(cls) -> str:
-        """Return the name of the format this writer handles."""
-        return "json"
+    def __init__(self, indent: Optional[int] = 2, use_orjson: bool = True, **options):
+        """
+        Initialize the JSON writer.
 
-    @classmethod
-    def is_available(cls) -> bool:
-        """Check if this writer's dependencies are available."""
-        # JSON is available through standard library
-        return True
+        Args:
+            indent: Indentation level for pretty-printing (None for no indentation)
+            use_orjson: Whether to use orjson for better performance (if available)
+            **options: Additional JSON writer options
+        """
+        self.indent = indent
+        self.use_orjson = use_orjson and ORJSON_AVAILABLE
+        self.options = options
 
-    @classmethod
-    def get_performance_tier(cls) -> str:
-        """Get the performance tier of the writer."""
-        try:
-            import orjson
+    def write(self, data: Any, destination: Union[str, BinaryIO], **options) -> Any:
+        """
+        Write data to the specified destination.
 
-            return "high"
-        except ImportError:
-            return "standard"
+        Args:
+            data: Data to write
+            destination: Path or file-like object to write to
+            **options: Format-specific options
+
+        Returns:
+            Path to the written file or file-like object
+
+        Raises:
+            OutputError: If writing fails
+        """
+        # Combine constructor options with per-call options
+        combined_options = {**self.options, **options}
+
+        # Delegate to write_table for implementation
+        if isinstance(destination, str):
+            return self.write_table(data, destination, **combined_options)
+        else:
+            return self.write_table(data, destination, **combined_options)
 
     def write_table(
         self,
-        table_data: List[Dict[str, Any]],
-        output_path: str,
-        indent: Optional[int] = 2,
-        **kwargs,
-    ) -> str:
+        table_data: List[JsonDict],
+        output_path: Union[str, BinaryIO, TextIO],
+        indent: Optional[int] = None,
+        **options,
+    ) -> Union[str, BinaryIO, TextIO]:
         """
-        Write a single table to JSON format.
+        Write table data to a JSON file.
 
         Args:
-            table_data: List of records to write
-            output_path: Path to write the output file
-            indent: Number of spaces to indent (None for no indentation)
-            **kwargs: Additional options
+            table_data: The table data to write
+            output_path: Path or file-like object to write to
+            indent: Indentation level (None for no indentation)
+            **options: Additional options
 
         Returns:
-            Path to the written file
+            Path to the written file or file-like object
+
+        Raises:
+            OutputError: If writing fails
         """
         try:
-            # Create directory if it doesn't exist
-            os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+            # Use options or fall back to instance defaults
+            indent_val = indent if indent is not None else self.indent
+            use_orjson = options.get("use_orjson", self.use_orjson)
 
-            # Try using orjson if available
-            if ORJSON_AVAILABLE:
-                try:
-                    serialized = self._write_with_orjson(table_data, indent)
-                    with open(output_path, "wb") as f:
-                        f.write(serialized)
+            # Convert data to JSON bytes
+            if use_orjson and ORJSON_AVAILABLE:
+                json_bytes = orjson.dumps(
+                    table_data, option=orjson.OPT_INDENT_2 if indent_val else 0
+                )
+            else:
+                json_string = json.dumps(table_data, indent=indent_val)
+                json_bytes = json_string.encode("utf-8")
+
+            # Determine whether we're writing to a file or file-like object
+            if isinstance(output_path, str):
+                # Ensure directory exists
+                os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+
+                # Write to file
+                with open(output_path, "wb") as f:
+                    f.write(json_bytes)
+
+                return output_path
+            else:
+                # Write to file-like object
+                if hasattr(output_path, "write"):
+                    # Check if it's a text or binary stream
+                    if hasattr(output_path, "mode") and "b" not in output_path.mode:
+                        output_path.write(json_bytes.decode("utf-8"))
+                    else:
+                        output_path.write(json_bytes)
                     return output_path
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to write JSON with orjson: {e}. Falling back to stdlib."
-                    )
-                    # Fall back to standard library
+                else:
+                    raise OutputError(f"Invalid destination type: {type(output_path)}")
 
-            # Use standard library json
-            with open(output_path, "w", encoding="utf-8") as f:
-                json.dump(table_data, f, indent=indent, ensure_ascii=False)
-
-            return output_path
         except Exception as e:
             logger.error(f"Error writing JSON: {e}")
-            raise OutputError(f"Failed to write JSON: {e}")
-
-    def _write_with_orjson(
-        self, table_data: List[Dict[str, Any]], indent: Optional[int]
-    ) -> bytes:
-        """
-        Write table data using orjson.
-
-        Args:
-            table_data: List of records to write
-            indent: Number of spaces to indent (None for no indentation)
-
-        Returns:
-            Serialized JSON as bytes
-        """
-        if not ORJSON_AVAILABLE:
-            raise MissingDependencyError("orjson is required for this operation")
-
-        try:
-            options = 0
-            if indent is not None:
-                options |= orjson.OPT_INDENT_2
-
-            return orjson.dumps(table_data, option=options)
-        except Exception as e:
-            logger.error(f"Error writing JSON with orjson: {e}")
-            raise OutputError(f"Failed to write JSON with orjson: {e}")
+            raise OutputError(f"Failed to write JSON file: {e}")
 
     def write_all_tables(
         self,
-        main_table: List[Dict[str, Any]],
-        child_tables: Dict[str, List[Dict[str, Any]]],
+        main_table: List[JsonDict],
+        child_tables: Dict[str, List[JsonDict]],
         base_path: str,
-        entity_name: str = "entity",
-        indent: Optional[int] = 2,
-        **kwargs,
+        entity_name: str,
+        **options,
     ) -> Dict[str, str]:
         """
-        Write main and child tables to JSON format.
+        Write main and child tables to JSON files.
 
         Args:
-            main_table: Main table data
-            child_tables: Dict of child table name to table data
-            base_path: Base directory for output
-            entity_name: Name of the main entity
-            indent: Number of spaces to indent (None for no indentation)
-            **kwargs: Additional options
+            main_table: The main table data
+            child_tables: Dictionary of child tables
+            base_path: Directory to write files to
+            entity_name: Name of the entity (for main table filename)
+            **options: Additional JSON formatting options
 
         Returns:
-            Dict mapping table names to output file paths
-        """
-        result_paths = {}
+            Dictionary mapping table names to file paths
 
-        # Ensure the base directory exists
+        Raises:
+            OutputError: If writing fails
+        """
+        results = {}
+
+        # Ensure base directory exists
         os.makedirs(base_path, exist_ok=True)
 
         # Write main table
         main_path = os.path.join(base_path, f"{entity_name}.json")
-        self.write_table(main_table, main_path, indent=indent, **kwargs)
-        result_paths["main"] = main_path
+        self.write_table(main_table, main_path, **options)
+        results["main"] = main_path
 
         # Write child tables
         for table_name, table_data in child_tables.items():
-            safe_name = table_name.replace("/", "_").replace("\\", "_")
-            table_path = os.path.join(base_path, f"{safe_name}.json")
-            self.write_table(table_data, table_path, indent=indent, **kwargs)
-            result_paths[table_name] = table_path
+            # Replace dots and slashes with underscores for file names
+            safe_name = table_name.replace(".", "_").replace("/", "_")
+            file_path = os.path.join(base_path, f"{safe_name}.json")
+            self.write_table(table_data, file_path, **options)
+            results[table_name] = file_path
 
-        return result_paths
+        return results
+
+    @classmethod
+    def is_available(cls) -> bool:
+        """
+        Check if this writer is available.
+
+        Returns:
+            bool: Always True for JSON writer as it uses standard library
+        """
+        return True
 
 
 class JsonStreamingWriter(StreamingWriter):
