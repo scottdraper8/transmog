@@ -360,8 +360,11 @@ class JsonStreamingWriter(StreamingWriter):
 
         file_obj = self._get_file_for_table(table_name)
 
-        # Determine if we're working with a binary or text stream
-        is_binary = hasattr(file_obj, "mode") and "b" in file_obj.mode
+        # Determine if we're working with a binary stream
+        # Check both the mode and the object type since BytesIO doesn't have a mode attribute
+        is_binary = (hasattr(file_obj, "mode") and "b" in file_obj.mode) or isinstance(
+            file_obj, io.BytesIO
+        )
 
         if self.use_orjson:
             # orjson doesn't support streaming, so we need to handle it manually
@@ -371,7 +374,10 @@ class JsonStreamingWriter(StreamingWriter):
                 file_obj.write("[")
         else:
             # Standard json
-            file_obj.write("[")
+            if is_binary:
+                file_obj.write(b"[")
+            else:
+                file_obj.write("[")
 
         file_obj.flush()
         self.initialized_tables.add(table_name)
@@ -430,8 +436,11 @@ class JsonStreamingWriter(StreamingWriter):
         file_obj = self._get_file_for_table(table_name)
         record_count = self.record_counts[table_name]
 
-        # Determine if we're working with a binary or text stream
-        is_binary = hasattr(file_obj, "mode") and "b" in file_obj.mode
+        # Determine if we're working with a binary stream
+        # Check both the mode and the object type since BytesIO doesn't have a mode attribute
+        is_binary = (hasattr(file_obj, "mode") and "b" in file_obj.mode) or isinstance(
+            file_obj, io.BytesIO
+        )
 
         # Write each record
         for record in records:
@@ -478,7 +487,12 @@ class JsonStreamingWriter(StreamingWriter):
                     json_str = json.dumps(
                         record, indent=self.indent, ensure_ascii=False
                     )
-                    file_obj.write(json_str)
+
+                    # Convert to bytes if needed
+                    if is_binary:
+                        file_obj.write(json_str.encode("utf-8"))
+                    else:
+                        file_obj.write(json_str)
 
             record_count += 1
 
@@ -501,8 +515,11 @@ class JsonStreamingWriter(StreamingWriter):
         for table_name in self.initialized_tables:
             file_obj = self.file_objects[table_name]
 
-            # Determine if we're working with a binary or text stream
-            is_binary = hasattr(file_obj, "mode") and "b" in file_obj.mode
+            # Determine if we're working with a binary stream
+            # Check both the mode and the object type since BytesIO doesn't have a mode attribute
+            is_binary = (
+                hasattr(file_obj, "mode") and "b" in file_obj.mode
+            ) or isinstance(file_obj, io.BytesIO)
 
             # Add newline for pretty printing if indent is specified
             if self.indent is not None:
@@ -511,13 +528,17 @@ class JsonStreamingWriter(StreamingWriter):
                 else:
                     file_obj.write("\n")
 
-            # Write closing bracket
+            # Close the JSON array
             if is_binary:
                 file_obj.write(b"]")
             else:
                 file_obj.write("]")
 
-            file_obj.flush()
+            # Flush to ensure all data is written
+            if hasattr(file_obj, "flush"):
+                file_obj.flush()
+
+        self.initialized_tables = set()
 
     def close(self) -> None:
         """

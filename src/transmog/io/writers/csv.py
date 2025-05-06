@@ -522,18 +522,32 @@ class CsvStreamingWriter(StreamingWriter):
         Initialize the CSV streaming writer.
 
         Args:
-            destination: Output file path or file-like object
-            entity_name: Name of the entity
-            include_header: Whether to include a header row
-            delimiter: CSV field delimiter
+            destination: Directory path or file-like object for output
+            entity_name: Name of the entity being processed
+            include_header: Whether to include header row in output
+            delimiter: CSV delimiter character
             quotechar: CSV quote character
-            **options: Additional CSV writer options
+            **options: Additional CSV formatting options
         """
-        self.entity_name = entity_name
+        super().__init__(destination, entity_name, **options)
+
         self.include_header = include_header
         self.delimiter = delimiter
         self.quotechar = quotechar
-        self.options = options
+
+        # Set common CSV writer options
+        self.options = {
+            "delimiter": delimiter,
+            "quotechar": quotechar,
+            "quoting": csv.QUOTE_MINIMAL,
+            **options,
+        }
+
+        # Track writer instances for reuse
+        self.writers = {}
+
+        # Track TextIOWrapper objects that wrap binary files
+        self.text_wrappers = {}
 
         # Open or use the destination
         if destination is None:
@@ -557,7 +571,6 @@ class CsvStreamingWriter(StreamingWriter):
             self.should_close = False
 
         # Keep track of CSV writers
-        self.writers = {}
         self.headers = {}
 
     def _get_file_for_table(self, table_name: str) -> TextIO:
@@ -587,38 +600,52 @@ class CsvStreamingWriter(StreamingWriter):
                 f"Cannot create file for table {table_name}: no base directory specified"
             )
 
-    def _get_writer_for_table(
-        self, table_name: str, fieldnames: List[str]
-    ) -> csv.DictWriter:
+    def _get_writer_for_table(self, table_name: str, fieldnames: List[str]) -> Any:
         """
-        Get or create a CSV writer for the given table.
+        Get a CSV DictWriter for a table.
 
         Args:
             table_name: Name of the table
-            fieldnames: Field names for the CSV
+            fieldnames: Field names for the CSV header
 
         Returns:
-            CSV writer
+            CSV DictWriter instance
         """
         if table_name in self.writers:
             return self.writers[table_name]
 
-        # Create a new writer
         file_obj = self._get_file_for_table(table_name)
-        writer = csv.DictWriter(
-            file_obj,
-            fieldnames=fieldnames,
-            delimiter=self.delimiter,
-            quotechar=self.quotechar,
-            quoting=csv.QUOTE_MINIMAL,
-        )
-        self.writers[table_name] = writer
-        self.headers[table_name] = fieldnames
 
-        # Write header if requested
+        # Determine if we're working with a binary stream
+        # Check both the mode and the object type since BytesIO doesn't have a mode attribute
+        is_binary = (hasattr(file_obj, "mode") and "b" in file_obj.mode) or isinstance(
+            file_obj, io.BytesIO
+        )
+
+        # For binary mode files, we need a TextIOWrapper to handle text-based CSV writing
+        if is_binary:
+            # Create a TextIOWrapper around the binary file
+            # Using UTF-8 encoding which is standard for CSV
+            binary_file = file_obj
+            text_file = io.TextIOWrapper(
+                binary_file, encoding="utf-8", write_through=True
+            )
+
+            # Create the CSV writer with the text wrapper
+            writer = csv.DictWriter(text_file, fieldnames=fieldnames, **self.options)
+
+            # Store both objects to prevent garbage collection
+            self.text_wrappers[table_name] = text_file
+        else:
+            # Standard text mode file
+            writer = csv.DictWriter(file_obj, fieldnames=fieldnames, **self.options)
+
         if self.include_header:
             writer.writeheader()
-            file_obj.flush()
+
+        # Store the writer and headers
+        self.writers[table_name] = writer
+        self.headers[table_name] = fieldnames
 
         return writer
 

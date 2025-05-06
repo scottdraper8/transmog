@@ -108,6 +108,9 @@ from transmog.io import (
     is_streaming_format_available,
 )
 
+# Specific writer implementations
+from transmog.io.writers.parquet import ParquetStreamingWriter
+
 # For backwards compatibility, alias the DependencyManager
 # This ensures existing imports that use IoDependencyManager continue to work
 from .dependencies import DependencyManager as IoDependencyManager
@@ -150,6 +153,8 @@ __all__ = [
     "create_streaming_writer",
     "get_supported_streaming_formats",
     "is_streaming_format_available",
+    # Specific writer implementations
+    "ParquetStreamingWriter",
     # Features and dependencies
     "Features",
     "DependencyManager",

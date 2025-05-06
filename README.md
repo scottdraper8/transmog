@@ -220,6 +220,30 @@ Transmog provides three main categories of output formats:
    result.write_all_json()       # Write to JSON files
    result.write_all_csv()        # Write to CSV files
    result.write_all_parquet()    # Write to Parquet files
+   result.stream_to_parquet()    # Stream to Parquet files with optimal memory usage
+   ```
+
+4. **Streaming Output** - Direct streaming for memory-efficient processing
+   ```python
+   # Process and stream data directly to Parquet files
+   from transmog.io import create_streaming_writer
+
+   writer = create_streaming_writer(
+       "parquet", 
+       destination="output_dir", 
+       compression="snappy", 
+       row_group_size=10000
+   )
+   
+   with writer:
+       # Process and write data in batches
+       for batch in data_batches:
+           batch_result = processor.process_batch(batch)
+           writer.write_main_records(batch_result.get_main_table())
+           
+           for table_name in batch_result.get_table_names():
+               writer.initialize_child_table(table_name)
+               writer.write_child_records(table_name, batch_result.get_child_table(table_name))
    ```
 
 ## Documentation

@@ -36,21 +36,25 @@ class TestJsonStreamingWriter(AbstractStreamingWriterTest):
         writer.write_main_records(sample_records)
         writer.finalize()
 
-        # Verify JSON content
+        # Verify content
         buffer.seek(0)
         content = buffer.getvalue()
-        assert content
 
-        # Parse JSON content
-        data = json.loads(content)
-        assert isinstance(data, list)
-        assert len(data) == len(sample_records)
+        # Convert binary content to string
+        content_str = content.decode("utf-8")
 
-        # Verify record contents
+        # Parse JSON
+        json_data = json.loads(content_str)
+
+        # Verify data
+        assert isinstance(json_data, list)
+        assert len(json_data) == len(sample_records)
+
+        # Check record content
         for i, record in enumerate(sample_records):
-            assert data[i]["id"] == record["id"]
-            assert data[i]["name"] == record["name"]
-            assert data[i]["value"] == record["value"]
+            assert json_data[i]["id"] == record["id"]
+            assert json_data[i]["name"] == record["name"]
+            assert json_data[i]["value"] == record["value"]
 
     def test_file_naming_convention(self, writer_instance, sample_records, temp_dir):
         """Test that files are named according to convention."""
@@ -184,11 +188,17 @@ class TestJsonStreamingWriter(AbstractStreamingWriterTest):
         buffer.seek(0)
         content = buffer.getvalue()
 
-        # Should parse correctly
-        data = json.loads(content)
-        assert len(data) == 3
+        # Convert binary content to string
+        content_str = content.decode("utf-8")
 
-        # Special characters should be preserved
-        assert data[0]["text"] == records[0]["text"]
-        assert data[1]["text"] == records[1]["text"]
-        assert data[2]["text"] == records[2]["text"]
+        # Parse JSON
+        json_data = json.loads(content_str)
+
+        # Verify data
+        assert isinstance(json_data, list)
+        assert len(json_data) == len(records)
+
+        # Check special characters
+        assert json_data[0]["text"] == records[0]["text"]
+        assert json_data[1]["text"] == records[1]["text"]
+        assert json_data[2]["text"] == records[2]["text"]

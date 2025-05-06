@@ -48,9 +48,13 @@ class AbstractStreamingWriterTest:
 
     @pytest.fixture
     def memory_writer(self, writer_class, writer_options):
-        """Create a writer instance that writes to a memory buffer."""
-        buffer = io.StringIO()
+        """Create a writer that writes to memory."""
+        # Create a memory buffer
+        buffer = io.BytesIO()  # Use BytesIO instead of StringIO for binary data
+
+        # Create a writer with the buffer as destination
         writer = writer_class(destination=buffer, **writer_options)
+
         return writer, buffer
 
     @pytest.fixture

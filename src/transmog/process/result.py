@@ -26,7 +26,7 @@ from enum import Enum
 from transmog.types.base import JsonDict
 from transmog.types.result_types import ResultInterface, ConversionModeType
 from transmog.types.io_types import WriterProtocol
-from transmog.error import OutputError
+from transmog.error import OutputError, MissingDependencyError
 from transmog.io.writer_factory import (
     create_writer,
     is_format_available,
@@ -393,21 +393,12 @@ class ProcessingResult(ResultInterface):
         Convert all tables to Parquet bytes.
 
         Args:
-            compression: Compression format (snappy, gzip, None, etc.)
-            **kwargs: Additional PyArrow Parquet options
+            compression: Compression codec (e.g., snappy, gzip, brotli)
+            **kwargs: Additional Parquet options
 
         Returns:
             Dict mapping table names to Parquet bytes
-
-        Raises:
-            ImportError: If PyArrow is not available
         """
-        if not _check_pyarrow_available():
-            raise ImportError(
-                "PyArrow is required for Parquet serialization. "
-                "Install with: pip install pyarrow"
-            )
-
         # Use cache key
         cache_key = _get_cache_key(
             self, "parquet_bytes", compression=compression, **kwargs
@@ -415,22 +406,188 @@ class ProcessingResult(ResultInterface):
         if cache_key in _conversion_cache:
             return _conversion_cache[cache_key]
 
-        import pyarrow.parquet as pq
+        # Check if PyArrow is available
+        try:
+            import pyarrow as pa
+            import pyarrow.parquet as pq
+            import io
+        except ImportError:
+            raise MissingDependencyError(
+                "PyArrow is required for Parquet support. Install with 'pip install pyarrow'"
+            )
 
-        # Get PyArrow tables
-        tables = self.to_pyarrow_tables()
+        # Convert to PyArrow tables first
+        pa_tables = self.to_pyarrow_tables()
 
-        # Convert each table to Parquet bytes
+        # Convert each PyArrow table to Parquet bytes
         result = {}
-        for table_name, table in tables.items():
-            buffer = io.BytesIO()
-            pq.write_table(table, buffer, compression=compression, **kwargs)
-            buffer.seek(0)
-            result[table_name] = buffer.getvalue()
+        for table_name, table in pa_tables.items():
+            try:
+                buffer = io.BytesIO()
+                pq.write_table(table, buffer, compression=compression, **kwargs)
+                buffer.seek(0)
+                result[table_name] = buffer.getvalue()
+            except Exception as e:
+                raise OutputError(f"Failed to convert to Parquet: {e}")
 
         # Cache the result
         _conversion_cache[cache_key] = result
         return result
+
+    def stream_to_parquet(
+        self,
+        base_path: str,
+        compression: str = "snappy",
+        row_group_size: int = 10000,
+        **kwargs,
+    ) -> Dict[str, str]:
+        """
+        Stream all tables to Parquet files with optimal memory usage.
+
+        This method uses the ParquetStreamingWriter to write tables to Parquet files
+        in a streaming fashion, which is more memory-efficient for large datasets.
+
+        Args:
+            base_path: Base directory for output files
+            compression: Compression codec (e.g., snappy, gzip, brotli, zstd)
+            row_group_size: Number of rows per row group
+            **kwargs: Additional Parquet writer options
+
+        Returns:
+            Dict mapping table names to output file paths
+
+        Raises:
+            MissingDependencyError: If PyArrow is not available
+            OutputError: If writing fails
+        """
+        from transmog.io.writers.parquet import ParquetStreamingWriter
+
+        try:
+            # Create the base directory
+            os.makedirs(base_path, exist_ok=True)
+
+            # Create a streaming writer
+            writer = ParquetStreamingWriter(
+                destination=base_path,
+                entity_name=self.entity_name,
+                compression=compression,
+                row_group_size=row_group_size,
+                **kwargs,
+            )
+
+            # Use context manager to ensure proper finalization
+            with writer:
+                # Write main table
+                writer.write_main_records(self.main_table)
+
+                # Write child tables
+                for table_name, table_data in self.child_tables.items():
+                    writer.initialize_child_table(table_name)
+                    writer.write_child_records(table_name, table_data)
+
+            # Prepare result mapping
+            result = {}
+
+            # Add main table path
+            main_path = os.path.join(base_path, f"{self.entity_name}.parquet")
+            if os.path.exists(main_path):
+                result["main"] = main_path
+
+            # Add child table paths
+            for table_name in self.child_tables.keys():
+                # Get the sanitized table name
+                formatted_name = self.get_formatted_table_name(table_name)
+                safe_name = formatted_name.replace(".", "_").replace("/", "_")
+                file_path = os.path.join(base_path, f"{safe_name}.parquet")
+
+                if os.path.exists(file_path):
+                    result[table_name] = file_path
+
+            return result
+
+        except ImportError:
+            raise MissingDependencyError(
+                "PyArrow is required for Parquet support. Install with 'pip install pyarrow'"
+            )
+        except Exception as e:
+            raise OutputError(f"Failed to stream to Parquet: {e}")
+
+    def write_all_parquet(
+        self, base_path: str, compression: str = "snappy", **kwargs
+    ) -> Dict[str, str]:
+        """
+        Write all tables to Parquet files.
+
+        This is a convenience method that first converts data to PyArrow Tables
+        internally, then writes to the file system.
+
+        Args:
+            base_path: Base output directory
+            compression: Compression format
+            **kwargs: Additional Parquet options
+
+        Returns:
+            Dictionary of table names to file paths
+        """
+        try:
+            # Get Parquet bytes
+            parquet_data = self.to_parquet_bytes(compression=compression, **kwargs)
+
+            # Create base directory
+            os.makedirs(base_path, exist_ok=True)
+
+            # Write each table to disk
+            result = {}
+
+            # Write main table
+            main_path = os.path.join(base_path, f"{self.entity_name}.parquet")
+            with open(main_path, "wb") as f:
+                f.write(parquet_data["main"])
+            result["main"] = main_path
+
+            # Write child tables
+            for table_name, data in parquet_data.items():
+                if table_name == "main":
+                    continue
+
+                formatted_name = self.get_formatted_table_name(table_name)
+                file_path = os.path.join(base_path, f"{formatted_name}.parquet")
+                with open(file_path, "wb") as f:
+                    f.write(data)
+                result[table_name] = file_path
+
+            return result
+
+        except ImportError as e:
+            logger.warning(f"Could not write Parquet files: {str(e)}")
+            logger.warning("PyArrow is required for Parquet output.")
+            logger.warning("Install with: pip install pyarrow")
+
+            # Create the base directory if it doesn't exist
+            os.makedirs(base_path, exist_ok=True)
+
+            # Create dummy output paths for backward compatibility
+            results = {"main": f"{base_path}/{self.entity_name}.parquet"}
+
+            # Create dummy file with warning message
+            with open(results["main"], "w") as f:
+                f.write(
+                    "PyArrow required for Parquet output. This is a placeholder file."
+                )
+
+            # Add dummy paths for child tables
+            for table_name in self.child_tables:
+                formatted_name = self.get_formatted_table_name(table_name)
+                file_path = f"{base_path}/{formatted_name}.parquet"
+                results[table_name] = file_path
+
+                # Create dummy file with warning message
+                with open(file_path, "w") as f:
+                    f.write(
+                        "PyArrow required for Parquet output. This is a placeholder file."
+                    )
+
+            return results
 
     def to_csv_bytes(self, include_header: bool = True, **kwargs) -> Dict[str, bytes]:
         """
@@ -803,83 +960,6 @@ class ProcessingResult(ResultInterface):
             result[table_name] = file_path
 
         return result
-
-    def write_all_parquet(
-        self, base_path: str, compression: str = "snappy", **kwargs
-    ) -> Dict[str, str]:
-        """
-        Write all tables to Parquet files.
-
-        This is a convenience method that first converts data to PyArrow Tables
-        internally, then writes to the file system.
-
-        Args:
-            base_path: Base output directory
-            compression: Compression format
-            **kwargs: Additional Parquet options
-
-        Returns:
-            Dictionary of table names to file paths
-        """
-        try:
-            # Get Parquet bytes
-            parquet_data = self.to_parquet_bytes(compression=compression, **kwargs)
-
-            # Create base directory
-            os.makedirs(base_path, exist_ok=True)
-
-            # Write each table to disk
-            result = {}
-
-            # Write main table
-            main_path = os.path.join(base_path, f"{self.entity_name}.parquet")
-            with open(main_path, "wb") as f:
-                f.write(parquet_data["main"])
-            result["main"] = main_path
-
-            # Write child tables
-            for table_name, data in parquet_data.items():
-                if table_name == "main":
-                    continue
-
-                formatted_name = self.get_formatted_table_name(table_name)
-                file_path = os.path.join(base_path, f"{formatted_name}.parquet")
-                with open(file_path, "wb") as f:
-                    f.write(data)
-                result[table_name] = file_path
-
-            return result
-
-        except ImportError as e:
-            logger.warning(f"Could not write Parquet files: {str(e)}")
-            logger.warning("PyArrow is required for Parquet output.")
-            logger.warning("Install with: pip install pyarrow")
-
-            # Create the base directory if it doesn't exist
-            os.makedirs(base_path, exist_ok=True)
-
-            # Create dummy output paths for backward compatibility
-            results = {"main": f"{base_path}/{self.entity_name}.parquet"}
-
-            # Create dummy file with warning message
-            with open(results["main"], "w") as f:
-                f.write(
-                    "PyArrow required for Parquet output. This is a placeholder file."
-                )
-
-            # Add dummy paths for child tables
-            for table_name in self.child_tables:
-                formatted_name = self.get_formatted_table_name(table_name)
-                file_path = f"{base_path}/{formatted_name}.parquet"
-                results[table_name] = file_path
-
-                # Create dummy file with warning message
-                with open(file_path, "w") as f:
-                    f.write(
-                        "PyArrow required for Parquet output. This is a placeholder file."
-                    )
-
-            return results
 
     def write_all_json(
         self, base_path: str, indent: Optional[int] = 2, **kwargs

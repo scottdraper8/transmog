@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Renamed project from Transmog to Transmog for brevity
 
+### Added
+- Streaming Parquet writing capability for memory-efficient processing of large datasets
+- New `ParquetStreamingWriter` class that implements the `StreamingWriter` interface
+- New `stream_to_parquet()` method in `ProcessingResult` class
+- Row group management for optimal Parquet file organization
+- Schema evolution handling for consistent Parquet schema across batches
+- Example script for streaming Parquet usage
+
 ## [0.1.0] - 2023-11-15
 
 ### Added
@@ -33,3 +41,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Memory optimization for large datasets with chunked processing
 - CSV input processing with type inference
 - Table and field name abbreviation options 
+
+## [0.1.2.5] - 2023-07-15
+### Added
+- Support for custom time field names in metadata
+- Advanced batch processing mode for handling large datasets
+
+### Fixed
+- Issue with nested array extraction in specific edge cases
+- Memory management in streaming data extraction
+
+## [0.1.2.4] - 2023-06-22
+### Added 
