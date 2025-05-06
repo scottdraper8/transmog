@@ -57,8 +57,6 @@ class ProcessingConfig:
     # Validation settings
     validate_field_names: bool = False
     validate_table_names: bool = False
-    schema_validation: bool = False
-    custom_validator: Optional[Callable] = None
 
 
 @dataclass
@@ -244,8 +242,6 @@ class TransmogConfig:
         Args:
             validate_field_names: Whether to validate field names
             validate_table_names: Whether to validate table names
-            schema_validation: Whether to enable schema validation
-            custom_validator: Custom validation function
             **kwargs: Additional processing settings
 
         Returns:
@@ -254,8 +250,6 @@ class TransmogConfig:
         # Extract validation-specific settings
         validate_field_names = kwargs.pop("validate_field_names", None)
         validate_table_names = kwargs.pop("validate_table_names", None)
-        schema_validation = kwargs.pop("schema_validation", None)
-        custom_validator = kwargs.pop("custom_validator", None)
 
         # Create processing kwargs
         processing_kwargs = kwargs.copy()
@@ -263,10 +257,6 @@ class TransmogConfig:
             processing_kwargs["validate_field_names"] = validate_field_names
         if validate_table_names is not None:
             processing_kwargs["validate_table_names"] = validate_table_names
-        if schema_validation is not None:
-            processing_kwargs["schema_validation"] = schema_validation
-        if custom_validator is not None:
-            processing_kwargs["custom_validator"] = custom_validator
 
         # Use with_processing for the actual update
         return self.with_processing(**processing_kwargs)
