@@ -14,6 +14,9 @@ import sys
 import traceback
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar, Union, cast
 
+# Import the central dependency manager
+from transmog.dependencies import DependencyManager
+
 from .exceptions import (
     CircularReferenceError,
     ConfigurationError,
@@ -93,7 +96,7 @@ def safe_json_loads(s: Union[str, bytes]) -> Any:
         ParsingError: If the input is not valid JSON
     """
     # Try orjson first (much faster)
-    try:
+    if DependencyManager.has_dependency("orjson"):
         import orjson
 
         try:
@@ -102,7 +105,7 @@ def safe_json_loads(s: Union[str, bytes]) -> Any:
             # Get the first 100 characters for error context
             context = str(s)[:100] + ("..." if len(str(s)) > 100 else "")
             raise ParsingError(f"Invalid JSON data: {str(e)}. Context: {context}")
-    except ImportError:
+    else:
         # Fall back to standard json
         try:
             return json.loads(s)
@@ -122,15 +125,8 @@ def check_dependency(package_name: str, feature: Optional[str] = None) -> bool:
 
     Returns:
         True if installed, False otherwise
-
-    Raises:
-        MissingDependencyError: If raise_error is True and dependency is missing
     """
-    try:
-        __import__(package_name)
-        return True
-    except ImportError:
-        return False
+    return DependencyManager.has_dependency(package_name)
 
 
 def require_dependency(package_name: str, feature: Optional[str] = None) -> None:
@@ -144,7 +140,7 @@ def require_dependency(package_name: str, feature: Optional[str] = None) -> None
     Raises:
         MissingDependencyError: If dependency is missing
     """
-    if not check_dependency(package_name):
+    if not DependencyManager.has_dependency(package_name):
         feature_name = feature or package_name
         raise MissingDependencyError(
             f"{package_name} is required but not installed",

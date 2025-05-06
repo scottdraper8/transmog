@@ -106,8 +106,11 @@ from transmog.io import (
     create_streaming_writer,
     get_supported_streaming_formats,
     is_streaming_format_available,
-    DependencyManager as IoDependencyManager,
 )
+
+# For backwards compatibility, alias the DependencyManager
+# This ensures existing imports that use IoDependencyManager continue to work
+from .dependencies import DependencyManager as IoDependencyManager
 
 # Initialize IO features
 initialize_io_features()

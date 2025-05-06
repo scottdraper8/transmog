@@ -5,7 +5,7 @@ This module provides centralized format detection and handles
 registration of readers and writers for different formats.
 """
 
-from typing import Dict, Type, Optional, Any, List, Set, Callable
+from typing import Dict, Type, Optional, Any, List, Set, Callable, Union
 
 
 class FormatRegistry:
@@ -18,6 +18,7 @@ class FormatRegistry:
 
     _reader_formats: Set[str] = set()
     _writer_formats: Set[str] = set()
+    _writer_classes = {}  # Store writer classes
 
     @classmethod
     def register_reader_format(cls, format_name: str) -> None:
@@ -30,14 +31,17 @@ class FormatRegistry:
         cls._reader_formats.add(format_name)
 
     @classmethod
-    def register_writer_format(cls, format_name: str) -> None:
+    def register_writer_format(cls, format_name: str, writer_class=None) -> None:
         """
         Register a format as having a writer implementation.
 
         Args:
             format_name: The name of the format (e.g., 'json', 'csv')
+            writer_class: The writer class (optional)
         """
         cls._writer_formats.add(format_name)
+        if writer_class is not None:
+            cls._writer_classes[format_name] = writer_class
 
     @classmethod
     def get_available_reader_formats(cls) -> List[str]:
@@ -58,6 +62,53 @@ class FormatRegistry:
             List of format names
         """
         return sorted(cls._writer_formats)
+
+    @classmethod
+    def list_all_writers(cls) -> Dict[str, Any]:
+        """
+        Get all registered writer classes.
+
+        Returns:
+            Dictionary mapping format names to writer classes
+        """
+        from transmog.io.writer_factory import _WRITER_REGISTRY
+
+        # Return the writer registry
+        return _WRITER_REGISTRY
+
+    @classmethod
+    def list_available_formats(cls) -> List[str]:
+        """
+        Get a list of all available formats with writer implementations.
+
+        This only includes formats with writers whose dependencies
+        are available.
+
+        Returns:
+            List of available format names
+        """
+        available_formats = []
+        for format_name, writer_class in cls.list_all_writers().items():
+            if writer_class.is_available():
+                available_formats.append(format_name)
+        return sorted(available_formats)
+
+    @classmethod
+    def create_writer(cls, format_name: str, **options) -> Any:
+        """
+        Create a writer for the specified format.
+
+        Args:
+            format_name: Name of the format
+            **options: Writer options
+
+        Returns:
+            Writer instance
+        """
+        from transmog.io.writer_factory import create_writer
+
+        # Use the existing create_writer function
+        return create_writer(format_name, **options)
 
     @classmethod
     def has_reader_format(cls, format_name: str) -> bool:
@@ -86,52 +137,8 @@ class FormatRegistry:
         return format_name in cls._writer_formats
 
 
-class DependencyManager:
-    """
-    Manages optional dependencies for IO operations.
-
-    This class provides a centralized way to check for the
-    availability of optional dependencies.
-    """
-
-    _optional_deps: Dict[str, bool] = {}
-
-    @classmethod
-    def has_dependency(cls, name: str) -> bool:
-        """
-        Check if an optional dependency is available.
-
-        Args:
-            name: Dependency name (e.g., 'pyarrow', 'orjson')
-
-        Returns:
-            Whether the dependency is available
-        """
-        if name not in cls._optional_deps:
-            cls._check_dependency(name)
-        return cls._optional_deps.get(name, False)
-
-    @classmethod
-    def _check_dependency(cls, name: str) -> None:
-        """
-        Check for a dependency and cache the result.
-
-        Args:
-            name: Dependency name to check
-        """
-        try:
-            if name == "pyarrow":
-                import pyarrow
-
-                cls._optional_deps["pyarrow"] = True
-            elif name == "orjson":
-                import orjson
-
-                cls._optional_deps["orjson"] = True
-            else:
-                cls._optional_deps[name] = False
-        except ImportError:
-            cls._optional_deps[name] = False
+# Import the central DependencyManager instead of duplicating implementation
+from transmog.dependencies import DependencyManager
 
 
 def detect_format(data_source: Any) -> str:
