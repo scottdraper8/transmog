@@ -1,8 +1,8 @@
 """
-Processing strategies module for Transmog.
+Processing strategies for Transmog.
 
-This module implements the Strategy pattern for different processing methods,
-centralizing common functionality while allowing specialization for different data sources.
+This module provides various strategies for processing data
+with different memory/performance tradeoffs.
 """
 
 from abc import ABC, abstractmethod
@@ -18,6 +18,9 @@ from typing import (
     cast,
     Set,
     TypeVar,
+    TextIO,
+    Generic,
+    Protocol,
 )
 import json
 import os
@@ -51,8 +54,13 @@ from ..core.metadata import (
     generate_extract_id,
     get_current_timestamp,
     create_batch_metadata,
+    annotate_with_metadata,
 )
 from .result import ProcessingResult, ConversionMode
+from .data_iterators import get_data_iterator
+from .utils import get_common_config_params, get_batch_size
+from ..core.flattener import flatten_json
+from ..core.extractor import extract_arrays
 
 T = TypeVar("T")
 
@@ -107,14 +115,17 @@ class ProcessingStrategy(ABC):
         naming_config = self.config.naming
         processing_config = self.config.processing
         metadata_config = self.config.metadata
+        error_config = self.config.error_handling
 
-        return {
+        # Create parameters dictionary
+        params = {
             # Naming parameters
             "separator": naming_config.separator,
             "abbreviate_table_names": naming_config.abbreviate_table_names,
             "abbreviate_field_names": naming_config.abbreviate_field_names,
             "max_table_component_length": naming_config.max_table_component_length,
             "max_field_component_length": naming_config.max_field_component_length,
+            "preserve_root_component": naming_config.preserve_root_component,
             "preserve_leaf_component": naming_config.preserve_leaf_component,
             "custom_abbreviations": naming_config.custom_abbreviations,
             # Processing parameters
@@ -127,9 +138,42 @@ class ProcessingStrategy(ABC):
             "parent_field": metadata_config.parent_field,
             "time_field": metadata_config.time_field,
             "extract_time": extract_time,
-            "deterministic_id_fields": metadata_config.deterministic_id_fields,
+            "default_id_field": metadata_config.default_id_field,
             "id_generation_strategy": metadata_config.id_generation_strategy,
         }
+
+        # Add recovery strategy if configured
+        if error_config.recovery_strategy:
+            from ..error.recovery import (
+                STRICT,
+                DEFAULT,
+                LENIENT,
+                StrictRecovery,
+                SkipAndLogRecovery,
+                PartialProcessingRecovery,
+            )
+
+            # Create the recovery strategy instance
+            strategy_name = error_config.recovery_strategy
+            recovery_strategy = None
+
+            if strategy_name == "strict":
+                recovery_strategy = STRICT
+            elif strategy_name == "skip":
+                recovery_strategy = DEFAULT
+            elif strategy_name == "partial":
+                recovery_strategy = LENIENT
+            elif isinstance(
+                strategy_name,
+                (StrictRecovery, SkipAndLogRecovery, PartialProcessingRecovery),
+            ):
+                recovery_strategy = strategy_name
+
+            # Add to params if we have a valid strategy
+            if recovery_strategy:
+                params["recovery_strategy"] = recovery_strategy
+
+        return params
 
     def _get_batch_size(self, chunk_size: Optional[int] = None) -> int:
         """
@@ -144,6 +188,72 @@ class ProcessingStrategy(ABC):
         if chunk_size is not None and chunk_size > 0:
             return chunk_size
         return self.config.processing.batch_size
+
+    def _get_common_parameters(self, **kwargs):
+        """
+        Extract common parameters from kwargs or config.
+
+        This method combines user-provided parameters with defaults from config.
+
+        Args:
+            **kwargs: User-provided parameters that override defaults
+
+        Returns:
+            Dictionary of parameters for processing
+        """
+        # Get config objects
+        naming_config = self.config.naming
+        processing_config = self.config.processing
+        metadata_config = self.config.metadata
+
+        # Combine parameters from config and kwargs
+        params = {
+            # Naming parameters
+            "separator": kwargs.get("separator", naming_config.separator),
+            "abbreviate_table_names": kwargs.get(
+                "abbreviate_table_names", naming_config.abbreviate_table_names
+            ),
+            "abbreviate_field_names": kwargs.get(
+                "abbreviate_field_names", naming_config.abbreviate_field_names
+            ),
+            "max_table_component_length": kwargs.get(
+                "max_table_component_length", naming_config.max_table_component_length
+            ),
+            "max_field_component_length": kwargs.get(
+                "max_field_component_length", naming_config.max_field_component_length
+            ),
+            "preserve_root": kwargs.get(
+                "preserve_root_component", naming_config.preserve_root_component
+            ),
+            "preserve_leaf": kwargs.get(
+                "preserve_leaf_component", naming_config.preserve_leaf_component
+            ),
+            "custom_abbreviations": kwargs.get(
+                "custom_abbreviations", naming_config.custom_abbreviations
+            ),
+            # Processing parameters
+            "cast_to_string": kwargs.get(
+                "cast_to_string", processing_config.cast_to_string
+            ),
+            "include_empty": kwargs.get(
+                "include_empty", processing_config.include_empty
+            ),
+            "skip_null": kwargs.get("skip_null", processing_config.skip_null),
+            "max_depth": kwargs.get("max_depth", processing_config.max_nesting_depth),
+            "visit_arrays": kwargs.get("visit_arrays", processing_config.visit_arrays),
+            # Metadata parameters
+            "id_field": kwargs.get("id_field", metadata_config.id_field),
+            "parent_field": kwargs.get("parent_field", metadata_config.parent_field),
+            "time_field": kwargs.get("time_field", metadata_config.time_field),
+            "default_id_field": kwargs.get(
+                "default_id_field", metadata_config.default_id_field
+            ),
+            "id_generation_strategy": kwargs.get(
+                "id_generation_strategy", metadata_config.id_generation_strategy
+            ),
+        }
+
+        return params
 
 
 class InMemoryStrategy(ProcessingStrategy):
@@ -219,9 +329,15 @@ class InMemoryStrategy(ProcessingStrategy):
         # Get configuration parameters
         params = self._get_common_config_params(extract_time)
 
+        # Extract recovery strategy if present and remove from params to avoid duplicate
+        recovery_strategy = params.pop("recovery_strategy", None)
+
         # Process records in a single pass
         main_records, child_tables = process_records_in_single_pass(
-            records=records, entity_name=entity_name, **params
+            records=records,
+            entity_name=entity_name,
+            recovery_strategy=recovery_strategy,
+            **params,
         )
 
         return ProcessingResult(
@@ -315,9 +431,15 @@ class InMemoryStrategy(ProcessingStrategy):
         # Get configuration parameters
         params = self._get_common_config_params(extract_time)
 
+        # Extract recovery strategy if present and remove from params to avoid duplicate
+        recovery_strategy = params.pop("recovery_strategy", None)
+
         # Process records in a single pass
         main_records, child_tables = process_records_in_single_pass(
-            records=batch_data, entity_name=entity_name, **params
+            records=batch_data,
+            entity_name=entity_name,
+            recovery_strategy=recovery_strategy,
+            **params,
         )
 
         return ProcessingResult(
@@ -329,47 +451,75 @@ class InMemoryStrategy(ProcessingStrategy):
 
 
 class FileStrategy(ProcessingStrategy):
-    """Strategy for processing file-based data."""
+    """Strategy for processing files."""
 
-    @error_context("Failed to process file", log_exceptions=True)
     def process(
         self,
         file_path: str,
         entity_name: str,
         extract_time: Optional[Any] = None,
+        result: Optional[ProcessingResult] = None,
         **kwargs,
     ) -> ProcessingResult:
         """
-        Process data from a file.
+        Process a file.
 
         Args:
             file_path: Path to the file to process
             entity_name: Name of the entity being processed
             extract_time: Optional extraction timestamp
+            result: Optional existing result to append to
             **kwargs: Additional parameters
 
         Returns:
             ProcessingResult containing processed data
         """
-        if not os.path.exists(file_path):
+        # Check file exists
+        if not isinstance(file_path, str) or not os.path.exists(file_path):
             raise FileError(f"File not found: {file_path}")
 
-        if not os.path.isfile(file_path):
-            raise FileError(f"Not a file: {file_path}")
+        # Extract common parameters
+        params = self._get_common_parameters(**kwargs)
+        extract_time = extract_time or get_current_timestamp()
 
-        # Detect file format based on extension
-        file_ext = os.path.splitext(file_path)[1].lower()
+        # Initialize result object
+        result = result or ProcessingResult(
+            main_table=[], child_tables={}, entity_name=entity_name
+        )
 
-        if file_ext == ".json":
-            # Process JSON file
-            return self._process_json_file(file_path, entity_name, extract_time)
-        elif file_ext == ".jsonl":
-            # Process JSONL file
-            return self._process_jsonl_file(
-                file_path, entity_name, extract_time, kwargs.get("chunk_size")
-            )
-        else:
-            raise FileError(f"Unsupported file format: {file_ext}")
+        # Get batch size
+        batch_size = get_batch_size(self.config, kwargs)
+
+        # Detect file format and get an appropriate data iterator
+        data_iterator = get_data_iterator(self, file_path, "auto")
+
+        # Get unique ID parameters
+        id_field = params.get("id_field", self.config.metadata.id_field)
+        parent_field = params.get("parent_field", self.config.metadata.parent_field)
+        time_field = params.get("time_field", self.config.metadata.time_field)
+        default_id_field = params.get(
+            "default_id_field", self.config.metadata.default_id_field
+        )
+        id_generation_strategy = params.get(
+            "id_generation_strategy", self.config.metadata.id_generation_strategy
+        )
+
+        # Process data in batches
+        self._process_data_batches(
+            data_iterator,
+            entity_name,
+            extract_time,
+            result,
+            id_field,
+            parent_field,
+            time_field,
+            default_id_field,
+            id_generation_strategy,
+            params,
+            batch_size,
+        )
+
+        return result
 
     def _process_json_file(
         self,
@@ -461,264 +611,623 @@ class FileStrategy(ProcessingStrategy):
         except IOError as e:
             raise FileError(f"Failed to read file {file_path}: {str(e)}")
 
+    def _process_data_batches(
+        self,
+        data_iterator,
+        entity_name,
+        extract_time,
+        result,
+        id_field,
+        parent_field,
+        time_field,
+        default_id_field,
+        id_generation_strategy,
+        params,
+        batch_size,
+    ):
+        """Process data in batches efficiently."""
+        batch = []
+        batch_size_counter = 0
+        all_main_ids = []
+
+        for record in data_iterator:
+            # Skip non-dict records
+            if not isinstance(record, dict):
+                continue
+
+            batch.append(record)
+            batch_size_counter += 1
+
+            if batch_size_counter >= batch_size:
+                # Process main records for this batch
+                main_ids = self._process_batch_main_records(
+                    batch,
+                    entity_name,
+                    extract_time,
+                    result,
+                    id_field,
+                    parent_field,
+                    time_field,
+                    default_id_field,
+                    id_generation_strategy,
+                    params,
+                )
+                all_main_ids.extend(main_ids)
+
+                # Process arrays for the batch
+                self._process_batch_arrays(
+                    batch,
+                    entity_name,
+                    extract_time,
+                    result,
+                    id_field,
+                    main_ids,
+                    default_id_field,
+                    id_generation_strategy,
+                    params,
+                )
+
+                # Reset batch
+                batch = []
+                batch_size_counter = 0
+
+        # Process remaining records if any
+        if batch:
+            # Process main records for final batch
+            main_ids = self._process_batch_main_records(
+                batch,
+                entity_name,
+                extract_time,
+                result,
+                id_field,
+                parent_field,
+                time_field,
+                default_id_field,
+                id_generation_strategy,
+                params,
+            )
+            all_main_ids.extend(main_ids)
+
+            # Process arrays for the final batch
+            self._process_batch_arrays(
+                batch,
+                entity_name,
+                extract_time,
+                result,
+                id_field,
+                main_ids,
+                default_id_field,
+                id_generation_strategy,
+                params,
+            )
+
+        return all_main_ids
+
+    def _process_batch_main_records(
+        self,
+        batch,
+        entity_name,
+        extract_time,
+        result,
+        id_field,
+        parent_field,
+        time_field,
+        default_id_field,
+        id_generation_strategy,
+        params,
+    ):
+        """Process main records in a batch."""
+        # Get recovery strategy if available, but don't remove it from params
+        # so it can be used in subsequent processing
+        recovery_strategy = params.get("recovery_strategy")
+
+        # Create arrays for batch processing results
+        main_table = []
+        main_ids = []
+
+        # Process each record
+        for record in batch:
+            # Flatten the record
+            flattened = flatten_json(
+                record,
+                separator=params.get("separator", "_"),
+                cast_to_string=params.get("cast_to_string", True),
+                include_empty=params.get("include_empty", False),
+                skip_null=params.get("skip_null", True),
+                max_depth=params.get("max_depth"),
+                abbreviate_field_names=params.get("abbreviate_field_names", False),
+                max_field_component_length=params.get("max_field_component_length"),
+                preserve_root_component=params.get("preserve_root", True),
+                preserve_leaf_component=params.get("preserve_leaf", True),
+                custom_abbreviations=params.get("custom_abbreviations", {}),
+                recovery_strategy=recovery_strategy,
+            )
+
+            # Add metadata and track
+            annotated = annotate_with_metadata(
+                flattened,
+                parent_id=None,  # Main records have no parent
+                extract_time=extract_time,
+                source_field=default_id_field,
+                id_generation_strategy=id_generation_strategy,
+            )
+
+            # Add extract ID to track for child relationships
+            if id_field in annotated:
+                main_ids.append(annotated[id_field])
+            else:
+                # Fallback if ID field not present for some reason
+                main_ids.append(None)
+
+            # Add to result's main table
+            result.add_main_record(annotated)
+
+        return main_ids
+
+    def _process_batch_arrays(
+        self,
+        batch,
+        entity_name,
+        extract_time,
+        result,
+        id_field,
+        main_ids,
+        default_id_field,
+        id_generation_strategy,
+        params,
+    ):
+        """Process arrays for a batch of records efficiently."""
+        # Process arrays for each record in batch
+        for i, record in enumerate(batch):
+            if i >= len(main_ids):
+                # Shouldn't happen, but safety check
+                continue
+
+            # Extract arrays for this record
+            arrays = extract_arrays(
+                record,
+                parent_id=main_ids[i],
+                entity_name=entity_name,
+                separator=params["separator"],
+                cast_to_string=params["cast_to_string"],
+                include_empty=params["include_empty"],
+                skip_null=params["skip_null"],
+                extract_time=extract_time,
+                abbreviate_enabled=params["abbreviate_table_names"],
+                max_component_length=params["max_table_component_length"],
+                preserve_leaf=params["preserve_leaf"],
+                custom_abbreviations=params["custom_abbreviations"],
+                default_id_field=default_id_field,
+                id_generation_strategy=id_generation_strategy,
+            )
+
+            # Add arrays to result
+            result.add_child_tables(arrays)
+
 
 class BatchStrategy(ProcessingStrategy):
-    """Strategy for processing batches of records."""
+    """Strategy for optimized batch processing of data."""
 
-    @error_context("Failed to process batch", log_exceptions=True)
     def process(
         self,
-        batch_data: List[Dict[str, Any]],
+        data,
         entity_name: str,
         extract_time: Optional[Any] = None,
+        result: Optional[ProcessingResult] = None,
         **kwargs,
     ) -> ProcessingResult:
         """
-        Process a batch of records.
+        Process data in optimized batches.
 
         Args:
-            batch_data: Batch of records to process
-            entity_name: Name of the entity being processed
+            data: Input data
+            entity_name: Name of the entity
             extract_time: Optional extraction timestamp
-            **kwargs: Additional parameters
+            result: Optional existing result to append to
+            **kwargs: Additional processing parameters
 
         Returns:
-            ProcessingResult for the batch
+            ProcessingResult with processed data
         """
-        # Validate input
-        validate_input(
-            batch_data, expected_type=list, param_name="batch_data", allow_none=False
+        # Extract common parameters from kwargs or config
+        params = self._get_common_parameters(**kwargs)
+        extract_time = extract_time or get_current_timestamp()
+
+        # Initialize result if needed
+        result = result or ProcessingResult(
+            main_table=[], child_tables={}, entity_name=entity_name
         )
 
-        # Create in-memory strategy for processing
-        in_memory_strategy = InMemoryStrategy(self.config)
+        # Get batch size with fallback to config
+        batch_size = kwargs.get("batch_size", self.config.processing.batch_size)
 
-        # Process the batch using in-memory strategy
-        return in_memory_strategy._process_batch_internal(
-            batch_data, entity_name, extract_time
+        # Get unique ID parameters
+        id_field = params.get("id_field", self.config.metadata.id_field)
+        parent_field = params.get("parent_field", self.config.metadata.parent_field)
+        time_field = params.get("time_field", self.config.metadata.time_field)
+        default_id_field = params.get(
+            "default_id_field", self.config.metadata.default_id_field
         )
+        id_generation_strategy = params.get(
+            "id_generation_strategy", self.config.metadata.id_generation_strategy
+        )
+
+        # Get data iterator
+        data_iterator = get_data_iterator(None, data)
+
+        # Process in batches
+        batch = []
+        batch_size_counter = 0
+        main_ids = []  # Keep track of main IDs for array extraction
+
+        for record in data_iterator:
+            if not isinstance(record, dict):
+                continue
+
+            batch.append(record)
+            batch_size_counter += 1
+
+            if batch_size_counter >= batch_size:
+                # Process batch of main records
+                new_main_ids = self._process_batch_main_records(
+                    batch,
+                    entity_name,
+                    extract_time,
+                    result,
+                    id_field,
+                    parent_field,
+                    time_field,
+                    default_id_field,
+                    id_generation_strategy,
+                    params,
+                )
+                main_ids.extend(new_main_ids)
+
+                # Process batch of arrays
+                self._process_batch_arrays(
+                    batch,
+                    entity_name,
+                    extract_time,
+                    result,
+                    id_field,
+                    new_main_ids,
+                    default_id_field,
+                    id_generation_strategy,
+                    params,
+                )
+
+                # Reset batch
+                batch = []
+                batch_size_counter = 0
+
+        # Process any remaining records
+        if batch:
+            # Process batch of main records
+            new_main_ids = self._process_batch_main_records(
+                batch,
+                entity_name,
+                extract_time,
+                result,
+                id_field,
+                parent_field,
+                time_field,
+                default_id_field,
+                id_generation_strategy,
+                params,
+            )
+            main_ids.extend(new_main_ids)
+
+            # Process batch of arrays
+            self._process_batch_arrays(
+                batch,
+                entity_name,
+                extract_time,
+                result,
+                id_field,
+                new_main_ids,
+                default_id_field,
+                id_generation_strategy,
+                params,
+            )
+
+        return result
+
+    def _process_batch_main_records(
+        self,
+        batch,
+        entity_name,
+        extract_time,
+        result,
+        id_field,
+        parent_field,
+        time_field,
+        default_id_field,
+        id_generation_strategy,
+        params,
+    ):
+        """
+        Process a batch of main records without array extraction.
+
+        This handles the flattening and metadata annotation of the
+        main records without extracting arrays, which is done separately.
+
+        Args:
+            batch: The batch of records to process
+            entity_name: The name of the entity for the records
+            extract_time: Extraction timestamp
+            result: ProcessingResult to update
+            id_field: Extract ID field name
+            parent_field: Field name for parent ID
+            time_field: Field name for timestamp
+            default_id_field: Field for deterministic IDs
+            id_generation_strategy: Custom ID generation function
+            params: Processing parameters
+
+        Returns:
+            List of extract IDs for the processed records
+        """
+        if not params:
+            params = {}
+
+        # Default parameters
+        recovery_strategy = params.get("recovery_strategy")
+
+        main_ids = []
+        for record in batch:
+            # Flatten the main record
+            flattened = flatten_json(
+                record,
+                separator=params.get("separator", "_"),
+                cast_to_string=params.get("cast_to_string", True),
+                include_empty=params.get("include_empty", False),
+                skip_null=params.get("skip_null", True),
+                skip_arrays=True,  # Always skip arrays - they're extracted separately
+                visit_arrays=params.get("visit_arrays", False),
+                abbreviate_field_names=params.get("abbreviate_field_names", False),
+                max_field_component_length=params.get("max_field_component_length"),
+                preserve_root_component=params.get("preserve_root_component", True),
+                preserve_leaf_component=params.get("preserve_leaf_component", True),
+                custom_abbreviations=params.get("custom_abbreviations"),
+                recovery_strategy=recovery_strategy,
+            )
+
+            # Add metadata and track
+            annotated = annotate_with_metadata(
+                flattened,
+                parent_id=None,  # Main records have no parent
+                extract_time=extract_time,
+                source_field=default_id_field,
+                id_generation_strategy=id_generation_strategy,
+            )
+
+            # Add extract ID to track for child relationships
+            if id_field in annotated:
+                main_ids.append(annotated[id_field])
+            else:
+                # Fallback if ID field not present for some reason
+                main_ids.append(None)
+
+            # Add to result's main table
+            result.add_main_record(annotated)
+
+        return main_ids
+
+    def _process_batch_arrays(
+        self,
+        batch,
+        entity_name,
+        extract_time,
+        result,
+        id_field,
+        main_ids,
+        default_id_field,
+        id_generation_strategy,
+        params,
+    ):
+        """Process arrays for a batch of records efficiently."""
+        # Process arrays for each record in batch
+        for i, record in enumerate(batch):
+            if i >= len(main_ids):
+                # Shouldn't happen, but safety check
+                continue
+
+            # Extract arrays for this record
+            arrays = extract_arrays(
+                record,
+                parent_id=main_ids[i],
+                entity_name=entity_name,
+                separator=params["separator"],
+                cast_to_string=params["cast_to_string"],
+                include_empty=params["include_empty"],
+                skip_null=params["skip_null"],
+                extract_time=extract_time,
+                abbreviate_enabled=params["abbreviate_table_names"],
+                max_component_length=params["max_table_component_length"],
+                preserve_leaf=params["preserve_leaf"],
+                custom_abbreviations=params["custom_abbreviations"],
+                default_id_field=default_id_field,
+                id_generation_strategy=id_generation_strategy,
+            )
+
+            # Add arrays to result for this record
+            for table_name, child_records in arrays.items():
+                for child in child_records:
+                    result.add_child_record(table_name, child)
 
 
 class ChunkedStrategy(ProcessingStrategy):
-    """Strategy for processing data in chunks for memory efficiency."""
+    """Strategy for processing data in chunks to reduce memory usage."""
 
-    @error_context("Failed to process in chunks", log_exceptions=True)
     def process(
         self,
-        data: Union[Dict[str, Any], List[Dict[str, Any]], str, bytes],
+        data,
         entity_name: str,
         extract_time: Optional[Any] = None,
-        chunk_size: Optional[int] = None,
+        result: Optional[ProcessingResult] = None,
         **kwargs,
     ) -> ProcessingResult:
         """
-        Process data in chunks for memory efficiency.
+        Process data in chunks.
 
         Args:
-            data: Input data (various formats)
-            entity_name: Name of the entity being processed
+            data: Input data (iterator or data source)
+            entity_name: Name of the entity
             extract_time: Optional extraction timestamp
-            chunk_size: Size of chunks to process
-            **kwargs: Additional parameters
+            result: Optional existing result to append to
+            **kwargs: Additional processing parameters
 
         Returns:
-            ProcessingResult containing processed data
+            ProcessingResult with processed data
         """
-        # Get iterator for the data
-        data_iterator = self._get_data_iterator(
-            data, kwargs.get("input_format", "auto")
+        # Extract common parameters from kwargs or config
+        params = self._get_common_parameters(**kwargs)
+        extract_time = extract_time or get_current_timestamp()
+
+        # Initialize result if needed
+        result = result or ProcessingResult(
+            main_table=[], child_tables={}, entity_name=entity_name
         )
 
-        # Create in-memory strategy for processing
-        in_memory_strategy = InMemoryStrategy(self.config)
+        # Get batch size with fallback to config
+        batch_size = kwargs.get("batch_size", self.config.processing.batch_size)
 
-        # Process using in-memory strategy with chunking
-        return in_memory_strategy._process_in_chunks(
-            data_iterator, entity_name, extract_time, chunk_size
+        # Get unique ID parameters
+        id_field = params.get("id_field", self.config.metadata.id_field)
+        parent_field = params.get("parent_field", self.config.metadata.parent_field)
+        time_field = params.get("time_field", self.config.metadata.time_field)
+        default_id_field = params.get(
+            "default_id_field", self.config.metadata.default_id_field
+        )
+        id_generation_strategy = params.get(
+            "id_generation_strategy", self.config.metadata.id_generation_strategy
         )
 
-    def _get_data_iterator(
+        # Get data iterator
+        data_iterator = get_data_iterator(None, data)
+
+        # Process in chunks
+        chunk = []
+        chunk_size = 0
+        for record in data_iterator:
+            if not isinstance(record, dict):
+                continue
+
+            chunk.append(record)
+            chunk_size += 1
+
+            if chunk_size >= batch_size:
+                # Process this chunk
+                self._process_chunk(
+                    chunk,
+                    entity_name,
+                    extract_time,
+                    result,
+                    id_field,
+                    parent_field,
+                    time_field,
+                    default_id_field,
+                    id_generation_strategy,
+                    params,
+                )
+
+                # Reset chunk
+                chunk = []
+                chunk_size = 0
+
+        # Process any remaining records
+        if chunk:
+            self._process_chunk(
+                chunk,
+                entity_name,
+                extract_time,
+                result,
+                id_field,
+                parent_field,
+                time_field,
+                default_id_field,
+                id_generation_strategy,
+                params,
+            )
+
+        return result
+
+    def _process_chunk(
         self,
-        data_source: Union[Dict[str, Any], List[Dict[str, Any]], str, bytes],
-        input_format: str = "auto",
-    ) -> Iterator[Dict[str, Any]]:
-        """
-        Get an iterator for the data source based on its format.
+        chunk,
+        entity_name,
+        extract_time,
+        result,
+        id_field,
+        parent_field,
+        time_field,
+        default_id_field,
+        id_generation_strategy,
+        params,
+    ):
+        """Process a chunk of records."""
+        main_ids = []
 
-        Args:
-            data_source: Data source (various formats)
-            input_format: Format of the data or 'auto' for detection
+        # Process each record in the chunk
+        for record in chunk:
+            # Flatten the main record
+            flattened = flatten_json(
+                record,
+                separator=params.get("separator", "_"),
+                cast_to_string=params.get("cast_to_string", True),
+                include_empty=params.get("include_empty", False),
+                skip_null=params.get("skip_null", True),
+                skip_arrays=True,  # Skip arrays - they're extracted separately
+                visit_arrays=params.get("visit_arrays", False),
+                abbreviate_field_names=params.get("abbreviate_field_names", False),
+                max_field_component_length=params.get("max_field_component_length"),
+                preserve_root_component=params.get("preserve_root_component", True),
+                preserve_leaf_component=params.get("preserve_leaf_component", True),
+                custom_abbreviations=params.get("custom_abbreviations"),
+            )
 
-        Returns:
-            Iterator of dictionaries
-        """
-        # Map legacy format names to new format names
-        format_mapping = {
-            "json": "json_string_object",
-            "jsonl": "jsonl_string",
-        }
+            # Add metadata
+            annotated = annotate_with_metadata(
+                flattened,
+                parent_id=None,  # Main records have no parent
+                extract_time=extract_time,
+                source_field=default_id_field,
+                id_generation_strategy=id_generation_strategy,
+            )
 
-        # Map legacy format to new format if needed
-        if input_format in format_mapping:
-            input_format = format_mapping[input_format]
-
-        # Auto-detect format if not specified
-        if input_format == "auto":
-            if isinstance(data_source, dict):
-                input_format = "json_object"
-            elif isinstance(data_source, list):
-                input_format = "json_array"
-            # Check if object is a generator or iterator
-            elif hasattr(data_source, "__iter__") and hasattr(data_source, "__next__"):
-                # Direct return the generator/iterator
-                return data_source
-            elif isinstance(data_source, (str, bytes)):
-                # Try to determine if it's a file path or JSON/JSONL string
-                if isinstance(data_source, str) and os.path.exists(data_source):
-                    # It's a file path
-                    ext = os.path.splitext(data_source)[1].lower()
-                    if ext == ".json":
-                        input_format = "json_file"
-                    elif ext == ".jsonl":
-                        input_format = "jsonl_file"
-                    else:
-                        raise ConfigurationError(f"Unsupported file format: {ext}")
-                else:
-                    # It's a string or bytes, try to parse as JSON
-                    try:
-                        # If it's bytes, decode to string first
-                        data_str = (
-                            data_source.decode("utf-8")
-                            if isinstance(data_source, bytes)
-                            else data_source
-                        )
-                        data_str = data_str.strip()
-
-                        if data_str.startswith("[") and data_str.endswith("]"):
-                            input_format = "json_string_array"
-                        elif data_str.startswith("{") and data_str.endswith("}"):
-                            input_format = "json_string_object"
-                        elif "\n" in data_str:
-                            # Check if it looks like JSONL (multiple JSON objects, one per line)
-                            input_format = "jsonl_string"
-                        else:
-                            input_format = (
-                                "json_string_object"  # Default to single object
-                            )
-                    except Exception as e:
-                        raise ConfigurationError(
-                            f"Failed to determine format of input data: {str(e)}"
-                        )
+            # Extract and process arrays for this record
+            # Track extract ID and add to main table
+            if id_field in annotated:
+                main_ids.append(annotated[id_field])
             else:
-                raise ConfigurationError(f"Unsupported data type: {type(data_source)}")
+                main_ids.append(None)
 
-        # Process based on determined format
-        if input_format == "json_object":
-            # Single object, convert to iterator
-            return iter([data_source])
+            # Add to the result
+            result.add_main_record(annotated)
 
-        elif input_format == "json_array":
-            # Array of objects, convert to iterator
-            return iter(data_source)
-
-        elif input_format == "json_file":
-            # JSON file path
-            try:
-                with open(data_source, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-
-                if isinstance(data, dict):
-                    return iter([data])
-                elif isinstance(data, list):
-                    return iter(data)
-                else:
-                    raise ParsingError(f"Invalid JSON data in {data_source}")
-            except json.JSONDecodeError as e:
-                raise ParsingError(f"Failed to parse JSON file {data_source}: {str(e)}")
-            except IOError as e:
-                raise FileError(f"Failed to read file {data_source}: {str(e)}")
-
-        elif input_format == "jsonl_file":
-            # JSONL file path
-            def jsonl_iterator():
-                with open(data_source, "r", encoding="utf-8") as f:
-                    for line_num, line in enumerate(f, 1):
-                        line = line.strip()
-                        if not line or line.startswith("#"):
-                            continue  # Skip empty lines and comments
-                        try:
-                            yield safe_json_loads(line)
-                        except json.JSONDecodeError as e:
-                            logger.warning(
-                                f"Error parsing line {line_num} in {data_source}: {str(e)}"
-                            )
-                            continue
-
-            return jsonl_iterator()
-
-        elif input_format == "json_string_object":
-            # JSON string (single object)
-            try:
-                data_str = (
-                    data_source.decode("utf-8")
-                    if isinstance(data_source, bytes)
-                    else data_source
+            # Extract and process arrays for this record
+            if id_field in annotated:
+                extract_id = annotated[id_field]
+                arrays = extract_arrays(
+                    record,
+                    parent_id=extract_id,
+                    entity_name=entity_name,
+                    separator=params.get("separator", "_"),
+                    cast_to_string=params.get("cast_to_string", True),
+                    include_empty=params.get("include_empty", False),
+                    skip_null=params.get("skip_null", True),
+                    extract_time=extract_time,
+                    abbreviate_enabled=params.get("abbreviate_table_names", True),
+                    max_component_length=params.get("max_table_component_length"),
+                    preserve_leaf=params.get("preserve_leaf_component", True),
+                    custom_abbreviations=params.get("custom_abbreviations"),
+                    default_id_field=default_id_field,
+                    id_generation_strategy=id_generation_strategy,
                 )
-                data = json.loads(data_str)
 
-                if isinstance(data, dict):
-                    return iter([data])
-                else:
-                    raise ParsingError(f"Expected JSON object, got {type(data)}")
-            except json.JSONDecodeError as e:
-                raise ParsingError(f"Failed to parse JSON string: {str(e)}")
-
-        elif input_format == "json_string_array":
-            # JSON string (array of objects)
-            try:
-                data_str = (
-                    data_source.decode("utf-8")
-                    if isinstance(data_source, bytes)
-                    else data_source
-                )
-                data = json.loads(data_str)
-
-                if isinstance(data, list):
-                    return iter(data)
-                else:
-                    raise ParsingError(f"Expected JSON array, got {type(data)}")
-            except json.JSONDecodeError as e:
-                raise ParsingError(f"Failed to parse JSON string: {str(e)}")
-
-        elif input_format == "jsonl_string":
-            # JSONL string (multiple objects, one per line)
-            try:
-                data_str = (
-                    data_source.decode("utf-8")
-                    if isinstance(data_source, bytes)
-                    else data_source
-                )
-                lines = data_str.strip().split("\n")
-
-                def jsonl_string_iterator():
-                    for line_num, line in enumerate(lines, 1):
-                        line = line.strip()
-                        if not line or line.startswith("#"):
-                            continue  # Skip empty lines and comments
-                        try:
-                            yield safe_json_loads(line)
-                        except json.JSONDecodeError as e:
-                            logger.warning(
-                                f"Error parsing line {line_num} in JSONL string: {str(e)}"
-                            )
-                            continue
-
-                return jsonl_string_iterator()
-            except Exception as e:
-                raise ParsingError(f"Failed to parse JSONL string: {str(e)}")
-
-        else:
-            raise ConfigurationError(f"Unsupported input format: {input_format}")
+                # Add arrays to result for this record
+                for table_name, records in arrays.items():
+                    for child in records:
+                        result.add_child_record(table_name, child)
 
 
 class CSVStrategy(ProcessingStrategy):
@@ -730,6 +1239,7 @@ class CSVStrategy(ProcessingStrategy):
         file_path: str,
         entity_name: str,
         extract_time: Optional[Any] = None,
+        result: Optional[ProcessingResult] = None,
         delimiter: Optional[str] = None,
         has_header: bool = True,
         null_values: Optional[List[str]] = None,
@@ -738,15 +1248,17 @@ class CSVStrategy(ProcessingStrategy):
         skip_rows: int = 0,
         quote_char: Optional[str] = None,
         encoding: str = "utf-8",
+        chunk_size: Optional[int] = None,
         **kwargs,
     ) -> ProcessingResult:
         """
-        Process a CSV file.
+        Process data from a CSV file.
 
         Args:
             file_path: Path to the CSV file
             entity_name: Name of the entity being processed
             extract_time: Optional extraction timestamp
+            result: Optional existing result to append to
             delimiter: CSV delimiter character
             has_header: Whether the CSV has a header row
             null_values: List of strings to treat as null values
@@ -755,122 +1267,303 @@ class CSVStrategy(ProcessingStrategy):
             skip_rows: Number of rows to skip at the beginning
             quote_char: Quote character for CSV fields
             encoding: File encoding
+            chunk_size: Size of chunks to process
             **kwargs: Additional parameters
 
         Returns:
             ProcessingResult containing processed data
         """
-        if not os.path.exists(file_path):
+        # Check file exists
+        if not isinstance(file_path, str) or not os.path.exists(file_path):
             raise FileError(f"File not found: {file_path}")
 
-        if not os.path.isfile(file_path):
-            raise FileError(f"Not a file: {file_path}")
+        # Get extraction timestamp
+        extract_time = extract_time or get_current_timestamp()
 
+        # Initialize result object
+        result = result or ProcessingResult(
+            main_table=[], child_tables={}, entity_name=entity_name
+        )
+
+        # Extract common parameters from kwargs or config
+        params = self._get_common_parameters(**kwargs)
+
+        # Get unique ID parameters
+        id_field = params.get("id_field", self.config.metadata.id_field)
+        parent_field = params.get("parent_field", self.config.metadata.parent_field)
+        time_field = params.get("time_field", self.config.metadata.time_field)
+        default_id_field = params.get(
+            "default_id_field", self.config.metadata.default_id_field
+        )
+        id_generation_strategy = params.get(
+            "id_generation_strategy", self.config.metadata.id_generation_strategy
+        )
+
+        # Process CSV using PyArrow if available (preferred), otherwise use native CSV module
+        # We deliberately avoid using pandas to reduce dependencies
         try:
-            # Try to import csv
-            import csv
+            import pyarrow as pa
+            import pyarrow.csv as csv
 
-            # Default values
-            if delimiter is None:
-                delimiter = ","
+            # Set CSV reading options
+            parse_options = csv.ParseOptions(
+                delimiter=delimiter or ",",
+                quote_char=quote_char or '"',
+                escape_char="\\",
+                newlines_in_values=True,
+            )
 
-            if null_values is None:
-                null_values = [
-                    "",
-                    "NULL",
-                    "null",
-                    "None",
-                    "none",
-                    "NA",
-                    "na",
-                    "N/A",
-                    "n/a",
-                ]
+            read_options = csv.ReadOptions(
+                skip_rows=skip_rows, encoding=encoding, use_threads=True
+            )
 
-            if quote_char is None:
-                quote_char = '"'
+            convert_options = csv.ConvertOptions(
+                null_values=null_values
+                or ["", "NULL", "null", "NA", "na", "N/A", "n/a"],
+                strings_can_be_null=True,
+            )
 
-            # Open the CSV file
-            with open(file_path, "r", encoding=encoding) as f:
-                # Skip initial rows if needed
-                for _ in range(skip_rows):
-                    next(f, None)
+            # Read the CSV file
+            table = csv.read_csv(
+                file_path,
+                parse_options=parse_options,
+                read_options=read_options,
+                convert_options=convert_options,
+            )
 
-                # Create CSV reader
-                csv_reader = csv.reader(f, delimiter=delimiter, quotechar=quote_char)
+            # Convert to records
+            records = []
+            # Convert PyArrow table to Python dict list
+            records = table.to_pylist()
 
-                # Read header if present
-                headers = next(csv_reader) if has_header else None
+            # Process the records in chunks if needed
+            if chunk_size and chunk_size > 0:
+                for i in range(0, len(records), chunk_size):
+                    chunk = records[i : i + chunk_size]
+                    self._process_csv_chunk(
+                        chunk,
+                        entity_name,
+                        extract_time,
+                        result,
+                        id_field,
+                        parent_field,
+                        time_field,
+                        default_id_field,
+                        id_generation_strategy,
+                        params,
+                        sanitize_column_names,
+                    )
+            else:
+                # Process all records at once
+                self._process_csv_chunk(
+                    records,
+                    entity_name,
+                    extract_time,
+                    result,
+                    id_field,
+                    parent_field,
+                    time_field,
+                    default_id_field,
+                    id_generation_strategy,
+                    params,
+                    sanitize_column_names,
+                )
 
-                if headers is None:
-                    # No header, use column indices as field names
-                    sample_row = next(csv_reader, None)
-                    if sample_row is None:
-                        # Empty CSV
-                        return ProcessingResult(
-                            main_table=[],
-                            child_tables={},
-                            entity_name=entity_name,
-                            source_info={"record_count": 0},
-                        )
+        except ImportError:
+            # Fall back to built-in CSV module
+            import csv as csv_stdlib
 
-                    # Create headers based on column count
-                    headers = [f"column_{i}" for i in range(len(sample_row))]
-
-                    # Reset reader
-                    f.seek(0)
+            # Use the csv module
+            records = []
+            try:
+                with open(file_path, "r", encoding=encoding) as f:
+                    # Skip initial rows if needed
                     for _ in range(skip_rows):
                         next(f, None)
-                    csv_reader = csv.reader(
-                        f, delimiter=delimiter, quotechar=quote_char
+
+                    # Set up CSV reader
+                    csv_reader = csv_stdlib.reader(
+                        f, delimiter=delimiter or ",", quotechar=quote_char or '"'
                     )
 
-                # Sanitize header names if requested
-                if sanitize_column_names:
-                    from ..naming.conventions import sanitize_column_names
+                    # Read headers if present
+                    headers = next(csv_reader) if has_header else None
 
-                    headers = sanitize_column_names(
-                        headers, separator="_", replace_with="_", sql_safe=True
-                    )
+                    # If no headers, create positional ones
+                    if not headers:
+                        # Read first row to determine number of columns
+                        first_row = next(csv_reader, None)
+                        if first_row:
+                            num_cols = len(first_row)
+                            headers = [f"col{i}" for i in range(num_cols)]
 
-                # Read all rows into dictionaries
-                records = []
-                for row in csv_reader:
-                    # Skip rows with incorrect number of fields
-                    if len(row) != len(headers):
-                        logger.warning(
-                            f"Skipping row with {len(row)} fields (expected {len(headers)})"
-                        )
-                        continue
+                            # Initialize batch and count
+                            batch = []
+                            count = 0
 
-                    # Create record
-                    record = {}
-                    for i, value in enumerate(row):
-                        # Handle null values
-                        if value in null_values:
-                            record[headers[i]] = None
+                            # Go back to the beginning to re-read all rows including the first one
+                            f.seek(0)
+                            for _ in range(skip_rows):
+                                next(f, None)
+                            csv_reader = csv_stdlib.reader(
+                                f,
+                                delimiter=delimiter or ",",
+                                quotechar=quote_char or '"',
+                            )
                         else:
-                            # Infer types if requested
-                            if infer_types:
-                                # Try to convert to int, float, or bool
-                                if value.isdigit():
-                                    record[headers[i]] = int(value)
-                                elif value.replace(".", "", 1).isdigit():
-                                    record[headers[i]] = float(value)
-                                elif value.lower() in ("true", "false"):
-                                    record[headers[i]] = value.lower() == "true"
+                            headers = []  # No data
+                            batch = []
+                            count = 0
+                    else:
+                        batch = []
+                        count = 0
+
+                    # Process rows
+                    for row in csv_reader:
+                        record = {}
+                        for i, value in enumerate(row):
+                            if i < len(headers):
+                                col_name = headers[i]
+
+                                # Handle null values
+                                if null_values and value in null_values:
+                                    record[col_name] = None
                                 else:
-                                    record[headers[i]] = value
-                            else:
-                                record[headers[i]] = value
+                                    # Infer types if requested
+                                    if infer_types and value:
+                                        try:
+                                            # Try as int
+                                            int_val = int(value)
+                                            if str(int_val) == value:
+                                                record[col_name] = int_val
+                                                continue
+                                        except ValueError:
+                                            pass
 
-                    records.append(record)
+                                        try:
+                                            # Try as float
+                                            float_val = float(value)
+                                            record[col_name] = float_val
+                                            continue
+                                        except ValueError:
+                                            pass
 
-                # Create in-memory strategy for processing
-                in_memory_strategy = InMemoryStrategy(self.config)
+                                        # Check for boolean
+                                        if value.lower() in ("true", "yes", "1"):
+                                            record[col_name] = True
+                                            continue
+                                        elif value.lower() in ("false", "no", "0"):
+                                            record[col_name] = False
+                                            continue
 
-                # Process using in-memory strategy
-                return in_memory_strategy.process(records, entity_name, extract_time)
+                                        # Default to string
+                                        record[col_name] = value
 
-        except Exception as e:
-            raise FileError(f"Failed to process CSV file {file_path}: {str(e)}")
+                        batch.append(record)
+                        count += 1
+
+                        # Process in chunks if requested
+                        if chunk_size and count >= chunk_size:
+                            self._process_csv_chunk(
+                                batch,
+                                entity_name,
+                                extract_time,
+                                result,
+                                id_field,
+                                parent_field,
+                                time_field,
+                                default_id_field,
+                                id_generation_strategy,
+                                params,
+                                sanitize_column_names,
+                            )
+                            batch = []
+                            count = 0
+
+                    # Process any remaining records
+                    if batch:
+                        self._process_csv_chunk(
+                            batch,
+                            entity_name,
+                            extract_time,
+                            result,
+                            id_field,
+                            parent_field,
+                            time_field,
+                            default_id_field,
+                            id_generation_strategy,
+                            params,
+                            sanitize_column_names,
+                        )
+
+            except Exception as e:
+                raise FileError(f"Failed to read CSV file {file_path}: {str(e)}")
+
+        return result
+
+    def _process_csv_chunk(
+        self,
+        records,
+        entity_name,
+        extract_time,
+        result,
+        id_field,
+        parent_field,
+        time_field,
+        default_id_field,
+        id_generation_strategy,
+        params,
+        sanitize_column_names,
+    ):
+        """Process a chunk of CSV records."""
+        # Handle column name sanitization
+        if sanitize_column_names and records:
+            from ..naming.conventions import sanitize_name
+
+            separator = params.get("separator", "_")
+
+            # Create a mapping of original to sanitized column names
+            col_mapping = {}
+            for record in records:
+                for col in list(record.keys()):
+                    if col not in col_mapping:
+                        sanitized = sanitize_name(col, separator, "_")
+                        col_mapping[col] = sanitized
+
+            # Update records with sanitized column names
+            sanitized_records = []
+            for record in records:
+                sanitized_record = {}
+                for col, value in record.items():
+                    sanitized_record[col_mapping.get(col, col)] = value
+                sanitized_records.append(sanitized_record)
+
+            records = sanitized_records
+
+        # Apply cast_to_string if enabled
+        cast_to_string = params.get("cast_to_string", True)
+        if cast_to_string:
+            for record in records:
+                for col, value in list(record.items()):
+                    if value is not None and not isinstance(value, str):
+                        if isinstance(value, bool):
+                            record[col] = "true" if value else "false"
+                        else:
+                            record[col] = str(value)
+
+        # Process each record
+        for record in records:
+            # Add metadata to record
+            annotated_record = annotate_with_metadata(
+                record,
+                id_field=id_field,
+                parent_field=parent_field,
+                time_field=time_field,
+                extract_time=extract_time,
+                source_field=default_id_field,
+                id_generation_strategy=id_generation_strategy,
+                in_place=True,
+            )
+
+            # Add to result
+            result.main_table.append(annotated_record)

@@ -6,6 +6,7 @@ This module provides a Parquet writer using PyArrow.
 
 import os
 import importlib.util
+import pathlib
 from typing import Any, Dict, List, Optional, Union, BinaryIO
 
 from transmog.io.writer_interface import DataWriter
@@ -44,7 +45,19 @@ class ParquetWriter(DataWriter):
         self.compression = compression
         self.options = options
 
-    def write(self, data: Any, destination: Union[str, BinaryIO], **options) -> Any:
+    @classmethod
+    def format_name(cls) -> str:
+        """
+        Get the format name for this writer.
+
+        Returns:
+            str: The format name ("parquet")
+        """
+        return "parquet"
+
+    def write(
+        self, data: Any, destination: Union[str, pathlib.Path, BinaryIO], **options
+    ) -> Any:
         """
         Write data to the specified destination.
 
@@ -64,18 +77,15 @@ class ParquetWriter(DataWriter):
         combined_options = {**self.options, **options}
 
         # Delegate to write_table for implementation
-        if isinstance(destination, str):
-            return self.write_table(data, destination, **combined_options)
-        else:
-            return self.write_table(data, destination, **combined_options)
+        return self.write_table(data, destination, **combined_options)
 
     def write_table(
         self,
         table_data: List[JsonDict],
-        output_path: Union[str, BinaryIO],
+        output_path: Union[str, pathlib.Path, BinaryIO],
         compression: Optional[str] = None,
         **options,
-    ) -> Union[str, BinaryIO]:
+    ) -> Union[str, pathlib.Path, BinaryIO]:
         """
         Write table data to a Parquet file.
 
@@ -110,12 +120,13 @@ class ParquetWriter(DataWriter):
                 empty_table = pa.table({})
 
                 # Write to file or file-like object
-                if isinstance(output_path, str):
+                if isinstance(output_path, (str, pathlib.Path)):
+                    # Convert Path to string if needed
+                    path_str = str(output_path)
+
                     # Ensure directory exists
-                    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-                    pq.write_table(
-                        empty_table, output_path, compression=compression_val
-                    )
+                    os.makedirs(os.path.dirname(path_str) or ".", exist_ok=True)
+                    pq.write_table(empty_table, path_str, compression=compression_val)
                 else:
                     pq.write_table(
                         empty_table, output_path, compression=compression_val
@@ -132,12 +143,13 @@ class ParquetWriter(DataWriter):
             table = pa.table(columns)
 
             # Write to file or file-like object
-            if isinstance(output_path, str):
+            if isinstance(output_path, (str, pathlib.Path)):
+                # Convert Path to string if needed
+                path_str = str(output_path)
+
                 # Ensure directory exists
-                os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-                pq.write_table(
-                    table, output_path, compression=compression_val, **options
-                )
+                os.makedirs(os.path.dirname(path_str) or ".", exist_ok=True)
+                pq.write_table(table, path_str, compression=compression_val, **options)
             else:
                 pq.write_table(
                     table, output_path, compression=compression_val, **options
@@ -153,10 +165,10 @@ class ParquetWriter(DataWriter):
         self,
         main_table: List[JsonDict],
         child_tables: Dict[str, List[JsonDict]],
-        base_path: str,
+        base_path: Union[str, pathlib.Path],
         entity_name: str,
         **options,
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Union[str, pathlib.Path]]:
         """
         Write main and child tables to Parquet files.
 
@@ -183,10 +195,15 @@ class ParquetWriter(DataWriter):
         results = {}
 
         # Ensure base directory exists
-        os.makedirs(base_path, exist_ok=True)
+        base_path_str = str(base_path)
+        os.makedirs(base_path_str, exist_ok=True)
 
         # Write main table
-        main_path = os.path.join(base_path, f"{entity_name}.parquet")
+        if isinstance(base_path, pathlib.Path):
+            main_path = base_path / f"{entity_name}.parquet"
+        else:
+            main_path = os.path.join(base_path_str, f"{entity_name}.parquet")
+
         self.write_table(main_table, main_path, **options)
         results["main"] = main_path
 
@@ -194,7 +211,12 @@ class ParquetWriter(DataWriter):
         for table_name, table_data in child_tables.items():
             # Replace dots and slashes with underscores for file names
             safe_name = table_name.replace(".", "_").replace("/", "_")
-            file_path = os.path.join(base_path, f"{safe_name}.parquet")
+
+            if isinstance(base_path, pathlib.Path):
+                file_path = base_path / f"{safe_name}.parquet"
+            else:
+                file_path = os.path.join(base_path_str, f"{safe_name}.parquet")
+
             self.write_table(table_data, file_path, **options)
             results[table_name] = file_path
 

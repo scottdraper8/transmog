@@ -48,7 +48,11 @@ def _process_value(
     """
     # Handle None/null values
     if value is None:
-        return None if skip_null else ""
+        if skip_null:
+            return None
+        else:
+            # Convert None to empty string when not skipping nulls
+            return ""
 
     # Handle empty strings
     if value == "" and not include_empty:
@@ -194,236 +198,144 @@ def _flatten_json_core(
     max_depth: Optional[int],
     abbreviate_field_names: bool,
     max_field_component_length: Optional[int],
+    preserve_root_component: bool,
     preserve_leaf_component: bool,
     custom_abbreviations: Optional[Dict[str, str]],
     current_depth: int,
     in_place: bool,
     context: CacheContext,
     flatten_func: Callable,
+    recovery_strategy: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
-    Core implementation of JSON flattening logic used by both standard and streaming functions.
+    Core implementation of JSON flattening.
 
-    Args:
-        data: Dictionary to flatten
-        separator: Separator to use between path segments
-        cast_to_string: Whether to cast all values to strings
-        include_empty: Whether to include empty strings
-        skip_null: Whether to skip null values
-        skip_arrays: Whether to skip array flattening
-        visit_arrays: Whether to visit array elements
-        visited: Set of visited object IDs (for circular reference detection)
-        parent_path: Path prefix from parent object
-        path_parts: List of path components (for optimization)
-        path_parts_optimization: Whether to use path parts optimization
-        max_depth: Maximum recursion depth
-        abbreviate_field_names: Whether to abbreviate field names
-        max_field_component_length: Maximum length for each component
-        preserve_leaf_component: Whether to preserve the leaf component
-        custom_abbreviations: Custom abbreviation dictionary
-        current_depth: Current recursion depth
-        in_place: Whether to modify the original object in place
-        context: Cache context ("standard" or "streaming")
-        flatten_func: The flattening function to call recursively
-
-    Returns:
-        Flattened dictionary
+    This internal function handles the actual flattening logic.
+    It's separated from the public interface to allow for proper error
+    context and default parameter handling.
     """
-    # Check for max recursion depth
-    if max_depth is not None and current_depth > max_depth:
-        logger.warning(
-            f"Maximum nesting depth ({max_depth}) exceeded, truncating nested content"
-        )
+    # Check for null or non-dictionary input
+    if data is None:
         return {}
 
-    # Initialize result dictionary
-    result = {}
+    if not isinstance(data, dict):
+        raise TypeError(f"Expected dictionary, got {type(data).__name__}")
 
-    # Check for circular references by object id
+    # Detect circular references
     obj_id = id(data)
     if obj_id in visited:
-        # Instead of raising an exception, return a placeholder for circular references
-        circular_ref_value = "[Circular Reference]"
-        if cast_to_string:
-            circular_ref_value = str(circular_ref_value)
+        # Handle circular reference recovery if a strategy is provided
+        if recovery_strategy is not None:
+            try:
+                # Convert path_parts to a path for the recovery strategy
+                current_path = []
+                if path_parts:
+                    current_path = list(path_parts)
+                elif parent_path:
+                    current_path = [parent_path]
 
-        if parent_path:
-            key = f"{parent_path}{separator}_circular_reference"
-        else:
-            key = "_circular_reference"
+                # First, check if the strategy has the specialized circular reference handler
+                if hasattr(recovery_strategy, "handle_circular_reference"):
+                    circular_error = CircularReferenceError(
+                        "Circular reference detected"
+                    )
+                    replacement = recovery_strategy.handle_circular_reference(
+                        circular_error, current_path
+                    )
+                    # If replacement is a dict, return it directly; otherwise wrap it
+                    if isinstance(replacement, dict):
+                        return replacement
+                    else:
+                        return {"_circular_reference": True, "_value": replacement}
+                # Otherwise try generic recovery
+                elif hasattr(recovery_strategy, "recover"):
+                    circular_error = CircularReferenceError(
+                        "Circular reference detected"
+                    )
+                    replacement = recovery_strategy.recover(
+                        circular_error, path=current_path
+                    )
+                    # If replacement is a dict, return it directly; otherwise wrap it
+                    if isinstance(replacement, dict):
+                        return replacement
+                    else:
+                        return {"_circular_reference": True, "_value": replacement}
+            except Exception as e:
+                # Log recovery failure but continue with standard error
+                logger.warning(f"Failed to recover from circular reference: {e}")
 
-        # Apply abbreviation if needed
-        if abbreviate_field_names and custom_abbreviations:
-            key = abbreviate_field_name(
-                key,
-                separator=separator,
-                max_component_length=max_field_component_length,
-                preserve_leaf=preserve_leaf_component,
-                abbreviation_dict=custom_abbreviations,
-            )
+        # No recovery strategy or recovery failed, raise the standard error
+        raise CircularReferenceError("Circular reference detected")
 
-        result[key] = circular_ref_value
-        return result
-
-    # Add the object to visited set
     visited.add(obj_id)
 
-    # Get abbreviation dictionary if needed
-    abbreviation_dict = None
-    if abbreviate_field_names and custom_abbreviations:
-        default_abbrevs = get_common_abbreviations()
-        abbreviation_dict = default_abbrevs.copy()
-        abbreviation_dict.update(custom_abbreviations)
-    elif abbreviate_field_names:
-        abbreviation_dict = get_common_abbreviations()
-
     try:
-        # Process each key in the object
-        for key, value in data.items():
-            # Sanitize the key to be safe for path construction
-            current_key = sanitize_name(key, separator, "")
+        # Initialize result - either a new dict or use the input data
+        if in_place and isinstance(data, dict):
+            result = data
+            # Create a copy of the keys to safely iterate while modifying
+            keys_to_process = list(data.keys())
 
-            # Build the new key path
-            if parent_path:
-                new_key = f"{parent_path}{separator}{current_key}"
+            # Store items to remove after processing (instead of removing during iteration)
+            keys_to_remove = []
+        else:
+            result = {}
+            # For non-in-place, we can directly use the keys
+            keys_to_process = list(data.keys())
+            keys_to_remove = []
+
+        # Prepare abbreviation dictionary
+        abbreviation_dict = None
+        if abbreviate_field_names and custom_abbreviations:
+            common_abbrevs = get_common_abbreviations()
+            abbreviation_dict = common_abbrevs.copy()
+            abbreviation_dict.update(custom_abbreviations)
+
+        # Check max depth - only for nested recursion, not the top level
+        if max_depth is not None and current_depth > max_depth:
+            # Return an empty result beyond max depth
+            return result
+
+        # Track complex objects that need to be removed for in-place processing
+        complex_keys_to_remove = []
+
+        # Process each key in the dictionary
+        for key in keys_to_process:
+            value = data[key]
+
+            # Skip special keys - often used for metadata or internal purposes
+            if key.startswith("__"):
+                if in_place:
+                    result[key] = value
+                continue
+
+            # Create sanitized key name while preserving underscores
+            # Only replace the separator if it's different from underscores
+            if separator != "_":
+                sanitized_key = sanitize_name(key, separator, "_")
             else:
-                new_key = current_key
-
-            # Handle nested objects
-            if isinstance(value, dict):
-                # Get new path parts for optimization if enabled
-                new_path_parts = (
-                    path_parts + [current_key] if path_parts_optimization else None
+                # If separator is already underscore, preserve it
+                sanitized_key = sanitize_name(
+                    key, separator, "_", preserve_separator=True
                 )
 
-                # Try to recursively flatten nested dictionaries, handling circular references
-                try:
-                    nested_flat = flatten_func(
-                        value,
-                        separator=separator,
-                        cast_to_string=cast_to_string,
-                        include_empty=include_empty,
-                        skip_null=skip_null,
-                        visited=visited,
-                        parent_path=new_key,
-                        path_parts=new_path_parts,
-                        path_parts_optimization=path_parts_optimization,
-                        max_depth=max_depth,
-                        abbreviate_field_names=abbreviate_field_names,
-                        max_field_component_length=max_field_component_length,
-                        preserve_leaf_component=preserve_leaf_component,
-                        custom_abbreviations=custom_abbreviations,
-                        current_depth=current_depth + 1,
-                        in_place=in_place,
-                        mode=context,
-                    )
-                    # Update result with flattened nested dictionary
-                    result.update(nested_flat)
-                except CircularReferenceError:
-                    # Handle circular reference by adding a marker
-                    circular_ref_key = f"{new_key}{separator}_circular_reference"
-                    if abbreviate_field_names and abbreviation_dict:
-                        circular_ref_key = abbreviate_field_name(
-                            circular_ref_key,
-                            separator=separator,
-                            max_component_length=max_field_component_length,
-                            preserve_leaf=preserve_leaf_component,
-                            abbreviation_dict=abbreviation_dict,
-                        )
-                    result[circular_ref_key] = (
-                        "[Circular Reference]"
-                        if not cast_to_string
-                        else "[Circular Reference]"
-                    )
+            # Calculate new key with parent path
+            if parent_path:
+                new_key = f"{parent_path}{separator}{sanitized_key}"
+            else:
+                new_key = sanitized_key
 
-            # Handle array values if not skipping
-            elif isinstance(value, list) and not skip_arrays:
-                # Skip empty arrays
-                if not value:
-                    continue
+            # Update path components if using optimization
+            if path_parts_optimization and path_parts is not None:
+                current_path_parts = path_parts + [sanitized_key]
+            else:
+                current_path_parts = None
 
-                # Format array values according to configuration
-                if visit_arrays:
-                    # If visit_arrays is True, treat array items as object fields
-                    for i, item in enumerate(value):
-                        # Build array item path
-                        item_key = f"{new_key}{separator}{i}"
-
-                        # Handle different item types
-                        if isinstance(item, dict):
-                            # Get new path parts for optimization if enabled
-                            new_path_parts = (
-                                path_parts + [current_key, str(i)]
-                                if path_parts_optimization
-                                else None
-                            )
-
-                            # Try to recursively flatten nested dictionary in array, handling circular references
-                            try:
-                                nested_flat = flatten_func(
-                                    item,
-                                    separator=separator,
-                                    cast_to_string=cast_to_string,
-                                    include_empty=include_empty,
-                                    skip_null=skip_null,
-                                    visited=visited,
-                                    parent_path=item_key,
-                                    path_parts=new_path_parts,
-                                    path_parts_optimization=path_parts_optimization,
-                                    max_depth=max_depth,
-                                    abbreviate_field_names=abbreviate_field_names,
-                                    max_field_component_length=max_field_component_length,
-                                    preserve_leaf_component=preserve_leaf_component,
-                                    custom_abbreviations=custom_abbreviations,
-                                    current_depth=current_depth + 1,
-                                    in_place=in_place,
-                                    mode=context,
-                                )
-                                # Update result with flattened nested dictionary
-                                result.update(nested_flat)
-                            except CircularReferenceError:
-                                # Handle circular reference by adding a marker
-                                circular_ref_key = (
-                                    f"{item_key}{separator}_circular_reference"
-                                )
-                                if abbreviate_field_names and abbreviation_dict:
-                                    circular_ref_key = abbreviate_field_name(
-                                        circular_ref_key,
-                                        separator=separator,
-                                        max_component_length=max_field_component_length,
-                                        preserve_leaf=preserve_leaf_component,
-                                        abbreviation_dict=abbreviation_dict,
-                                    )
-                                result[circular_ref_key] = (
-                                    "[Circular Reference]"
-                                    if not cast_to_string
-                                    else "[Circular Reference]"
-                                )
-                        else:
-                            # Process non-object item as array element
-                            processed_value = _process_value_wrapper(
-                                item,
-                                cast_to_string=cast_to_string,
-                                include_empty=include_empty,
-                                skip_null=skip_null,
-                                context=context,
-                            )
-
-                            if processed_value is not None:
-                                if abbreviate_field_names and abbreviation_dict:
-                                    # Abbreviate the key
-                                    abbreviated_key = abbreviate_field_name(
-                                        item_key,
-                                        separator=separator,
-                                        max_component_length=max_field_component_length,
-                                        preserve_leaf=preserve_leaf_component,
-                                        abbreviation_dict=abbreviation_dict,
-                                    )
-                                    result[abbreviated_key] = processed_value
-                                else:
-                                    result[item_key] = processed_value
-                else:
-                    # Format the entire array as a single value
+            # Handle nested dictionaries
+            if isinstance(value, dict):
+                # Check if we're at the max depth before recursing further
+                if max_depth is not None and current_depth >= max_depth:
+                    # At max depth, include the object itself instead of recursing
                     processed_value = _process_value_wrapper(
                         value,
                         cast_to_string=cast_to_string,
@@ -433,12 +345,103 @@ def _flatten_json_core(
                     )
 
                     if processed_value is not None:
-                        if abbreviate_field_names and abbreviation_dict:
-                            # Abbreviate the key
+                        if abbreviate_field_names:
                             abbreviated_key = abbreviate_field_name(
                                 new_key,
                                 separator=separator,
                                 max_component_length=max_field_component_length,
+                                preserve_root=preserve_root_component,
+                                preserve_leaf=preserve_leaf_component,
+                                abbreviation_dict=abbreviation_dict,
+                            )
+                            result[abbreviated_key] = processed_value
+                        else:
+                            result[new_key] = processed_value
+                elif len(value) == 0:
+                    # Special case: empty dictionary - can be handled as a scalar
+                    # This is common in JSON APIs where empty objects are placeholders
+                    processed_value = _process_value_wrapper(
+                        {},
+                        cast_to_string=cast_to_string,
+                        include_empty=include_empty,
+                        skip_null=skip_null,
+                        context=context,
+                    )
+
+                    if processed_value is not None:
+                        if abbreviate_field_names:
+                            abbreviated_key = abbreviate_field_name(
+                                new_key,
+                                separator=separator,
+                                max_component_length=max_field_component_length,
+                                preserve_root=preserve_root_component,
+                                preserve_leaf=preserve_leaf_component,
+                                abbreviation_dict=abbreviation_dict,
+                            )
+                            result[abbreviated_key] = processed_value
+                        else:
+                            result[new_key] = processed_value
+                else:
+                    # Recursively flatten the nested dictionary
+                    nested_result = flatten_func(
+                        value,
+                        separator=separator,
+                        cast_to_string=cast_to_string,
+                        include_empty=include_empty,
+                        skip_null=skip_null,
+                        skip_arrays=skip_arrays,
+                        visit_arrays=visit_arrays,
+                        visited=visited,
+                        parent_path=new_key,
+                        path_parts=current_path_parts,
+                        path_parts_optimization=path_parts_optimization,
+                        max_depth=max_depth,
+                        abbreviate_field_names=abbreviate_field_names,
+                        max_field_component_length=max_field_component_length,
+                        preserve_root_component=preserve_root_component,
+                        preserve_leaf_component=preserve_leaf_component,
+                        custom_abbreviations=custom_abbreviations,
+                        current_depth=current_depth + 1,
+                        in_place=False,  # Never use in_place for nested calls
+                        mode=context,
+                        recovery_strategy=recovery_strategy,
+                    )
+
+                    # Add the flattened results to our result dict
+                    for nested_key, nested_value in nested_result.items():
+                        result[nested_key] = nested_value
+
+                # For in-place modification, mark the original key for removal
+                if in_place:
+                    # Only remove complex objects after flattening them
+                    complex_keys_to_remove.append(key)
+
+            # Handle arrays
+            elif isinstance(value, list):
+                # Skip arrays if configured to do so
+                if skip_arrays:
+                    # Mark array field for removal
+                    if in_place:
+                        keys_to_remove.append(key)
+                    continue
+
+                # Keep arrays as-is if not visiting or if empty
+                if not visit_arrays or len(value) == 0:
+                    processed_value = _process_value_wrapper(
+                        value,
+                        cast_to_string=cast_to_string,
+                        include_empty=include_empty,
+                        skip_null=skip_null,
+                        context=context,
+                    )
+
+                    if processed_value is not None:
+                        if abbreviate_field_names:
+                            abbreviated_key = abbreviate_field_name(
+                                new_key,
+                                separator=separator,
+                                max_component_length=max_field_component_length,
+                                preserve_root=preserve_root_component,
                                 preserve_leaf=preserve_leaf_component,
                                 abbreviation_dict=abbreviation_dict,
                             )
@@ -446,25 +449,95 @@ def _flatten_json_core(
                         else:
                             result[new_key] = processed_value
 
-            # Process non-array, non-object values directly
+                    # For in-place modification, mark original key for removal if different
+                    if in_place and key != sanitized_key:
+                        keys_to_remove.append(key)
+
+                    continue
+
+                # Process array elements if we're visiting arrays
+                for i, item in enumerate(value):
+                    # Handle dictionary array elements by recursively flattening
+                    if isinstance(item, dict):
+                        nested_result = flatten_func(
+                            item,
+                            separator=separator,
+                            cast_to_string=cast_to_string,
+                            include_empty=include_empty,
+                            skip_null=skip_null,
+                            skip_arrays=skip_arrays,
+                            visit_arrays=visit_arrays,
+                            visited=visited,
+                            parent_path=f"{new_key}{separator}{i}",
+                            path_parts=current_path_parts,
+                            path_parts_optimization=path_parts_optimization,
+                            max_depth=max_depth,
+                            abbreviate_field_names=abbreviate_field_names,
+                            max_field_component_length=max_field_component_length,
+                            preserve_root_component=preserve_root_component,
+                            preserve_leaf_component=preserve_leaf_component,
+                            custom_abbreviations=custom_abbreviations,
+                            current_depth=current_depth + 1,
+                            in_place=False,  # Never use in_place for nested calls
+                            mode=context,
+                            recovery_strategy=recovery_strategy,
+                        )
+
+                        # Add the flattened results to our result dict
+                        for nested_key, nested_value in nested_result.items():
+                            result[nested_key] = nested_value
+                    # Handle non-dictionary array elements directly
+                    else:
+                        # Create item key with index
+                        item_key = f"{new_key}{separator}{i}"
+
+                        # Process the value
+                        processed_value = _process_value_wrapper(
+                            item,
+                            cast_to_string=cast_to_string,
+                            include_empty=include_empty,
+                            skip_null=skip_null,
+                            context=context,
+                        )
+
+                        if processed_value is not None:
+                            if abbreviate_field_names:
+                                # Abbreviate the key
+                                abbreviated_key = abbreviate_field_name(
+                                    item_key,
+                                    separator=separator,
+                                    max_component_length=max_field_component_length,
+                                    preserve_root=preserve_root_component,
+                                    preserve_leaf=preserve_leaf_component,
+                                    abbreviation_dict=abbreviation_dict,
+                                )
+                                result[abbreviated_key] = processed_value
+                            else:
+                                result[item_key] = processed_value
+
+                # For in-place modification, mark arrays for removal
+                if in_place:
+                    complex_keys_to_remove.append(key)
+
+            # Handle scalar values
             else:
-                # Process the value
+                # Process the scalar value
                 processed_value = _process_value_wrapper(
                     value,
                     cast_to_string=cast_to_string,
                     include_empty=include_empty,
                     skip_null=skip_null,
-                    context=context,  # Still pass but it will be ignored
+                    context=context,
                 )
 
-                # Add to result if not skipped
                 if processed_value is not None:
-                    if abbreviate_field_names and abbreviation_dict:
+                    if abbreviate_field_names:
                         # Abbreviate the key
                         abbreviated_key = abbreviate_field_name(
                             new_key,
                             separator=separator,
                             max_component_length=max_field_component_length,
+                            preserve_root=preserve_root_component,
                             preserve_leaf=preserve_leaf_component,
                             abbreviation_dict=abbreviation_dict,
                         )
@@ -472,10 +545,26 @@ def _flatten_json_core(
                     else:
                         result[new_key] = processed_value
 
+                # For in-place modification, mark original key for removal if different
+                if in_place and key != sanitized_key:
+                    keys_to_remove.append(key)
+
+        # Remove keys outside the loop to avoid dictionary size change during iteration
+        if in_place:
+            # First remove all complex nested objects that have been flattened
+            for key in complex_keys_to_remove:
+                if key in result:
+                    result.pop(key, None)
+
+            # Then remove any other keys that need to be replaced
+            for key in keys_to_remove:
+                if key in result:
+                    result.pop(key, None)
+
         return result
     finally:
         # Remove from visited set when done to allow reuse of objects in different contexts
-        if in_place and obj_id in visited:
+        if obj_id in visited:
             visited.remove(obj_id)
 
 
@@ -499,35 +588,42 @@ def flatten_json(
     max_depth: Optional[int] = None,
     abbreviate_field_names: Optional[bool] = None,
     max_field_component_length: Optional[int] = None,
+    preserve_root_component: Optional[bool] = None,
     preserve_leaf_component: Optional[bool] = None,
     custom_abbreviations: Optional[Dict[str, str]] = None,
     current_depth: int = 0,
     in_place: bool = False,
     mode: FlattenMode = "standard",
+    recovery_strategy: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
-    Flatten a nested JSON object into a single-level dictionary.
+    Flatten a nested dictionary into a single-level structure.
+
+    Keys in the flattened dictionary will be created by joining
+    the nested path with the specified separator.
 
     Args:
-        data: Dictionary to flatten
-        separator: Separator to use between path segments
-        cast_to_string: Whether to cast all values to strings
-        include_empty: Whether to include empty strings
-        skip_null: Whether to skip null values
-        skip_arrays: Whether to skip array flattening
-        visit_arrays: Whether to visit array elements
-        visited: Set of visited object IDs (for circular reference detection)
-        parent_path: Path prefix from parent object
-        path_parts: List of path components (for optimization)
+        data: Nested JSON data to flatten
+        separator: Character used to join nested keys
+        cast_to_string: Convert all values to strings
+        include_empty: Include empty strings in output
+        skip_null: Skip null values in output
+        skip_arrays: Skip array fields
+        visit_arrays: Process arrays into separate fields
+        visited: Set of already visited objects to prevent circular refs
+        parent_path: Path prefix for flattened keys
+        path_parts: Precomputed path parts for efficiency (internal)
         path_parts_optimization: Whether to use path parts optimization
-        max_depth: Maximum recursion depth
+        max_depth: Maximum nesting depth to process
         abbreviate_field_names: Whether to abbreviate field names
-        max_field_component_length: Maximum length for each component
-        preserve_leaf_component: Whether to preserve the leaf component
+        max_field_component_length: Maximum length of field name components
+        preserve_root_component: Don't abbreviate root component
+        preserve_leaf_component: Don't abbreviate leaf component
         custom_abbreviations: Custom abbreviation dictionary
-        current_depth: Current recursion depth
+        current_depth: Current nesting depth (internal)
         in_place: Whether to modify the original object in place
         mode: Processing mode ("standard" for regular processing, "streaming" for memory-efficient)
+        recovery_strategy: Recovery strategy for handling circular references
 
     Returns:
         Flattened dictionary
@@ -545,41 +641,45 @@ def flatten_json(
     if skip_null is None:
         skip_null = settings.get_option("skip_null")
 
-    if visit_arrays is None:
-        visit_arrays = settings.get_option("visit_arrays")
-
     if path_parts_optimization is None:
         path_parts_optimization = settings.get_option("path_parts_optimization")
 
-    if max_depth is None:
-        max_depth = settings.get_option("max_nesting_depth")
-
-    # Initialize visitor tracking if not provided
     if visited is None:
         visited = set()
 
-    # Initialize path components list if using optimization
-    if path_parts_optimization and path_parts is None:
-        path_parts = []
+    if path_parts is None and path_parts_optimization:
+        if parent_path:
+            path_parts = parent_path.split(separator)
+        else:
+            path_parts = []
 
-    # Get abbreviation settings if not provided
+    # Check abbreviation settings
     if abbreviate_field_names is None:
         abbreviate_field_names = settings.get_option("abbreviate_field_names")
 
     if max_field_component_length is None:
         max_field_component_length = settings.get_option("max_field_component_length")
 
+    if preserve_root_component is None:
+        preserve_root_component = settings.get_option("preserve_root_component")
+
     if preserve_leaf_component is None:
         preserve_leaf_component = settings.get_option("preserve_leaf_component")
 
-    if custom_abbreviations is None:
-        custom_abbreviations = settings.get_option("custom_abbreviations")
+    if visit_arrays is None:
+        visit_arrays = settings.get_option("visit_arrays")
 
-    # Select the context and function reference based on mode
-    context: CacheContext = mode
+    # Use a recursive reference to the function itself for nested calls
     flatten_func_ref = flatten_json
 
-    # Delegate to core implementation
+    # Choose the processing context
+    context = "streaming" if mode == "streaming" else "standard"
+
+    # Clear the process cache at the end of processing in standard mode
+    if current_depth == 0 and context == "standard":
+        _clear_process_cache(context)
+
+    # Do the actual flattening
     return _flatten_json_core(
         data=data,
         separator=separator,
@@ -595,10 +695,12 @@ def flatten_json(
         max_depth=max_depth,
         abbreviate_field_names=abbreviate_field_names,
         max_field_component_length=max_field_component_length,
+        preserve_root_component=preserve_root_component,
         preserve_leaf_component=preserve_leaf_component,
         custom_abbreviations=custom_abbreviations,
         current_depth=current_depth,
         in_place=in_place,
         context=context,
         flatten_func=flatten_func_ref,
+        recovery_strategy=recovery_strategy,
     )

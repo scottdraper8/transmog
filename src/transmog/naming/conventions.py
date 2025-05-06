@@ -75,20 +75,62 @@ def get_table_name(
 def sanitize_name(
     name: str,
     separator: str = "_",
-    replace_with: str = "",
+    replace_with: str = "_",
+    sql_safe: bool = True,
+    preserve_separator: bool = False,
 ) -> str:
     """
-    Sanitize names to prevent issues with path parsing.
+    Sanitize names to prevent issues with path parsing and SQL compatibility.
 
     Args:
         name: Name to sanitize
         separator: Character to replace
         replace_with: Replacement string
+        sql_safe: Make names SQL-safe (remove spaces, special chars)
+        preserve_separator: Whether to preserve the separator character when it's used in field names
 
     Returns:
         Sanitized name
     """
-    return name.replace(separator, replace_with)
+    # Only replace the separator with replace_with if they're different and not preserving
+    if separator != replace_with and not preserve_separator:
+        sanitized = name.replace(separator, replace_with)
+    else:
+        sanitized = name
+
+    # Make SQL-safe if requested
+    if sql_safe:
+        # Replace spaces with underscores
+        sanitized = sanitized.replace(" ", "_")
+
+        # Replace dashes with underscores to preserve readability
+        sanitized = sanitized.replace("-", "_")
+
+        # Replace other special characters while preserving underscores
+        result = ""
+        last_was_underscore = False
+
+        for c in sanitized:
+            if c.isalnum() or c == "_":
+                result += c
+                last_was_underscore = c == "_"
+            else:
+                # Replace special char with underscore if not already preceded by one
+                if not last_was_underscore:
+                    result += "_"
+                    last_was_underscore = True
+
+        sanitized = result
+
+        # Ensure it doesn't start with a number
+        if sanitized and sanitized[0].isdigit():
+            sanitized = f"col_{sanitized}"
+
+        # Handle empty names
+        if not sanitized:
+            sanitized = "unnamed_field"
+
+    return sanitized
 
 
 def sanitize_column_names(
@@ -111,30 +153,10 @@ def sanitize_column_names(
     """
     result = []
     for column in columns:
-        # Replace separator characters
-        sanitized = sanitize_name(column, separator, replace_with)
-
-        # Make SQL-safe if requested
-        if sql_safe:
-            # Replace spaces with underscores
-            sanitized = sanitized.replace(" ", "_")
-
-            # Replace dashes with underscores to preserve readability
-            sanitized = sanitized.replace("-", "_")
-
-            # Replace other special characters
-            sanitized = "".join(
-                c if c.isalnum() or c == "_" else "_" for c in sanitized
-            )
-
-            # Ensure it doesn't start with a number
-            if sanitized and sanitized[0].isdigit():
-                sanitized = f"col_{sanitized}"
-
-            # Handle empty column names
-            if not sanitized:
-                sanitized = "unnamed_column"
-
+        # Use the updated sanitize_name function
+        sanitized = sanitize_name(
+            column, separator=separator, replace_with=replace_with, sql_safe=sql_safe
+        )
         result.append(sanitized)
 
     return result

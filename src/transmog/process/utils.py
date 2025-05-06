@@ -51,15 +51,28 @@ def get_common_config_params(
     }
 
 
-def get_batch_size(processor, chunk_size: Optional[int] = None) -> int:
+def get_batch_size(config_or_processor, chunk_size: Optional[int] = None) -> int:
     """
     Get the batch size, using provided value or config default.
 
     Args:
-        processor: Processor instance
+        config_or_processor: Processor or TransmogConfig instance
         chunk_size: Optional chunk size override
 
     Returns:
         Batch size to use
     """
-    return chunk_size or processor.config.processing.batch_size
+    # Handle chunk_size kwargs being a dict
+    if isinstance(chunk_size, dict):
+        chunk_size = chunk_size.get("chunk_size") or None
+
+    # Extract batch size from either config or processor
+    if hasattr(config_or_processor, "processing"):
+        # It's a TransmogConfig object
+        return chunk_size or config_or_processor.processing.batch_size
+    elif hasattr(config_or_processor, "config"):
+        # It's a Processor object
+        return chunk_size or config_or_processor.config.processing.batch_size
+    else:
+        # Default to a reasonable batch size
+        return chunk_size or 1000

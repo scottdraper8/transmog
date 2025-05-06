@@ -12,7 +12,19 @@ import logging
 import os
 import sys
 import traceback
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar, Union, cast
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+    Type,
+)
 
 # Import the central dependency manager
 from transmog.dependencies import DependencyManager
@@ -28,6 +40,10 @@ from .exceptions import (
     ProcessingError,
     ValidationError,
 )
+
+from .recovery import RecoveryStrategy
+
+from ..config.settings import settings
 
 # Set up logging
 logger = logging.getLogger("transmog")
@@ -183,19 +199,18 @@ def handle_circular_reference(
 
 def error_context(
     context_message: str,
-    *,
-    log_exceptions: bool = True,
-    reraise: bool = True,
     wrap_as: Optional[Callable[[Exception], Exception]] = None,
+    reraise: bool = True,
+    log_exceptions: bool = True,
 ) -> Callable[[Callable[..., R]], Callable[..., R]]:
     """
-    Decorator to add context to exceptions and handle logging consistently.
+    Decorator to add context to errors raised by a function.
 
     Args:
-        context_message: Context message to add to exceptions
-        log_exceptions: Whether to log exceptions
+        context_message: Error context prefix
+        wrap_as: Function to wrap exceptions
         reraise: Whether to reraise exceptions
-        wrap_as: Function to wrap exceptions (or None to keep original)
+        log_exceptions: Whether to log exceptions
 
     Returns:
         Decorated function
@@ -206,6 +221,39 @@ def error_context(
         def wrapper(*args: Any, **kwargs: Any) -> R:
             try:
                 return func(*args, **kwargs)
+            except CircularReferenceError as e:
+                # Special handling for circular references to avoid deep nested errors
+                error_msg = f"{context_message} in {func.__qualname__}: {str(e)}"
+
+                # Log the exception if requested
+                if log_exceptions:
+                    logger.error(error_msg)
+
+                # Try recovery specific to circular references if available
+                recovery_strategy = kwargs.get("recovery_strategy")
+                if recovery_strategy:
+                    # Get path information
+                    path = kwargs.get("path_parts", [])
+                    if not path and "parent_path" in kwargs and kwargs["parent_path"]:
+                        separator = kwargs.get("separator", "_")
+                        path = kwargs["parent_path"].split(separator)
+
+                    try:
+                        # Try circular reference specific recovery
+                        if hasattr(recovery_strategy, "handle_circular_reference"):
+                            return recovery_strategy.handle_circular_reference(e, path)
+                        # Try generic recovery
+                        elif hasattr(recovery_strategy, "recover"):
+                            return recovery_strategy.recover(e, path=path)
+                    except Exception as recovery_error:
+                        logger.warning(f"Recovery failed: {str(recovery_error)}")
+
+                # If no recovery, wrap and raise
+                if wrap_as:
+                    raise wrap_as(e) from e
+                else:
+                    raise
+
             except Exception as e:
                 # Format the error message with function info
                 func_name = func.__qualname__
@@ -227,6 +275,23 @@ def error_context(
                             )
                         )
 
+                # Try recovery if recovery strategy is available
+                recovery_strategy = kwargs.get("recovery_strategy")
+                if recovery_strategy and hasattr(recovery_strategy, "recover"):
+                    # Get current path parts if available for better error context
+                    path = kwargs.get("path_parts", [])
+                    if "parent_path" in kwargs and not path and kwargs["parent_path"]:
+                        # Try to extract path from parent_path using separator
+                        separator = kwargs.get("separator", "_")
+                        path = kwargs["parent_path"].split(separator)
+
+                    try:
+                        # Try generic recovery with path context
+                        return recovery_strategy.recover(e, path=path)
+                    except Exception as re:
+                        # If recovery fails, continue with normal error handling
+                        logger.warning(f"Recovery failed: {str(re)}")
+
                 # Wrap exception if requested
                 if wrap_as is not None:
                     new_exception = wrap_as(e)
@@ -234,10 +299,12 @@ def error_context(
                         new_exception.__cause__ = e
                     if reraise:
                         raise new_exception
-                elif reraise:
-                    raise
+                    return cast(R, None)  # Return None if not reraising
 
-                return None  # This is never reached if reraise=True
+                # Propagate the original exception
+                if reraise:
+                    raise
+                return cast(R, None)  # Return None if not reraising
 
         return wrapper
 
@@ -246,9 +313,10 @@ def error_context(
 
 def try_with_recovery(
     func: Callable[..., T],
-    recovery_func: Callable[[Exception], T],
-    *args: Any,
-    **kwargs: Any,
+    recovery_func: Optional[Callable[[Exception], T]] = None,
+    recovery_strategy: Optional[RecoveryStrategy] = None,
+    *func_args: Any,
+    **func_kwargs: Any,
 ) -> T:
     """
     Execute a function with recovery handling.
@@ -260,16 +328,22 @@ def try_with_recovery(
     Args:
         func: The function to execute
         recovery_func: Function to call if an exception is raised
-        *args: Positional arguments to pass to func
-        **kwargs: Keyword arguments to pass to func
+        recovery_strategy: Optional recovery strategy to use
+        *func_args: Positional arguments to pass to func
+        **func_kwargs: Keyword arguments to pass to func
 
     Returns:
         The result of func or recovery_func if an exception occurred
     """
     try:
-        return func(*args, **kwargs)
+        return func(*func_args, **func_kwargs)
     except Exception as e:
-        return recovery_func(e)
+        if recovery_func:
+            return recovery_func(e)
+        elif recovery_strategy:
+            return recovery_strategy.recover(e)
+        else:
+            raise
 
 
 def validate_input(

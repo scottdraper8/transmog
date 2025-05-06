@@ -29,8 +29,9 @@ DEFAULT_OPTIONS = {
     "visit_arrays": False,
     "abbreviate_table_names": True,
     "abbreviate_field_names": True,
-    "max_table_component_length": 8,
-    "max_field_component_length": 8,
+    "max_table_component_length": 4,
+    "max_field_component_length": 4,
+    "preserve_root_component": True,
     "preserve_leaf_component": True,
     "custom_abbreviations": {},
     "path_parts_optimization": True,
@@ -78,6 +79,7 @@ class TransmogSettings:
     DEFAULT_ABBREVIATE_FIELD_NAMES = True
     DEFAULT_MAX_TABLE_COMPONENT_LENGTH = 4
     DEFAULT_MAX_FIELD_COMPONENT_LENGTH = 4
+    DEFAULT_PRESERVE_ROOT_COMPONENT = True
     DEFAULT_PRESERVE_LEAF_COMPONENT = True
     DEFAULT_CUSTOM_ABBREVIATIONS = {}
 

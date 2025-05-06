@@ -129,9 +129,17 @@ class Processor:
         return cls(TransmogConfig.performance_optimized())
 
     @classmethod
-    def with_deterministic_ids(cls, id_fields: Dict[str, str]) -> "Processor":
-        """Create a processor with deterministic ID generation."""
-        return cls(TransmogConfig.with_deterministic_ids(id_fields))
+    def with_deterministic_ids(cls, source_field: str) -> "Processor":
+        """
+        Create a processor with deterministic ID generation.
+
+        Args:
+            source_field: Field name to use for deterministic ID generation
+
+        Returns:
+            Processor configured with deterministic ID generation
+        """
+        return cls(TransmogConfig.with_deterministic_ids(source_field))
 
     @classmethod
     def with_custom_id_generation(
@@ -622,23 +630,83 @@ class Processor:
         Process data with the specified memory mode.
 
         Args:
-            data: Input data as list or iterator
-            entity_name: Name of the entity
+            data: Input data to process
+            entity_name: Entity name
             extract_time: Optional extraction timestamp
             memory_mode: Memory optimization mode
 
         Returns:
-            ProcessingResult containing processed data
+            ProcessingResult
         """
-        # Create appropriate strategy based on memory mode
-        if memory_mode == ProcessingMode.LOW_MEMORY:
-            strategy = ChunkedStrategy(self.config)
-        else:
-            strategy = InMemoryStrategy(self.config)
+        # Set a default extract time if none provided
+        if extract_time is None:
+            extract_time = get_current_timestamp()
 
-        # Process using selected strategy
-        return strategy.process(
-            data, entity_name=entity_name, extract_time=extract_time
+        # Get parameters from config
+        params = get_common_config_params(self.config)
+
+        # Add recovery strategy to params
+        if self.config.error_handling.recovery_strategy:
+            from ..error.recovery import (
+                STRICT,
+                DEFAULT,
+                LENIENT,
+                StrictRecovery,
+                SkipAndLogRecovery,
+                PartialProcessingRecovery,
+            )
+
+            # Create the recovery strategy instance
+            strategy_name = self.config.error_handling.recovery_strategy
+            recovery_strategy = None
+
+            if strategy_name == "strict":
+                recovery_strategy = STRICT
+            elif strategy_name == "skip":
+                recovery_strategy = DEFAULT
+            elif strategy_name == "partial":
+                recovery_strategy = LENIENT
+            elif isinstance(
+                strategy_name,
+                (StrictRecovery, SkipAndLogRecovery, PartialProcessingRecovery),
+            ):
+                recovery_strategy = strategy_name
+
+            # Add to params
+            if recovery_strategy:
+                params["recovery_strategy"] = recovery_strategy
+
+        # Choose the appropriate strategy for this data
+        if memory_mode == ProcessingMode.STANDARD:
+            # For standard mode, process in memory with the InMemoryStrategy
+            processing_strategy = InMemoryStrategy()
+        elif memory_mode == ProcessingMode.MEMORY_OPTIMIZED:
+            # For memory-optimized mode, use the BatchStrategy with a smaller batch size
+            batch_size = get_batch_size(
+                self.config.processing.batch_size,
+                memory_mode,
+                data_len=getattr(data, "__len__", lambda: None)(),
+            )
+            processing_strategy = BatchStrategy(batch_size=batch_size)
+        elif memory_mode == ProcessingMode.PERFORMANCE_OPTIMIZED:
+            # For performance-optimized mode, use a larger batch size
+            batch_size = get_batch_size(
+                self.config.processing.batch_size,
+                memory_mode,
+                data_len=getattr(data, "__len__", lambda: None)(),
+            )
+            processing_strategy = BatchStrategy(batch_size=batch_size)
+        else:
+            # Default to InMemoryStrategy for other modes
+            processing_strategy = InMemoryStrategy()
+
+        # Process the data with the chosen strategy
+        return processing_strategy.process(
+            data,
+            entity_name=entity_name,
+            extract_time=extract_time,
+            config=self.config,
+            params=params,
         )
 
     def process_to_format(

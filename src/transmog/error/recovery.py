@@ -1,151 +1,169 @@
 """
-Recovery strategies for handling errors during processing.
+Recovery strategies for error handling.
 
-This module provides a framework for error recovery during data processing operations,
-enabling robust handling of malformed or unexpected data. Recovery strategies define
-how the system should respond to different types of errors, allowing for flexible
-error handling approaches ranging from strict (fail fast) to lenient (best effort).
-
-Key concepts:
-- Recovery strategies define how to handle different error types
-- Multiple predefined strategies are available for common use cases
-- Custom strategies can be created by extending the base RecoveryStrategy class
-- The with_recovery decorator applies strategies to any function
-
-Usage example:
-    ```python
-    from transmog.error import SkipAndLogRecovery, with_recovery
-
-    # Create a recovery strategy
-    recovery = SkipAndLogRecovery(log_level=logging.WARNING)
-
-    # Apply recovery to a function that might fail
-    @with_recovery(strategy=recovery)
-    def process_data(data):
-        # Processing that might raise exceptions
-        return transform_data(data)
-
-    # Or apply recovery inline
-    result = with_recovery(process_data, strategy=recovery, data=input_data)
-    ```
+Provides different strategies for recovering from errors during processing.
 """
 
 import logging
-import json
 import os
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar, Union
 import functools
+import traceback
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar, Union, Type
+from abc import ABC, abstractmethod
 
 from .exceptions import (
-    CircularReferenceError,
-    FileError,
-    ParsingError,
-    ProcessingError,
     TransmogError,
+    ProcessingError,
+    ParsingError,
+    FileError,
+    ConfigurationError,
     ValidationError,
+    CircularReferenceError,
 )
-from .handling import logger
 
+from ..config.settings import settings
+
+# Set up logger
+logger = logging.getLogger("transmog")
+
+# Type variable for generic return types
 T = TypeVar("T")
 
 
-class RecoveryStrategy:
-    """
-    Base class for recovery strategies.
+class RecoveryStrategy(ABC):
+    """Base class for recovery strategies."""
 
-    Recovery strategies provide a consistent way to handle errors during processing
-    and decide how to proceed when encountering malformed or invalid data. They
-    implement methods for handling different types of errors, each returning an
-    appropriate recovery value or re-raising the exception.
-
-    To create a custom recovery strategy, extend this class and implement all
-    the required methods to define your custom error handling behavior.
-
-    Example:
-        ```python
-        class CustomRecovery(RecoveryStrategy):
-            def handle_parsing_error(self, error, source=None):
-                # Custom logic to handle parsing errors
-                logger.error(f"Parsing error in {source}: {error}")
-                return {"error": str(error)}  # Return fallback value
-        ```
-    """
-
-    def handle_parsing_error(
-        self, error: ParsingError, source: Optional[str] = None
+    @abstractmethod
+    def recover(
+        self, error: Exception, entity_name: Optional[str] = None, **kwargs: Any
     ) -> Any:
         """
-        Handle JSON parsing errors.
+        Recover from an error.
 
         Args:
-            error: The parsing error that occurred
-            source: Optional source identifier (e.g., file name)
+            error: The error to recover from
+            entity_name: Optional entity name for context
+            **kwargs: Additional parameters for recovery
 
         Returns:
-            Recovery value or re-raises the exception
-        """
-        raise NotImplementedError()
+            The recovered value or result
 
-    def handle_processing_error(
-        self, error: ProcessingError, entity_name: Optional[str] = None
-    ) -> Any:
+        Raises:
+            Exception: If recovery is not possible
         """
-        Handle data processing errors.
+        pass
+
+    def recover_or_raise(
+        self,
+        func: Callable[..., T],
+        *args: Any,
+        exception_type: Optional[Type[Exception]] = None,
+        entity_name: Optional[str] = None,
+        **kwargs: Any,
+    ) -> T:
+        """
+        Execute a function with recovery or re-raise a specified error.
+
+        This method executes the given function and, if an error occurs,
+        passes it to the recovery strategy appropriate for the error type.
+        If the exception_type is specified and the error doesn't match that type,
+        the error is re-raised without attempting recovery.
 
         Args:
-            error: The processing error that occurred
-            entity_name: Optional entity name being processed
+            func: Function to execute
+            *args: Arguments to pass to the function
+            exception_type: Optional specific exception type to handle
+            entity_name: Name of the entity being processed
+            **kwargs: Additional keyword arguments for the function
 
         Returns:
-            Recovery value or re-raises the exception
+            Result from the function or recovery mechanism
+
+        Raises:
+            Exception: If the error cannot be recovered from
         """
-        raise NotImplementedError()
+        # No positional args - just call the function directly
+        if not args:
+            try:
+                return func(**kwargs)
+            except Exception as e:
+                # Re-raise without wrapping if it's not the target exception type
+                if exception_type and not isinstance(e, exception_type):
+                    raise
 
-    def handle_circular_reference(
-        self, error: CircularReferenceError, path: List[str]
-    ) -> Any:
-        """
-        Handle circular reference errors.
+                # For StrictRecovery, re-raise the original exception
+                if (
+                    exception_type
+                    and isinstance(e, exception_type)
+                    and isinstance(self, StrictRecovery)
+                ):
+                    raise
 
-        Args:
-            error: The circular reference error that occurred
-            path: Path where the circular reference was detected
+                # Otherwise, wrap in ProcessingError for better context
+                if not isinstance(e, ProcessingError):
+                    error = ProcessingError(f"Error processing data: {e}")
+                else:
+                    error = e
 
-        Returns:
-            Recovery value or re-raises the exception
-        """
-        raise NotImplementedError()
+                return self.recover(error, entity_name=entity_name, **kwargs)
 
-    def handle_file_error(
-        self, error: FileError, file_path: Optional[str] = None
-    ) -> Any:
-        """
-        Handle file-related errors.
+        # Process positional args with flexible handling
+        # Interpret args based on common calling patterns
+        data_args = []
+        if len(args) >= 1:
+            data_args = [args[0]]  # First arg is data
 
-        Args:
-            error: The file error that occurred
-            file_path: Optional file path that caused the error
+            if len(args) > 1:
+                exception_type = args[1]  # Second arg is exception_type
 
-        Returns:
-            Recovery value or re-raises the exception
-        """
-        raise NotImplementedError()
+            if len(args) > 2:
+                entity_name = args[2]  # Third arg is entity_name
+
+            # Any remaining args stay in data_args
+            if len(args) > 3:
+                data_args.extend(args[3:])
+
+        try:
+            return func(*data_args, **kwargs)
+        except Exception as e:
+            # Re-raise without wrapping if it's not the target exception type
+            if exception_type and not isinstance(e, exception_type):
+                raise
+
+            # For StrictRecovery, re-raise the original exception
+            if (
+                exception_type
+                and isinstance(e, exception_type)
+                and isinstance(self, StrictRecovery)
+            ):
+                raise
+
+            # Otherwise, wrap in ProcessingError for better context
+            if not isinstance(e, ProcessingError):
+                error = ProcessingError(f"Error processing data: {e}")
+            else:
+                error = e
+
+            return self.recover(error, entity_name=entity_name, **kwargs)
 
 
 class StrictRecovery(RecoveryStrategy):
     """
-    Strict recovery strategy that re-raises all errors.
+    Recovery strategy that re-raises all errors.
 
-    This strategy is useful when you want to ensure all data is processed
-    correctly and prefer to fail fast on any errors. Use this strategy when:
+    This strategy provides no recovery, instead ensuring that errors
+    are immediately propagated. Use this strategy when:
 
-    - Data quality is critical and errors indicate significant problems
-    - You want to address issues immediately rather than continuing with partial data
-    - During development or testing when you want to catch all issues
+    - Data integrity is critical
+    - You want to fail fast on any error
+    - Errors need immediate attention
 
     Example:
         ```python
-        processor = Processor(recovery_strategy=StrictRecovery())
+        # Create a processor with strict error handling
+        strategy = StrictRecovery()
+        processor = Processor(recovery_strategy=strategy)
+
         try:
             result = processor.process(data)
         except TransmogError as e:
@@ -177,27 +195,44 @@ class StrictRecovery(RecoveryStrategy):
         """Re-raise file errors."""
         raise error
 
+    def recover(self, error: Exception, **kwargs: Any) -> Any:
+        """
+        Generic method to recover from any exception based on its type.
+
+        This method maps different exception types to their specific handlers.
+
+        Args:
+            error: The exception to recover from
+            **kwargs: Additional context for error handling
+
+        Returns:
+            Recovery result based on the error type
+
+        Raises:
+            Exception: If the error type is not handled by this strategy
+        """
+        if isinstance(error, ParsingError):
+            return self.handle_parsing_error(error, kwargs.get("source"))
+        elif isinstance(error, ProcessingError):
+            return self.handle_processing_error(error, kwargs.get("entity_name"))
+        elif isinstance(error, CircularReferenceError):
+            return self.handle_circular_reference(error, kwargs.get("path", []))
+        elif isinstance(error, FileError):
+            return self.handle_file_error(error, kwargs.get("file_path"))
+        elif isinstance(error, Exception):
+            # For other exceptions, wrap as a processing error
+            wrapped_error = ProcessingError(str(error))
+            return self.handle_processing_error(
+                wrapped_error, kwargs.get("entity_name")
+            )
+
 
 class SkipAndLogRecovery(RecoveryStrategy):
     """
-    Recovery strategy that skips errors and logs them.
+    Recovery strategy that logs errors and continues processing.
 
-    This strategy is useful for batch processing when you want to continue
-    even if some records fail, logging the errors for later analysis. Use this strategy when:
-
-    - Processing large datasets where some errors are expected
-    - You prefer to get partial results rather than no results
-    - You want to log errors for later review without stopping processing
-
-    Example:
-        ```python
-        # Create a processor with skip-and-log recovery
-        strategy = SkipAndLogRecovery(log_level=logging.WARNING)
-        processor = Processor(recovery_strategy=strategy)
-
-        # Process data, continuing even when errors occur
-        result = processor.process(data)
-        ```
+    This strategy is useful for batch processing where a few records
+    failing shouldn't stop the entire process.
     """
 
     def __init__(self, log_level: int = logging.WARNING):
@@ -211,75 +246,147 @@ class SkipAndLogRecovery(RecoveryStrategy):
 
     def handle_parsing_error(
         self, error: ParsingError, source: Optional[str] = None
-    ) -> Any:
-        """Log parsing errors and return an empty dict."""
-        source_info = f" in {source}" if source else ""
-        logger.log(
-            self.log_level,
-            f"Skipping record due to parsing error{source_info}: {error}",
-        )
-        return {}  # Empty dict as fallback
+    ) -> None:
+        """
+        Log parsing errors and return None.
+
+        Args:
+            error: The parsing error
+            source: Optional source identifier
+
+        Returns:
+            None to indicate skipping this record
+        """
+        if source:
+            logger.warning(f"Skipping parsing of {source}: {error}")
+        else:
+            logger.warning(f"Skipping record due to parsing error: {error}")
+        return None
 
     def handle_processing_error(
         self, error: ProcessingError, entity_name: Optional[str] = None
-    ) -> Any:
-        """Log processing errors and return an empty dict."""
-        entity_info = f" for entity '{entity_name}'" if entity_name else ""
-        logger.log(
-            self.log_level,
-            f"Skipping record due to processing error{entity_info}: {error}",
-        )
-        return {}  # Empty dict as fallback
+    ) -> None:
+        """
+        Log processing errors and return None.
+
+        Args:
+            error: The processing error
+            entity_name: Optional entity name
+
+        Returns:
+            None to indicate skipping this record
+        """
+        context = f" for {entity_name}" if entity_name else ""
+        logger.warning(f"Skipping record due to error{context}: {error}")
+        return None
 
     def handle_circular_reference(
         self, error: CircularReferenceError, path: List[str]
-    ) -> Any:
-        """Log circular reference errors and return an empty dict."""
-        path_str = " > ".join(path) if path else "unknown"
-        logger.log(
-            self.log_level,
-            f"Circular reference detected at path {path_str}: {error}",
-        )
-        return {}  # Empty dict as fallback
+    ) -> None:
+        """
+        Log circular reference errors and return None.
+
+        Args:
+            error: The circular reference error
+            path: Path where the circular reference was found
+
+        Returns:
+            None to indicate skipping this record
+        """
+        path_str = " -> ".join(path) if path else "unknown"
+        logger.warning(f"Skipping circular reference at {path_str}: {error}")
+        return None
 
     def handle_file_error(
         self, error: FileError, file_path: Optional[str] = None
-    ) -> Any:
-        """Log file errors and return an empty list."""
-        file_info = f" with file '{file_path}'" if file_path else ""
-        logger.log(self.log_level, f"File operation failed{file_info}: {error}")
-        return []  # Empty list as fallback
+    ) -> None:
+        """
+        Log file errors and return None.
+
+        Args:
+            error: The file error
+            file_path: Optional path to the file
+
+        Returns:
+            None to indicate skipping this file
+        """
+        if file_path:
+            logger.warning(f"Skipping file {file_path}: {error}")
+        else:
+            logger.warning(f"Skipping file: {error}")
+        return None
+
+    def recover(self, error: Exception, **kwargs: Any) -> Any:
+        """
+        Recover from any exception by logging and returning appropriate empty values.
+
+        For list input data, return an empty list. Otherwise, return an empty dict.
+
+        Args:
+            error: The exception to recover from
+            **kwargs: Additional context for error handling
+
+        Returns:
+            Empty list if input was a list, otherwise empty dict
+        """
+        # Check if data is a list to determine appropriate return type
+        data = kwargs.get("data", [])
+        if isinstance(data, list):
+            # For batch operations, return empty list
+            if isinstance(error, ParsingError):
+                source_info = (
+                    f" in {kwargs.get('source', '')}" if kwargs.get("source") else ""
+                )
+                logger.log(
+                    self.log_level,
+                    f"Skipping record due to parsing error{source_info}: {error}",
+                )
+            elif isinstance(error, ProcessingError):
+                entity_info = (
+                    f" for entity '{kwargs.get('entity_name', '')}'"
+                    if kwargs.get("entity_name")
+                    else ""
+                )
+                logger.log(
+                    self.log_level,
+                    f"Skipping record due to processing error{entity_info}: {error}",
+                )
+            elif isinstance(error, CircularReferenceError):
+                path = kwargs.get("path", [])
+                path_str = " > ".join(path) if path else "unknown"
+                logger.log(
+                    self.log_level,
+                    f"Circular reference detected at path {path_str}: {error}",
+                )
+            elif isinstance(error, FileError):
+                file_info = (
+                    f" with file '{kwargs.get('file_path', '')}'"
+                    if kwargs.get("file_path")
+                    else ""
+                )
+                logger.log(self.log_level, f"File operation failed{file_info}: {error}")
+            else:
+                logger.log(self.log_level, f"Skipping record due to error: {error}")
+            return []
+        else:
+            # Forward to the appropriate handler based on error type
+            return super().recover(error, **kwargs)
 
 
 class PartialProcessingRecovery(RecoveryStrategy):
     """
-    Recovery strategy that attempts to extract partial data when possible.
+    Recovery strategy that attempts to recover partial results.
 
-    This strategy is more sophisticated than SkipAndLogRecovery, as it tries to
-    extract as much useful data as possible from a record, even if parts of it
-    have errors. Use this strategy when:
-
-    - You're dealing with complex nested structures where some parts may be invalid
-    - You want to recover partial data rather than discarding entire records
-    - You need a balance between data quality and completeness
-
-    Example:
-        ```python
-        # Create a processor with partial processing recovery
-        strategy = PartialProcessingRecovery()
-        processor = Processor(recovery_strategy=strategy)
-
-        # Process data, recovering partial records when possible
-        result = processor.process(data)
-        ```
+    This strategy is useful for complex processing operations where
+    some parts may fail but partial results are still valuable.
     """
 
     def __init__(self, log_level: int = logging.WARNING):
         """
-        Initialize with the specified log level.
+        Initialize with a log level.
 
         Args:
-            log_level: Logging level to use for error messages
+            log_level: Logging level for error messages
         """
         self.log_level = log_level
 
@@ -351,20 +458,29 @@ class PartialProcessingRecovery(RecoveryStrategy):
         # Get the data from the error if available
         data = getattr(error, "data", None)
         if data is None:
-            return {}
+            return {"_partial_error": str(error), "error": str(error)}
 
         # Return the data as is, even if it's incomplete
         if isinstance(data, dict):
             # If we have a dict, add an error marker field
             result = data.copy()
-            result["_error"] = str(error)
+            result["_partial_error"] = str(error)
+            result["error"] = str(error)
             return result
         elif isinstance(data, (list, tuple)):
-            # If we have a list/tuple, return it as is
-            return list(data)
+            # If we have a list/tuple, return it as is with metadata in first item if possible
+            result = list(data)
+            if result and isinstance(result[0], dict):
+                result[0]["_partial_error"] = str(error)
+                result[0]["error"] = str(error)
+            return result
         else:
             # Convert to string representation as fallback
-            return {"_error": str(error), "_value": str(data)}
+            return {
+                "_partial_error": str(error),
+                "_value": str(data),
+                "error": str(error),
+            }
 
     def handle_circular_reference(
         self, error: CircularReferenceError, path: List[str]
@@ -440,6 +556,48 @@ class PartialProcessingRecovery(RecoveryStrategy):
         # For other file errors, return empty list
         return []
 
+    def recover(self, error: Exception, **kwargs: Any) -> Any:
+        """
+        Generic method to recover from any exception based on its type.
+
+        This method maps different exception types to their specific handlers.
+
+        Args:
+            error: The exception to recover from
+            **kwargs: Additional context for error handling
+
+        Returns:
+            Recovery result based on the error type
+
+        Raises:
+            Exception: If the error type is not handled by this strategy
+        """
+        # For KeyError, IndexError, AttributeError, etc., return partial results with error info
+        if isinstance(error, (KeyError, IndexError, AttributeError)):
+            logger.warning(
+                f"Attempting partial recovery from {type(error).__name__}: {error}"
+            )
+            return {
+                "_partial_error": str(error),
+                "_error_type": type(error).__name__,
+            }
+
+        # For other types, use the standard recovery method
+        if isinstance(error, ParsingError):
+            return self.handle_parsing_error(error, kwargs.get("source"))
+        elif isinstance(error, ProcessingError):
+            return self.handle_processing_error(error, kwargs.get("entity_name"))
+        elif isinstance(error, CircularReferenceError):
+            return self.handle_circular_reference(error, kwargs.get("path", []))
+        elif isinstance(error, FileError):
+            return self.handle_file_error(error, kwargs.get("file_path"))
+        elif isinstance(error, Exception):
+            # For other exceptions, wrap as a processing error
+            wrapped_error = ProcessingError(str(error))
+            return self.handle_processing_error(
+                wrapped_error, kwargs.get("entity_name")
+            )
+
 
 # Predefined recovery strategies for common use cases
 STRICT = StrictRecovery()
@@ -448,126 +606,52 @@ LENIENT = PartialProcessingRecovery()
 
 
 def with_recovery(
-    func: Optional[Callable[..., T]] = None,
-    strategy: RecoveryStrategy = STRICT,
-    *args: Any,
-    **kwargs: Any,
-) -> T:
+    strategy: Optional[RecoveryStrategy] = None,
+    fallback_value: Any = None,
+    **options: Any,
+) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """
-    Apply recovery strategy to a function call.
-
-    This can be used as a decorator or as a function wrapper at the call site.
-
-    Decorator usage:
-        ```python
-        @with_recovery(strategy=SkipAndLogRecovery())
-        def process_data(data):
-            # Process data with built-in error recovery
-            pass
-        ```
-
-    Function wrapper usage:
-        ```python
-        # Apply recovery when calling the function
-        result = with_recovery(process_data, strategy=LENIENT, data=input_data)
-        ```
+    Decorator to apply recovery strategy to a function.
 
     Args:
-        func: Function to decorate or call
-        strategy: Recovery strategy to apply
-        *args: Arguments to pass to the function
-        **kwargs: Keyword arguments to pass to the function
+        strategy: Recovery strategy to use
+        fallback_value: Value to return if recovery fails
+        **options: Additional options for recovery
 
     Returns:
-        Function result or recovery value if an exception occurred
+        Decorator function
     """
-    # Used as a decorator with parameters
-    if func is None:
+    # Use skip and log strategy by default
+    if strategy is None:
+        strategy = SkipAndLogRecovery()
 
-        def decorator(target_func):
-            @functools.wraps(target_func)
-            def wrapper(*inner_args, **inner_kwargs):
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> T:
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                # Log the error
+                logger.warning(
+                    f"Skipping record due to processing error: {e}",
+                    exc_info=settings.get_option("debug_mode"),
+                )
+
+                # Try to recover
                 try:
-                    return target_func(*inner_args, **inner_kwargs)
-                except ParsingError as e:
-                    source = inner_kwargs.get("source")
-                    if source is None and inner_args:
-                        # Try to get source from first positional arg if it seems to be a file path
-                        first_arg = inner_args[0]
-                        if isinstance(first_arg, str) and (
-                            os.path.exists(first_arg)
-                            or "." in os.path.basename(first_arg)
-                        ):
-                            source = first_arg
-                    return strategy.handle_parsing_error(e, source)
-                except ProcessingError as e:
-                    entity_name = inner_kwargs.get("entity_name")
-                    if entity_name is None and len(inner_args) > 1:
-                        # Try to get entity_name from second positional arg if it's a string
-                        if isinstance(inner_args[1], str):
-                            entity_name = inner_args[1]
-                    return strategy.handle_processing_error(e, entity_name)
-                except CircularReferenceError as e:
-                    path = getattr(e, "path", [])
-                    return strategy.handle_circular_reference(e, path)
-                except FileError as e:
-                    file_path = getattr(e, "file_path", None)
-                    if file_path is None and inner_args:
-                        # Try to get file_path from first positional arg if it seems to be a file path
-                        first_arg = inner_args[0]
-                        if isinstance(first_arg, str) and (
-                            os.path.exists(first_arg)
-                            or "." in os.path.basename(first_arg)
-                        ):
-                            file_path = first_arg
-                    return strategy.handle_file_error(e, file_path)
-                except Exception as e:
-                    # For other exceptions, treat as processing errors
-                    logger.debug(
-                        f"Unhandled exception in with_recovery: {type(e).__name__}: {e}"
+                    result = strategy.recover(e, **options)
+                    if result is not None:
+                        return result
+                except Exception as recovery_error:
+                    # Recovery failed, log this too
+                    logger.error(
+                        f"Recovery failed for {func.__name__}: {recovery_error}",
+                        exc_info=settings.get_option("debug_mode"),
                     )
-                    wrapped_error = ProcessingError(str(e))
-                    return strategy.handle_processing_error(wrapped_error)
 
-            return wrapper
+                # Return fallback value if recovery fails
+                return fallback_value
 
-        return decorator
+        return wrapper
 
-    # Used as a function wrapper
-    try:
-        return func(*args, **kwargs)
-    except ParsingError as e:
-        source = kwargs.get("source")
-        if source is None and args:
-            # Try to get source from first positional arg if it seems to be a file path
-            first_arg = args[0]
-            if isinstance(first_arg, str) and (
-                os.path.exists(first_arg) or "." in os.path.basename(first_arg)
-            ):
-                source = first_arg
-        return strategy.handle_parsing_error(e, source)
-    except ProcessingError as e:
-        entity_name = kwargs.get("entity_name")
-        if entity_name is None and len(args) > 1:
-            # Try to get entity_name from second positional arg if it's a string
-            if isinstance(args[1], str):
-                entity_name = args[1]
-        return strategy.handle_processing_error(e, entity_name)
-    except CircularReferenceError as e:
-        path = getattr(e, "path", [])
-        return strategy.handle_circular_reference(e, path)
-    except FileError as e:
-        file_path = getattr(e, "file_path", None)
-        if file_path is None and args:
-            # Try to get file_path from first positional arg if it seems to be a file path
-            first_arg = args[0]
-            if isinstance(first_arg, str) and (
-                os.path.exists(first_arg) or "." in os.path.basename(first_arg)
-            ):
-                file_path = first_arg
-        return strategy.handle_file_error(e, file_path)
-    except Exception as e:
-        # For other exceptions, treat as processing errors
-        logger.debug(f"Unhandled exception in with_recovery: {type(e).__name__}: {e}")
-        wrapped_error = ProcessingError(str(e))
-        return strategy.handle_processing_error(wrapped_error)
+    return decorator

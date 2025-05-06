@@ -451,7 +451,7 @@ class TestCsvIntegration:
 
                     # Check for dash column - look for 'colu' (part of 'column') and 'dash'
                     has_dash_col = any(
-                        "columnwithdash" == col for col in sanitized_cols
+                        col == "column_with_dash" for col in sanitized_cols
                     )
                     assert has_dash_col, (
                         "No sanitized column found for 'column-with-dash'"

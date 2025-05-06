@@ -11,6 +11,7 @@ import csv
 import gzip
 import bz2
 import lzma
+import pathlib
 from typing import Any, Dict, List, Optional, Union, BinaryIO, Tuple, TextIO
 from io import StringIO
 
@@ -52,16 +53,36 @@ class CsvWriter(DataWriter):
         # CSV is available in the standard library
         return True
 
-    def __init__(self, **options):
+    def __init__(
+        self,
+        include_header: bool = True,
+        delimiter: str = ",",
+        quotechar: str = '"',
+        quoting: int = csv.QUOTE_MINIMAL,
+        escapechar: Optional[str] = None,
+        **options,
+    ):
         """
         Initialize the CSV writer.
 
         Args:
+            include_header: Whether to include column headers
+            delimiter: Column delimiter character
+            quotechar: Character to use for quoting
+            quoting: Quoting mode (from csv module)
+            escapechar: Character to use for escaping
             **options: CSV formatting options
         """
+        self.include_header = include_header
+        self.delimiter = delimiter
+        self.quotechar = quotechar
+        self.quoting = quoting
+        self.escapechar = escapechar
         self.options = options
 
-    def write(self, data: Any, destination: Union[str, BinaryIO], **options) -> Any:
+    def write(
+        self, data: Any, destination: Union[str, pathlib.Path, BinaryIO], **options
+    ) -> Any:
         """
         Write data to the specified destination.
 
@@ -80,21 +101,19 @@ class CsvWriter(DataWriter):
         combined_options = {**self.options, **options}
 
         # Delegate to write_table for implementation
-        if isinstance(destination, str):
-            return self.write_table(data, destination, **combined_options)
-        else:
-            return self.write_table(data, destination, **combined_options)
+        return self.write_table(data, destination, **combined_options)
 
     def write_table(
         self,
         table_data: List[JsonDict],
-        output_path: Union[str, BinaryIO, TextIO],
-        include_header: bool = True,
-        delimiter: str = ",",
-        quotechar: str = '"',
-        quoting: int = csv.QUOTE_MINIMAL,
+        output_path: Union[str, pathlib.Path, BinaryIO, TextIO],
+        include_header: Optional[bool] = None,
+        delimiter: Optional[str] = None,
+        quotechar: Optional[str] = None,
+        quoting: Optional[int] = None,
+        escapechar: Optional[str] = None,
         **options,
-    ) -> Union[str, BinaryIO, TextIO]:
+    ) -> Union[str, pathlib.Path, BinaryIO, TextIO]:
         """
         Write a table to a CSV file.
 
@@ -105,6 +124,7 @@ class CsvWriter(DataWriter):
             delimiter: Column delimiter character
             quotechar: Character to use for quoting
             quoting: Quoting mode (from csv module)
+            escapechar: Character to use for escaping
             **options: Additional options
 
         Returns:
@@ -114,12 +134,22 @@ class CsvWriter(DataWriter):
             OutputError: If writing fails
         """
         try:
+            # Use provided options or instance defaults
+            use_header = (
+                include_header if include_header is not None else self.include_header
+            )
+            use_delimiter = delimiter if delimiter is not None else self.delimiter
+            use_quotechar = quotechar if quotechar is not None else self.quotechar
+            use_quoting = quoting if quoting is not None else self.quoting
+            use_escapechar = escapechar if escapechar is not None else self.escapechar
+
             # Handle empty data case
             if not table_data:
-                if isinstance(output_path, str):
+                if isinstance(output_path, (str, pathlib.Path)):
                     # Create directory and empty file
-                    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-                    with open(output_path, "w") as f:
+                    path_str = str(output_path)
+                    os.makedirs(os.path.dirname(path_str) or ".", exist_ok=True)
+                    with open(path_str, "w") as f:
                         pass
                     return output_path
                 else:
@@ -130,21 +160,28 @@ class CsvWriter(DataWriter):
             field_names = list(table_data[0].keys())
 
             # Determine whether we're writing to a file or file-like object
-            if isinstance(output_path, str):
+            if isinstance(output_path, (str, pathlib.Path)):
+                # Convert to string if Path
+                path_str = str(output_path)
+
                 # Ensure directory exists
-                os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+                os.makedirs(os.path.dirname(path_str) or ".", exist_ok=True)
 
                 # Write to file
-                with open(output_path, "w", newline="") as f:
-                    writer = csv.DictWriter(
-                        f,
-                        fieldnames=field_names,
-                        delimiter=delimiter,
-                        quotechar=quotechar,
-                        quoting=quoting,
-                    )
+                with open(path_str, "w", newline="") as f:
+                    writer_params = {
+                        "fieldnames": field_names,
+                        "delimiter": use_delimiter,
+                        "quotechar": use_quotechar,
+                        "quoting": use_quoting,
+                    }
 
-                    if include_header:
+                    if use_escapechar:
+                        writer_params["escapechar"] = use_escapechar
+
+                    writer = csv.DictWriter(f, **writer_params)
+
+                    if use_header:
                         writer.writeheader()
 
                     writer.writerows(table_data)
@@ -164,15 +201,19 @@ class CsvWriter(DataWriter):
                 if is_binary:
                     # For binary streams, generate CSV in memory and write as bytes
                     csv_buffer = io.StringIO(newline="")
-                    writer = csv.DictWriter(
-                        csv_buffer,
-                        fieldnames=field_names,
-                        delimiter=delimiter,
-                        quotechar=quotechar,
-                        quoting=quoting,
-                    )
+                    writer_params = {
+                        "fieldnames": field_names,
+                        "delimiter": use_delimiter,
+                        "quotechar": use_quotechar,
+                        "quoting": use_quoting,
+                    }
 
-                    if include_header:
+                    if use_escapechar:
+                        writer_params["escapechar"] = use_escapechar
+
+                    writer = csv.DictWriter(csv_buffer, **writer_params)
+
+                    if use_header:
                         writer.writeheader()
 
                     writer.writerows(table_data)
@@ -181,15 +222,19 @@ class CsvWriter(DataWriter):
                     output_path.write(csv_buffer.getvalue().encode("utf-8"))
                 else:
                     # Text stream
-                    writer = csv.DictWriter(
-                        output_path,
-                        fieldnames=field_names,
-                        delimiter=delimiter,
-                        quotechar=quotechar,
-                        quoting=quoting,
-                    )
+                    writer_params = {
+                        "fieldnames": field_names,
+                        "delimiter": use_delimiter,
+                        "quotechar": use_quotechar,
+                        "quoting": use_quoting,
+                    }
 
-                    if include_header:
+                    if use_escapechar:
+                        writer_params["escapechar"] = use_escapechar
+
+                    writer = csv.DictWriter(output_path, **writer_params)
+
+                    if use_header:
                         writer.writeheader()
 
                     writer.writerows(table_data)
@@ -204,10 +249,10 @@ class CsvWriter(DataWriter):
         self,
         main_table: List[JsonDict],
         child_tables: Dict[str, List[JsonDict]],
-        base_path: str,
+        base_path: Union[str, pathlib.Path],
         entity_name: str,
         **options,
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Union[str, pathlib.Path]]:
         """
         Write main and child tables to CSV files.
 
@@ -227,10 +272,15 @@ class CsvWriter(DataWriter):
         results = {}
 
         # Ensure base directory exists
-        os.makedirs(base_path, exist_ok=True)
+        base_path_str = str(base_path)
+        os.makedirs(base_path_str, exist_ok=True)
 
         # Write main table
-        main_path = os.path.join(base_path, f"{entity_name}.csv")
+        if isinstance(base_path, pathlib.Path):
+            main_path = base_path / f"{entity_name}.csv"
+        else:
+            main_path = os.path.join(base_path_str, f"{entity_name}.csv")
+
         self.write_table(main_table, main_path, **options)
         results["main"] = main_path
 
@@ -238,7 +288,12 @@ class CsvWriter(DataWriter):
         for table_name, table_data in child_tables.items():
             # Replace dots and slashes with underscores for file names
             safe_name = table_name.replace(".", "_").replace("/", "_")
-            file_path = os.path.join(base_path, f"{safe_name}.csv")
+
+            if isinstance(base_path, pathlib.Path):
+                file_path = base_path / f"{safe_name}.csv"
+            else:
+                file_path = os.path.join(base_path_str, f"{safe_name}.csv")
+
             self.write_table(table_data, file_path, **options)
             results[table_name] = file_path
 

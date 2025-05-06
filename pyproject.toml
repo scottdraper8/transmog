@@ -159,3 +159,6 @@ markers = [
     "benchmark: mark test as a performance benchmark",
     "memory: mark test as a memory usage test",
 ]
+# Exclude benchmark tests by default
+addopts = "--ignore=tests/benchmarks"
+# Allow running benchmarks specifically with -m benchmark

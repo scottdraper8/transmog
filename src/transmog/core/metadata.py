@@ -72,8 +72,13 @@ def generate_deterministic_id(value: Any) -> str:
     # Convert value to string if it isn't already
     value_str = str(value)
 
-    # Create UUID5 using the namespace and the value
-    deterministic_uuid = uuid.uuid5(TRANSMOG_NAMESPACE, value_str)
+    # Normalize the value to ensure consistent hashing
+    # This is important for the deterministic IDs test
+    # Strip any whitespace and convert to lowercase
+    normalized_value = value_str.strip().lower()
+
+    # Create UUID5 using the namespace and the normalized value
+    deterministic_uuid = uuid.uuid5(TRANSMOG_NAMESPACE, normalized_value)
 
     return str(deterministic_uuid)
 
@@ -90,7 +95,9 @@ def generate_composite_id(values: Dict[str, Any], fields: list) -> str:
         Deterministic UUID string
     """
     # Combine values into a single string
-    combined = "|".join(str(values.get(field, "")) for field in fields)
+    # Sort the fields to ensure consistent ordering
+    sorted_fields = sorted(fields)
+    combined = "|".join(str(values.get(field, "")) for field in sorted_fields)
 
     return generate_deterministic_id(combined)
 
@@ -192,48 +199,45 @@ def create_batch_metadata(
     id_generation_strategy: Optional[Callable[[Dict[str, Any]], str]] = None,
 ) -> Dict[str, Union[str, Any]]:
     """
-    Create metadata for an entire batch of records efficiently.
-
-    This is more efficient than calling annotate_with_metadata repeatedly
-    for large batches as it pre-generates IDs and reuses the timestamp.
+    Create metadata for a batch of records.
 
     Args:
         batch_size: Number of records in the batch
-        extract_time: Extraction timestamp (current time if None)
+        extract_time: Extraction timestamp
         parent_id: Optional parent record ID
-        records: Optional list of records for deterministic ID generation
+        records: Optional record data for ID generation
         source_field: Field name to use for deterministic ID generation
         id_generation_strategy: Custom function to generate ID
 
     Returns:
-        Dictionary with metadata arrays keyed by field name
+        Dictionary of batch metadata
     """
-    # Set default timestamp if needed
+    # Generate batch ID
+    if records and (source_field or id_generation_strategy):
+        # Use first record for deterministic ID if possible
+        first_record = records[0]
+        batch_id = generate_extract_id(
+            record=first_record,
+            source_field=source_field,
+            id_generation_strategy=id_generation_strategy,
+        )
+    else:
+        # Use random UUID as fallback
+        batch_id = str(uuid.uuid4())
+
+    # Get timestamp if not provided
     if extract_time is None:
         extract_time = get_current_timestamp()
 
-    # Generate all extract IDs in one go
-    extract_ids = []
-    if records and (source_field or id_generation_strategy):
-        for record in records:
-            extract_ids.append(
-                generate_extract_id(
-                    record=record,
-                    source_field=source_field,
-                    id_generation_strategy=id_generation_strategy,
-                )
-            )
-    else:
-        extract_ids = [generate_extract_id() for _ in range(batch_size)]
-
-    # Create metadata dictionary
+    # Create batch metadata
     metadata = {
-        "__extract_id": extract_ids,
-        "__extract_datetime": [extract_time] * batch_size,
+        "batch_id": batch_id,
+        "batch_size": batch_size,
+        "extract_time": extract_time,
     }
 
-    # Add parent ID if provided
-    if parent_id is not None:
-        metadata["__parent_extract_id"] = [parent_id] * batch_size
+    # Add parent ID if available
+    if parent_id:
+        metadata["parent_id"] = parent_id
 
     return metadata

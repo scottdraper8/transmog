@@ -1,59 +1,47 @@
 """
-Pytest configuration file for Transmog tests.
+Pytest configuration for Transmog tests.
 
-This file contains fixtures and configuration for pytest tests.
+This file contains fixtures and configuration for testing the Transmog package.
 """
 
 import os
 import sys
 import json
 import pytest
-from typing import Dict, List, Any, Optional, Union, BinaryIO
+from typing import Dict, List, Any, Optional, Union, BinaryIO, Callable
+from unittest.mock import MagicMock
 
 # Add the package root to sys.path for importing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+# Import core package components
 from transmog import Processor
 from transmog.config import TransmogConfig
-from transmog.core.flattener import _clear_process_cache
+from transmog.types.base import JsonDict
+from transmog.io.writer_factory import FormatRegistry
+from transmog.error import MissingDependencyError
 
 
-# Add helper mixin for writer classes
-class WriterMixin:
-    """Mixin to help writer classes implement the new protocol interface."""
-
-    def write(self, data: Any, destination: Union[str, BinaryIO], **options) -> Any:
-        """
-        Implement the WriterProtocol's write method.
-
-        Args:
-            data: Data to write
-            destination: File path or file-like object
-            **options: Format-specific options
-
-        Returns:
-            Path to the written file or other format-specific result
-        """
-        if isinstance(destination, str):
-            # Ensure the directory exists
-            os.makedirs(os.path.dirname(destination) or ".", exist_ok=True)
-            # Call write_table with the destination path
-            return self.write_table(data, destination, **options)
-        else:
-            # Call write_table with the file object
-            return self.write_table(data, destination, **options)
-
-
+# Clear any module-level caches before and after tests
 @pytest.fixture(autouse=True)
-def clear_process_caches():
-    """Clear all process caches before each test to prevent state pollution between tests."""
-    # This fixture runs automatically before each test
+def clear_caches():
+    """Clear all caches before and after each test to prevent state pollution."""
+    # Import locally to avoid circular imports
+    from transmog.core.flattener import _clear_process_cache
+
+    # Clear caches before test
     _clear_process_cache("standard")
     _clear_process_cache("streaming")
+
+    # Run the test
     yield
-    # Clear again after the test
+
+    # Clear caches after test
     _clear_process_cache("standard")
     _clear_process_cache("streaming")
+
+
+# ---- Test Data Fixtures ----
 
 
 @pytest.fixture
@@ -169,51 +157,200 @@ def complex_batch() -> List[Dict[str, Any]]:
 
 
 @pytest.fixture
+def circular_reference_data() -> Dict[str, Any]:
+    """Return data with a circular reference."""
+    data = {
+        "id": 789,
+        "name": "Circular Entity",
+        "self_ref": None,  # Will be set to self-reference
+    }
+    data["self_ref"] = data
+    return data
+
+
+# ---- Test File Fixtures ----
+
+
+@pytest.fixture
+def json_file(tmp_path, simple_data) -> str:
+    """Create and return a temporary JSON file."""
+    json_path = tmp_path / "test.json"
+    with open(json_path, "w") as f:
+        json.dump(simple_data, f)
+    return str(json_path)
+
+
+@pytest.fixture
+def jsonl_file(tmp_path, batch_data) -> str:
+    """Create and return a temporary JSONL file."""
+    jsonl_path = tmp_path / "test.jsonl"
+    with open(jsonl_path, "w") as f:
+        for record in batch_data:
+            f.write(json.dumps(record) + "\n")
+    return str(jsonl_path)
+
+
+@pytest.fixture
+def csv_file(tmp_path, batch_data) -> str:
+    """Create and return a temporary CSV file."""
+    import csv
+
+    csv_path = tmp_path / "test.csv"
+
+    # Get all keys from the batch
+    keys = set()
+    for record in batch_data:
+        keys.update(record.keys())
+    keys = sorted(list(keys))
+
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=keys)
+        writer.writeheader()
+        writer.writerows(batch_data)
+
+    return str(csv_path)
+
+
+# ---- Processor Fixtures ----
+
+
+@pytest.fixture
 def processor():
-    """Fixture for a basic processor."""
+    """Return a basic processor with default configuration."""
     config = (
         TransmogConfig.default()
         .with_processing(cast_to_string=True)
         .with_naming(
             abbreviate_field_names=False,
-            separator="_",  # Explicitly set separator to ensure consistency in tests
+            separator="_",  # Ensure consistency in tests
         )
     )
     return Processor(config=config)
 
 
 @pytest.fixture
-def test_output_dir(tmpdir) -> str:
-    """Create and return a temporary output directory."""
-    output_dir = os.path.join(tmpdir, "output")
-    os.makedirs(output_dir, exist_ok=True)
-    return output_dir
+def memory_optimized_processor():
+    """Return a memory-optimized processor."""
+    return Processor.memory_optimized()
 
 
 @pytest.fixture
-def json_file(tmpdir, simple_data) -> str:
-    """Create and return a temporary JSON file."""
-    json_path = os.path.join(tmpdir, "test.json")
-    with open(json_path, "w") as f:
-        json.dump(simple_data, f)
-    return json_path
+def performance_optimized_processor():
+    """Return a performance-optimized processor."""
+    return Processor.performance_optimized()
+
+
+# ---- Dependency Management Fixtures ----
 
 
 @pytest.fixture
-def jsonl_file(tmpdir, batch_data) -> str:
-    """Create and return a temporary JSONL file."""
-    jsonl_path = os.path.join(tmpdir, "test.jsonl")
-    with open(jsonl_path, "w") as f:
-        for record in batch_data:
-            f.write(json.dumps(record) + "\n")
-    return jsonl_path
+def dependency_status():
+    """Return the availability status of optional dependencies."""
+    return {
+        "pyarrow": _is_dependency_available("pyarrow"),
+        "orjson": _is_dependency_available("orjson"),
+        "pandas": _is_dependency_available("pandas"),
+        "zstandard": _is_dependency_available("zstandard"),
+    }
+
+
+def _is_dependency_available(module_name):
+    """Check if a dependency is available."""
+    try:
+        __import__(module_name)
+        return True
+    except ImportError:
+        return False
+
+
+@pytest.fixture
+def dependency_injection_factory():
+    """Create a factory for injecting dependencies."""
+
+    def _create_dependency_injector(module_name, mock_attributes=None):
+        """
+        Create an injector for dependencies.
+
+        Args:
+            module_name: Name of the module to inject
+            mock_attributes: Dictionary of attributes to mock
+
+        Returns:
+            Function that injects dependencies
+        """
+        mock_attributes = mock_attributes or {}
+
+        def _injector(monkeypatch):
+            # Try to import the real module
+            try:
+                real_module = __import__(module_name)
+
+                # Create a mock that wraps the real module
+                mock_module = MagicMock(wraps=real_module)
+
+                # Override specific attributes
+                for attr_name, mock_value in mock_attributes.items():
+                    setattr(mock_module, attr_name, mock_value)
+
+            except ImportError:
+                # If real module is not available, create a pure mock
+                mock_module = MagicMock()
+
+                # Add a custom is_available method that returns False
+                mock_module.is_available = lambda: False
+
+                # Set all required mock attributes
+                for attr_name, mock_value in mock_attributes.items():
+                    setattr(mock_module, attr_name, mock_value)
+
+            # Apply the mock
+            monkeypatch.setitem(sys.modules, module_name, mock_module)
+
+            return mock_module
+
+        return _injector
+
+    return _create_dependency_injector
 
 
 # Configure pytest
 def pytest_configure(config):
-    """Configure pytest."""
-    # Register test marks
-    config.addinivalue_line("markers", "memory: mark test as a memory test")
+    """Configure pytest with custom markers."""
+    config.addinivalue_line(
+        "markers", "requires_pyarrow: mark test that requires PyArrow"
+    )
+    config.addinivalue_line(
+        "markers", "requires_orjson: mark test that requires orjson"
+    )
+    config.addinivalue_line(
+        "markers", "requires_pandas: mark test that requires pandas"
+    )
+    config.addinivalue_line(
+        "markers", "requires_zstandard: mark test that requires zstandard"
+    )
+    config.addinivalue_line("markers", "integration: mark test as an integration test")
     config.addinivalue_line(
         "markers", "benchmark: mark test as a performance benchmark"
     )
+
+
+# Define dependency-specific test skipping
+def pytest_runtest_setup(item):
+    """Skip tests based on dependency requirements."""
+    for marker in item.iter_markers():
+        if marker.name == "requires_pyarrow" and not _is_dependency_available(
+            "pyarrow"
+        ):
+            pytest.skip("PyArrow is required for this test")
+        elif marker.name == "requires_orjson" and not _is_dependency_available(
+            "orjson"
+        ):
+            pytest.skip("orjson is required for this test")
+        elif marker.name == "requires_pandas" and not _is_dependency_available(
+            "pandas"
+        ):
+            pytest.skip("pandas is required for this test")
+        elif marker.name == "requires_zstandard" and not _is_dependency_available(
+            "zstandard"
+        ):
+            pytest.skip("zstandard is required for this test")

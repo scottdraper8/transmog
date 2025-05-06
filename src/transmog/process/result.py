@@ -173,6 +173,41 @@ class ProcessingResult(ResultInterface):
         """
         return table_name.replace(".", "_").replace("/", "_")
 
+    def add_main_record(self, record: JsonDict) -> None:
+        """
+        Add a record to the main table.
+
+        Args:
+            record: Record to add to the main table
+        """
+        self.main_table.append(record)
+
+    def add_child_tables(self, tables: Dict[str, List[JsonDict]]) -> None:
+        """
+        Add child tables to the result.
+
+        Args:
+            tables: Dictionary of child tables to add
+        """
+        for table_name, records in tables.items():
+            if table_name in self.child_tables:
+                self.child_tables[table_name].extend(records)
+            else:
+                self.child_tables[table_name] = records
+
+    def add_child_record(self, table_name: str, record: JsonDict) -> None:
+        """
+        Add a single record to a child table.
+
+        Args:
+            table_name: Name of the child table
+            record: Record to add to the child table
+        """
+        if table_name in self.child_tables:
+            self.child_tables[table_name].append(record)
+        else:
+            self.child_tables[table_name] = [record]
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert to a dictionary representation.

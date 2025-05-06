@@ -8,6 +8,7 @@ informative messages when functionality is not available.
 
 from typing import Dict, Set, Optional, Any
 import logging
+import importlib
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,21 @@ class DependencyManager:
         cls._optional_deps[name] = available
         return available
 
+    @classmethod
+    def register_dependency(cls, name: str, available: bool) -> None:
+        """
+        Manually register a dependency availability.
+
+        This method is primarily used for testing or for cases
+        where you want to manually control dependency availability
+        without actually importing the package.
+
+        Args:
+            name: Name of the dependency package
+            available: Whether the dependency should be marked as available
+        """
+        cls._optional_deps[name] = available
+
     @staticmethod
     def _check_dependency(name: str) -> bool:
         """
@@ -61,7 +77,7 @@ class DependencyManager:
             Whether the import succeeds
         """
         try:
-            __import__(name)
+            importlib.import_module(name)
             return True
         except ImportError:
             return False
