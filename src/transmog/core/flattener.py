@@ -71,71 +71,64 @@ def _process_value(
     return value
 
 
-# Cache for process_value function to avoid frequent recomputation
-# Different caches for different processing contexts
-_standard_process_cache = {}
-_streaming_process_cache = {}
-
-# Type for cache context selection
-CacheContext = Literal["standard", "streaming"]
-
-
-def _get_process_cache(
-    context: CacheContext,
-) -> Dict[Tuple[Any, bool, bool, bool], Any]:
+# Add this function to dynamically create the LRU cache with the configured maxsize
+def _get_lru_cache_decorator(maxsize=10000):
     """
-    Get the appropriate process cache based on context.
+    Create an LRU cache decorator with the specified maxsize.
 
     Args:
-        context: The processing context
+        maxsize: Maximum size for the LRU cache
 
     Returns:
-        Cache dictionary for the given context
+        Configured functools.lru_cache decorator
     """
-    if context == "streaming":
-        return _streaming_process_cache
-    return _standard_process_cache
+    return functools.lru_cache(maxsize=maxsize)
 
 
-def _clear_process_cache(context: CacheContext) -> None:
+# Configure the cached function dynamically
+def _get_cached_process_value():
     """
-    Clear the process cache for the given context.
+    Get the cached process value function with the current configuration.
 
-    Args:
-        context: The processing context
-    """
-    if context == "streaming":
-        _streaming_process_cache.clear()
-    else:
-        _standard_process_cache.clear()
-
-
-def _make_cache_key(
-    value: Any, cast_to_string: bool, include_empty: bool, skip_null: bool
-) -> Tuple[int, bool, bool, bool]:
-    """
-    Create a cache key for process_value.
-
-    Args:
-        value: The value to process
-        cast_to_string: Whether to cast to string
-        include_empty: Whether to include empty strings
-        skip_null: Whether to skip null values
+    The maxsize is determined from settings.
 
     Returns:
-        Cache key tuple
+        Cached process value function
     """
-    # Use id for mutable objects to avoid hash errors
-    if isinstance(value, (dict, list, set)):
-        return (id(value), cast_to_string, include_empty, skip_null)
-    else:
-        try:
-            # Try to hash the value
-            hash(value)
-            return (hash(value), cast_to_string, include_empty, skip_null)
-        except TypeError:
-            # Fall back to id for unhashable objects
-            return (id(value), cast_to_string, include_empty, skip_null)
+    # Get the cache maxsize from settings
+    maxsize = getattr(settings, "cache_maxsize", 10000)
+
+    # Create a new decorator with the configured maxsize
+    lru_decorator = _get_lru_cache_decorator(maxsize=maxsize)
+
+    # Apply the decorator to the function - use a tuple key containing value_hash and parameters
+    @lru_decorator
+    def _cached_func(
+        value_hash, cast_to_string, include_empty, skip_null, original_value
+    ):
+        # Pass the original_value to _process_value, not the string representation
+        return _process_value(original_value, cast_to_string, include_empty, skip_null)
+
+    return _cached_func
+
+
+# Store the cached function
+_process_value_cached = _get_cached_process_value()
+
+
+def refresh_cache_config():
+    """Refresh the cache configuration based on current settings."""
+    global _process_value_cached
+    # Clear existing cache
+    clear_caches()
+    # Replace with newly configured cache
+    _process_value_cached = _get_cached_process_value()
+
+
+def clear_caches():
+    """Clear all processing caches."""
+    if hasattr(_process_value_cached, "cache_clear"):
+        _process_value_cached.cache_clear()
 
 
 def _process_value_wrapper(
@@ -143,41 +136,43 @@ def _process_value_wrapper(
     cast_to_string: bool,
     include_empty: bool,
     skip_null: bool,
-    context: CacheContext = "standard",
+    context: Literal["standard", "streaming"] = "standard",
 ) -> Optional[Any]:
     """
-    Process a value with caching based on context.
+    Simplified wrapper that handles edge cases and uses LRU cache.
 
     Args:
         value: The value to process
         cast_to_string: Whether to cast to string
         include_empty: Whether to include empty strings
         skip_null: Whether to skip null values
-        context: Cache context
+        context: Cache context (kept for backwards compatibility)
 
     Returns:
         Processed value or None if it should be skipped
     """
-    # Special values are handled directly
+    # Special values handled directly without caching
     if value is None or value == "":
         return _process_value(value, cast_to_string, include_empty, skip_null)
 
-    # For simple scalars, don't use cache
-    if isinstance(value, (int, float, bool)):
-        return _process_value(value, cast_to_string, include_empty, skip_null)
+    # Check if caching is enabled in settings
+    cache_enabled = getattr(settings, "cache_enabled", True)
 
-    # Get the appropriate cache
-    cache = _get_process_cache(context)
-    cache_key = _make_cache_key(value, cast_to_string, include_empty, skip_null)
+    # For simple scalars, use caching if enabled
+    if cache_enabled and isinstance(value, (int, float, bool, str)):
+        try:
+            # Create a hash of the value for caching
+            value_hash = hash(value)
+            # Pass both the hash (for cache key) and the original value (for processing)
+            return _process_value_cached(
+                value_hash, cast_to_string, include_empty, skip_null, value
+            )
+        except (TypeError, ValueError):
+            # If value can't be hashed, process directly
+            return _process_value(value, cast_to_string, include_empty, skip_null)
 
-    # Check cache first
-    if cache_key in cache:
-        return cache[cache_key]
-
-    # Process and cache the result
-    result = _process_value(value, cast_to_string, include_empty, skip_null)
-    cache[cache_key] = result
-    return result
+    # For complex objects or if caching is disabled, process directly without caching
+    return _process_value(value, cast_to_string, include_empty, skip_null)
 
 
 def _flatten_json_core(
@@ -199,7 +194,7 @@ def _flatten_json_core(
     custom_abbreviations: Optional[Dict[str, str]],
     current_depth: int,
     in_place: bool,
-    context: CacheContext,
+    context: Literal["standard", "streaming"],
     flatten_func: Callable,
     recovery_strategy: Optional[Any] = None,
 ) -> Dict[str, Any]:

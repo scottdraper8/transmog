@@ -155,6 +155,37 @@ The partial recovery strategy is particularly valuable when working with:
 
 See the [error handling guide](docs/user/error-handling.md) for more information.
 
+## Cache Configuration
+
+Transmog provides configurable value processing cache for performance optimization:
+
+```python
+import transmog as tm
+
+# Default configuration
+processor = tm.Processor()
+
+# Disable caching completely
+processor = tm.Processor(
+    tm.TransmogConfig.default().with_caching(enabled=False)
+)
+
+# Configure cache size
+processor = tm.Processor(
+    tm.TransmogConfig.default().with_caching(maxsize=50000)
+)
+
+# Clear cache after batch processing
+processor = tm.Processor(
+    tm.TransmogConfig.default().with_caching(clear_after_batch=True)
+)
+
+# Manually clear cache
+processor.clear_cache()
+```
+
+The cache system improves performance when processing datasets with repeated values while providing memory usage control. See the [cache configuration guide](docs/user/caching.md) for more details.
+
 ## Processing Large Datasets
 
 For large datasets, use memory-optimized configuration:

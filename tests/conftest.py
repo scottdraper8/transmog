@@ -27,18 +27,16 @@ from transmog.error import MissingDependencyError
 def clear_caches():
     """Clear all caches before and after each test to prevent state pollution."""
     # Import locally to avoid circular imports
-    from transmog.core.flattener import _clear_process_cache
+    from transmog.core.flattener import clear_caches
 
     # Clear caches before test
-    _clear_process_cache("standard")
-    _clear_process_cache("streaming")
+    clear_caches()
 
     # Run the test
     yield
 
     # Clear caches after test
-    _clear_process_cache("standard")
-    _clear_process_cache("streaming")
+    clear_caches()
 
 
 # ---- Test Data Fixtures ----

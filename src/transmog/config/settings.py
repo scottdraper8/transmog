@@ -43,6 +43,9 @@ DEFAULT_OPTIONS = {
     * 1024
     * 1024,  # 100MB threshold for switching to low-memory mode
     "memory_tracking_enabled": False,  # Whether to track memory usage during processing
+    "cache_enabled": True,
+    "cache_maxsize": 10000,
+    "clear_cache_after_batch": False,
 }
 
 # Environment variable for config file path
@@ -100,6 +103,11 @@ class TransmogSettings:
     DEFAULT_LOG_LEVEL = logging.WARNING
     DEFAULT_LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
+    # Cache settings
+    DEFAULT_CACHE_ENABLED = True
+    DEFAULT_CACHE_MAXSIZE = 10000
+    DEFAULT_CLEAR_CACHE_AFTER_BATCH = False
+
     # Configuration profiles
     PROFILES = {
         "default": {
@@ -110,6 +118,9 @@ class TransmogSettings:
             "batch_size": 500,
             "chunk_size": 200,
             "lru_cache_size": 256,
+            "cache_enabled": True,
+            "cache_maxsize": 1000,
+            "clear_cache_after_batch": True,
         },
         "performance": {
             "optimize_for_memory": False,
@@ -118,6 +129,9 @@ class TransmogSettings:
             "path_parts_optimization": True,
             "lru_cache_size": 2048,
             "max_workers": 8,
+            "cache_enabled": True,
+            "cache_maxsize": 50000,
+            "clear_cache_after_batch": False,
         },
         "strict": {
             "allow_malformed_data": False,

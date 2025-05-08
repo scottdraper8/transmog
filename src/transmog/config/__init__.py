@@ -82,6 +82,15 @@ class ErrorHandlingConfig:
 
 
 @dataclass
+class CacheConfig:
+    """Configuration for value processing cache behavior."""
+
+    enabled: bool = True
+    maxsize: int = 10000
+    clear_after_batch: bool = False
+
+
+@dataclass
 class TransmogConfig:
     """Complete configuration for Transmog processing."""
 
@@ -89,6 +98,7 @@ class TransmogConfig:
     processing: ProcessingConfig = field(default_factory=ProcessingConfig)
     metadata: MetadataConfig = field(default_factory=MetadataConfig)
     error_handling: ErrorHandlingConfig = field(default_factory=ErrorHandlingConfig)
+    cache_config: CacheConfig = field(default_factory=CacheConfig)
 
     @classmethod
     def default(cls) -> "TransmogConfig":
@@ -103,7 +113,12 @@ class TransmogConfig:
                 processing_mode=ProcessingMode.LOW_MEMORY,
                 batch_size=100,
                 path_parts_optimization=True,
-            )
+            ),
+            cache_config=CacheConfig(
+                enabled=True,
+                maxsize=1000,  # Smaller cache for memory optimization
+                clear_after_batch=True,
+            ),
         )
 
     @classmethod
@@ -114,7 +129,12 @@ class TransmogConfig:
                 processing_mode=ProcessingMode.HIGH_PERFORMANCE,
                 batch_size=10000,
                 path_parts_optimization=True,
-            )
+            ),
+            cache_config=CacheConfig(
+                enabled=True,
+                maxsize=50000,  # Larger cache for performance
+                clear_after_batch=False,
+            ),
         )
 
     @classmethod
@@ -184,6 +204,7 @@ class TransmogConfig:
             processing=ProcessingConfig(**{**self.processing.__dict__, **kwargs}),
             metadata=self.metadata,
             error_handling=self.error_handling,
+            cache_config=self.cache_config,
         )
 
     def with_metadata(self, **kwargs) -> "TransmogConfig":
@@ -193,6 +214,7 @@ class TransmogConfig:
             processing=self.processing,
             metadata=MetadataConfig(**{**self.metadata.__dict__, **kwargs}),
             error_handling=self.error_handling,
+            cache_config=self.cache_config,
         )
 
     def with_error_handling(self, **kwargs) -> "TransmogConfig":
@@ -204,7 +226,37 @@ class TransmogConfig:
             error_handling=ErrorHandlingConfig(
                 **{**self.error_handling.__dict__, **kwargs}
             ),
+            cache_config=self.cache_config,
         )
+
+    def with_caching(
+        self,
+        enabled: Optional[bool] = None,
+        maxsize: Optional[int] = None,
+        clear_after_batch: Optional[bool] = None,
+    ) -> "TransmogConfig":
+        """Configure caching behavior.
+
+        Args:
+            enabled: Whether caching is enabled
+            maxsize: Maximum size of the LRU cache
+            clear_after_batch: Whether to clear cache after batch processing
+
+        Returns:
+            Updated TransmogConfig
+        """
+        cache_config = dataclasses.replace(self.cache_config)
+
+        if enabled is not None:
+            cache_config.enabled = enabled
+
+        if maxsize is not None:
+            cache_config.maxsize = maxsize
+
+        if clear_after_batch is not None:
+            cache_config.clear_after_batch = clear_after_batch
+
+        return dataclasses.replace(self, cache_config=cache_config)
 
     def with_extraction(self, **kwargs) -> "TransmogConfig":
         """

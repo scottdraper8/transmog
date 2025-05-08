@@ -84,6 +84,9 @@ from .data_iterators import (
 # Import utilities
 from .utils import get_common_config_params, get_batch_size
 
+# Import the clear_caches and refresh_cache_config functions from flattener module
+from ..core.flattener import clear_caches, refresh_cache_config
+
 # Type for data records
 T = TypeVar("T")
 
@@ -112,6 +115,9 @@ class Processor:
             config: Optional configuration object. If None, uses default configuration.
         """
         self.config = config or TransmogConfig.default()
+
+        # Apply cache configuration
+        self._configure_cache()
 
     @classmethod
     def default(cls) -> "Processor":
@@ -172,7 +178,8 @@ class Processor:
 
     def with_config(self, config: TransmogConfig) -> "Processor":
         """Create a new processor with the given configuration."""
-        return Processor(config)
+        processor = Processor(config)
+        return processor
 
     def with_naming(self, **kwargs) -> "Processor":
         """Create a new processor with updated naming settings."""
@@ -244,22 +251,21 @@ class Processor:
         """
         Process a batch of records.
 
-        This is a simplified version of process() specifically optimized
-        for batch processing of records.
-
         Args:
             batch_data: List of records to process
-            entity_name: Name of the entity being processed
-            extract_time: Optional extraction timestamp
+            entity_name: Name of the entity
+            extract_time: Extraction timestamp
 
         Returns:
-            ProcessingResult containing processed data
+            ProcessingResult with flattened records
         """
-        # Create batch strategy and process
-        strategy = BatchStrategy(self.config)
-        return strategy.process(
-            batch_data, entity_name=entity_name, extract_time=extract_time
-        )
+        result = self._process_batch(batch_data, entity_name, extract_time)
+
+        # Clear cache after batch processing if configured
+        if getattr(self.config.cache_config, "clear_after_batch", False):
+            self.clear_cache()
+
+        return result
 
     def process_file(
         self,
@@ -762,6 +768,51 @@ class Processor:
             result.write(output_format, output_path, **format_options)
 
         return result
+
+    def clear_cache(self):
+        """Clear the processor's caches."""
+        clear_caches()
+        return self
+
+    def _process_batch(
+        self,
+        batch_data: List[Dict[str, Any]],
+        entity_name: str,
+        extract_time: Optional[Any] = None,
+    ) -> ProcessingResult:
+        """
+        Internal method to process a batch of records.
+
+        Args:
+            batch_data: List of records to process
+            entity_name: Name of the entity
+            extract_time: Extraction timestamp
+
+        Returns:
+            ProcessingResult with flattened records
+        """
+        # Create batch strategy and process
+        strategy = BatchStrategy(self.config)
+        return strategy.process(
+            batch_data, entity_name=entity_name, extract_time=extract_time
+        )
+
+    def _configure_cache(self):
+        """Configure the processor's cache settings."""
+        # Apply cache configuration from the processor's config to global settings
+        from ..config.settings import settings
+
+        # Update global settings with cache configuration
+        if hasattr(self.config, "cache_config"):
+            cache_config = self.config.cache_config
+            settings.update(
+                cache_enabled=cache_config.enabled,
+                cache_maxsize=cache_config.maxsize,
+                clear_cache_after_batch=cache_config.clear_after_batch,
+            )
+
+            # Refresh the cache configuration to apply settings
+            refresh_cache_config()
 
 
 # Public API
