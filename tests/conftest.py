@@ -157,15 +157,17 @@ def complex_batch() -> List[Dict[str, Any]]:
 
 
 @pytest.fixture
-def circular_reference_data() -> Dict[str, Any]:
-    """Return data with a circular reference."""
-    data = {
-        "id": 789,
-        "name": "Circular Entity",
-        "self_ref": None,  # Will be set to self-reference
-    }
-    data["self_ref"] = data
-    return data
+def deeply_nested_data() -> Dict[str, Any]:
+    """Return data with a deeply nested structure for max depth testing."""
+    result = {"id": 789, "name": "Deeply Nested Structure"}
+
+    # Create a deeply nested structure (10 levels deep)
+    current = result
+    for i in range(10):
+        current["level"] = {"id": f"level-{i}", "name": f"Level {i}"}
+        current = current["level"]
+
+    return result
 
 
 # ---- Test File Fixtures ----

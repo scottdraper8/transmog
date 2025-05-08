@@ -157,7 +157,6 @@ class Processor:
         partial data from records with errors, particularly useful for:
         - Data migration from legacy systems
         - Processing API responses with inconsistent structures
-        - Handling circular references in complex objects
         - Recovering data from malformed/corrupted files
 
         Returns:
@@ -197,7 +196,6 @@ class Processor:
         data: Union[Dict[str, Any], List[Dict[str, Any]], str, bytes],
         entity_name: str,
         extract_time: Optional[Any] = None,
-        use_single_pass: bool = True,
     ) -> ProcessingResult:
         """
         Process data with the current configuration.
@@ -206,7 +204,6 @@ class Processor:
             data: Input data to process
             entity_name: Name of the entity being processed
             extract_time: Optional extraction timestamp
-            use_single_pass: Whether to use single-pass processing
 
         Returns:
             ProcessingResult containing processed data
@@ -235,7 +232,6 @@ class Processor:
             data,
             entity_name=entity_name,
             extract_time=extract_time,
-            use_single_pass=use_single_pass,
         )
 
     @error_context("Failed to process batch", log_exceptions=True)
@@ -248,14 +244,18 @@ class Processor:
         """
         Process a batch of records.
 
+        This is a simplified version of process() specifically optimized
+        for batch processing of records.
+
         Args:
-            batch_data: Batch of records to process
+            batch_data: List of records to process
             entity_name: Name of the entity being processed
             extract_time: Optional extraction timestamp
 
         Returns:
-            ProcessingResult for the batch
+            ProcessingResult containing processed data
         """
+        # Create batch strategy and process
         strategy = BatchStrategy(self.config)
         return strategy.process(
             batch_data, entity_name=entity_name, extract_time=extract_time

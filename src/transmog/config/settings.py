@@ -26,7 +26,7 @@ DEFAULT_OPTIONS = {
     "cast_to_string": True,
     "include_empty": False,
     "skip_null": True,
-    "visit_arrays": False,
+    "visit_arrays": True,
     "abbreviate_table_names": True,
     "abbreviate_field_names": True,
     "max_table_component_length": 4,
@@ -69,7 +69,7 @@ class TransmogSettings:
     DEFAULT_OPTIMIZE_FOR_MEMORY = False
     DEFAULT_MAX_NESTING_DEPTH = None
     DEFAULT_PATH_PARTS_OPTIMIZATION = True
-    DEFAULT_VISIT_ARRAYS = False
+    DEFAULT_VISIT_ARRAYS = True
     DEFAULT_ALLOW_MALFORMED_DATA = False
     DEFAULT_DETERMINISTIC_ID_FIELDS = {}
     DEFAULT_ID_GENERATION_STRATEGY = None

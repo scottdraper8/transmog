@@ -15,7 +15,6 @@ flatten_json(
     skip_null: bool = None,
     skip_arrays: bool = True,
     visit_arrays: bool = None,
-    visited: Optional[Set[int]] = None,
     parent_path: str = "",
     path_parts: Optional[List[str]] = None,
     path_parts_optimization: bool = None,
@@ -43,7 +42,6 @@ Flattens a nested JSON object into a single-level dictionary.
 | skip_null | bool | None | Whether to skip null values |
 | skip_arrays | bool | True | Whether to skip array flattening |
 | visit_arrays | bool | None | Whether to visit array elements |
-| visited | Set[int] | None | Set of visited object IDs (for circular reference detection) |
 | parent_path | str | "" | Path prefix from parent object |
 | path_parts | List[str] | None | List of path components (for optimization) |
 | path_parts_optimization | bool | None | Whether to use path parts optimization |
@@ -106,9 +104,7 @@ extract_arrays(
     include_empty: bool = None,
     skip_null: bool = None,
     extract_time: Optional[Any] = None,
-    visited: Optional[Set[int]] = None,
     parent_path_parts: Optional[List[str]] = None,
-    shared_flatten_cache: Optional[Dict[int, Dict[str, Any]]] = None,
     abbreviate_enabled: Optional[bool] = None,
     max_component_length: Optional[int] = None,
     preserve_leaf: Optional[bool] = None,
@@ -135,9 +131,7 @@ process_structure(
     include_empty: bool = False,
     skip_null: bool = True,
     extract_time: Optional[Any] = None,
-    visited: Optional[Set[int]] = None,
     root_entity: Optional[str] = None,
-    shared_flatten_cache: Optional[Dict[int, Dict[str, Any]]] = None,
     abbreviate_table_names: bool = True,
     abbreviate_field_names: bool = True,
     max_table_component_length: int = None,

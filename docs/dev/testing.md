@@ -227,15 +227,6 @@ def test_invalid_input():
     # Test with invalid type
     with pytest.raises(TypeError):
         transformer.transform(123)
-    
-    # Test with circular reference
-    circular = {}
-    circular["self"] = circular
-    
-    with pytest.raises(TransformError) as excinfo:
-        transformer.transform(circular)
-    
-    assert "circular reference" in str(excinfo.value).lower()
 ```
 
 ### Parametrized Tests

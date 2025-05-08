@@ -197,8 +197,10 @@ Key observations:
 This demonstrates why partial recovery is valuable for:
 - Data migration from legacy systems
 - Processing API responses with inconsistent structures
-- Handling circular references in complex objects
-- Recovering data from malformed files
+- Social media or user-generated content analysis
+- Cross-system data synchronization
+- Historical data integration with schema evolution
+- Extracting information from corrupted files
 """)
 
 

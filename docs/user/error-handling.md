@@ -16,7 +16,6 @@ TransmogError              - Base class for all Transmog errors
 ├── ValidationError        - Input validation failures
 ├── ParsingError           - JSON parsing problems
 ├── FileError              - File operations issues
-├── CircularReferenceError - Circular reference detection
 ├── MissingDependencyError - Missing optional dependencies
 ├── ConfigurationError     - Configuration problems
 └── OutputError            - Errors writing output
@@ -197,7 +196,6 @@ The partial recovery strategy is the most sophisticated approach that attempts t
 - Preserves partially valid data within problematic records
 - Maintains parent-child relationships even when some fields have errors
 - Marks error locations with explicit metadata for downstream handling
-- Handles circular references by replacing them with reference indicators
 - Can extract valid portions of malformed JSON files
 
 **Configuration:**
@@ -229,12 +227,8 @@ data = {
     "metrics": {
         "valid": 42,
         "invalid": float('nan'),  # This would normally cause an error
-    },
-    "reference": None  # This will be set to a circular reference
+    }
 }
-
-# Create circular reference
-data["reference"] = data
 
 # Create processor with partial recovery
 processor = Processor.with_partial_recovery()
@@ -247,9 +241,6 @@ main_table = result.get_main_table()[0]
 print(f"ID: {main_table['id']}")
 print(f"Name: {main_table['name']}")
 print(f"Valid metric: {main_table['metrics_valid']}")
-# The circular reference will have a marker
-if "_circular_reference" in main_table:
-    print("Circular reference was handled gracefully")
 # The NaN value will have an error marker
 if "_error" in main_table:
     print(f"Error: {main_table['_error']}")
@@ -306,9 +297,9 @@ Different strategies for different error types:
 
 ```python
 from transmog import Processor, TransmogConfig
-from transmog.error import ParsingError, CircularReferenceError, LENIENT
+from transmog.error import ParsingError, LENIENT
 
-# Create a processor that handles circular references gracefully
+# Create a processor that handles errors gracefully
 processor = Processor(
     config=TransmogConfig.default()
     .with_error_handling(
@@ -323,9 +314,6 @@ try:
 except ParsingError:
     # Fall back to text processing for parsing errors
     result = process_as_text(data)
-except CircularReferenceError:
-    # Special handling for circular references
-    result = process_with_reference_handling(data)
 ```
 
 ## Best Practices
@@ -349,7 +337,6 @@ except CircularReferenceError:
 
 5. **Inspect error markers in recovered data**
    - Look for fields with `_error` to identify problematic values
-   - Check for `_circular_reference` or similar markers
 
 6. **Use factory methods for common configurations**
    - `Processor.with_partial_recovery()` for maximum data yield
@@ -375,7 +362,6 @@ except CircularReferenceError:
 - Cross-system data synchronization
 - Historical data integration with schema evolution
 - Extracting information from corrupted files
-- Processing data with circular relationships (e.g., organizational hierarchies)
 
 ## Best Practices
 

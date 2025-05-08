@@ -19,7 +19,6 @@ from transmog.core.hierarchy import (
     process_record_batch,
     process_records_in_single_pass,
     stream_process_records,
-    stream_process_structure,
 )
 from transmog.core.metadata import (
     generate_extract_id,
@@ -76,7 +75,6 @@ from transmog.error import (
     ValidationError,
     ParsingError,
     FileError,
-    CircularReferenceError,
     MissingDependencyError,
     ConfigurationError,
     OutputError,
@@ -165,7 +163,6 @@ __all__ = [
     "ValidationError",
     "ParsingError",
     "FileError",
-    "CircularReferenceError",
     "MissingDependencyError",
     "ConfigurationError",
     "OutputError",

@@ -5,6 +5,7 @@ This module tests the array extraction functionality in the extractor module.
 """
 
 import pytest
+from unittest.mock import patch, ANY
 
 from transmog.core.extractor import extract_arrays, stream_extract_arrays
 from tests.interfaces.test_extractor_interface import AbstractExtractorTest
@@ -138,3 +139,22 @@ class TestExtractor(AbstractExtractorTest):
 
         # Verify it doesn't crash with custom abbreviations
         assert len(arrays) >= 2
+
+    def test_max_depth(self, deeply_nested_data):
+        """Test that the extractor handles deeply nested data correctly."""
+        # Extract arrays with default settings
+        arrays = extract_arrays(deeply_nested_data, entity_name="test")
+
+        # Verify it handles deep nesting correctly
+        assert isinstance(arrays, dict)
+
+        # The extractor should complete without stack overflow
+        # and should limit recursion as configured by max_depth
+
+        # Test with a very small max_depth to verify the limit is respected
+        with patch("transmog.core.extractor.logger") as mock_logger:
+            arrays_limited = extract_arrays(
+                deeply_nested_data, entity_name="test", max_depth=3
+            )
+            # Should log a warning about max depth
+            mock_logger.warning.assert_called_with(ANY)

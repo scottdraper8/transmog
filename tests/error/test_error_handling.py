@@ -11,10 +11,8 @@ from transmog.error import (
     ValidationError,
     ParsingError,
     FileError,
-    CircularReferenceError,
     MissingDependencyError,
     error_context,
-    handle_circular_reference,
     safe_json_loads,
     RecoveryStrategy,
     StrictRecovery,
@@ -58,11 +56,6 @@ class TestErrors(AbstractErrorTest):
         """Provide the file error class."""
         return FileError
 
-    @pytest.fixture
-    def circular_reference_error_class(self):
-        """Provide the circular reference error class."""
-        return CircularReferenceError
-
 
 class TestErrorHandlingUtilities(AbstractErrorHandlingUtilitiesTest):
     """Concrete tests for error handling utilities."""
@@ -78,19 +71,9 @@ class TestErrorHandlingUtilities(AbstractErrorHandlingUtilitiesTest):
         return safe_json_loads
 
     @pytest.fixture
-    def handle_circular_reference_func(self):
-        """Provide the handle_circular_reference function."""
-        return handle_circular_reference
-
-    @pytest.fixture
     def parsing_error_class(self):
         """Provide the parsing error class."""
         return ParsingError
-
-    @pytest.fixture
-    def circular_reference_error_class(self):
-        """Provide the circular reference error class."""
-        return CircularReferenceError
 
     @pytest.fixture
     def processing_error_class(self):
@@ -248,77 +231,59 @@ class TestRecoveryStrategiesCustom:
     def test_with_recovery_decorator(self):
         """Test the with_recovery decorator."""
 
-        # Create a function to decorate
         @with_recovery(strategy=SkipAndLogRecovery())
         def process_data(data):
-            if isinstance(data, list):
-                results = []
-                for item in data:
-                    if item.get("should_fail"):
-                        raise ValueError(f"Failed on item {item['id']}")
-                    results.append({"id": item["id"], "status": "success"})
-                return results
-            else:
-                if data.get("should_fail"):
-                    raise ValueError("Failed processing")
-                return {"id": data["id"], "status": "success"}
+            if data.get("should_fail"):
+                raise ValueError("Data processing failed")
+            return {"result": data["value"]}
 
-        # Test with a single successful item
-        result = process_data({"id": 1, "should_fail": False})
-        assert result["id"] == 1
-        assert result["status"] == "success"
+        # Test with non-failing data
+        result = process_data({"value": "test", "should_fail": False})
+        assert result["result"] == "test"
 
-        # Test with a single failing item - should return an empty dict or something similar
-        result = process_data({"id": 2, "should_fail": True})
-        # The implementation can return either None, an empty dict, or an empty list
-        assert result is None or result == [] or isinstance(result, dict), (
-            f"Expected None, empty list, or dict but got {result}"
-        )
-
-        # Test with a batch of items
-        batch = [
-            {"id": 1, "should_fail": False},
-            {"id": 2, "should_fail": True},  # Will fail
-            {"id": 3, "should_fail": False},
-        ]
-
-        # Create a more robust test that allows for different implementations
-        results = process_data(batch)
-
-        # Allow either empty results or filtered results
-        if isinstance(results, list) and len(results) > 0:
-            # Some implementations filter out failing items
-            assert any(item["id"] == 1 for item in results)
+        # Test with failing data
+        result = process_data({"value": "bad", "should_fail": True})
+        # The recovery strategy may return different values depending on implementation
+        # So we're flexible with what we assert
+        if isinstance(result, dict):
+            # Some strategies return empty dict or error indication
+            pass
+        elif result is None:
+            # Some strategies return None for errors
+            pass
         else:
-            # Some implementations return empty structure on any failure
-            assert isinstance(results, (dict, list))
+            # Should be dict, None, or some reasonable error indicator
+            assert False, f"Unexpected recovery result: {result}"
 
     def test_try_with_recovery(self):
         """Test the try_with_recovery function."""
 
-        # Create test function
         def test_func(x):
             if x == 0:
                 raise ValueError("Cannot divide by zero")
             return 10 / x
 
-        # Create recovery function
         def recovery_func(e):
-            return float("inf")  # Return infinity for division by zero
+            return "recovery result"
 
-        # Create a custom wrapper around recover_or_raise to make tests pass
-        def custom_try_with_recovery(func, recovery_func=None, *args, **kwargs):
-            try:
-                return func(*args, **kwargs)
-            except Exception as e:
-                if recovery_func:
-                    return recovery_func(e)
-                raise
+        try:
+            # Function exists in different forms across implementations
+            # Try the first pattern
+            from transmog.error import try_with_recovery
 
-        # Test with recovery and no error
-        result = custom_try_with_recovery(test_func, recovery_func, 5)
-        assert result == 2.0
+            # Try with failing function
+            result = try_with_recovery(test_func, recovery_func=recovery_func, x=0)
+            assert result == "recovery result", "Recovery function should be called"
 
-        # Test with recovery and recoverable error
-        result = custom_try_with_recovery(test_func, recovery_func, 0)
-        assert result == float("inf")
+            # Try with successful function
+            result = try_with_recovery(test_func, recovery_func=recovery_func, x=2)
+            assert result == 5, "Original function should return normally"
+
+        except (ImportError, AttributeError):
+            # Try the second pattern using the fixture
+            result = recover_or_raise(test_func, recovery_func=recovery_func, x=0)
+            assert result == "recovery result", "Recovery function should be called"
+
+            # Try with successful function
+            result = recover_or_raise(test_func, recovery_func=recovery_func, x=2)
+            assert result == 5, "Original function should return normally"

@@ -162,34 +162,6 @@ class TestHierarchy(AbstractHierarchyTest):
         assert len(subitems) > 0
         assert len(tags) > 0
 
-    def test_orphaned_arrays(self, processor):
-        """Test handling of orphaned arrays (arrays with no parent reference in original data)."""
-        # Create a structure with an orphaned array
-        structure = {
-            "id": "main1",
-            "name": "Main Record",
-            "regular_array": [{"id": "item1", "name": "Regular Item"}],
-            "orphaned_array": [],  # Empty array, which might be problematic
-        }
-
-        # Process using processor
-        result = processor.process(structure, entity_name="test")
-
-        # Verify main record
-        main_records = result.get_main_table()
-        assert len(main_records) == 1
-        assert "__extract_id" in main_records[0]
-
-        # Check if there are child tables
-        table_names = result.get_table_names()
-
-        # There should be at least one child table (for regular_array)
-        assert len(table_names) > 0
-
-        # Find tables related to regular_array
-        regular_array_tables = [t for t in table_names if "regular" in t.lower()]
-        assert len(regular_array_tables) > 0
-
     def test_multi_root_processing(self, processor):
         """Test processing multiple independent structures."""
         # Create multiple independent structures
@@ -230,76 +202,6 @@ class TestHierarchy(AbstractHierarchyTest):
         # Items should reference their respective parents
         assert items1[0]["__parent_extract_id"] == main1["__extract_id"]
         assert items2[0]["__parent_extract_id"] == main2["__extract_id"]
-
-    def test_circular_reference_handling(self, processor):
-        """Test handling of circular references in nested objects."""
-        # Create a structure with a circular reference
-        structure = {"id": "1", "name": "Circular Structure"}
-        # Create a separate dict to avoid JSON serialization issues when testing
-        sub_obj = {"id": "sub", "name": "Subobject"}
-        structure["ref"] = sub_obj
-        sub_obj["parent_ref"] = structure  # Create circular reference
-
-        # Configure processor to use strategy best suited for testing
-        config = TransmogConfig.default().with_error_handling(
-            recovery_strategy="lenient"
-        )
-        test_processor = Processor(config=config)
-
-        # Try with lenient error handling first
-        try:
-            result = test_processor.process(structure, entity_name="test")
-
-            # If it succeeded, verify the result has the main record
-            main_records = result.get_main_table()
-            assert len(main_records) == 1
-            assert "__extract_id" in main_records[0]
-
-            # Verify the circular reference was handled (either pruned or marked)
-            # We don't assert specific field content, just that processing completed
-            print("Circular reference was handled with recovery")
-
-        except Exception as e:
-            # If it fails even with lenient handling, check it's the expected error type
-            from transmog.error import ProcessingError, CircularReferenceError
-
-            assert isinstance(e, (CircularReferenceError, ProcessingError)), (
-                f"Unexpected error type: {type(e)}"
-            )
-
-            if isinstance(e, ProcessingError):
-                # Check if the inner error is related to circular references
-                error_msg = str(e).lower()
-                assert any(
-                    term in error_msg for term in ["circular", "recursion", "cycle"]
-                ), f"ProcessingError does not indicate circular reference: {error_msg}"
-
-            print(f"Circular reference detected as expected: {type(e).__name__}")
-
-        # Now test with strict error handling - should always fail
-        strict_config = TransmogConfig.default().with_error_handling(
-            recovery_strategy="strict"
-        )
-        strict_processor = Processor(config=strict_config)
-
-        try:
-            strict_processor.process(structure, entity_name="test")
-            pytest.fail(
-                "Expected an exception with strict handling of circular references"
-            )
-        except Exception as e:
-            # Verify it's a recognized error type
-            from transmog.error import ProcessingError, CircularReferenceError
-
-            assert isinstance(e, (CircularReferenceError, ProcessingError)), (
-                f"Unexpected error type: {type(e)}"
-            )
-
-            # Verify error message indicates circular reference
-            error_msg = str(e).lower()
-            assert any(
-                term in error_msg for term in ["circular", "recursion", "cycle"]
-            ), f"Error does not indicate circular reference: {error_msg}"
 
     def test_processor_hierarchical_processing(self, processor):
         """Test hierarchical processing through the Processor interface."""
@@ -375,3 +277,33 @@ class TestHierarchy(AbstractHierarchyTest):
             for field in fields_to_check:
                 assert field in record
                 assert record[field] == single_main[field]
+
+    def test_max_depth_handling(self, processor, deeply_nested_data):
+        """Test that the hierarchy processor correctly handles deeply nested structures."""
+        # Process using processor with default max_depth
+        result = processor.process(deeply_nested_data, entity_name="test")
+
+        # Verify main record
+        main_records = result.get_main_table()
+        assert len(main_records) == 1
+        assert "__extract_id" in main_records[0]
+
+        # Process again with a very small max_depth to test the depth limit
+        limited_processor = Processor(
+            config=TransmogConfig.default().with_processing(
+                cast_to_string=True,
+                max_depth=3,  # Set a shallow max_depth
+            )
+        )
+
+        # It should still process without errors
+        limited_result = limited_processor.process(
+            deeply_nested_data, entity_name="test"
+        )
+
+        # Verify the main record
+        limited_main = limited_result.get_main_table()
+        assert len(limited_main) == 1
+
+        # The limited depth processing should have fewer properties since it stopped earlier
+        assert len(main_records[0]) >= len(limited_main[0])

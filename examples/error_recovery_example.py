@@ -24,7 +24,6 @@ from transmog.error import (
     ProcessingError,
     ValidationError,
     ParsingError,
-    CircularReferenceError,
 )
 
 # Configure logging
@@ -43,11 +42,11 @@ PROBLEMATIC_DATA = [
         "name": "Good Record",
         "details": {"status": "active", "score": 95},
     },
-    # Record with circular reference
+    # Record with malformed values
     {
         "id": 2,
-        "name": "Circular Reference",
-        "details": {},  # Will be set to self-reference
+        "name": "Malformed Data",
+        "details": {"status": None, "weird_value": object()},  # Non-serializable value
     },
     # Record with invalid nested values
     {
@@ -74,8 +73,8 @@ def prepare_problematic_data() -> List[Dict[str, Any]]:
     """Prepare problematic data with specific issues."""
     data = PROBLEMATIC_DATA.copy()
 
-    # Create circular reference in record #1
-    data[1]["details"]["self"] = data[1]
+    # Create non-serializable value in record #1
+    data[1]["details"]["weird_obj"] = object()
 
     # Create extremely deep nesting in record #3
     deep_obj = {}
@@ -102,10 +101,10 @@ class CustomRecoveryStrategy(RecoveryStrategy):
     def __init__(self):
         """Initialize the recovery strategy with counters."""
         self.error_counts = {
-            "circular_reference": 0,
             "validation": 0,
             "parsing": 0,
             "max_depth": 0,
+            "serialization": 0,
             "other": 0,
             "total": 0,
         }
@@ -132,13 +131,13 @@ class CustomRecoveryStrategy(RecoveryStrategy):
         record_id = context.get("record_id") if context else "unknown"
 
         # Different handling based on error type
-        if isinstance(error, CircularReferenceError):
-            self.error_counts["circular_reference"] += 1
+        if "is not JSON serializable" in str(error):
+            self.error_counts["serialization"] += 1
             logger.warning(
-                f"Circular reference detected at {path} in record {record_id}"
+                f"Non-serializable value detected at {path} in record {record_id}"
             )
             # Replace with a simple string reference indicator
-            return True, {"__circular_reference": True}
+            return True, {"__non_serializable": True}
 
         elif isinstance(error, ValidationError):
             self.error_counts["validation"] += 1
@@ -178,18 +177,6 @@ class CustomRecoveryStrategy(RecoveryStrategy):
         """Handle processing errors with our custom recovery."""
         logger.warning(f"Handling processing error: {str(error)}")
         recovered, value = self.recover(error, {"entity_name": entity_name})
-        if recovered:
-            return value
-        raise error
-
-    def handle_circular_reference(
-        self, error: CircularReferenceError, path: List[str]
-    ) -> Any:
-        """Handle circular reference errors with our custom recovery."""
-        logger.warning(
-            f"Handling circular reference at: {'.'.join(path) if path else 'unknown'}"
-        )
-        recovered, value = self.recover(error, {"path": ".".join(path) if path else ""})
         if recovered:
             return value
         raise error
@@ -262,9 +249,6 @@ def with_recovery_decorator(func: Callable) -> Callable:
             # Use our recovery strategy
             if isinstance(e, ProcessingError):
                 return decorator_recovery.handle_processing_error(e)
-            elif isinstance(e, CircularReferenceError):
-                path = getattr(e, "path", [])
-                return decorator_recovery.handle_circular_reference(e, path)
             else:
                 # Wrap other exceptions in ProcessingError
                 wrapped = ProcessingError(f"Error processing data: {str(e)}")
@@ -294,7 +278,7 @@ def process_single_record(data: Dict[str, Any], record_id: str) -> Dict[str, Any
     for key, value in data.items():
         if isinstance(value, dict):
             try:
-                # This could fail with circular references or max depth
+                # This could fail with max depth
                 processed[key] = process_single_record(value, f"{record_id}.{key}")
             except Exception as e:
                 # The @with_recovery decorator will handle this

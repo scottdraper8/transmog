@@ -115,7 +115,6 @@ The `with_partial_recovery()` method creates a processor configured to maximize 
 This is particularly useful for:
 - Data migration from legacy systems
 - Processing API responses with inconsistent structures
-- Handling circular references in complex objects
 - Recovering data from malformed/corrupted files
 
 ```python
@@ -132,8 +131,6 @@ try:
     for record in result.get_main_table():
         if "_error" in record:
             print(f"Record with ID {record.get('id')} had errors: {record['_error']}")
-        elif "_circular_reference" in record:
-            print(f"Record with ID {record.get('id')} had circular references")
         else:
             print(f"Record with ID {record.get('id')} processed successfully")
 except Exception as e:

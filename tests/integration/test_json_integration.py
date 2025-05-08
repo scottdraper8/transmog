@@ -12,7 +12,7 @@ import pytest
 from transmog import Processor
 from transmog.process.result import ProcessingResult
 from transmog.io.writers.json import JsonStreamingWriter
-from transmog.error import FileError
+from transmog.error import FileError, ProcessingError
 
 
 class TestJsonIntegration:
@@ -187,24 +187,27 @@ class TestJsonIntegration:
             non_existent_file = os.path.join(temp_dir, "does_not_exist.json")
 
             # Test with a file that doesn't exist
-            with pytest.raises(FileError):
+            # The error is wrapped in a ProcessingError by the error_context decorator
+            with pytest.raises(ProcessingError) as exc_info:
                 processor = Processor()
                 processor.process_file(
                     file_path=non_existent_file, entity_name="error_test"
                 )
+            # Verify that the underlying cause was a file error
+            assert "File not found" in str(exc_info.value)
 
             # Test with invalid JSON content
             invalid_json_path = os.path.join(temp_dir, "invalid.json")
             with open(invalid_json_path, "w") as f:
                 f.write("{invalid json")
 
-            with pytest.raises(
-                Exception
-            ):  # Could be ParsingError or another error type
+            with pytest.raises(ProcessingError) as exc_info:
                 processor = Processor()
                 processor.process_file(
                     file_path=invalid_json_path, entity_name="error_test"
                 )
+            # Verify that the error indicates a parsing problem
+            assert "json" in str(exc_info.value).lower()
 
     def test_large_batch_processing(self):
         """Test processing large batches of data."""

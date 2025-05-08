@@ -74,6 +74,19 @@ class AbstractHierarchyTest:
             "tags": [{"id": "301", "name": "Tag 1"}],
         }
 
+    @pytest.fixture
+    def deeply_nested_data(self):
+        """Create a data structure with deep nesting for max depth testing."""
+        result = {"id": "789", "name": "Deeply Nested Structure"}
+
+        # Create a deeply nested structure (10 levels deep)
+        current = result
+        for i in range(10):
+            current["level"] = {"id": f"level-{i}", "name": f"Level {i}"}
+            current = current["level"]
+
+        return result
+
     def test_process_structure(self, simple_table_structure):
         """Test processing a simple structure."""
         # Process structure
@@ -194,3 +207,21 @@ class AbstractHierarchyTest:
             len(child_tables[subitems_table]) == 6
         )  # 3 subitems per record * 2 records
         assert len(child_tables["test_tags"]) == 2  # 1 tag per record * 2 records
+
+    def test_max_depth_handling(self, deeply_nested_data):
+        """Test handling of deeply nested structures."""
+        # Process with default settings
+        main_record, arrays = process_structure(deeply_nested_data, entity_name="test")
+
+        # Verify it processes without errors
+        assert "__extract_id" in main_record
+
+        # Test with limited max_depth
+        main_record_limited, arrays_limited = process_structure(
+            deeply_nested_data,
+            entity_name="test",
+            max_depth=3,  # Limit recursion depth
+        )
+
+        # It should still complete without errors
+        assert "__extract_id" in main_record_limited

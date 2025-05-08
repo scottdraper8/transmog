@@ -8,7 +8,7 @@ import os
 import json
 import pytest
 from transmog import Processor, TransmogConfig, ProcessingResult
-from transmog.error import ParsingError, CircularReferenceError, ProcessingError
+from transmog.error import ParsingError, ProcessingError
 
 from tests.interfaces.test_processor_interface import AbstractProcessorTest
 
@@ -560,21 +560,7 @@ class TestProcessor(AbstractProcessorTest):
         """Test error handling in the processor."""
         processor = Processor()
 
-        # Test with invalid input type
+        # Test with invalid input type (string instead of dict)
+        # This should raise an error due to invalid input type
         with pytest.raises((TypeError, ParsingError, ValueError, ProcessingError)):
             processor.process("not a dict", entity_name="test")
-
-        # Test with circular reference
-        circular_dict = {"self": None}
-        circular_dict["self"] = circular_dict
-
-        # Accept different error types for circular reference
-        try:
-            processor.process(circular_dict, entity_name="test")
-            assert False, "Expected an error for circular reference"
-        except (CircularReferenceError, ProcessingError, RecursionError) as e:
-            # Check error message if it's not explicitly CircularReferenceError
-            if not isinstance(e, CircularReferenceError):
-                assert "circular" in str(e).lower() or "recursion" in str(e).lower(), (
-                    f"Error doesn't mention circular reference: {str(e)}"
-                )

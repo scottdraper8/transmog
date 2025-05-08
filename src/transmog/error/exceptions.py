@@ -99,21 +99,6 @@ class FileError(TransmogError):
         super().__init__(f"File error{op_info}{path_info}: {message}")
 
 
-class CircularReferenceError(TransmogError):
-    """Exception raised when a circular reference is detected.
-
-    This exception is raised when processing detects a circular reference
-    in the data structure that would cause infinite recursion.
-    """
-
-    def __init__(self, message: str, path: Optional[List[str]] = None):
-        self.path = path
-        path_info = ""
-        if path:
-            path_info = f" Path: {' > '.join(path)}"
-        super().__init__(f"Circular reference detected: {message}.{path_info}")
-
-
 class MissingDependencyError(TransmogError):
     """Exception raised when an optional dependency is missing."""
 

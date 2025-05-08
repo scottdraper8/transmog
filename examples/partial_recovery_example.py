@@ -143,20 +143,37 @@ def example_malformed_array():
             print(f"    Error: {employee['_error']}")
 
 
-# Example 2: API response with circular references
-def example_circular_references():
+# Example 2: API response with deeply nested structures
+def example_deeply_nested_structures():
     """
     Real-world scenario: Processing API responses or exported data that may contain
-    circular references but you still want to extract the valuable information.
+    excessively deep nested structures that are difficult to process.
 
     This is common when:
-    - Working with graph-like data structures
-    - Processing exported database dumps
-    - Handling recursive relationships in data models
+    - Working with complex hierarchical data structures
+    - Processing verbose API responses
+    - Handling nested JSON configurations
     """
-    print_header("Example 2: Handling Circular References")
+    print_header("Example 2: Handling Deeply Nested Structures")
 
-    # Create data with a circular reference
+    # Create data with excessive nesting
+    # This simulates an API response with an excessive hierarchy
+    def create_nested_object(level, max_level=100):
+        """Create a deeply nested object."""
+        if level >= max_level:
+            return {"value": f"level-{level}"}
+
+        return {
+            "id": f"level-{level}",
+            "name": f"Level {level}",
+            "metadata": {
+                "created_at": "2023-01-01",
+                "version": level,
+                "child": create_nested_object(level + 1, max_level),
+            },
+        }
+
+    # Create a deeply nested department structure
     department = {
         "id": "dept-eng",
         "name": "Engineering",
@@ -164,30 +181,35 @@ def example_circular_references():
             "id": "emp-1",
             "name": "Alice",
             "title": "Engineering Director",
-            "direct_reports": [],
+            "profile": create_nested_object(1, 50),  # This creates excessive nesting
         },
-        "employees": [],
+        "employees": [
+            {
+                "id": "emp-1",
+                "name": "Alice",
+                "title": "Engineering Director",
+                "skills": [
+                    {"name": "Leadership", "level": 9},
+                    {"name": "Architecture", "level": 8},
+                    {
+                        "name": "Programming",
+                        "level": 7,
+                        "details": create_nested_object(1, 30),
+                    },
+                ],
+            },
+            {
+                "id": "emp-2",
+                "name": "Bob",
+                "title": "Senior Engineer",
+                "skills": [
+                    {"name": "Programming", "level": 9},
+                    {"name": "Testing", "level": 8},
+                    {"name": "DevOps", "level": 7},
+                ],
+            },
+        ],
     }
-
-    # Create employees with a circular reference back to their department
-    employees = [
-        {
-            "id": "emp-1",
-            "name": "Alice",
-            "title": "Engineering Director",
-            "department": department,  # Circular: employee → department → manager → same employee
-        },
-        {
-            "id": "emp-2",
-            "name": "Bob",
-            "title": "Senior Engineer",
-            "department": department,
-        },
-    ]
-
-    # Add circular reference from department back to employees
-    department["employees"] = employees
-    department["manager"]["direct_reports"] = employees
 
     # Prepare data for processing
     organization = {"name": "Acme Inc.", "departments": [department]}
@@ -195,7 +217,7 @@ def example_circular_references():
     # Process with different recovery strategies
     comparison_results = {}
 
-    # 1. Try strict recovery (will fail)
+    # 1. Try strict recovery (will fail due to max recursion depth)
     try:
         strict_processor = Processor(
             config=TransmogConfig.default().with_error_handling(
@@ -225,16 +247,22 @@ def example_circular_references():
         table = partial_result.get_child_table(table_name)
         print(f"  {table_name}: {len(table)} records")
 
-    # Show how circular references were handled
-    print(
-        "\nCircular references were handled by replacing them with reference markers:"
-    )
+    # Show how deep nesting was handled
+    print("\nDeep nesting issues were handled by marking problematic parts:")
+    marked_records_found = False
     for table_name in partial_result.get_table_names():
         table = partial_result.get_child_table(table_name)
         for record in table:
-            if "_circular_reference" in record:
+            # Look for error indicators in any field
+            error_fields = [field for field in record if field.startswith("_error")]
+            if error_fields:
+                marked_records_found = True
                 print(f"  Table '{table_name}', record {record.get('id', 'unknown')}:")
-                print(f"    {record}")
+                for field in error_fields:
+                    print(f"    Error in {field}: {record[field]}")
+
+    if not marked_records_found:
+        print("  No error markers found in processed records")
 
 
 # Example 3: Partial JSON file recovery
@@ -404,16 +432,15 @@ def main():
     print("""
 This example demonstrates how the PartialProcessingRecovery strategy can help:
 1. Recover usable data from malformed array elements
-2. Extract information from data with circular references
-3. Process corrupted or malformed JSON files
-4. Handle schema inconsistencies during data migrations
+2. Process corrupted or malformed JSON files
+3. Handle schema inconsistencies during data migrations
 
 Each example compares the results between strict, skip, and partial recovery strategies.
     """)
 
     # Run all examples
     example_malformed_array()
-    example_circular_references()
+    example_deeply_nested_structures()
     example_malformed_json_file()
     example_schema_inconsistencies()
 

@@ -48,7 +48,6 @@ from ..core.hierarchy import (
     process_structure,
     process_records_in_single_pass,
     stream_process_records,
-    stream_process_structure,
 )
 from ..core.metadata import (
     generate_extract_id,
@@ -265,7 +264,6 @@ class InMemoryStrategy(ProcessingStrategy):
         data: Union[Dict[str, Any], List[Dict[str, Any]]],
         entity_name: str,
         extract_time: Optional[Any] = None,
-        use_single_pass: bool = True,
         **kwargs,
     ) -> ProcessingResult:
         """
@@ -275,7 +273,6 @@ class InMemoryStrategy(ProcessingStrategy):
             data: Input data (dict or list of dicts)
             entity_name: Name of the entity being processed
             extract_time: Optional extraction timestamp
-            use_single_pass: Whether to use single-pass processing
             **kwargs: Additional parameters
 
         Returns:
@@ -293,160 +290,86 @@ class InMemoryStrategy(ProcessingStrategy):
         )
 
         # Get configuration parameters
-        config_params = self._get_common_config_params(extract_time)
-
-        # Use single-pass processing for better performance when appropriate
-        if use_single_pass:
-            return self._process_in_single_pass(
-                iter(data_list), entity_name, extract_time
-            )
-        else:
-            # Use chunked processing based on configuration
-            return self._process_in_chunks(
-                iter(data_list), entity_name, extract_time, kwargs.get("chunk_size")
-            )
-
-    def _process_in_single_pass(
-        self,
-        data_iterator: Iterator[Dict[str, Any]],
-        entity_name: str,
-        extract_time: Optional[Any] = None,
-    ) -> ProcessingResult:
-        """
-        Process data in a single pass for better performance.
-
-        Args:
-            data_iterator: Iterator of data records
-            entity_name: Name of the entity being processed
-            extract_time: Optional extraction timestamp
-
-        Returns:
-            ProcessingResult containing processed data
-        """
-        # Convert iterator to list for single-pass processing
-        records = list(data_iterator)
-
-        # Get configuration parameters
         params = self._get_common_config_params(extract_time)
+        params.update({k: v for k, v in kwargs.items() if v is not None})
 
-        # Extract recovery strategy if present and remove from params to avoid duplicate
-        recovery_strategy = params.pop("recovery_strategy", None)
-
-        # Process records in a single pass
-        main_records, child_tables = process_records_in_single_pass(
-            records=records,
-            entity_name=entity_name,
-            recovery_strategy=recovery_strategy,
-            **params,
-        )
-
-        return ProcessingResult(
-            main_table=main_records,
-            child_tables=child_tables,
-            entity_name=entity_name,
-            source_info={"record_count": len(records)},
-        )
-
-    def _process_in_chunks(
-        self,
-        data_iterator: Iterator[Dict[str, Any]],
-        entity_name: str,
-        extract_time: Optional[Any] = None,
-        chunk_size: Optional[int] = None,
-    ) -> ProcessingResult:
-        """
-        Process data in chunks for memory efficiency.
-
-        Args:
-            data_iterator: Iterator of data records
-            entity_name: Name of the entity being processed
-            extract_time: Optional extraction timestamp
-            chunk_size: Size of chunks to process
-
-        Returns:
-            ProcessingResult containing processed data
-        """
         # Get batch size from configuration or override
-        batch_size = self._get_batch_size(chunk_size)
+        batch_size = self._get_batch_size(kwargs.get("chunk_size"))
 
-        # Create batches from the iterator
-        batches = []
+        # Extract recovery strategy if present
+        recovery_strategy = params.get("recovery_strategy")
+
+        # Remove from params to avoid duplicate argument
+        params_copy = params.copy()
+        if "recovery_strategy" in params_copy:
+            del params_copy["recovery_strategy"]
+
+        # Handle small data sets in one go
+        if len(data_list) <= batch_size:
+            # Process all records in a single pass
+            main_records, child_tables = process_records_in_single_pass(
+                records=data_list,
+                entity_name=entity_name,
+                recovery_strategy=recovery_strategy,
+                **params_copy,
+            )
+
+            return ProcessingResult(
+                main_table=main_records,
+                child_tables=child_tables,
+                entity_name=entity_name,
+                source_info={"record_count": len(data_list)},
+            )
+
+        # For larger datasets, process in batches
+        data_iterator = iter(data_list)
         total_records = 0
+        result = None
 
         # Process data in chunks
-        for chunk in iter(
-            lambda: list(itertools.islice(data_iterator, batch_size)), []
-        ):
-            batches.append(chunk)
-            total_records += len(chunk)
+        while True:
+            # Get next batch
+            batch = list(itertools.islice(data_iterator, batch_size))
+            if not batch:
+                break
 
-        if not batches:
-            # No data to process
-            return ProcessingResult(
-                main_table=[],
-                child_tables={},
+            # Process batch
+            main_records, child_tables = process_records_in_single_pass(
+                records=batch,
                 entity_name=entity_name,
-                source_info={"record_count": 0},
+                recovery_strategy=recovery_strategy,
+                **params_copy,
             )
 
-        # Process the first batch to initialize the result
-        first_batch = batches[0]
-        result = self._process_batch_internal(first_batch, entity_name, extract_time)
+            # Update record count
+            total_records += len(batch)
 
-        # Process remaining batches and combine results
-        if len(batches) > 1:
-            batch_results = [result]
-
-            for batch in batches[1:]:
-                batch_result = self._process_batch_internal(
-                    batch, entity_name, extract_time
+            # Initialize or update result
+            if result is None:
+                result = ProcessingResult(
+                    main_table=main_records,
+                    child_tables=child_tables,
+                    entity_name=entity_name,
                 )
-                batch_results.append(batch_result)
+            else:
+                # Add main records
+                result.add_main_records(main_records)
 
-            # Combine all batch results
-            result = ProcessingResult.combine_results(batch_results, entity_name)
+                # Add child records
+                for table_name, records in child_tables.items():
+                    result.add_records(table_name, records)
 
         # Update source info
-        result.source_info["record_count"] = total_records
+        if result:
+            result.source_info["record_count"] = total_records
+            return result
 
-        return result
-
-    def _process_batch_internal(
-        self,
-        batch_data: List[Dict[str, Any]],
-        entity_name: str,
-        extract_time: Optional[Any] = None,
-    ) -> ProcessingResult:
-        """
-        Process a batch of records.
-
-        Args:
-            batch_data: Batch of records to process
-            entity_name: Name of the entity being processed
-            extract_time: Optional extraction timestamp
-
-        Returns:
-            ProcessingResult for the batch
-        """
-        # Get configuration parameters
-        params = self._get_common_config_params(extract_time)
-
-        # Extract recovery strategy if present and remove from params to avoid duplicate
-        recovery_strategy = params.pop("recovery_strategy", None)
-
-        # Process records in a single pass
-        main_records, child_tables = process_records_in_single_pass(
-            records=batch_data,
-            entity_name=entity_name,
-            recovery_strategy=recovery_strategy,
-            **params,
-        )
-
+        # Handle empty data case
         return ProcessingResult(
-            main_table=main_records,
-            child_tables=child_tables,
+            main_table=[],
+            child_tables={},
             entity_name=entity_name,
-            source_info={"record_count": len(batch_data)},
+            source_info={"record_count": 0},
         )
 
 
@@ -799,6 +722,7 @@ class FileStrategy(ProcessingStrategy):
                 custom_abbreviations=params["custom_abbreviations"],
                 default_id_field=default_id_field,
                 id_generation_strategy=id_generation_strategy,
+                recovery_strategy=params.get("recovery_strategy"),
             )
 
             # Add arrays to result
@@ -1047,6 +971,7 @@ class BatchStrategy(ProcessingStrategy):
                 custom_abbreviations=params["custom_abbreviations"],
                 default_id_field=default_id_field,
                 id_generation_strategy=id_generation_strategy,
+                recovery_strategy=params.get("recovery_strategy"),
             )
 
             # Add arrays to result for this record
@@ -1222,6 +1147,7 @@ class ChunkedStrategy(ProcessingStrategy):
                     custom_abbreviations=params.get("custom_abbreviations"),
                     default_id_field=default_id_field,
                     id_generation_strategy=id_generation_strategy,
+                    recovery_strategy=params.get("recovery_strategy"),
                 )
 
                 # Add arrays to result for this record

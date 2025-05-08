@@ -68,14 +68,14 @@ class AbstractExtractorTest:
         }
 
     @pytest.fixture
-    def circular_reference_data(self):
-        """Create a data structure with circular references."""
+    def self_referential_data(self):
+        """Create a data structure with self-referential properties for recursion testing."""
         data = {
             "id": "789",
-            "name": "Circular Entity",
+            "name": "Recursive Entity",
             "child": {"id": "child1", "name": "Child 1"},
         }
-        # Create a circular reference
+        # Create a self-reference
         data["child"]["parent"] = data
         return data
 
@@ -151,16 +151,16 @@ class AbstractExtractorTest:
         assert len(tables[items_table]) == 2
         assert len(tables[subitems_table]) == 3
 
-    def test_circular_reference_handling(self, circular_reference_data):
-        """Test handling of circular references."""
+    def test_recursion_handling(self, self_referential_data):
+        """Test handling of recursive data structures."""
         # Extract arrays with default settings
-        arrays = extract_arrays(circular_reference_data, entity_name="test")
+        arrays = extract_arrays(self_referential_data, entity_name="test")
 
         # Verify it doesn't cause infinite recursion
-        # The implementation might handle circular references in different ways
-        # Some might prune the reference, others might include a limited depth
+        # The implementation might handle self-references in different ways
+        # Some might prune the reference, others might have a maximum recursion depth
 
-        # Just verify the function didn't crash with circular references
+        # Just verify the function didn't crash with self-referential data
         assert isinstance(arrays, dict)
 
     def test_extraction_with_options(self, simple_nested_data):

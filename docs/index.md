@@ -148,15 +148,12 @@ See our [ROADMAP.md](https://github.com/scottdraper8/transmog/blob/main/ROADMAP.
 
 ### Error Recovery Strategies
 
-* Configurable approach to handling problematic data:
-  * Strict recovery - fails on any error (default)
-  * Skip and log - ignores problematic records but continues processing
-  * Partial recovery - preserves valid portions of problematic records
-* Simplified configuration with factory methods:
-  * `Processor.with_partial_recovery()` for maximizing data yield
-* Handles circular references by replacing them with reference markers
-* Recovers data from malformed JSON sources
-* Processes data with schema inconsistencies
+* **Robust Error Recovery:** Multiple recovery strategies for malformed data:
+  * Strict recovery enforces data integrity by raising errors
+  * Skip-and-log recovery continues processing by skipping problematic records
+  * Partial recovery extracts valid portions of records with errors
+  * Comprehensive logging and error tracking
+  * Configurable error handling with custom strategies
 
 ### Performance Optimization
 

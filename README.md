@@ -151,7 +151,6 @@ result = processor.process(problematic_data, entity_name="records")
 The partial recovery strategy is particularly valuable when working with:
 - Data migration from legacy systems
 - Processing API responses with inconsistent structures
-- Handling circular references in complex objects
 - Recovering data from malformed files
 
 See the [error handling guide](docs/user/error-handling.md) for more information.

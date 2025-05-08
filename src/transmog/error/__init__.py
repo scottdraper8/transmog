@@ -1,37 +1,31 @@
 """
-Error handling module for Transmog package.
+Error handling package for Transmog.
 
-This module provides exception types, error handling utilities, and recovery strategies
-for handling errors throughout the Transmog package.
+This package provides error handling, logging, and recovery
+functionality for the Transmog package.
 """
 
-# Import exceptions
 from .exceptions import (
     TransmogError,
     ProcessingError,
     ValidationError,
     ParsingError,
     FileError,
-    CircularReferenceError,
     MissingDependencyError,
     ConfigurationError,
     OutputError,
 )
 
-# Import error handling utilities
 from .handling import (
     error_context,
     setup_logging,
     safe_json_loads,
     check_dependency,
     require_dependency,
-    handle_circular_reference,
-    validate_input,
     try_with_recovery,
-    logger,
+    validate_input,
 )
 
-# Import recovery strategies
 from .recovery import (
     RecoveryStrategy,
     StrictRecovery,
@@ -43,26 +37,28 @@ from .recovery import (
     LENIENT,
 )
 
+# Import logger for convenience
+from .handling import logger
+
+# Public API
 __all__ = [
-    # Base exceptions
+    # Exceptions
     "TransmogError",
     "ProcessingError",
     "ValidationError",
     "ParsingError",
     "FileError",
-    "CircularReferenceError",
     "MissingDependencyError",
     "ConfigurationError",
     "OutputError",
-    # Error handling utilities
+    # Error handling
     "error_context",
     "setup_logging",
     "safe_json_loads",
     "check_dependency",
     "require_dependency",
-    "handle_circular_reference",
-    "validate_input",
     "try_with_recovery",
+    "validate_input",
     "logger",
     # Recovery strategies
     "RecoveryStrategy",

@@ -50,8 +50,9 @@ class ProcessingConfig:
     include_empty: bool = False
     skip_null: bool = True
     max_nesting_depth: Optional[int] = None
+    max_depth: int = 100  # Maximum recursion depth
     path_parts_optimization: bool = True
-    visit_arrays: bool = False
+    visit_arrays: bool = True
     batch_size: int = 1000
     processing_mode: ProcessingMode = ProcessingMode.STANDARD
     # Validation settings

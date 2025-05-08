@@ -1,56 +1,58 @@
 """
 Error handling utilities for the Transmog package.
 
-This module provides decorators and utility functions for consistent error handling,
-logging, and recovery strategies throughout the package.
+This module provides functions and decorators for error handling
+and recovery in the Transmog package.
 """
 
 import functools
-import inspect
+import importlib
 import json
 import logging
 import os
-import sys
 import traceback
 from typing import (
     Any,
     Callable,
     Dict,
+    Generator,
     List,
     Optional,
     Set,
-    Tuple,
     TypeVar,
     Union,
     cast,
+    Tuple,
     Type,
 )
 
-# Import the central dependency manager
-from transmog.dependencies import DependencyManager
-
-from .exceptions import (
-    CircularReferenceError,
+from transmog.error.exceptions import (
     ConfigurationError,
     FileError,
     MissingDependencyError,
-    TransmogError,
-    OutputError,
     ParsingError,
     ProcessingError,
+    TransmogError,
     ValidationError,
 )
 
-from .recovery import RecoveryStrategy
+# Optional dependency on recovery strategies
+try:
+    from ..error.recovery import RecoveryStrategy
+except (ImportError, ModuleNotFoundError):
+    # Define a placeholder for type hints
+    class RecoveryStrategy:  # type: ignore
+        """Placeholder for RecoveryStrategy."""
 
-from ..config.settings import settings
+        pass
 
-# Set up logging
-logger = logging.getLogger("transmog")
 
-# Type variables for function signatures
+# Type variables for return type preservation
 T = TypeVar("T")
 R = TypeVar("R")
+
+# Setup module logger
+logger = logging.getLogger(__name__)
 
 
 def setup_logging(
@@ -62,139 +64,127 @@ def setup_logging(
     Set up logging for the Transmog package.
 
     Args:
-        level: Logging level (default: INFO)
-        log_file: Optional path to log file
-        log_format: Custom log format string
+        level: Logging level
+        log_file: Optional file path for log output
+        log_format: Optional custom log format
     """
+    # Use a reasonable default format if none specified
     if log_format is None:
-        log_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+        log_format = (
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            if log_file
+            else "%(levelname)s: %(message)s"
+        )
 
-    # Create formatter
-    formatter = logging.Formatter(log_format)
-
-    # Configure root logger
-    root_logger = logging.getLogger("transmog")
-    root_logger.setLevel(level)
+    # Configure basic logger
+    logger = logging.getLogger("transmog")
+    logger.setLevel(level)
 
     # Remove existing handlers
-    for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
+    if logger.handlers:
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
 
-    # Add console handler
+    # Create handlers based on configuration
+    handlers = []
+
+    # Console handler always added
     console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    root_logger.addHandler(console_handler)
+    console_handler.setLevel(level)
+    console_handler.setFormatter(logging.Formatter(log_format))
+    handlers.append(console_handler)
 
-    # Add file handler if specified
+    # File handler if specified
     if log_file:
         try:
             file_handler = logging.FileHandler(log_file)
-            file_handler.setFormatter(formatter)
-            root_logger.addHandler(file_handler)
+            file_handler.setLevel(level)
+            file_handler.setFormatter(logging.Formatter(log_format))
+            handlers.append(file_handler)
         except Exception as e:
-            logger.warning(f"Failed to set up log file '{log_file}': {str(e)}")
+            logger.warning(f"Failed to create log file at {log_file}: {e}")
+
+    # Add all handlers
+    for handler in handlers:
+        logger.addHandler(handler)
+
+    # Log setup completion
+    logger.debug(f"Logging configured with level {level}")
 
 
 def safe_json_loads(s: Union[str, bytes]) -> Any:
     """
-    Safely load JSON data with better error handling.
-
-    This function attempts to use orjson first (for better performance),
-    falling back to standard library json if orjson is not available.
+    Safely load JSON data with enhanced error handling.
 
     Args:
-        s: JSON string to parse
+        s: JSON string or bytes to parse
 
     Returns:
         Parsed JSON data
 
     Raises:
-        ParsingError: If the input is not valid JSON
+        ParsingError: If JSON parsing fails
     """
-    # Try orjson first (much faster)
-    if DependencyManager.has_dependency("orjson"):
-        import orjson
+    import json
 
+    try:
+        if isinstance(s, bytes):
+            # Try UTF-8 first
+            return json.loads(s.decode("utf-8"))
+        return json.loads(s)
+    except UnicodeDecodeError:
+        # If UTF-8 fails, try with errors='replace'
         try:
-            return orjson.loads(s)
-        except (orjson.JSONDecodeError, ValueError, TypeError) as e:
-            # Get the first 100 characters for error context
-            context = str(s)[:100] + ("..." if len(str(s)) > 100 else "")
-            raise ParsingError(f"Invalid JSON data: {str(e)}. Context: {context}")
-    else:
-        # Fall back to standard json
-        try:
-            return json.loads(s)
-        except json.JSONDecodeError as e:
-            # Get the first 100 characters for error context
-            context = str(s)[:100] + ("..." if len(str(s)) > 100 else "")
-            raise ParsingError(f"Invalid JSON data: {str(e)}. Context: {context}")
+            return json.loads(s.decode("utf-8", errors="replace"))
+        except Exception as e:
+            raise ParsingError(f"Failed to decode bytes: {str(e)}")
+    except json.JSONDecodeError as e:
+        # Provide detailed error context
+        line_col = f"line {e.lineno}, column {e.colno}" if hasattr(e, "lineno") else ""
+        raise ParsingError(f"Invalid JSON format at {line_col}: {str(e)}")
+    except Exception as e:
+        # Generic fallback
+        raise ParsingError(f"JSON parsing error: {str(e)}")
 
 
 def check_dependency(package_name: str, feature: Optional[str] = None) -> bool:
     """
-    Check if an optional dependency is installed.
+    Check if a dependency is available.
 
     Args:
-        package_name: The package to check
-        feature: The feature that requires this package (for error messages)
+        package_name: Name of the package to check
+        feature: Optional feature name requiring this package
 
     Returns:
-        True if installed, False otherwise
+        True if the dependency is available, False otherwise
     """
-    return DependencyManager.has_dependency(package_name)
+    try:
+        __import__(package_name)
+        return True
+    except ImportError:
+        return False
 
 
 def require_dependency(package_name: str, feature: Optional[str] = None) -> None:
     """
-    Require that an optional dependency is installed.
+    Require a dependency, raising an error if not available.
 
     Args:
-        package_name: The package to check
-        feature: The feature that requires this package
+        package_name: Name of the package to require
+        feature: Optional feature name requiring this package
 
     Raises:
-        MissingDependencyError: If dependency is missing
+        MissingDependencyError: If the dependency is not available
     """
-    if not DependencyManager.has_dependency(package_name):
+    try:
+        __import__(package_name)
+    except ImportError:
         feature_name = feature or package_name
         raise MissingDependencyError(
             f"{package_name} is required but not installed",
             package=package_name,
             feature=feature,
         )
-
-
-def handle_circular_reference(
-    obj_id: int,
-    visited: Set[int],
-    path: List[str],
-    max_depth: Optional[int] = None,
-) -> None:
-    """
-    Check for circular references and handle appropriately.
-
-    Args:
-        obj_id: Object ID to check
-        visited: Set of already visited object IDs
-        path: Current object path for error reporting
-        max_depth: Maximum allowed reference depth
-
-    Raises:
-        CircularReferenceError: If circular reference is detected
-    """
-    if obj_id in visited:
-        raise CircularReferenceError(
-            "Object referenced multiple times in data structure", path=path
-        )
-
-    if max_depth is not None and len(path) > max_depth:
-        raise CircularReferenceError(
-            f"Maximum nesting depth exceeded ({max_depth})", path=path
-        )
-
-    # Add object ID to visited set
-    visited.add(obj_id)
 
 
 def error_context(
@@ -215,45 +205,15 @@ def error_context(
     Returns:
         Decorated function
     """
+    # Default wrapper uses ProcessingError if not specified
+    if wrap_as is None:
+        wrap_as = lambda e: ProcessingError(f"{context_message}: {str(e)}")
 
     def decorator(func: Callable[..., R]) -> Callable[..., R]:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> R:
             try:
                 return func(*args, **kwargs)
-            except CircularReferenceError as e:
-                # Special handling for circular references to avoid deep nested errors
-                error_msg = f"{context_message} in {func.__qualname__}: {str(e)}"
-
-                # Log the exception if requested
-                if log_exceptions:
-                    logger.error(error_msg)
-
-                # Try recovery specific to circular references if available
-                recovery_strategy = kwargs.get("recovery_strategy")
-                if recovery_strategy:
-                    # Get path information
-                    path = kwargs.get("path_parts", [])
-                    if not path and "parent_path" in kwargs and kwargs["parent_path"]:
-                        separator = kwargs.get("separator", "_")
-                        path = kwargs["parent_path"].split(separator)
-
-                    try:
-                        # Try circular reference specific recovery
-                        if hasattr(recovery_strategy, "handle_circular_reference"):
-                            return recovery_strategy.handle_circular_reference(e, path)
-                        # Try generic recovery
-                        elif hasattr(recovery_strategy, "recover"):
-                            return recovery_strategy.recover(e, path=path)
-                    except Exception as recovery_error:
-                        logger.warning(f"Recovery failed: {str(recovery_error)}")
-
-                # If no recovery, wrap and raise
-                if wrap_as:
-                    raise wrap_as(e) from e
-                else:
-                    raise
-
             except Exception as e:
                 # Format the error message with function info
                 func_name = func.__qualname__
@@ -357,8 +317,8 @@ def validate_input(
     Validate input data against expected type and custom validation.
 
     Args:
-        data: Data to validate
-        expected_type: Expected type or tuple of types
+        data: The data to validate
+        expected_type: Expected type or types
         param_name: Parameter name for error messages
         allow_none: Whether None is allowed
         validation_func: Optional custom validation function
@@ -366,30 +326,34 @@ def validate_input(
     Raises:
         ValidationError: If validation fails
     """
-    # Check if None is allowed
-    if data is None:
-        if allow_none:
-            return
-        raise ValidationError(f"Parameter '{param_name}' cannot be None")
-
-    # Check type
-    if not isinstance(data, expected_type):
-        type_names = (
-            [t.__name__ for t in expected_type]
-            if isinstance(expected_type, tuple)
-            else [expected_type.__name__]
+    # Check for None if not allowed
+    if data is None and not allow_none:
+        raise ValidationError(
+            f"Parameter '{param_name}' cannot be None", {param_name: "none_not_allowed"}
         )
-        expected_type_str = " or ".join(type_names)
+
+    # Skip type check if None is provided and allowed
+    if data is None and allow_none:
+        return
+
+    # Type check
+    if not isinstance(data, expected_type):
+        type_name = (
+            ", ".join(t.__name__ for t in expected_type)
+            if isinstance(expected_type, tuple)
+            else expected_type.__name__
+        )
         actual_type = type(data).__name__
         raise ValidationError(
-            f"Parameter '{param_name}' must be of type {expected_type_str}, "
-            f"got {actual_type}"
+            f"Parameter '{param_name}' has wrong type",
+            {param_name: f"expected {type_name}, got {actual_type}"},
         )
 
-    # Run custom validation if provided
-    if validation_func is not None:
-        is_valid, error_message = validation_func(data)
+    # Custom validation if provided
+    if validation_func:
+        is_valid, error_msg = validation_func(data)
         if not is_valid:
             raise ValidationError(
-                f"Validation failed for parameter '{param_name}': {error_message}"
+                f"Parameter '{param_name}' failed validation",
+                {param_name: error_msg or "invalid_value"},
             )
