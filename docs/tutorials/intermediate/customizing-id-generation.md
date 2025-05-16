@@ -17,15 +17,16 @@ By default, Transmog generates random UUIDs for records. However, customizing ID
 Transmog provides three main ID generation approaches:
 
 1. **Random UUIDs** (default) - Non-deterministic, unique identifiers
-2. **Field-based deterministic IDs** - Based on field values
-3. **Custom function-based ID generation** - Complete control over ID generation
+2. **Field-based deterministic IDs** - Based on a single field value
+3. **Custom function-based ID generation** - Complete control over ID generation,
+including using multiple fields
 
 ## Basic Deterministic IDs
 
-Let's start with field-based deterministic IDs:
+Let's start with field-based deterministic IDs using a single field:
 
 ```python
-from transmog import TransmogProcessor, TransmogConfig
+from transmog import Processor, TransmogConfig
 
 # Sample data
 employee_data = {
@@ -39,104 +40,128 @@ employee_data = {
     ]
 }
 
-# Configure with deterministic IDs based on specific fields
-config = TransmogConfig().with_deterministic_ids(
-    id_fields=["employeeId"],  # Use employeeId field for the main table
-    child_id_fields={
-        "projects": ["projectId"]  # Use projectId field for projects table
-    }
-)
+# Configure with deterministic IDs based on a specific field
+# Note: with_deterministic_ids only accepts a single field name or mapping
+config = TransmogConfig.with_deterministic_ids("employeeId")  # Use employeeId field for IDs
+processor = Processor(config=config)
 
-# Create processor with custom configuration
-processor = TransmogProcessor(config)
+# Or use the processor factory method directly
+processor = Processor.with_deterministic_ids("employeeId")
 
 # Process the data
-result = processor.process_data(employee_data)
+result = processor.process(data=employee_data, entity_name="employee")
 
 # Display the results
 tables = result.to_dict()
 for table_name, records in tables.items():
     print(f"\n=== {table_name} ===")
     for record in records:
-        print(f"ID: {record['id']}, Data: {record}")
+        print(f"ID: {record['__extract_id']}, Data: {record}")
 ```
 
-## Advanced Deterministic IDs
+## Using Different Fields for Different Tables
 
-For more complex scenarios, you can combine multiple fields and customize the format:
+You can specify different ID fields for different tables using a dictionary mapping:
 
 ```python
-# Configure with multi-field deterministic IDs
-config = TransmogConfig().with_deterministic_ids(
-    id_fields=["department", "employeeId"],  # Combine department and employeeId
-    id_field_separator="-",  # Use hyphen as separator
-    child_id_prefix="child_",  # Add prefix to child IDs
-    child_id_fields={
-        "projects": ["projectId", "name"]  # Combine projectId and name
-    }
-)
+# Map table paths to their ID fields
+id_mapping = {
+    "": "employeeId",              # Root level uses "employeeId" field
+    "employee_projects": "projectId"  # Projects table uses "projectId" field
+}
 
-processor = TransmogProcessor(config)
-result = processor.process_data(employee_data)
+# Configure with the mapping
+processor = Processor.with_deterministic_ids(id_mapping)
+
+# Process the data
+result = processor.process(data=employee_data, entity_name="employee")
 ```
 
-## Custom ID Generation Function
+## Multiple Fields for Deterministic IDs
 
-For complete control, you can provide a custom ID generation function:
+To use multiple fields for deterministic ID generation, you need to use a custom ID function:
 
 ```python
 import hashlib
 
 # Define a custom ID generation function
-def hash_based_id_generator(record, path):
-    """Generate an ID by hashing relevant fields based on the table path"""
-    # For the main table
-    if not path:
-        # Use employee ID if available, otherwise hash the whole record
-        if "employeeId" in record:
-            return f"EMP-{record['employeeId']}"
-        else:
-            record_str = str(sorted(record.items()))
-            return hashlib.md5(record_str.encode()).hexdigest()[:10]
+def multi_field_id_generator(record):
+    """Generate an ID by combining multiple fields"""
+    # For the main record, combine department and employeeId
+    department = record.get("department", "")
+    employee_id = record.get("employeeId", "")
 
-    # For the projects table
-    elif path[-1] == "projects":
-        if "projectId" in record:
-            return f"PROJ-{record['projectId']}"
-        else:
-            return f"PROJ-{hashlib.md5(str(record).encode()).hexdigest()[:8]}"
+    # Create a combined string and return it
+    return f"{department}-{employee_id}"
 
-    # Default for any other tables
-    else:
-        return f"ID-{hashlib.md5(str(record).encode()).hexdigest()[:8]}"
+# Configure with custom ID generation
+processor = Processor.with_custom_id_generation(multi_field_id_generator)
 
-# Configure with the custom ID function
-config = TransmogConfig().with_id_generation(id_generator=hash_based_id_generator)
-
-processor = TransmogProcessor(config)
-result = processor.process_data(employee_data)
+# Process the data
+result = processor.process(data=employee_data, entity_name="employee")
 ```
 
-## Creating Hierarchical IDs
+## Path-Aware Custom ID Generation
 
-You can create IDs that reflect the data hierarchy:
+For more complete control, you can create a custom ID generator that handles different tables:
 
 ```python
-# Configure hierarchical IDs
-config = TransmogConfig().with_deterministic_ids(
-    id_fields=["employeeId"],
-    include_parent_ids=True,  # Include parent ID in child IDs
-    child_id_fields={
-        "projects": ["projectId"]
-    }
-)
+import hashlib
 
-processor = TransmogProcessor(config)
-result = processor.process_data(employee_data)
+# Define a custom ID generation function
+def path_aware_id_generator(record):
+    """Generate an ID based on record content and type"""
+    # For employee records
+    if "employeeId" in record:
+        department = record.get("department", "")
+        employee_id = record.get("employeeId", "")
+        return f"EMP-{department}-{employee_id}"
 
-# This will create IDs like:
-# employee: "E12345"
-# projects: "E12345_P100", "E12345_P200"
+    # For project records
+    elif "projectId" in record:
+        project_id = record.get("projectId", "")
+        project_name = record.get("name", "")
+        # Create a hash of the name to keep IDs compact
+        name_hash = hashlib.md5(project_name.encode()).hexdigest()[:8]
+        return f"PROJ-{project_id}-{name_hash}"
+
+    # Default fallback
+    else:
+        record_str = str(sorted(record.items()))
+        return hashlib.md5(record_str.encode()).hexdigest()[:16]
+
+# Configure with custom ID generation
+processor = Processor.with_custom_id_generation(path_aware_id_generator)
+
+# Process the data
+result = processor.process(data=employee_data, entity_name="employee")
+```
+
+## Including Parent IDs in Child Records
+
+When using custom ID generation, you can create hierarchical IDs that include parent information:
+
+```python
+def hierarchical_id_generator(record):
+    """Create hierarchical IDs that include parent information when available"""
+    # Check if this is a child record with parent reference
+    if "__parent_extract_id" in record:
+        parent_id = record.get("__parent_extract_id", "")
+
+        # For project records
+        if "projectId" in record:
+            project_id = record.get("projectId", "")
+            return f"{parent_id}_PROJ_{project_id}"
+
+    # For employee (root) records
+    elif "employeeId" in record:
+        return f"EMP_{record['employeeId']}"
+
+    # Default random ID fallback
+    return None  # Return None to use random UUID
+
+# Set up the processor with custom ID generation
+processor = Processor.with_custom_id_generation(hierarchical_id_generator)
 ```
 
 ## Using Deterministic IDs with File Processing
@@ -151,22 +176,16 @@ with open("employee.json", "w") as f:
     json.dump(employee_data, f)
 
 # Configure with deterministic IDs
-config = TransmogConfig().with_deterministic_ids(
-    id_fields=["employeeId"],
-    child_id_fields={
-        "projects": ["projectId"]
-    }
-)
+processor = Processor.with_deterministic_ids("employeeId")
 
 # Process the file
-processor = TransmogProcessor(config)
-result = processor.process_file("employee.json")
+result = processor.process_file("employee.json", entity_name="employee")
 
 # Write to output files
 result.write_all_json("output_directory")
 
 # Process the same file again - will produce identical IDs
-result2 = processor.process_file("employee.json")
+result2 = processor.process_file("employee.json", entity_name="employee")
 ```
 
 ## Best Practices for ID Generation

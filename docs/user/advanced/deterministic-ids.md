@@ -45,10 +45,10 @@ This is suitable for one-time processing but can create issues in incremental lo
 
 ### 2. Field-based Deterministic IDs
 
-You can specify which fields to use for generating deterministic IDs at different paths in your data:
+You can specify which field to use for generating deterministic IDs at different paths in your data:
 
 ```python
-# Configure deterministic IDs based on specific fields
+# Configure deterministic IDs based on specific fields for different tables
 config = tm.TransmogConfig.with_deterministic_ids({
     "": "id",                     # Root level uses "id" field
     "customers": "customer_id",   # Customer records use "customer_id" field
@@ -73,9 +73,13 @@ You can also use a single field for all tables:
 processor = tm.Processor.with_deterministic_ids("id")
 ```
 
+> **Note**: The `with_deterministic_ids` method only supports using a single field per table path.
+> To generate IDs based on multiple fields, you must use the custom ID generation approach described below.
+
 ### 3. Custom ID Generation
 
-For complex requirements, you can provide a custom function to generate IDs:
+For complex requirements, such as combining multiple fields for a single table, you can provide a custom function
+to generate IDs:
 
 ```python
 def custom_id_strategy(record):
@@ -154,7 +158,7 @@ processor = processor.with_metadata(
     }
 )
 
-# Or directly with the ID generation strategy
+# Or directly with the ID generation strategy for multiple fields
 def custom_strategy(record):
     return f"CUSTOM-{record.get('id', 'unknown')}"
 
@@ -182,7 +186,7 @@ result2 = processor.process(data, entity_name="test")
 assert result.get_main_table()[0]["__extract_id"] == result2.get_main_table()[0]["__extract_id"]
 ```
 
-### Advanced Example: Nested Structure with Different ID Fields
+### Example: Nested Structure with Different ID Fields
 
 ```python
 import transmog as tm
@@ -228,21 +232,21 @@ products_table = result.get_child_table("store_products")
 # The IDs will be consistent if the same data is processed again
 ```
 
-### Example: Custom ID Strategy
+### Example: Multi-Field Custom ID Strategy
 
 ```python
 import transmog as tm
 import uuid
 
-# Define a custom ID generation strategy
+# Define a custom ID generation strategy that combines multiple fields
 def custom_id_strategy(record):
-    # For customer records
-    if "customer_id" in record:
-        return f"CUST-{record['customer_id']}"
+    # For customer records with multiple fields
+    if "customer_id" in record and "email" in record:
+        return f"CUST-{record['customer_id']}-{hash(record['email'])}"
 
-    # For order records
-    elif "order_id" in record:
-        return f"ORD-{record['order_id']}"
+    # For order records with multiple fields
+    elif "order_id" in record and "total" in record:
+        return f"ORD-{record['order_id']}-{int(record['total'])}"
 
     # For product records
     elif "sku" in record:
@@ -258,26 +262,6 @@ processor = tm.Processor.with_custom_id_generation(custom_id_strategy)
 
 # Process data
 result = processor.process(data, entity_name="store")
-```
-
-### Example: Updating Configuration
-
-```python
-import transmog as tm
-
-# Start with default configuration
-processor = tm.Processor()
-
-# Later, update to use deterministic IDs
-updated_processor = processor.with_metadata(
-    deterministic_id_fields={
-        "": "id",
-        "customers": "customer_id"
-    }
-)
-
-# Process data with updated configuration
-result = updated_processor.process(data, entity_name="store")
 ```
 
 ## Technical Details
