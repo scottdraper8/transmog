@@ -10,10 +10,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional, Union
 
-# Setup logger
+# Logger initialization
 logger = logging.getLogger(__name__)
 
-# Define a consistent namespace for deterministic IDs
+# Namespace UUID for deterministic ID generation
 TRANSMOG_NAMESPACE = uuid.UUID("a9b8c7d6-e5f4-1234-abcd-0123456789ab")
 
 
@@ -42,7 +42,6 @@ def generate_extract_id(
         try:
             return str(id_generation_strategy(record))
         except Exception:
-            # Fall back to random UUID on error
             return str(uuid.uuid4())
 
     # Option 2: Deterministic field-based generation
@@ -52,9 +51,7 @@ def generate_extract_id(
             if field_value:
                 return generate_deterministic_id(field_value)
         except Exception as e:
-            # Log error and fall back to random UUID
             logger.debug(f"Error generating deterministic ID: {e}")
-            # Fall back to random UUID on error
             pass
 
     # Option 1: Random UUID (default)
@@ -70,15 +67,12 @@ def generate_deterministic_id(value: Any) -> str:
     Returns:
         UUID5 string
     """
-    # Convert value to string if it isn't already
     value_str = str(value)
 
-    # Normalize the value to ensure consistent hashing
-    # This is important for the deterministic IDs test
-    # Strip any whitespace and convert to lowercase
+    # Normalize for consistent hashing
     normalized_value = value_str.strip().lower()
 
-    # Create UUID5 using the namespace and the normalized value
+    # Generate UUID5 with namespace
     deterministic_uuid = uuid.uuid5(TRANSMOG_NAMESPACE, normalized_value)
 
     return str(deterministic_uuid)
@@ -94,8 +88,7 @@ def generate_composite_id(values: dict[str, Any], fields: list) -> str:
     Returns:
         Deterministic UUID string
     """
-    # Combine values into a single string
-    # Sort the fields to ensure consistent ordering
+    # Sort fields for consistent ordering
     sorted_fields = sorted(fields)
     combined = "|".join(str(values.get(field, "")) for field in sorted_fields)
 
@@ -123,7 +116,7 @@ def get_current_timestamp(
     if as_string and format_string:
         return now.strftime(format_string)
     elif as_string:
-        # Default to ISO format with microseconds
+        # ISO format with microseconds
         return now.strftime("%Y-%m-%d %H:%M:%S.%f")
 
     return now
@@ -160,7 +153,7 @@ def annotate_with_metadata(
     Returns:
         Annotated record
     """
-    # Make a copy only if needed
+    # Create copy if not modifying in-place
     annotated = record if in_place else record.copy()
 
     # Add extract ID
@@ -181,7 +174,7 @@ def annotate_with_metadata(
         extract_time = get_current_timestamp()
     annotated[time_field] = extract_time
 
-    # Add any extra fields
+    # Add extra fields
     if extra_fields:
         annotated.update(extra_fields)
 
@@ -211,7 +204,7 @@ def create_batch_metadata(
     """
     # Generate batch ID
     if records and (source_field or id_generation_strategy):
-        # Use first record for deterministic ID if possible
+        # Use first record for deterministic ID
         first_record = records[0]
         batch_id = generate_extract_id(
             record=first_record,
@@ -219,21 +212,21 @@ def create_batch_metadata(
             id_generation_strategy=id_generation_strategy,
         )
     else:
-        # Use random UUID as fallback
+        # Random UUID fallback
         batch_id = str(uuid.uuid4())
 
-    # Get timestamp if not provided
+    # Use current timestamp if not provided
     if extract_time is None:
         extract_time = get_current_timestamp()
 
-    # Create batch metadata
+    # Construct metadata dictionary
     metadata = {
         "batch_id": batch_id,
         "batch_size": batch_size,
         "extract_time": extract_time,
     }
 
-    # Add parent ID if available
+    # Include parent ID if available
     if parent_id:
         metadata["parent_id"] = parent_id
 

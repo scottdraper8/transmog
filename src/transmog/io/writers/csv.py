@@ -177,8 +177,7 @@ class CsvWriter(DataWriter):
 
                 return output_path
             else:
-                # For file-like objects, we need to determine if it's a binary stream
-                # This handles BytesIO, BufferedWriter, etc.
+                # For file-like objects, determine if it's a binary stream
                 is_binary = isinstance(output_path, io.BufferedIOBase) or isinstance(
                     output_path, io.BytesIO
                 )
@@ -221,7 +220,7 @@ class CsvWriter(DataWriter):
                     if hasattr(output_path, "mode") and "b" not in getattr(
                         output_path, "mode", ""
                     ):
-                        # For text streams, we need to decode
+                        # For text streams, decode binary data
                         text_output = cast(TextIO, output_path)
                         text_output.write(binary_data.decode("utf-8"))
                     else:
@@ -645,18 +644,13 @@ class CsvStreamingWriter(StreamingWriter):
 
         file_obj = self._get_file_for_table(table_name)
 
-        # Determine if we're working with a binary stream
-        # Check both the mode and the object type since BytesIO doesn't have
-        # a mode attribute
+        # Determine if working with a binary stream
         is_binary = (hasattr(file_obj, "mode") and "b" in file_obj.mode) or isinstance(
             file_obj, io.BytesIO
         )
 
-        # For binary mode files, we need a TextIOWrapper to handle text-based
-        # CSV writing
+        # For binary mode files, use TextIOWrapper for text-based CSV writing
         if is_binary:
-            # Create a TextIOWrapper around the binary file
-            # Using UTF-8 encoding which is standard for CSV
             binary_file = cast(BinaryIO, file_obj)
             text_file = io.TextIOWrapper(
                 binary_file, encoding="utf-8", write_through=True, line_buffering=True

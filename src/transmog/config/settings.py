@@ -32,16 +32,14 @@ DEFAULT_OPTIONS = {
     "indent": 2,
     "batch_size": 1000,
     "processing_mode": "standard",
-    "memory_threshold": 100
-    * 1024
-    * 1024,  # 100MB threshold for switching to low-memory mode
-    "memory_tracking_enabled": False,  # Whether to track memory usage during processing
+    "memory_threshold": 100 * 1024 * 1024,  # 100MB threshold for memory mode switching
+    "memory_tracking_enabled": False,  # Memory usage tracking flag
     "cache_enabled": True,
     "cache_maxsize": 10000,
     "clear_cache_after_batch": False,
 }
 
-# Environment variable for config file path
+# Configuration file path environment variable
 CONFIG_PATH_ENV_VAR = "TRANSMOG_CONFIG_PATH"
 
 
@@ -340,7 +338,7 @@ class TransmogSettings:
         Returns:
             Converted value
         """
-        # If default is None, try to parse as JSON or return as string
+        # Parse as JSON when no default value is provided
         if default_value is None:
             try:
                 return json.loads(value)
@@ -350,14 +348,14 @@ class TransmogSettings:
         # Convert based on default value type
         try:
             if isinstance(default_value, bool):
-                # Handle boolean conversion (treat certain strings as True/False)
+                # Convert string to boolean based on common true/false representations
                 lower_val = value.lower()
                 if lower_val in ("true", "t", "yes", "y", "1"):
                     return True
                 elif lower_val in ("false", "f", "no", "n", "0"):
                     return False
                 else:
-                    # Default to boolean conversion of the string
+                    # Fall back to standard boolean conversion
                     return bool(value)
             elif isinstance(default_value, int):
                 return int(value)
@@ -368,10 +366,10 @@ class TransmogSettings:
             elif isinstance(default_value, dict):
                 return json.loads(value)
             else:
-                # For other types, use the same type as the default
+                # Apply same type as default value
                 return type(default_value)(value)
         except (ValueError, json.JSONDecodeError):
-            # If conversion fails, log a warning and use the string value
+            # Log warning on conversion failure and return original string
             type_name = type(default_value).__name__
             logger.warning(f"Could not convert value '{value}' to type {type_name}")
             return value
@@ -410,27 +408,25 @@ class TransmogSettings:
         """
         normalized_key = key.lower()
 
-        # Use the setting if it exists, otherwise use default
+        # Retrieve setting or use default if not found
         value = self._settings.get(normalized_key, default)
 
-        # If no value found and no default provided, check class defaults
+        # Fall back to class default if no value or default provided
         if value is None and default is None:
             default_attr = f"DEFAULT_{key.upper()}"
             if hasattr(self.__class__, default_attr):
                 value = getattr(self.__class__, default_attr)
 
-        # If expected_type is not specified but default is provided,
-        # infer expected_type from default
+        # Infer expected type from default value if not explicitly specified
         if expected_type is None and default is not None:
             expected_type = type(default)
 
-        # If we have an expected type, validate the value
+        # Validate and convert value to expected type if needed
         if expected_type is not None and value is not None:
             if not isinstance(value, expected_type):
-                # Try to convert the value
                 try:
                     if isinstance(expected_type, tuple):
-                        # Try each type in the tuple
+                        # Attempt conversion with each type in the tuple
                         for t in expected_type:
                             try:
                                 value = t(value)
@@ -438,7 +434,7 @@ class TransmogSettings:
                             except (ValueError, TypeError):
                                 continue
                         else:
-                            # If we get here, none of the conversions worked
+                            # No conversion succeeded
                             type_name = type(value).__name__
                             msg_part1 = f"Setting '{key}' has invalid type: expected "
                             error_msg = f"{msg_part1}{expected_type}, got {type_name}"
@@ -473,7 +469,7 @@ class TransmogSettings:
         Raises:
             AttributeError: If setting not found
         """
-        # Convert camelCase to snake_case for convenience
+        # Support both camelCase and snake_case access patterns
         snake_case = name[0].lower() + "".join(
             ["_" + c.lower() if c.isupper() else c for c in name[1:]]
         )
@@ -489,7 +485,7 @@ class TransmogSettings:
         if hasattr(self.__class__, default_attr):
             return getattr(self.__class__, default_attr)
 
-        # Not found
+        # Setting not found in configuration
         raise AttributeError(f"Setting '{name}' not found")
 
     def update(self, **kwargs: Any) -> None:
@@ -608,6 +604,7 @@ def load_profile(profile_name: str) -> TransmogSettings:
     if profile_name not in TransmogSettings.PROFILES:
         raise ConfigurationError(f"Unknown profile: {profile_name}")
 
+    # Initialize settings with specified profile
     settings = TransmogSettings(profile=profile_name)
     return settings
 

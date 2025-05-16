@@ -12,13 +12,11 @@ from transmog.io.writer_factory import register_streaming_writer, register_write
 from transmog.io.writer_interface import DataWriter, StreamingWriter
 from transmog.types.base import JsonDict
 
-# Try to import PyArrow at module level, but don't fail if it's not available
-# Instead, set these variables to None so we can check them later
+# Import PyArrow conditionally
 try:
     import pyarrow as pa
     import pyarrow.parquet as pq
 except ImportError:
-    # PyArrow not available - will be checked in is_available()
     pa = None
     pq = None
 
@@ -269,11 +267,15 @@ class ParquetStreamingWriter(StreamingWriter):
             row_group_size: Number of records per row group
             **options: Additional options for PyArrow
         """
+        # Initialize destination attribute with correct type
+        self.destination: Optional[Union[str, BinaryIO, TextIO]] = None
+        self.base_path: Optional[str] = None
+
         # Handle file-like objects
         if destination is not None and hasattr(destination, "write"):
             self.base_path = None
             self.destination = destination
-            # For file-like objects, we can only write the main table
+            # For file-like objects, only the main table can be written
             logger.warning(
                 "File-like destination provided to ParquetStreamingWriter. "
                 "Only the main table will be written to this destination. "
@@ -282,7 +284,7 @@ class ParquetStreamingWriter(StreamingWriter):
         else:
             # Directory path
             self.base_path = str(destination) if destination is not None else None
-            self.destination = None
+            self.destination = destination
 
         self.entity_name = entity_name
         self.compression = compression

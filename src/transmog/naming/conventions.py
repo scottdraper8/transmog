@@ -34,36 +34,30 @@ def get_table_name(
     Returns:
         Formatted table name
     """
-    # Split the path into components
     parts = path.split(separator)
 
-    # For a single-part path, it's a direct child of the entity
+    # Direct child of entity
     if len(parts) <= 1:
-        # For direct children of the entity, use full parent name
         return f"{parent_entity}{separator}{path}"
 
-    # For deeper nesting, first get the final array name
     array_name = parts[-1]
 
-    # If we're not abbreviating middle segments, return simplified name
+    # Skip abbreviation for simplified naming
     if not abbreviate_middle:
         return f"{parent_entity}{separator}{array_name}"
 
-    # Extract all path segments except the final one and abbreviate them
+    # Abbreviate middle segments for complex paths
     middle_segments = parts[:-1]
     abbreviated_path = []
 
     for segment in middle_segments:
-        # Create abbreviation from segment
         if len(segment) <= abbreviation_length:
             abbrev = segment
         else:
-            # Use first n chars as an abbreviation
             abbrev = segment[:abbreviation_length]
 
         abbreviated_path.append(abbrev)
 
-    # Join everything with separators
     path_str = separator.join(abbreviated_path)
     result = f"{parent_entity}{separator}{path_str}{separator}{array_name}"
 
@@ -91,22 +85,18 @@ def sanitize_name(
     Returns:
         Sanitized name
     """
-    # Only replace the separator with replace_with if they're different
-    # and not preserving
+    # Handle separator replacement based on configuration
     if separator != replace_with and not preserve_separator:
         sanitized = name.replace(separator, replace_with)
     else:
         sanitized = name
 
-    # Make SQL-safe if requested
+    # SQL safety transformations
     if sql_safe:
-        # Replace spaces with underscores
         sanitized = sanitized.replace(" ", "_")
-
-        # Replace dashes with underscores to preserve readability
         sanitized = sanitized.replace("-", "_")
 
-        # Replace other special characters while preserving underscores
+        # Process special characters
         result = ""
         last_was_underscore = False
 
@@ -115,18 +105,18 @@ def sanitize_name(
                 result += c
                 last_was_underscore = c == "_"
             else:
-                # Replace special char with underscore if not already preceded by one
+                # Avoid consecutive underscores
                 if not last_was_underscore:
                     result += "_"
                     last_was_underscore = True
 
         sanitized = result
 
-        # Ensure it doesn't start with a number
+        # Prefix numeric names with "col_"
         if sanitized and sanitized[0].isdigit():
             sanitized = f"col_{sanitized}"
 
-        # Handle empty names
+        # Fallback for empty names
         if not sanitized:
             sanitized = "unnamed_field"
 
@@ -152,7 +142,6 @@ def sanitize_column_names(
     """
     result = []
     for column in columns:
-        # Use the updated sanitize_name function
         sanitized = sanitize_name(
             column, separator=separator, replace_with=replace_with, sql_safe=sql_safe
         )
@@ -190,7 +179,7 @@ def get_standard_field_name(
     return result
 
 
-# Cached path splitting for efficiency in repeated operations
+# Path operations with caching for performance
 @functools.lru_cache(maxsize=1024)
 def split_path(path: str, separator: str = "_") -> tuple[str, ...]:
     """Split a path into components with caching.
@@ -205,7 +194,6 @@ def split_path(path: str, separator: str = "_") -> tuple[str, ...]:
     return tuple(path.split(separator))
 
 
-# Cached path joining for efficiency in repeated operations
 @functools.lru_cache(maxsize=1024)
 def join_path(parts: tuple[str, ...], separator: str = "_") -> str:
     """Join path components with caching.

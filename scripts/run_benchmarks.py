@@ -22,7 +22,7 @@ except ImportError:
     sys.path.insert(0, os.path.join(parent_dir, "src"))
     from transmog import Processor
 
-# Set up base directory relative to script location
+# Base directory relative to script location
 BASE_DIR = Path(__file__).parent.parent
 
 
@@ -50,10 +50,8 @@ def generate_random_nested_data(count, levels=3, breadth=3):
                     secrets.randbelow(100) + float(secrets.randbelow(100)) / 1000
                 )
 
-            # Add array in nested level
-            if (
-                secrets.randbelow(2) == 1
-            ):  # 50% chance, equivalent to random.random() > 0.5
+            # Add array in nested level (50% chance)
+            if secrets.randbelow(2) == 1:
                 array_items = []
                 array_count = secrets.randbelow(5) + 1
                 for _k in range(array_count):
@@ -79,7 +77,7 @@ def benchmark_processing(data, count, label, mode=None, **kwargs):
     """Run a benchmark for a specific processing mode."""
     config = None
     if mode:
-        # This will use the processor's default mode
+        # Uses processor's default mode when mode is specified
         pass
 
     processor = Processor(config=config)

@@ -15,7 +15,7 @@ from .exceptions import (
     TransmogError,
 )
 
-# Set up logger
+# Module logger
 logger = logging.getLogger("transmog")
 
 # Type variable for generic return types
@@ -72,16 +72,15 @@ class RecoveryStrategy(ABC):
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            # Check if this is a specific exception we want to handle
+            # Filter exceptions by type if specified
             if exception_type is not None and not isinstance(e, exception_type):
                 raise
 
-            # Check if this is TransmogError that has built-in recovery support
+            # Use built-in recovery if available
             if hasattr(e, "recover") and callable(e.recover):
-                # Use the error's recovery mechanism
                 return cast(T, e.recover())
 
-            # For strict recovery, just raise (don't use self.recover)
+            # Skip recovery for strict TransmogErrors
             if (
                 isinstance(e, TransmogError)
                 and e.recover_strategy == "strict"
@@ -89,7 +88,7 @@ class RecoveryStrategy(ABC):
             ):
                 raise
 
-            # Otherwise, wrap in ProcessingError for better context
+            # Wrap non-ProcessingErrors for context
             if not isinstance(e, ProcessingError):
                 error = ProcessingError(f"Error processing data: {e}")
             else:
@@ -144,10 +143,10 @@ class SkipAndLogRecovery(RecoveryStrategy):
         Returns:
             None for batch operations, empty dict for single record operations
         """
-        # Get entity information for better context
+        # Format entity context for error messages
         entity_info = f" for entity '{entity_name or ''}'" if entity_name else ""
 
-        # Log the error with appropriate context
+        # Handle different error types with appropriate logging
         if isinstance(error, ParsingError):
             source_info = (
                 f" in {kwargs.get('source', '')}" if kwargs.get("source") else ""
@@ -170,16 +169,15 @@ class SkipAndLogRecovery(RecoveryStrategy):
             )
             logger.log(self.log_level, f"Skipping file{file_info}: {error}")
         else:
-            # Log other errors
             logger.log(self.log_level, f"Error processing data{entity_info}: {error}")
 
-        # Check if data is a list to determine appropriate return type
+        # Return type depends on input data structure
         data = kwargs.get("data", {})
         if isinstance(data, list):
-            # For batch operations, return None to be consistent with tests
+            # None for batch operations
             return None
         else:
-            # For single record operations, return empty dict
+            # Empty dict for single record operations
             return {}
 
 
@@ -215,10 +213,10 @@ class PartialProcessingRecovery(RecoveryStrategy):
         Returns:
             List or dict with partial data and error information
         """
-        # Get entity information for better context
+        # Format entity context for error messages
         entity_info = f" for entity '{entity_name or ''}'" if entity_name else ""
 
-        # Handle common error types
+        # Handle different error types with appropriate recovery
         if isinstance(error, (KeyError, IndexError, AttributeError)):
             logger.log(
                 self.log_level,
@@ -241,7 +239,7 @@ class PartialProcessingRecovery(RecoveryStrategy):
                 f"{entity_info}: {error}",
             )
 
-            # For parsing errors, return a minimal valid structure
+            # Minimal valid structure for parsing errors
             return {"_error": str(error), "error": str(error)}
 
         elif isinstance(error, ProcessingError):
@@ -251,19 +249,19 @@ class PartialProcessingRecovery(RecoveryStrategy):
                 f"{error}",
             )
 
-            # Get the data from the error if available
+            # Extract data from error if available
             data = getattr(error, "data", None)
             if data is None:
                 return {"_error": str(error), "error": str(error)}
 
-            # Return the data with error information
+            # Preserve existing data with error information
             if isinstance(data, dict):
                 result = data.copy()
                 result["_error"] = str(error)
                 result["error"] = str(error)
                 return result
             else:
-                # Convert to string representation as fallback
+                # String representation as fallback
                 return {
                     "_error": str(error),
                     "_value": str(data),
@@ -282,11 +280,11 @@ class PartialProcessingRecovery(RecoveryStrategy):
                 f"{entity_info}: {error}",
             )
 
-            # For file errors, return an empty list
+            # Empty list for file errors
             return []
 
         else:
-            # For other error types, return empty dict with error information
+            # Generic error handling
             logger.log(
                 self.log_level, f"Unable to recover from error{entity_info}: {error}"
             )
@@ -314,7 +312,7 @@ def with_recovery(
     Returns:
         Decorator function
     """
-    # Use strict recovery by default
+    # Default to strict recovery
     actual_strategy = strategy or StrictRecovery()
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
@@ -326,23 +324,20 @@ def with_recovery(
             try:
                 return func(*args, **kwargs)
             except Exception as e:
-                # Apply the recovery strategy
+                # Apply recovery strategy
                 try:
-                    # Get entity name from kwargs if available
                     entity_name = kwargs.get("entity_name")
 
-                    # Add the original function to kwargs for context
+                    # Add function name to context for better error reporting
                     context = {**options, **kwargs, "_func": func.__name__}
 
-                    # Try to recover using the strategy
                     result = actual_strategy.recover(
                         e, entity_name=entity_name, **context
                     )
 
-                    # Return the recovered result
                     return cast(T, result)
                 except Exception:
-                    # If recovery fails, use fallback value or re-raise
+                    # Use fallback or re-raise
                     if fallback_value is not None:
                         return cast(T, fallback_value)
                     raise

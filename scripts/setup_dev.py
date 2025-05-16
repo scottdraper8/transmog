@@ -19,7 +19,7 @@ import os
 import platform
 import re
 import shlex
-import subprocess  # nosec B404 - Used in a controlled development environment with appropriate safeguards
+import subprocess  # nosec B404 - Used in a controlled dev environment with appropriate safeguards
 import sys
 import venv
 from pathlib import Path
@@ -57,11 +57,11 @@ def run_command(command, description=None, check=False, capture_output=False):
         if any(
             shell_char in command for shell_char in ["|", ">", "<", "&&", "||", ";"]
         ):
-            # For shell commands, use shell=True but with proper validation
+            # For shell commands with proper validation
             cmd = command
             use_shell = True
         else:
-            # For simple commands, split the string and avoid shell=True
+            # Split the string to avoid shell=True
             cmd = shlex.split(command)
             use_shell = False
     else:
@@ -72,7 +72,7 @@ def run_command(command, description=None, check=False, capture_output=False):
     # with safeguards to prevent arbitrary command execution
     result = subprocess.run(  # nosec B602 # noqa: S603
         cmd,
-        shell=use_shell,  # Only True for complex commands with appropriate validation
+        shell=use_shell,  # Only True for validated complex commands
         check=check,
         text=True,
         capture_output=capture_output,
@@ -162,7 +162,7 @@ def validate_dependencies(python_path, dependencies):
     """Validate that installed dependencies match the expected versions."""
     print("\nValidating dependencies...")
 
-    # Get installed packages - avoid shell=True by using a list
+    # Get installed packages
     result = run_command(
         [str(python_path), "-m", "pip", "freeze"], description=None, capture_output=True
     )
@@ -223,7 +223,7 @@ def check_optional_dependencies(python_path):
     ]
 
     for package in performance_packages:
-        # Construct a safer Python import check command
+        # Python import check command
         result = run_command(
             [
                 str(python_path),
@@ -281,8 +281,6 @@ def main():
 
     # Get virtual environment paths
     python_path = get_venv_python(venv_path)
-    # No need to call this function since we're not using the result
-    # activate_script = get_venv_activate_script(venv_path)
 
     # Parse pyproject.toml
     version, dependencies = parse_pyproject_toml(root_dir)

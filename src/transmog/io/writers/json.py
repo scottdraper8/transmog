@@ -87,7 +87,7 @@ class JsonWriter(DataWriter):
         Raises:
             OutputError: If writing fails
         """
-        # Combine constructor options with per-call options
+        # Merge options
         combined_options = {**self.options, **options}
 
         # Delegate to write_table for implementation
@@ -115,7 +115,7 @@ class JsonWriter(DataWriter):
             OutputError: If writing fails
         """
         try:
-            # Use options or fall back to instance defaults
+            # Resolve configuration
             indent_val = indent if indent is not None else self.indent
             use_orjson = options.get("use_orjson", self.use_orjson)
 
@@ -128,36 +128,30 @@ class JsonWriter(DataWriter):
                 json_string = json.dumps(table_data, indent=indent_val)
                 json_bytes = json_string.encode("utf-8")
 
-            # Determine whether we're writing to a file or file-like object
+            # Handle file path destination
             if isinstance(output_path, (str, pathlib.Path)):
-                # Convert Path to string if needed
                 path_str = str(output_path)
-
-                # Ensure directory exists
                 os.makedirs(os.path.dirname(path_str) or ".", exist_ok=True)
 
-                # Write to file
                 with open(path_str, "wb") as f:
                     f.write(json_bytes)
 
                 return output_path
-            else:
-                # Write to file-like object
-                if hasattr(output_path, "write"):
-                    # Check if it's a text or binary stream
-                    if hasattr(output_path, "mode") and "b" not in getattr(
-                        output_path, "mode", ""
-                    ):
-                        # For text streams, decode to string
-                        text_output = cast(TextIO, output_path)
-                        text_output.write(json_bytes.decode("utf-8"))
-                    else:
-                        # For binary streams
-                        binary_output = cast(BinaryIO, output_path)
-                        binary_output.write(json_bytes)
-                    return output_path
+            # Handle file-like object destination
+            elif hasattr(output_path, "write"):
+                # Text stream handling
+                if hasattr(output_path, "mode") and "b" not in getattr(
+                    output_path, "mode", ""
+                ):
+                    text_output = cast(TextIO, output_path)
+                    text_output.write(json_bytes.decode("utf-8"))
+                # Binary stream handling
                 else:
-                    raise OutputError(f"Invalid destination type: {type(output_path)}")
+                    binary_output = cast(BinaryIO, output_path)
+                    binary_output.write(json_bytes)
+                return output_path
+            else:
+                raise OutputError(f"Invalid destination type: {type(output_path)}")
 
         except Exception as e:
             logger.error(f"Error writing JSON: {e}")
@@ -188,7 +182,7 @@ class JsonWriter(DataWriter):
         """
         results: dict[str, Union[str, pathlib.Path]] = {}
 
-        # Ensure base directory exists
+        # Create output directory
         base_path_str = str(base_path)
         os.makedirs(base_path_str, exist_ok=True)
 
@@ -204,7 +198,7 @@ class JsonWriter(DataWriter):
 
         # Write child tables
         for table_name, table_data in child_tables.items():
-            # Replace dots and slashes with underscores for file names
+            # Sanitize filename
             safe_name = table_name.replace(".", "_").replace("/", "_")
 
             table_path: Union[str, pathlib.Path]
@@ -263,18 +257,18 @@ class JsonStreamingWriter(StreamingWriter):
         self.should_close: bool = False
         self.base_dir: Optional[str] = None
 
-        # Open or use the destination
+        # Initialize destination
         if destination is None:
-            # Default to stdout for demo/testing
+            # Default to stdout
             self.file_objects = {"main": sys.stdout}
             self.should_close = False
         elif isinstance(destination, str):
-            # It's a base directory path
+            # Directory path
             self.base_dir = destination
             os.makedirs(self.base_dir, exist_ok=True)
             self.should_close = True
         else:
-            # It's a file-like object
+            # File-like object
             self.file_objects = {"main": destination}
             self.should_close = False
 
@@ -290,12 +284,12 @@ class JsonStreamingWriter(StreamingWriter):
         if table_name in self.file_objects:
             return self.file_objects[table_name]
 
-        # Create a new file
+        # Create new file when base directory is specified
         if self.base_dir is not None:
-            # Make sure paths are safe
+            # Sanitize path
             safe_name = table_name.replace("/", "_").replace("\\", "_")
 
-            # Use entity_name for the main table
+            # Main table uses entity_name
             if table_name == "main":
                 file_path = os.path.join(self.base_dir, f"{self.entity_name}.json")
             else:
@@ -303,11 +297,10 @@ class JsonStreamingWriter(StreamingWriter):
 
             self.file_paths[table_name] = file_path
 
+            # Open appropriate file mode based on serializer
             if self.use_orjson:
-                # Binary mode for orjson
                 file_obj: Union[BinaryIO, TextIO] = open(file_path, "wb")
             else:
-                # Text mode for standard json
                 file_obj = open(file_path, "w", encoding="utf-8")
 
             self.file_objects[table_name] = file_obj
@@ -356,9 +349,7 @@ class JsonStreamingWriter(StreamingWriter):
 
         file_obj = self._get_file_for_table(table_name)
 
-        # Determine if we're working with a binary stream
-        # Check both the mode and the object type since BytesIO doesn't have
-        # a mode attribute
+        # Detect binary stream by checking mode or instance type
         is_binary = (
             hasattr(file_obj, "mode") and "b" in getattr(file_obj, "mode", "")
         ) or isinstance(file_obj, (io.BytesIO, io.BufferedIOBase))
@@ -417,23 +408,21 @@ class JsonStreamingWriter(StreamingWriter):
         if not records:
             return
 
-        # Make sure the table is initialized
+        # Initialize table if needed
         if table_name not in self.initialized_tables:
             self._initialize_table(table_name, **options)
 
         file_obj = self._get_file_for_table(table_name)
         record_count = self.record_counts.get(table_name, 0)
 
-        # Determine if we're working with a binary stream
-        # Check both the mode and the object type since BytesIO doesn't have
-        # a mode attribute
+        # Detect binary stream by checking mode or instance type
         is_binary = (
             hasattr(file_obj, "mode") and "b" in getattr(file_obj, "mode", "")
         ) or isinstance(file_obj, (io.BytesIO, io.BufferedIOBase))
 
-        # Write each record
+        # Process each record
         for record in records:
-            # Add a comma if this isn't the first record
+            # Add separator for non-first records
             if record_count > 0:
                 if is_binary:
                     binary_file = cast(BinaryIO, file_obj)
@@ -442,7 +431,7 @@ class JsonStreamingWriter(StreamingWriter):
                     text_file = cast(TextIO, file_obj)
                     text_file.write(",")
 
-                # Add newline for pretty printing if indent is specified
+                # Add newline for indented output
                 if self.indent is not None:
                     if is_binary:
                         binary_file = cast(BinaryIO, file_obj)
@@ -451,7 +440,7 @@ class JsonStreamingWriter(StreamingWriter):
                         text_file = cast(TextIO, file_obj)
                         text_file.write("\n")
 
-            # Convert the record to JSON
+            # Serialize record
             if self.use_orjson and ORJSON_AVAILABLE:
                 json_bytes = orjson.dumps(
                     record, option=orjson.OPT_INDENT_2 if self.indent else 0
@@ -473,7 +462,7 @@ class JsonStreamingWriter(StreamingWriter):
 
             record_count += 1
 
-        # Update the record count
+        # Update record counter
         self.record_counts[table_name] = record_count
         file_obj.flush()
 
@@ -486,15 +475,15 @@ class JsonStreamingWriter(StreamingWriter):
         Returns:
             None
         """
-        # Close all open tables
+        # Close open tables
         for table_name in list(self.initialized_tables):
-            # Skip if already closed
+            # Skip already closed tables
             if table_name not in self.file_objects:
                 continue
 
             file_obj = self.file_objects[table_name]
 
-            # Determine if we're working with a binary stream
+            # Detect binary stream
             is_binary = (
                 hasattr(file_obj, "mode") and "b" in getattr(file_obj, "mode", "")
             ) or isinstance(file_obj, (io.BytesIO, io.BufferedIOBase))
@@ -509,7 +498,7 @@ class JsonStreamingWriter(StreamingWriter):
 
             file_obj.flush()
 
-        # Close file objects if needed
+        # Close file handles
         if self.should_close:
             self.close()
 
@@ -519,13 +508,13 @@ class JsonStreamingWriter(StreamingWriter):
         Returns:
             None
         """
-        # Close all file objects
+        # Skip standard streams when closing
         for table_name, file_obj in list(self.file_objects.items()):
             if file_obj not in (sys.stdout, sys.stderr, sys.stdin):
                 file_obj.close()
                 del self.file_objects[table_name]
 
 
-# Register the writer
+# Register writers with factory
 register_writer("json", JsonWriter)
 register_streaming_writer("json", JsonStreamingWriter)

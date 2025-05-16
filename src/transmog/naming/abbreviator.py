@@ -29,7 +29,7 @@ def abbreviate_component(
     if max_length is None:
         max_length = settings.DEFAULT_MAX_FIELD_COMPONENT_LENGTH
 
-    # Convert to string to be safe
+    # Convert to string for type safety
     component = str(component)
 
     # Check for custom abbreviation first if provided
@@ -37,11 +37,11 @@ def abbreviate_component(
         if component in abbreviation_dict:
             return abbreviation_dict[component]
 
-    # If already short enough, return as is
+    # Return component as is if already short enough
     if len(component) <= max_length:
         return component
 
-    # Simple truncation for unknown terms
+    # Truncate component for unknown terms
     return component[:max_length]
 
 
@@ -61,42 +61,42 @@ def _abbreviate_table_name_cached(
     if max_component_length is None:
         max_component_length = settings.DEFAULT_MAX_TABLE_COMPONENT_LENGTH
 
-    # Convert to string to be safe
+    # Convert to string for type safety
     path = str(path)
     parent_entity = str(parent_entity)
 
-    # If abbreviation is disabled, just return full path
+    # Return full path if abbreviation is disabled
     if not abbreviate_enabled:
         return f"{parent_entity}{separator}{path}" if path != parent_entity else path
 
     # Split the path into components
     parts = path.split(separator)
 
-    # For a single-part path, it's a direct child of the entity
+    # Handle single-part path case
     if len(parts) <= 1:
         return f"{parent_entity}{separator}{path}" if path != parent_entity else path
 
     # Process each component
     abbreviated_parts = []
     for i, part in enumerate(parts):
-        # Check if this is the root or leaf component
+        # Determine if component is root or leaf
         is_first = i == 0
         is_last = i == len(parts) - 1
 
         # Apply abbreviation rules
         if (is_first and preserve_root) or (is_last and preserve_leaf):
-            # Keep root/leaf component intact
+            # Preserve root/leaf components as specified
             abbreviated_parts.append(part)
         else:
-            # Abbreviate middle components by truncation
+            # Abbreviate middle components
             abbreviated_parts.append(part[:max_component_length])
 
-    # Join components into the final name
+    # Construct final name
     if parent_entity in abbreviated_parts:
-        # If parent entity is already in the path, don't duplicate it
+        # Avoid duplicate parent entity
         result = separator.join(abbreviated_parts)
     else:
-        # Prepend parent entity if not already in the path
+        # Prepend parent entity
         result = f"{parent_entity}{separator}{separator.join(abbreviated_parts)}"
 
     return result
@@ -131,11 +131,11 @@ def abbreviate_table_name(
     if max_component_length is None:
         max_component_length = settings.DEFAULT_MAX_TABLE_COMPONENT_LENGTH
 
-    # Convert to string to be safe
+    # Convert to string for type safety
     path = str(path)
     parent_entity = str(parent_entity)
 
-    # If no dictionary, use the cached version
+    # Use cached version when no custom dictionary is provided
     if abbreviation_dict is None:
         return _abbreviate_table_name_cached(
             path,
@@ -147,30 +147,30 @@ def abbreviate_table_name(
             preserve_leaf,
         )
 
-    # If abbreviation is disabled, just return full path
+    # Return full path if abbreviation is disabled
     if not abbreviate_enabled:
         return f"{parent_entity}{separator}{path}" if path != parent_entity else path
 
     # Split the path into components
     parts = path.split(separator)
 
-    # For a single-part path, it's a direct child of the entity
+    # Handle single-part path case
     if len(parts) <= 1:
         return f"{parent_entity}{separator}{path}" if path != parent_entity else path
 
     # Process each component
     abbreviated_parts = []
     for i, part in enumerate(parts):
-        # Check if this is the root or leaf component
+        # Determine if component is root or leaf
         is_first = i == 0
         is_last = i == len(parts) - 1
 
         # Apply abbreviation rules
         if (is_first and preserve_root) or (is_last and preserve_leaf):
-            # Keep root/leaf component intact
+            # Preserve root/leaf components as specified
             abbreviated_parts.append(part)
         else:
-            # Abbreviate middle components
+            # Apply abbreviation to middle components
             abbreviated_parts.append(
                 abbreviate_component(
                     part,
@@ -179,12 +179,12 @@ def abbreviate_table_name(
                 )
             )
 
-    # Join components into the final name
+    # Construct final name
     if parent_entity in abbreviated_parts:
-        # If parent entity is already in the path, don't duplicate it
+        # Avoid duplicate parent entity
         result = separator.join(abbreviated_parts)
     else:
-        # Prepend parent entity if not already in the path
+        # Prepend parent entity
         result = f"{parent_entity}{separator}{separator.join(abbreviated_parts)}"
 
     return result
@@ -204,36 +204,36 @@ def _abbreviate_field_name_cached(
     if max_component_length is None:
         max_component_length = settings.DEFAULT_MAX_FIELD_COMPONENT_LENGTH
 
-    # If abbreviation is disabled, return the original path
+    # Return original path if abbreviation is disabled
     if not abbreviate_enabled:
         return field_path
 
     # Split the path into components
     parts = field_path.split(separator)
 
-    # If single component, return as is
+    # Return as is for single component
     if len(parts) <= 1:
         return field_path
 
     # Process each component
     abbreviated_parts = []
     for i, part in enumerate(parts):
-        # Check if this is the root or leaf component
+        # Determine if component is root or leaf
         is_first = i == 0
         is_last = i == len(parts) - 1
 
         # Apply abbreviation rules
         if (is_first and preserve_root) or (is_last and preserve_leaf):
-            # Keep root/leaf component intact
+            # Preserve root/leaf components as specified
             abbreviated_parts.append(part)
         else:
-            # Simple truncation for cached version (no dictionary to use)
+            # Truncate middle components if needed
             if len(part) <= max_component_length:
                 abbreviated_parts.append(part)
             else:
                 abbreviated_parts.append(part[:max_component_length])
 
-    # Join components into the final name
+    # Join components to form field name
     return separator.join(abbreviated_parts)
 
 
@@ -264,39 +264,38 @@ def abbreviate_field_name(
     if max_component_length is None:
         max_component_length = settings.DEFAULT_MAX_FIELD_COMPONENT_LENGTH
 
-    # If abbreviation is disabled, return the original path
+    # Return original path if abbreviation is disabled
     if not abbreviate_enabled:
         return field_path
 
-    # Split the path into components using the separator
+    # Split the path into components
     parts = field_path.split(separator)
 
-    # If single component, return as is
+    # Return as is for single component
     if len(parts) <= 1:
         return field_path
 
     # Process each component
     abbreviated_parts = []
     for i, part in enumerate(parts):
-        # Check if this is the root or leaf component
+        # Determine if component is root or leaf
         is_first = i == 0
         is_last = i == len(parts) - 1
 
         # Apply abbreviation rules
         if (is_first and preserve_root) or (is_last and preserve_leaf):
-            # Keep root/leaf component intact
+            # Preserve root/leaf components as specified
             abbreviated_parts.append(part)
         else:
-            # Try custom abbreviation first if available
+            # Apply custom abbreviation or truncate
             if abbreviation_dict and part in abbreviation_dict:
                 abbreviated_parts.append(abbreviation_dict[part])
-            # If not, truncate to max length if needed
             elif len(part) <= max_component_length:
                 abbreviated_parts.append(part)
             else:
                 abbreviated_parts.append(part[:max_component_length])
 
-    # Join components into the final name with the separator
+    # Join components to form field name
     return separator.join(abbreviated_parts)
 
 

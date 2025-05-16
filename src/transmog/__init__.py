@@ -4,7 +4,7 @@ A library for transforming nested JSON structures into flattened formats
 with parent-child relationship preservation and metadata annotation.
 """
 
-__version__ = "0.1.2.5"
+__version__ = "1.0.0"
 
 # Configuration functionality
 from transmog.config import (

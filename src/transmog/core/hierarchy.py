@@ -29,7 +29,7 @@ ProcessResult = tuple[FlatDict, ArrayDict]
 StreamingChildTables = Generator[tuple[str, list[FlatDict]], None, None]
 ArrayResult = Union[ArrayDict, StreamingChildTables]
 
-# Logger initialization
+# Logger setup
 logger = logging.getLogger(__name__)
 
 
@@ -96,7 +96,7 @@ def process_structure(
     Returns:
         Tuple of (flattened main object, array tables dictionary or generator)
     """
-    # Initialize root_entity if at top level
+    # Initialize root_entity at top level
     if root_entity is None:
         root_entity = entity_name
 
@@ -110,7 +110,7 @@ def process_structure(
         if parent_id:
             empty_result[parent_field] = parent_id
 
-        # Return appropriate empty result based on mode
+        # Return empty result based on mode
         if streaming:
 
             def empty_generator() -> Generator[
@@ -145,19 +145,15 @@ def process_structure(
     source_field = None
     if default_id_field:
         if isinstance(default_id_field, str):
-            # Use same field for all paths
             source_field = default_id_field
         else:
-            # Map paths to field names
             normalized_path = parent_path.strip(separator) if parent_path else ""
 
-            # Check for exact path match first
+            # Path resolution priority: exact match, wildcard, prefix matches
             if normalized_path in default_id_field:
                 source_field = default_id_field[normalized_path]
-            # Try wildcard match
             elif "*" in default_id_field:
                 source_field = default_id_field["*"]
-            # Try path prefix matches (most specific first)
             else:
                 path_components = (
                     normalized_path.split(separator) if normalized_path else []
@@ -201,14 +197,13 @@ def process_structure(
     extract_id = annotated_obj.get(id_field)
 
     if streaming:
-        # Define a generator function to yield child tables
+
         def generate_child_records() -> Generator[
             tuple[str, list[dict[str, Any]]], None, None
         ]:
-            # Collect all records by table name to ensure complete tables are yielded
+            # Collect records by table name for complete table yields
             collected_tables: dict[str, list[dict[str, Any]]] = {}
 
-            # First, collect all records from the stream
             generator = stream_extract_arrays(
                 data,
                 parent_id=extract_id,
@@ -238,9 +233,9 @@ def process_structure(
                     collected_tables[table] = []
                 collected_tables[table].append(record)
 
-            # Then yield all records for each table
+            # Yield complete tables with records
             for table_name, records in collected_tables.items():
-                if records:  # Only yield if there are records
+                if records:
                     yield table_name, records
 
         return annotated_obj, generate_child_records()
@@ -370,7 +365,7 @@ def process_records_in_single_pass(
     Returns:
         Tuple of (main table as list of dicts, child tables as dict of lists)
     """
-    # Set extract_time to the current timestamp if not specified
+    # Set default extraction timestamp if not specified
     if extract_time is None:
         extract_time = datetime.now()
 
@@ -380,11 +375,10 @@ def process_records_in_single_pass(
 
     # Process each record
     for record in records:
-        # Process a single record with all nested arrays
         main_record, child_records = process_structure(
-            data=record,  # Process record even if None
+            data=record,
             entity_name=entity_name,
-            parent_id=None,  # Root records have no parent
+            parent_id=None,
             parent_path="",
             separator=separator,
             cast_to_string=cast_to_string,
@@ -404,7 +398,7 @@ def process_records_in_single_pass(
             parent_field=parent_field,
             time_field=time_field,
             visit_arrays=visit_arrays,
-            streaming=False,  # Must be False for single-pass
+            streaming=False,
             recovery_strategy=recovery_strategy,
             max_depth=max_depth,
         )
@@ -482,7 +476,7 @@ def stream_process_records(
     Returns:
         Tuple of (main table as list of dicts, generator for child tables)
     """
-    # Set extract_time to current time if not provided
+    # Set default extraction timestamp
     if extract_time is None:
         extract_time = datetime.now()
 
@@ -490,14 +484,12 @@ def stream_process_records(
     main_records = []
     generators_list: list[Generator[tuple[str, list[dict[str, Any]]], None, None]] = []
 
-    # Process each record's main table
+    # Process each record
     for record in records:
-        # Process a single record, but only retrieve the main record
-        # and a generator for child records that we'll store for later
         main_record, child_result = process_structure(
-            data=record,  # Process record even if None
+            data=record,
             entity_name=entity_name,
-            parent_id=None,  # Root records have no parent
+            parent_id=None,
             parent_path="",
             separator=separator,
             cast_to_string=cast_to_string,
@@ -517,16 +509,16 @@ def stream_process_records(
             parent_field=parent_field,
             time_field=time_field,
             visit_arrays=visit_arrays,
-            streaming=True,  # Enable streaming for child tables
+            streaming=True,
             max_depth=max_depth,
         )
 
         # Add to main table
         main_records.append(main_record)
 
-        # Determine the type of child_result and handle appropriately
+        # Handle child results by type
         if isinstance(child_result, dict):
-            # Convert the dictionary to a generator
+            # Convert dictionary to generator
             def dict_to_generator(
                 d: dict[str, list[dict[str, Any]]],
             ) -> Generator[tuple[str, list[dict[str, Any]]], None, None]:
@@ -537,27 +529,25 @@ def stream_process_records(
 
             generators_list.append(dict_to_generator(child_result))
         else:
-            # It's already a generator
             generators_list.append(child_result)
 
-    # Define a generator function that will yield child tables
+    # Generator to yield child tables
     def child_tables_generator() -> Generator[
         tuple[str, list[dict[str, Any]]], None, None
     ]:
-        # Dictionary to collect records for each table
+        # Collect records for each table
         table_records: dict[str, list[dict[str, Any]]] = {}
 
-        # Process child records for each record
+        # Process each generator
         for generator in generators_list:
             for table_name, records in generator:
-                # Add records to the corresponding table
                 if table_name not in table_records:
                     table_records[table_name] = []
                 table_records[table_name].extend(records)
 
-        # Yield each table's records
+        # Yield non-empty tables
         for table_name, records in table_records.items():
-            if records:  # Skip empty tables
+            if records:
                 yield table_name, records
 
     return main_records, child_tables_generator()

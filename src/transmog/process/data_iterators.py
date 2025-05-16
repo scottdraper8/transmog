@@ -40,7 +40,7 @@ def get_data_iterator(
     Returns:
         Iterator of data records
     """
-    # If data is already an iterator, just return it
+    # Return existing iterators directly
     if (
         hasattr(data, "__iter__")
         and hasattr(data, "__next__")
@@ -72,17 +72,16 @@ def get_data_iterator(
     if input_format == "auto":
         # Auto-detect format
         if isinstance(data, (dict, list)):
-            # Only pass dict or list to get_json_data_iterator, not iterator
             return get_json_data_iterator(data)  # type: ignore
         elif isinstance(data, (str, bytes)):
-            # Try to detect if this is JSONL or JSON
+            # Detect if data is JSONL or JSON
             try:
                 if isinstance(data, bytes):
                     sample = data[:1000].decode("utf-8", errors="ignore")
                 else:
                     sample = data[:1000]
 
-                # Check if sample contains newlines with JSON objects
+                # Check for newlines with JSON objects
                 if "\n" in sample and any(
                     line.strip().startswith("{")
                     for line in sample.split("\n")
@@ -92,7 +91,7 @@ def get_data_iterator(
                 else:
                     return get_json_data_iterator(data)
             except Exception:
-                # If detection fails, default to JSON
+                # Default to JSON on detection failure
                 return get_json_data_iterator(data)
         else:
             raise ValidationError(f"Unsupported data type: {type(data)}")
@@ -100,7 +99,6 @@ def get_data_iterator(
         if isinstance(data, (dict, list, str, bytes)):
             return get_json_data_iterator(data)
         else:
-            # For iterators, we need a different approach
             raise ValidationError(f"Unsupported data type for JSON: {type(data)}")
     elif input_format in ("jsonl", "ndjson"):
         if isinstance(data, (str, bytes)):
@@ -128,7 +126,7 @@ def get_json_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
         raise FileError(f"File not found: {file_path}")
 
     try:
-        # Try to use orjson for better performance
+        # Attempt to use orjson for performance
         try:
             import orjson
 
@@ -139,7 +137,7 @@ def get_json_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
             with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
 
-        # Handle single object vs list
+        # Process single object or list
         if isinstance(data, dict):
             yield data
         elif isinstance(data, list):
@@ -181,7 +179,7 @@ def get_json_data_iterator(
 
         data = parsed_data
 
-    # Handle single object vs list
+    # Handle single object or list
     if isinstance(data, dict):
         yield data
     elif isinstance(data, list):
@@ -210,7 +208,7 @@ def get_jsonl_file_iterator(processor: Any, file_path: str) -> Iterator[dict[str
     if not os.path.exists(file_path):
         raise FileError(f"File not found: {file_path}")
 
-    # Try to use orjson for better performance if available
+    # Select JSON parser
     try:
         import orjson as json_parser
 
@@ -229,14 +227,13 @@ def get_jsonl_file_iterator(processor: Any, file_path: str) -> Iterator[dict[str
                     continue
 
                 try:
-                    # Parse the JSON line
                     record = json_parser.loads(line)
                     yield record
                 except json_decode_error as e:
                     error_msg = f"Invalid JSON on line {line_number}: {str(e)}"
                     logger.warning(error_msg)
 
-                    # Determine how to handle the error based on recovery strategy
+                    # Handle error based on recovery strategy
                     if (
                         processor.config.error_handling.recovery_strategy is None
                         or processor.config.error_handling.recovery_strategy.is_strict()
@@ -278,11 +275,11 @@ def get_jsonl_data_iterator(
     # Split into lines
     lines = data.strip().split("\n")
 
-    # Try to use orjson for better performance if available
+    # Select JSON parser
     try:
         import orjson as json_parser
 
-        json_decode_error = (json.JSONDecodeError,)  # Use consistent error type
+        json_decode_error = (json.JSONDecodeError,)
     except ImportError:
         import json as json_parser
 
@@ -295,14 +292,13 @@ def get_jsonl_data_iterator(
             continue
 
         try:
-            # Parse the JSON line
             record = json_parser.loads(line)
             yield record
         except json_decode_error as e:
             error_msg = f"Invalid JSON on line {i + 1}: {str(e)}"
             logger.warning(error_msg)
 
-            # Determine how to handle the error based on recovery strategy
+            # Handle error based on recovery strategy
             if (
                 processor.config.error_handling.recovery_strategy is None
                 or processor.config.error_handling.recovery_strategy.is_strict()
@@ -352,7 +348,7 @@ def get_csv_file_iterator(
         raise FileError(f"File not found: {file_path}")
 
     try:
-        # Create CSV reader with configured settings
+        # Configure CSV reader
         reader = CSVReader(
             delimiter=delimiter,
             has_header=has_header,
@@ -365,7 +361,6 @@ def get_csv_file_iterator(
             cast_to_string=processor.config.processing.cast_to_string,
         )
 
-        # Return iterator over records
         yield from reader.read_records(file_path)
 
     except Exception as e:

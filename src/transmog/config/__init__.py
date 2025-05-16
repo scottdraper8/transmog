@@ -16,7 +16,7 @@ from transmog.config.settings import (
     load_profile,
 )
 
-# Create backwards-compatible global instances
+# Global instances
 settings = TransmogSettings()
 extensions = ExtensionRegistry()
 
@@ -25,8 +25,8 @@ class ProcessingMode(Enum):
     """Processing modes determining memory/performance tradeoff."""
 
     STANDARD = auto()  # Default mode
-    LOW_MEMORY = auto()  # Optimize for memory usage
-    HIGH_PERFORMANCE = auto()  # Optimize for performance
+    LOW_MEMORY = auto()  # Memory usage optimization
+    HIGH_PERFORMANCE = auto()  # Performance optimization
 
 
 @dataclass
@@ -77,7 +77,7 @@ class ErrorHandlingConfig:
     """Configuration for error handling and recovery."""
 
     allow_malformed_data: bool = False
-    recovery_strategy: str = "strict"  # "strict", "skip", "partial"
+    recovery_strategy: str = "strict"  # Options: "strict", "skip", "partial"
     max_retries: int = 3
     error_log_path: Optional[str] = None
 
@@ -117,7 +117,7 @@ class TransmogConfig:
             ),
             cache_config=CacheConfig(
                 enabled=True,
-                maxsize=1000,  # Smaller cache for memory optimization
+                maxsize=1000,  # Reduced cache size for memory conservation
                 clear_after_batch=True,
             ),
         )
@@ -133,7 +133,7 @@ class TransmogConfig:
             ),
             cache_config=CacheConfig(
                 enabled=True,
-                maxsize=50000,  # Larger cache for performance
+                maxsize=50000,  # Enlarged cache for performance
                 clear_after_batch=False,
             ),
         )
@@ -282,7 +282,7 @@ class TransmogConfig:
         if id_generation_strategy is not None:
             metadata_kwargs["id_generation_strategy"] = id_generation_strategy
 
-        # Use with_metadata for the actual update
+        # Apply changes through metadata method
         return self.with_metadata(**metadata_kwargs)
 
     def with_validation(self, **kwargs: Any) -> "TransmogConfig":
@@ -309,7 +309,7 @@ class TransmogConfig:
         if validate_table_names is not None:
             processing_kwargs["validate_table_names"] = validate_table_names
 
-        # Use with_processing for the actual update
+        # Apply changes through processing method
         return self.with_processing(**processing_kwargs)
 
 

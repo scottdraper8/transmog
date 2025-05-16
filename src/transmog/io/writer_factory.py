@@ -16,7 +16,7 @@ from transmog.types.io_types import StreamingWriterProtocol, WriterProtocol
 
 from .formats import FormatRegistry
 
-# Registry of writer classes
+# Writer class registries
 _WRITER_REGISTRY: dict[str, type[WriterProtocol]] = {}
 _STREAMING_WRITER_REGISTRY: dict[str, type[StreamingWriterProtocol]] = {}
 
@@ -29,7 +29,7 @@ def register_writer(format_name: str, writer_class: type[WriterProtocol]) -> Non
         writer_class: Writer class to register
     """
     _WRITER_REGISTRY[format_name.lower()] = writer_class
-    # Also register with the FormatRegistry for discovery
+    # Register with FormatRegistry for format discovery
     FormatRegistry.register_writer_format(format_name)
     logger.debug(f"Registered writer for {format_name}")
 
@@ -65,29 +65,26 @@ def create_writer(format_name: str, **kwargs: Any) -> WriterProtocol:
 
     if format_name not in _WRITER_REGISTRY:
         try:
-            # Try to dynamically load the writer
+            # Attempt dynamic loading of writer module
             module_path = f"transmog.io.writers.{format_name}"
             importlib.import_module(module_path)
         except ImportError as e:
-            # Handle specific error for missing dependency
+            # Differentiate between missing dependency and unsupported format
             if "dependency" in str(e).lower():
                 raise MissingDependencyError(
                     f"Missing dependency for {format_name} format: {str(e)}",
                     package=format_name,
                 ) from e
-            # Otherwise, the format is not supported
             raise ConfigurationError(f"Unsupported output format: {format_name}") from e
 
-    # Try again after loading
+    # Check registry again after attempted module load
     if format_name not in _WRITER_REGISTRY:
         raise ConfigurationError(f"No writer registered for format: {format_name}")
 
     try:
-        # Create and return the writer instance
         writer_class = _WRITER_REGISTRY[format_name]
         return writer_class(**kwargs)
     except Exception as e:
-        # Wrap any initialization errors
         raise ConfigurationError(
             f"Failed to create {format_name} writer: {str(e)}"
         ) from e
@@ -118,20 +115,19 @@ def create_streaming_writer(
 
     if format_name not in _STREAMING_WRITER_REGISTRY:
         try:
-            # Try to dynamically load the writer
+            # Attempt dynamic loading of writer module
             module_path = f"transmog.io.writers.{format_name}"
             importlib.import_module(module_path)
         except ImportError as e:
-            # Handle specific error for missing dependency
+            # Differentiate between missing dependency and unsupported format
             if "dependency" in str(e).lower():
                 raise MissingDependencyError(
                     f"Missing dependency for {format_name} format: {str(e)}",
                     package=format_name,
                 ) from e
-            # Otherwise, the format is not supported
             raise ConfigurationError(f"Unsupported output format: {format_name}") from e
 
-    # Try again after loading
+    # Check registry again after attempted module load
     if format_name not in _STREAMING_WRITER_REGISTRY:
         raise MissingDependencyError(
             f"No streaming writer registered for format: {format_name}",
@@ -139,14 +135,12 @@ def create_streaming_writer(
         )
 
     try:
-        # Create and return the streaming writer instance
         writer_class = _STREAMING_WRITER_REGISTRY[format_name]
         return writer_class(destination=destination, entity_name=entity_name, **kwargs)
     except MissingDependencyError:
-        # Let MissingDependencyError propagate directly
+        # Preserve MissingDependencyError exceptions
         raise
     except Exception as e:
-        # Wrap any other initialization errors
         raise ConfigurationError(
             f"Failed to create {format_name} streaming writer: {str(e)}"
         ) from e

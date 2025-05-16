@@ -139,7 +139,7 @@ class CSVReader:
             encoding: File encoding
             cast_to_string: Whether to cast all values to strings
         """
-        # Get configuration values or use defaults
+        # Configuration values from settings or defaults
         self.delimiter = delimiter or settings.get_option("csv_delimiter", ",")
         self.has_header = has_header
         self.null_values = null_values or settings.get_option(
@@ -154,10 +154,10 @@ class CSVReader:
             "cast_to_string", False
         )
 
-        # Use the same separator as the rest of the package for column name sanitization
+        # Separator for column name sanitization
         self.separator = settings.get_option("separator", "_")
 
-        # Flag to track if PyArrow is used
+        # Flag for PyArrow usage
         self._using_pyarrow = PYARROW_AVAILABLE
 
     def read_records(
@@ -178,17 +178,15 @@ class CSVReader:
         if not os.path.exists(file_path):
             raise FileError(f"File not found: {file_path}")
 
-        # Try PyArrow first if available and not already in fallback mode
+        # Try PyArrow first if available and not in fallback mode
         if PYARROW_AVAILABLE and not using_fallback:
             try:
-                # PyArrow doesn't have a streaming API that yields one record at a time,
-                # so we'll read in chunks and yield each record
+                # Read in chunks and yield each record
                 pyarrow_success = False
                 for chunk in self.read_in_chunks(file_path, chunk_size=1000):
                     yield from chunk
                     pyarrow_success = True
 
-                # If we successfully processed any chunks with PyArrow, we're done
                 if pyarrow_success:
                     return
             except Exception as e:
@@ -197,10 +195,6 @@ class CSVReader:
                     f"Falling back to built-in CSV module."
                 )
                 self._using_pyarrow = False
-                # Continue to built-in reader below
-
-        # If we get here, either PyArrow is not available, we're in fallback mode,
-        # or PyArrow failed completely (pyarrow_success remained False)
 
         # Fallback to built-in CSV module
         try:
@@ -321,14 +315,12 @@ class CSVReader:
         # Try PyArrow first if available
         if PYARROW_AVAILABLE:
             try:
-                # Collect all chunks from PyArrow in a list to detect complete failure
-                # This avoids yielding partial results that lead to double counting
+                # Collect all chunks to detect complete failure
                 pyarrow_success = False
                 for chunk in self._read_chunks_pyarrow(file_path, chunk_size):
                     yield chunk
                     pyarrow_success = True
 
-                # If we successfully processed any chunks with PyArrow, we're done
                 if pyarrow_success:
                     return
             except Exception as e:
@@ -337,13 +329,8 @@ class CSVReader:
                     f"Falling back to built-in CSV module."
                 )
                 self._using_pyarrow = False
-                # Continue to built-in reader below
 
-        # If we get here, either PyArrow is not available or PyArrow failed completely
-
-        # Fallback to built-in CSV module - use direct implementation
-        # instead of calling read_records
-        # to prevent circular dependencies
+        # Fallback to built-in CSV module
         try:
             file_extension = os.path.splitext(file_path)[1].lower()
             open_func, mode = self._get_file_opener(file_extension)
@@ -455,18 +442,17 @@ class CSVReader:
         Raises:
             ParsingError: If PyArrow fails to parse the CSV file
         """
-        # Get file size for sanity check
+        # Check file size
         file_size = os.path.getsize(file_path)
         if file_size == 0:
             logger.warning(f"File {file_path} is empty")
             raise ParsingError("CSV file is empty")
 
-        # For very large files, estimate the number of lines instead of counting exactly
-        # This avoids memory issues and improves performance
+        # Estimate record count for large files
         estimated_records = 0
         if file_size > 10 * 1024 * 1024:  # If file is larger than 10MB
             try:
-                # Sample the first 1000 lines to estimate average line length
+                # Sample first 1000 lines to estimate average line length
                 sample_lines = 1000
                 lines_read = 0
                 total_bytes = 0
@@ -493,24 +479,23 @@ class CSVReader:
                     estimated_records = 0
             except Exception as e:
                 logger.warning(f"Error estimating lines in file: {str(e)}")
-                # Fall back to a reasonable default based on file size and chunk size
-                estimated_records = max(1000, file_size // 100)  # Rough estimate
+                # Estimate based on file size and chunk size
+                estimated_records = max(1000, file_size // 100)
         else:
-            # For smaller files, count lines exactly
+            # Count lines in smaller files
             try:
                 total_lines = 0
                 with open(file_path, encoding=self.encoding) as f:
                     for _ in f:
                         total_lines += 1
 
-                # Account for header row if present
                 estimated_records = total_lines - (1 if self.has_header else 0)
             except Exception as e:
                 logger.warning(f"Error counting lines in file: {str(e)}")
                 raise ParsingError(f"Could not read file: {str(e)}") from e
 
-        # Safety check
-        estimated_records = max(0, estimated_records)  # Ensure non-negative
+        # Ensure non-negative record count
+        estimated_records = max(0, estimated_records)
         if estimated_records == 0:
             logger.warning(f"No data records in file {file_path}")
             return
@@ -520,11 +505,11 @@ class CSVReader:
             f"expecting ~{estimated_records} records"
         )
 
-        # Set up PyArrow read options
+        # Configure PyArrow options
         read_options = pa_csv.ReadOptions(
             skip_rows=self.skip_rows,
             autogenerate_column_names=not self.has_header,
-            # Use a reasonable block size based on file size - don't make it too large
+            # Reasonable block size based on file size
             block_size=min(chunk_size * 1024, file_size + 1024),
         )
 
@@ -539,15 +524,14 @@ class CSVReader:
             auto_dict_encode=True,
         )
 
-        # Create a reader for the file
+        # Setup batch processing
         record_count = 0
         batch_count = 0
         max_batches = max(
             100, (estimated_records // chunk_size) + 10
         )  # Reasonable upper limit
 
-        # Collect all chunks in this list, and only yield them
-        # if the entire process succeeds
+        # Collect chunks for processing
         all_chunks = []
         success = False
 
@@ -562,7 +546,7 @@ class CSVReader:
                 while True:
                     batch_count += 1
 
-                    # Hard limit on number of batches to prevent infinite loops
+                    # Prevent infinite loops with batch limit
                     if batch_count > max_batches:
                         logger.warning(
                             f"Reached maximum batch count ({max_batches}), "
@@ -577,8 +561,7 @@ class CSVReader:
                         if batch is None:
                             break
 
-                        # Add safety check for empty batches that might cause
-                        # infinite loops
+                        # Check for empty batches
                         if batch.num_rows == 0:
                             logger.warning(
                                 "Empty batch detected, stopping PyArrow processing"
@@ -588,7 +571,7 @@ class CSVReader:
                         # Convert batch to table
                         table = pa.Table.from_batches([batch])
 
-                        # Safety check - don't process more records than expected
+                        # Limit records to prevent processing excessive data
                         if record_count + table.num_rows > estimated_records * 1.5:
                             total_records = record_count + table.num_rows
                             expected_limit = estimated_records * 1.5
@@ -596,21 +579,20 @@ class CSVReader:
                                 f"Record count exceeds expected by significant margin: "
                                 f"{total_records} > {expected_limit}"
                             )
-                            # Only take the number of rows we need
+                            # Take only needed rows
                             remaining = max(
                                 0, int(estimated_records * 1.5) - record_count
                             )
                             if remaining <= 0:
                                 break
-                            # Slice the table to only get the remaining rows
+                            # Slice table to get remaining rows
                             if remaining < table.num_rows:
                                 table = table.slice(0, remaining)
 
                         # Process column names
                         column_names = list(table.column_names)
 
-                        # If no header, replace PyArrow's default 'f0', 'f1', etc.
-                        # with 'column_1', 'column_2', etc.
+                        # Handle column naming based on settings
                         if not self.has_header:
                             column_names = [
                                 f"column_{i + 1}" for i in range(len(column_names))
@@ -636,8 +618,7 @@ class CSVReader:
                                         and value is not None
                                         and not self.cast_to_string
                                     ):
-                                        # If not inferring types or casting to string,
-                                        # convert to string and then infer
+                                        # Convert to string then infer type
                                         value = self._infer_type(str(value))
 
                                     record[col_name] = value
@@ -646,7 +627,7 @@ class CSVReader:
                         # Update record count
                         record_count += len(records)
 
-                        # Add chunk to the list instead of yielding immediately
+                        # Process records into chunks
                         if records:
                             current_chunk = []
                             for record in records:
@@ -655,7 +636,7 @@ class CSVReader:
                                     all_chunks.append(current_chunk)
                                     current_chunk = []
 
-                            # Add any remaining records to a final chunk
+                            # Add remaining records
                             if current_chunk:
                                 all_chunks.append(current_chunk)
 
@@ -663,23 +644,23 @@ class CSVReader:
                         logger.warning(
                             f"Error processing batch {batch_count}: {str(e)}"
                         )
-                        # An error in a batch means we should abort PyArrow processing
+                        # Abort PyArrow processing on batch error
                         raise
 
-                # If we got here without exceptions, PyArrow processing succeeded
+                # Mark success if completed without exceptions
                 success = True
 
-            # Only yield results if the entire PyArrow processing succeeded
+            # Yield results only if PyArrow processing succeeded
             if success:
                 yield from all_chunks
             else:
-                # PyArrow processing failed, raise an error to trigger fallback
+                # Trigger fallback on failure
                 raise ParsingError("PyArrow CSV reading failed")
 
         except Exception as e:
             error_msg = f"Error reading CSV with PyArrow: {str(e)}"
             logger.warning(error_msg)
-            # Clear PyArrow flag and raise an exception to trigger fallback
+            # Clear PyArrow flag and trigger fallback
             self._using_pyarrow = False
             raise ParsingError(f"PyArrow CSV reading failed: {str(e)}") from e
 
@@ -706,7 +687,6 @@ class CSVReader:
             pass
 
         # Try to convert to boolean - only for non-numeric looking values
-        # to avoid converting "1" to True
         lower_value = value.lower()
         if not value.isdigit() and lower_value not in ("0", "1"):
             if lower_value in ("true", "yes"):
@@ -746,8 +726,7 @@ def normalize_column_names(column_names: list[str], separator: str = "_") -> lis
     Returns:
         List of normalized column names
     """
-    # First, sanitize the column names - use sanitize_column_names
-    # to properly handle all special characters
+    # Sanitize column names
     sanitized = sanitize_column_names(column_names, separator=separator, sql_safe=True)
 
     # Handle duplicate column names by adding a suffix
@@ -798,7 +777,7 @@ def detect_delimiter(
         # Return the delimiter with the highest count
         most_common = max(counts.items(), key=lambda x: x[1])
 
-        # If no delimiter was found with a significant count, default to comma
+        # Default to comma if no delimiter found with significant count
         if most_common[1] <= 5:
             return ","
 

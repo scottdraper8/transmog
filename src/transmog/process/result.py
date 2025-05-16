@@ -76,8 +76,7 @@ def _get_cache_key(
     Returns:
         A hashable cache key
     """
-    # For mutable collections we use id() as part of the key
-    # Not perfect, but helps with common cases
+    # For mutable collections use id() as part of the key
     data_id = id(table_data)
     options_str = str(sorted(options.items()))
     return (data_id, format_type, options_str)
@@ -291,7 +290,7 @@ class ProcessingResult(ResultInterface):
             json_record: dict[str, Union[str, int, float, bool, None, list, dict]] = {}
             for k, v in record.items():
                 if v is None:
-                    json_record[k] = None  # Type None is actually valid in JSON
+                    json_record[k] = None  # None is valid in JSON
                 elif isinstance(v, (str, int, float, bool)):
                     json_record[k] = v
                 elif isinstance(v, (list, dict)):
@@ -496,7 +495,7 @@ class ProcessingResult(ResultInterface):
                 file_path = os.path.join(base_path, f"{formatted_name}.parquet")
                 file_paths[table_name] = file_path
 
-                # For schema evolution support, we need to collect all fields first
+                # For schema evolution support, collect all fields first
                 all_fields: set[str] = set()
                 for record in records:
                     all_fields.update(record.keys())
@@ -1050,7 +1049,7 @@ class ProcessingResult(ResultInterface):
             format_name: Format name to register
             converter_func: Function that converts this result to the desired format
         """
-        # Store the converter function - wrap it to ensure type compatibility
+        # Store the converter function
         self._conversion_functions[format_name] = converter_func
 
     def convert_to(self, format_name: str, **options: Any) -> Any:
@@ -1071,7 +1070,6 @@ class ProcessingResult(ResultInterface):
             # Call the converter function with this result
             converter = self._conversion_functions[format_name]
             # Call the converter function with self and options parameters
-            # as per the registered function type
             return converter(self, options)
 
         # Format not found - try using built-in methods

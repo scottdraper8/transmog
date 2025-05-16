@@ -29,7 +29,7 @@ class ProcessingConfig:
         None  # Threshold in bytes for switching to low-memory mode
     )
     memory_tracking_enabled: bool = (
-        False  # Whether to track memory usage during processing
+        False  # Controls memory usage tracking during processing
     )
     additional_options: dict[str, Any] = field(default_factory=dict)
 
@@ -41,7 +41,7 @@ class ProcessingConfig:
             except ValueError:
                 self.processing_mode = ProcessingMode.STANDARD
 
-        # Handle optimization flags
+        # Apply optimization flags to processing mode
         if self.optimize_for_memory and self.processing_mode == ProcessingMode.STANDARD:
             self.processing_mode = ProcessingMode.LOW_MEMORY
         elif (
@@ -50,6 +50,6 @@ class ProcessingConfig:
         ):
             self.processing_mode = ProcessingMode.HIGH_PERFORMANCE
 
-        # Set default memory threshold if not provided
+        # Set default memory threshold
         if self.memory_threshold is None:
             self.memory_threshold = 100 * 1024 * 1024  # 100MB default

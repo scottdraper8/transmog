@@ -13,7 +13,7 @@ MAX_LINE_LENGTH = 120
 
 def is_protected_line(line):
     """Check if a line should be protected from line breaking."""
-    # Headers, horizontal rules, list items, code block markers, etc.
+    # Pattern groups for lines that should not be broken
     protected_patterns = [
         r"^#{1,6}\s+",  # Headers
         r"^-{3,}$",  # Horizontal rule
@@ -37,19 +37,19 @@ def break_long_line(line, max_length=MAX_LINE_LENGTH):
     if len(line) <= max_length or is_protected_line(line):
         return line
 
-    # Find a good breaking point
-    # Try to break at space after max_length - 20
+    # Calculate optimal break point location
     ideal_break_point = max_length - 20
     if ideal_break_point < 0:
         ideal_break_point = max_length // 2
 
     break_point = max_length
+    # Search forward from ideal break point
     for i in range(ideal_break_point, min(max_length, len(line))):
         if i < len(line) and line[i] == " ":
             break_point = i
             break
 
-    # If no good breaking point, try backwards
+    # Search backward if no break point found
     if break_point == max_length:
         for i in range(
             min(max_length, len(line)) - 1, max(ideal_break_point - 10, 0), -1
@@ -58,7 +58,7 @@ def break_long_line(line, max_length=MAX_LINE_LENGTH):
                 break_point = i
                 break
 
-    # If still no good breaking point, just break at max_length
+    # Force break at max_length if no space found
     if break_point == max_length and len(line) > max_length:
         if len(line) <= max_length:
             return line
@@ -76,20 +76,17 @@ def break_long_line(line, max_length=MAX_LINE_LENGTH):
 
 def fix_code_blocks(content):
     """Add 'text' as the language specifier for code blocks that don't have one."""
-    # Process the content line by line to handle code blocks properly
     lines = content.split("\n")
     in_code_block = False
 
     for i, line in enumerate(lines):
         stripped = line.strip()
-        # Check if this is a code block delimiter
         if stripped.startswith("```"):
             if not in_code_block:
-                # This is an opening fence - check if it already has a language
                 if stripped == "```":
-                    # No language specified, add 'text'
+                    # Add 'text' language specifier to unmarked code blocks
                     lines[i] = "```text"
-            # Toggle code block state
+            # Track code block state
             in_code_block = not in_code_block
 
     return "\n".join(lines)
@@ -100,27 +97,26 @@ def fix_markdown_file(file_path):
     with open(file_path, encoding="utf-8") as f:
         content = f.read()
 
-    # Fix code blocks first
+    # Apply code block fixes before line length fixes
     content = fix_code_blocks(content)
 
-    # Process lines for length
+    # Process content line by line
     lines = content.split("\n")
     in_code_block = False
     fixed_lines = []
 
     for line in lines:
-        # Toggle code block state
         if line.strip().startswith("```"):
             in_code_block = not in_code_block
             fixed_lines.append(line)
             continue
 
-        # Don't break lines in code blocks
+        # Preserve code block content intact
         if in_code_block:
             fixed_lines.append(line)
             continue
 
-        # Break long lines
+        # Apply line breaking for non-protected lines
         if len(line) > MAX_LINE_LENGTH and not is_protected_line(line):
             broken_lines = break_long_line(line).split("\n")
             fixed_lines.extend(broken_lines)
@@ -129,7 +125,7 @@ def fix_markdown_file(file_path):
 
     fixed_content = "\n".join(fixed_lines)
 
-    # Ensure file ends with newline
+    # Ensure standard file ending with newline
     if not fixed_content.endswith("\n"):
         fixed_content += "\n"
 
@@ -145,6 +141,10 @@ def process_directory(directory):
     directory_path = Path(directory)
 
     for path in directory_path.glob("**/*.md"):
+        # Skip markdown files in .env directory
+        if ".env" in path.parts:
+            continue
+
         print(f"Processing {path}")
         if fix_markdown_file(path):
             fixed_count += 1
@@ -154,7 +154,7 @@ def process_directory(directory):
 
 def main():
     """Main entry point."""
-    # Get the parent directory of the script
+    # Locate script directory and parent directory
     script_dir = Path(__file__).resolve().parent
     parent_dir = script_dir.parent
 

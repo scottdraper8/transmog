@@ -10,6 +10,7 @@ from typing import (
     Callable,
     Literal,
     Optional,
+    TypeVar,
     cast,
 )
 
@@ -19,6 +20,9 @@ from ..error.exceptions import ProcessingError
 from ..naming.abbreviator import abbreviate_field_name
 from ..naming.conventions import sanitize_name
 from ..types import FlattenMode
+
+# Define a return type variable for the decorator's generic type
+R = TypeVar("R")
 
 
 def _process_value(
@@ -63,7 +67,6 @@ def _process_value(
     return value
 
 
-# Add this function to dynamically create the LRU cache with the configured maxsize
 def _get_lru_cache_decorator(maxsize: int = 10000) -> Callable:
     """Create an LRU cache decorator with the specified maxsize.
 
@@ -76,7 +79,6 @@ def _get_lru_cache_decorator(maxsize: int = 10000) -> Callable:
     return functools.lru_cache(maxsize=maxsize)
 
 
-# Configure the cached function dynamically
 def _get_cached_process_value() -> Callable[
     [int, bool, bool, bool, Any], Optional[Any]
 ]:
@@ -85,7 +87,6 @@ def _get_cached_process_value() -> Callable[
     Returns:
         Cached function for processing values
     """
-    # Get appropriate cache decorator
     lru_decorator = _get_lru_cache_decorator()
 
     @lru_decorator
@@ -96,23 +97,20 @@ def _get_cached_process_value() -> Callable[
         skip_null: bool,
         original_value: Any,
     ) -> Optional[Any]:
-        # Pass the original_value to _process_value, not the string representation
+        # Process original value, not the hash
         return _process_value(original_value, cast_to_string, include_empty, skip_null)
 
-    # Return the properly typed function
     return cast(Callable[[int, bool, bool, bool, Any], Optional[Any]], _cached_func)
 
 
-# Store the cached function
+# Global cached function
 _process_value_cached = _get_cached_process_value()
 
 
 def refresh_cache_config() -> None:
     """Refresh the cache configuration based on current settings."""
     global _process_value_cached
-    # Clear existing cache
     clear_caches()
-    # Replace with newly configured cache
     _process_value_cached = _get_cached_process_value()
 
 
@@ -136,7 +134,7 @@ def _process_value_wrapper(
         cast_to_string: Whether to cast to string
         include_empty: Whether to include empty strings
         skip_null: Whether to skip null values
-        context: Cache context (kept for backwards compatibility)
+        context: Cache context
 
     Returns:
         Processed value or None if it should be skipped
@@ -148,20 +146,18 @@ def _process_value_wrapper(
     # Check if caching is enabled in settings
     cache_enabled = getattr(settings, "cache_enabled", True)
 
-    # For simple scalars, use caching if enabled
+    # Cache simple scalar values
     if cache_enabled and isinstance(value, (int, float, bool, str)):
         try:
-            # Create a hash of the value for caching
             value_hash = hash(value)
-            # Pass both the hash (for cache key) and the original value (for processing)
             return _process_value_cached(
                 value_hash, cast_to_string, include_empty, skip_null, value
             )
         except (TypeError, ValueError):
-            # If value can't be hashed, process directly
+            # Fall back to direct processing for unhashable values
             return _process_value(value, cast_to_string, include_empty, skip_null)
 
-    # For complex objects or if caching is disabled, process directly without caching
+    # Process complex objects directly
     return _process_value(value, cast_to_string, include_empty, skip_null)
 
 
@@ -231,21 +227,14 @@ def _flatten_json_core(
         return {}
 
     try:
-        # Initialize result - either a new dict or use the input data
+        # Initialize result based on in-place flag
         if in_place and isinstance(data, dict):
             result = data
-            # Create a copy of the keys to safely iterate while modifying
             keys_to_process = list(data.keys())
-
-            # Store items to remove after processing
-            # (instead of removing during iteration)
             keys_to_remove: list[str] = []
         else:
             result = {}
-            # For non-in-place, we can directly use the keys
             keys_to_process = list(data.keys())
-            # We don't need to track keys to remove for non-in-place operation
-            # but we'll initialize the variable for consistency
             keys_to_remove = []
 
         # Prepare abbreviation dictionary
@@ -253,25 +242,23 @@ def _flatten_json_core(
         if abbreviate_field_names and custom_abbreviations:
             abbreviation_dict = custom_abbreviations.copy()
 
-        # Track complex objects that need to be removed for in-place processing
+        # Track complex objects for in-place processing
         complex_keys_to_remove = []
 
         # Process each key in the dictionary
         for key in keys_to_process:
             value = data[key]
 
-            # Skip special keys - often used for metadata or internal purposes
+            # Skip special keys (metadata or internal)
             if key.startswith("__"):
                 if in_place:
                     result[key] = value
                 continue
 
-            # Create sanitized key name while preserving underscores
-            # Only replace the separator if it's different from underscores
+            # Create sanitized key name
             if separator != "_":
                 sanitized_key = sanitize_name(key, separator, "_")
             else:
-                # If separator is already underscore, preserve it
                 sanitized_key = sanitize_name(
                     key, separator, "_", preserve_separator=True
                 )
@@ -282,7 +269,7 @@ def _flatten_json_core(
             else:
                 new_key = sanitized_key
 
-            # Update path components if using optimization
+            # Update path components for optimization
             if path_parts_optimization and path_parts is not None:
                 current_path_parts = path_parts + [sanitized_key]
             else:
@@ -290,9 +277,8 @@ def _flatten_json_core(
 
             # Handle nested dictionaries
             if isinstance(value, dict):
-                # Check if we're at the max depth before recursing further
+                # At max depth, treat as scalar
                 if max_depth is not None and current_depth >= max_depth:
-                    # At max depth, include the object itself instead of recursing
                     processed_value = _process_value_wrapper(
                         value,
                         cast_to_string=cast_to_string,
@@ -315,8 +301,7 @@ def _flatten_json_core(
                         else:
                             result[new_key] = processed_value
                 elif len(value) == 0:
-                    # Special case: empty dictionary - can be handled as a scalar
-                    # This is common in JSON APIs where empty objects are placeholders
+                    # Empty dictionary - treat as scalar
                     processed_value = _process_value_wrapper(
                         {},
                         cast_to_string=cast_to_string,
@@ -339,7 +324,7 @@ def _flatten_json_core(
                         else:
                             result[new_key] = processed_value
                 else:
-                    # Recursively flatten the nested dictionary
+                    # Recursively flatten nested dictionary
                     nested_result = flatten_func(
                         value,
                         separator=separator,
@@ -363,24 +348,21 @@ def _flatten_json_core(
                         recovery_strategy=recovery_strategy,
                     )
 
-                    # Add the flattened results to our result dict
+                    # Add flattened results to result dict
                     for nested_key, nested_value in nested_result.items():
                         result[nested_key] = nested_value
 
-                # For in-place modification, mark the original key for removal
+                # Mark for removal if in-place
                 if in_place:
-                    # Only remove complex objects after flattening them
                     complex_keys_to_remove.append(key)
 
             # Handle arrays
             elif isinstance(value, list):
                 if visit_arrays and len(value) > 0:
-                    # If visit_arrays is True, recursively flatten array items
-
                     # Process each item in the array
                     for i, item in enumerate(value):
                         if isinstance(item, dict):
-                            # Flatten dictionaries within the array
+                            # Flatten dictionaries within array
                             item_key = f"{new_key}{separator}{i}"
                             item_path_parts = (
                                 current_path_parts + [str(i)]
@@ -388,7 +370,7 @@ def _flatten_json_core(
                                 else None
                             )
 
-                            # Recursively flatten the array item
+                            # Flatten array item
                             flattened_item = flatten_func(
                                 item,
                                 separator=separator,
@@ -412,14 +394,14 @@ def _flatten_json_core(
                                 recovery_strategy=recovery_strategy,
                             )
 
-                            # Add index to each key to disambiguate
+                            # Add index to each key
                             for flat_key, flat_value in flattened_item.items():
                                 base_key = flat_key.replace(item_key, new_key)
                                 indexed_key = f"{base_key}{separator}idx{i}"
                                 result[indexed_key] = flat_value
 
                         else:
-                            # For primitive array values, add directly with index
+                            # Add primitive array values with index
                             processed_value = _process_value_wrapper(
                                 item,
                                 cast_to_string=cast_to_string,
@@ -444,7 +426,7 @@ def _flatten_json_core(
                                     result[item_key] = processed_value
 
                 elif not skip_arrays:
-                    # If not skipping arrays, add the raw array
+                    # Keep raw array if not skipping
                     processed_value = _process_value_wrapper(
                         value,
                         cast_to_string=cast_to_string,
@@ -467,12 +449,12 @@ def _flatten_json_core(
                         else:
                             result[new_key] = processed_value
 
-                # For in-place modification, mark the original key for removal
+                # Mark for removal if in-place
                 if in_place:
                     complex_keys_to_remove.append(key)
 
             else:
-                # Handle primitive values
+                # Process primitive values
                 processed_value = _process_value_wrapper(
                     value,
                     cast_to_string=cast_to_string,
@@ -495,13 +477,11 @@ def _flatten_json_core(
                     else:
                         result[new_key] = processed_value
 
-                    # For in-place processing, mark the original key for removal
-                    # since we've moved it to a new key
+                    # Mark for removal if key changed and in-place
                     if in_place and key != new_key:
                         keys_to_remove.append(key)
 
-        # For in-place processing, remove the original keys that we've processed
-        # We need to do this after all processing to avoid changing during iteration
+        # Remove processed keys for in-place modification
         if in_place:
             for key in complex_keys_to_remove:
                 if key in data:
@@ -514,17 +494,16 @@ def _flatten_json_core(
         return result
 
     except Exception as e:
-        # Try recovery if strategy provided
+        # Attempt recovery if strategy provided
         if recovery_strategy and hasattr(recovery_strategy, "recover"):
             try:
-                # Gather path information for error context
+                # Get path for error context
                 current_path = []
                 if path_parts:
                     current_path = list(path_parts)
                 elif parent_path:
                     current_path = parent_path.split(separator)
 
-                # Try to recover
                 recovery_result = recovery_strategy.recover(
                     e, path=current_path, entity_name=None
                 )
@@ -588,7 +567,7 @@ def flatten_json(
     Returns:
         Flattened JSON data
     """
-    # Use global defaults from settings if not specified
+    # Load defaults from settings
     if separator is None:
         separator = settings.get("separator", "_")
 
@@ -622,12 +601,11 @@ def flatten_json(
     if max_depth is None:
         max_depth = settings.get("max_depth", 100)
 
-    # Initialize path parts from parent path if not provided
-    # This is an optimization to avoid repeated string splitting
+    # Optimize path parts handling
     if path_parts is None and path_parts_optimization:
         path_parts = parent_path.split(separator) if parent_path else []
 
-    # Use a recursive implementation
+    # Execute core flattening logic
     return _flatten_json_core(
         data=data,
         separator=separator,

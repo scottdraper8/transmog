@@ -14,6 +14,7 @@ from typing import (
     Protocol,
     TypeVar,
     Union,
+    cast,
 )
 
 from ..config import ProcessingMode, TransmogConfig
@@ -91,6 +92,10 @@ class DataIterator(Protocol[T_co]):
 
     def __iter__(self) -> Iterator[T_co]: ...
     def __next__(self) -> T_co: ...
+
+
+# Define return type variable for the decorator's generic type
+R = TypeVar("R")
 
 
 class Processor:
@@ -261,12 +266,14 @@ class Processor:
             raise ConfigurationError(f"Unsupported data type: {type(data)}")
 
         # Process using selected strategy
-        return strategy.process(
+        processed_result = strategy.process(
             data,
             entity_name=entity_name,
             extract_time=extract_time,
             result=result,
         )
+
+        return cast(ProcessingResult, processed_result)
 
     @error_context("Failed to process batch", log_exceptions=True)
     def process_batch(
@@ -291,7 +298,7 @@ class Processor:
         if getattr(self.config.cache_config, "clear_after_batch", False):
             self.clear_cache()
 
-        return result
+        return cast(ProcessingResult, result)
 
     def process_file(
         self,
@@ -636,7 +643,6 @@ class Processor:
                 except Exception as e:
                     # If estimation fails, log and default to standard mode
                     logger.debug(f"Error estimating memory requirements: {e}")
-                    # Default to standard mode
 
         # Default to the configured processing mode
         return self.config.processing.processing_mode
@@ -701,38 +707,68 @@ class Processor:
                 params["recovery_strategy"] = recovery_strategy
 
         # Choose the appropriate strategy for this data
+        processing_result: ProcessingResult
+
         if memory_mode == ProcessingMode.STANDARD:
             # For standard mode, process in memory with the InMemoryStrategy
             processing_strategy = InMemoryStrategy(self.config)
+            result = processing_strategy.process(
+                data,
+                entity_name=entity_name,
+                extract_time=extract_time,
+                config=self.config,
+                params=params,
+            )
+            processing_result = cast(ProcessingResult, result)
+
         elif memory_mode == ProcessingMode.LOW_MEMORY:
             # For memory-optimized mode, use the BatchStrategy with a smaller batch size
             batch_strategy = BatchStrategy(self.config)
-            return batch_strategy.process(
+            result = batch_strategy.process(
                 data if isinstance(data, list) else list(data),
                 entity_name=entity_name,
                 extract_time=extract_time,
                 config=self.config,
                 params=params,
             )
+            processing_result = cast(ProcessingResult, result)
+
         elif memory_mode == ProcessingMode.HIGH_PERFORMANCE:
             # For large datasets, use chunked processing with larger batches
             if isinstance(data, list) and len(data) > self.config.processing.batch_size:
-                return BatchStrategy(self.config)
-
-            # Default to in-memory strategy
-            processing_strategy = InMemoryStrategy(self.config)
+                batch_strategy = BatchStrategy(self.config)
+                result = batch_strategy.process(
+                    data,
+                    entity_name=entity_name,
+                    extract_time=extract_time,
+                    config=self.config,
+                    params=params,
+                )
+                processing_result = cast(ProcessingResult, result)
+            else:
+                # Default to in-memory strategy
+                processing_strategy = InMemoryStrategy(self.config)
+                result = processing_strategy.process(
+                    data,
+                    entity_name=entity_name,
+                    extract_time=extract_time,
+                    config=self.config,
+                    params=params,
+                )
+                processing_result = cast(ProcessingResult, result)
         else:
             # Default to InMemoryStrategy for other modes
             processing_strategy = InMemoryStrategy(self.config)
+            result = processing_strategy.process(
+                data,
+                entity_name=entity_name,
+                extract_time=extract_time,
+                config=self.config,
+                params=params,
+            )
+            processing_result = cast(ProcessingResult, result)
 
-        # Process the data with the chosen strategy (for standard mode and default)
-        return processing_strategy.process(
-            data,
-            entity_name=entity_name,
-            extract_time=extract_time,
-            config=self.config,
-            params=params,
-        )
+        return processing_result
 
     def process_to_format(
         self,
@@ -767,15 +803,18 @@ class Processor:
             memory_mode = self.config.processing.processing_mode
 
         # Process the data
+        result: ProcessingResult
         if isinstance(data, (str, bytes)) and os.path.isfile(data):
             # For file paths, use file processing methods
-            result = process_file(self, data, entity_name, extract_time)
+            processed_result = process_file(self, data, entity_name, extract_time)
+            result = cast(ProcessingResult, processed_result)
         else:
             # Process in memory with appropriate mode
             data_iterator = get_data_iterator(self, data)
-            result = self._process_data(
+            processed_result = self._process_data(
                 list(data_iterator), entity_name, extract_time, memory_mode
             )
+            result = cast(ProcessingResult, processed_result)
 
         # Write to output format if path is specified
         if output_path:
@@ -783,8 +822,7 @@ class Processor:
             os.makedirs(output_path, exist_ok=True)
 
             # Write to the specified format
-            if result is not None:
-                result.write(output_format, output_path, **format_options)
+            result.write(output_format, output_path, **format_options)
 
         return result
 
@@ -815,9 +853,10 @@ class Processor:
         """
         # Create batch strategy and process
         strategy = BatchStrategy(self.config)
-        return strategy.process(
+        result = strategy.process(
             batch_data, entity_name=entity_name, extract_time=extract_time
         )
+        return cast(ProcessingResult, result)
 
     def _configure_cache(self) -> None:
         """Configure the processor's cache settings."""
@@ -854,8 +893,6 @@ class Processor:
         Returns:
             Appropriate processing strategy for the data
         """
-        # Get recovery strategy
-
         # Determine strategy based on mode
         if mode == ProcessingMode.LOW_MEMORY:
             # For large datasets, use chunked processing

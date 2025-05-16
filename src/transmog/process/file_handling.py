@@ -9,12 +9,17 @@ from collections.abc import Generator
 from typing import (
     Any,
     Optional,
+    TypeVar,
     Union,
+    cast,
 )
 
 from ..error import error_context, logger
 from .result import ProcessingResult
 from .strategy import CSVStrategy, FileStrategy
+
+# Define a return type variable for the decorator's generic type
+R = TypeVar("R")
 
 
 @error_context("Failed to process file", log_exceptions=True)
@@ -35,10 +40,8 @@ def process_file(
     Returns:
         ProcessingResult containing processed data
     """
-    # Determine file type based on extension
     file_ext = os.path.splitext(file_path)[1].lower()
 
-    # Create the appropriate strategy
     if file_ext == ".csv":
         csv_strategy = CSVStrategy(processor.config)
         processed_result = csv_strategy.process(
@@ -50,8 +53,7 @@ def process_file(
             file_path, entity_name=entity_name, extract_time=extract_time
         )
 
-    # Return the processed result
-    return processed_result
+    return cast(ProcessingResult, processed_result)
 
 
 @error_context("Failed to process file", log_exceptions=True)
@@ -80,11 +82,9 @@ def process_file_to_format(
     Returns:
         ProcessingResult containing processed data
     """
-    # Determine if we should use streaming based on file size
-    if os.path.getsize(file_path) > 100 * 1024 * 1024:  # 100 MB
-        # For large files, stream directly to output format if possible
+    # Use streaming for files larger than 100 MB
+    if os.path.getsize(file_path) > 100 * 1024 * 1024:
         try:
-            # Create output directory if it doesn't exist
             if output_path:
                 os.makedirs(output_path, exist_ok=True)
 
@@ -101,7 +101,7 @@ def process_file_to_format(
                 **format_options,
             )
 
-            # Return a minimal ProcessingResult for API compatibility
+            # Return minimal result object for API compatibility
             result = ProcessingResult(
                 main_table=[],
                 child_tables={},
@@ -117,18 +117,13 @@ def process_file_to_format(
                 f"{error_message}"
             )
 
-    # Normal processing - this will always return a valid ProcessingResult
     processed_result = process_file(processor, file_path, entity_name, extract_time)
 
-    # Write to output format if path is specified
     if output_path:
-        # Create output directory if it doesn't exist
         os.makedirs(output_path, exist_ok=True)
-
-        # Write to the specified format
         processed_result.write(output_format, output_path, **format_options)
 
-    return processed_result
+    return cast(ProcessingResult, processed_result)
 
 
 def detect_input_format(file_path: str) -> str:
@@ -187,7 +182,7 @@ def process_csv(
         ProcessingResult containing processed data
     """
     strategy = CSVStrategy(processor.config)
-    # Create a result object first to ensure we don't return None
+    # Initialize result object with empty structures
     result = ProcessingResult(
         main_table=[],
         child_tables={},
@@ -195,8 +190,7 @@ def process_csv(
     )
     result.source_info["file_path"] = file_path
 
-    # Process the file
-    return strategy.process(
+    processed_result = strategy.process(
         file_path,
         entity_name=entity_name,
         extract_time=extract_time,
@@ -211,6 +205,8 @@ def process_csv(
         encoding=encoding,
         chunk_size=chunk_size,
     )
+
+    return cast(ProcessingResult, processed_result)
 
 
 @error_context("Failed to process in chunks", log_exceptions=True)
@@ -239,17 +235,15 @@ def process_chunked(
     """
     from .strategy import ChunkedStrategy
 
-    # Create a chunked strategy with the processor's config
     chunked_strategy = ChunkedStrategy(processor.config)
 
-    # Create result object
     result = ProcessingResult(
         main_table=[],
         child_tables={},
         entity_name=entity_name,
     )
 
-    # Convert data to expected format for ChunkedStrategy
+    # Convert input data to appropriate format for processing
     processed_data: Union[list[dict[str, Any]], Generator[dict[str, Any], None, None]]
 
     if isinstance(data, list) and all(isinstance(item, dict) for item in data):
@@ -257,24 +251,21 @@ def process_chunked(
     elif isinstance(data, dict):
         processed_data = [data]
     elif isinstance(data, (str, bytes)):
-        # If it's a string, treat it as a file path if it exists
+        # Process file path if data is a string and the file exists
         if isinstance(data, str) and os.path.exists(data):
-            # Use FileStrategy to properly process the file
             file_strategy = FileStrategy(processor.config)
             file_result = file_strategy.process(
                 data, entity_name=entity_name, extract_time=extract_time
             )
-            # Return the processed file directly
-            return file_result
+            return cast(ProcessingResult, file_result)
         else:
-            # If not a file path, create a single record with the raw data
+            # Treat non-file path strings/bytes as raw data
             processed_data = [{"raw_data": str(data)}]
     else:
-        # Fallback for any other type
+        # Generic fallback for unsupported data types
         processed_data = [{"raw_data": str(data)}]
 
-    # Process with the chunked strategy
-    return chunked_strategy.process(
+    processed_result = chunked_strategy.process(
         processed_data,
         entity_name=entity_name,
         extract_time=extract_time,
@@ -283,3 +274,5 @@ def process_chunked(
         input_format=input_format,
         **format_options,
     )
+
+    return cast(ProcessingResult, processed_result)

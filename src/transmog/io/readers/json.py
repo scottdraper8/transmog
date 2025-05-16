@@ -10,7 +10,7 @@ import os
 from collections.abc import Generator
 from typing import Any, Optional, Union, cast
 
-# Try to import optional high-performance JSON libraries
+# Optional high-performance JSON library import
 try:
     import orjson
 
@@ -116,7 +116,7 @@ class JsonlReader:
         Returns:
             List of parsed JSON records
         """
-        # Fixing return type: ensure this always returns list[dict[str, Any]]
+        # Ensure return type is always list[dict[str, Any]]
         result = parse_json_data(data, format_hint="jsonl")
         if isinstance(result, dict):
             return [result]
@@ -142,7 +142,7 @@ def read_json_file(file_path: str) -> Union[dict[str, Any], list[dict[str, Any]]
     with open(file_path, "rb") as f:
         content = f.read()
 
-    # Try to use the most efficient JSON parser available
+    # Use the most efficient JSON parser available
     if ORJSON_AVAILABLE:
         parsed_content: Union[dict[str, Any], list[dict[str, Any]]] = orjson.loads(
             content
@@ -200,13 +200,13 @@ def detect_json_format(content: str) -> str:
     Returns:
         "json" for regular JSON, "jsonl" for JSON Lines
     """
-    # If there are multiple lines with JSON objects, it's likely JSONL
+    # Check for JSONL format (multiple JSON objects on separate lines)
     content = content.strip()
     if "\n" in content:
-        # Check if we have JSON objects on separate lines
+        # Check for JSON objects on separate lines
         lines = [line.strip() for line in content.split("\n") if line.strip()]
 
-        # Consider it JSONL if first two non-empty lines start with {
+        # Consider it JSONL if first few non-empty lines start with { and end with }
         valid_lines = 0
         for line in lines[:5]:  # Check first 5 non-empty lines
             if line.startswith("{") and (line.endswith("}") or "}" in line):
@@ -256,7 +256,6 @@ def parse_json_data(
                     record = json.loads(line)
                 records.append(cast(dict[str, Any], record))
             except json.JSONDecodeError as e:
-                # Properly annotate this to ensure it doesn't return Any
                 raise json.JSONDecodeError(
                     f"Invalid JSON on line {line_num}: {e.msg}", e.doc, e.pos
                 ) from e
@@ -274,7 +273,6 @@ def parse_json_data(
                 parsed_data = json.loads(data)
                 return cast(Union[dict[str, Any], list[dict[str, Any]]], parsed_data)
         except json.JSONDecodeError as e:
-            # Properly annotate this to ensure it doesn't return Any
             raise json.JSONDecodeError(f"Invalid JSON: {e.msg}", e.doc, e.pos) from e
 
 
@@ -302,13 +300,12 @@ def read_json_stream(
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"File not found: {file_path}")
 
-    # First, determine the format by looking at the beginning of the file
+    # Determine format by examining file beginning
     with open(file_path) as f:
-        # Read just enough to determine the format
         header = f.read(1024)
         format_type = detect_json_format(header)
 
-    # Now process the file according to its format
+    # Process file according to its format
     if format_type == "jsonl":
         # Process as JSONL (Line-delimited JSON)
         with open(file_path) as f:
@@ -329,7 +326,6 @@ def read_json_stream(
                         yield buffer
                         buffer = []
                 except json.JSONDecodeError as e:
-                    # Enhance error message with line information
                     raise json.JSONDecodeError(
                         f"Invalid JSON in file {file_path}: {e.msg}", e.doc, e.pos
                     ) from e
@@ -339,11 +335,9 @@ def read_json_stream(
                 yield buffer
     else:
         # Process as standard JSON (assuming an array of objects)
-        # For large files, this loads the entire content at once
-        # Future improvement: implement streaming JSON parser for large files
         result: Union[dict[str, Any], list[dict[str, Any]]] = read_json_file(file_path)
 
-        # Ensure we're working with a list of records
+        # Ensure working with a list of records
         records: list[dict[str, Any]] = []
         if isinstance(result, dict):
             records = [result]

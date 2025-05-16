@@ -27,11 +27,11 @@ from transmog.error.exceptions import (
     ValidationError,
 )
 
-# Optional dependency on recovery strategies
+# Load recovery strategy with fallback placeholder
 try:
     from ..error.recovery import RecoveryStrategy
 except (ImportError, ModuleNotFoundError):
-    # Define a placeholder for type hints
+    # Placeholder class for type hinting
     class RecoveryStrategy:  # type: ignore
         """Placeholder for RecoveryStrategy."""
 
@@ -42,7 +42,7 @@ except (ImportError, ModuleNotFoundError):
 T = TypeVar("T")
 R = TypeVar("R")
 
-# Setup module logger
+# Module logger
 logger = logging.getLogger(__name__)
 
 
@@ -58,7 +58,7 @@ def setup_logging(
         log_file: Optional file path for log output
         log_format: Optional custom log format
     """
-    # Use a reasonable default format if none specified
+    # Default format based on output destination
     if log_format is None:
         log_format = (
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -66,25 +66,25 @@ def setup_logging(
             else "%(levelname)s: %(message)s"
         )
 
-    # Configure basic logger
+    # Configure logger
     logger = logging.getLogger("transmog")
     logger.setLevel(level)
 
-    # Remove existing handlers
+    # Clear existing handlers
     if logger.handlers:
         for handler in logger.handlers[:]:
             logger.removeHandler(handler)
 
-    # Create handlers based on configuration
+    # Handler collection
     handlers: list[Union[StreamHandler, FileHandler]] = []
 
-    # Console handler always added
+    # Add console handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(level)
     console_handler.setFormatter(logging.Formatter(log_format))
     handlers.append(console_handler)
 
-    # File handler if specified
+    # Add file handler if specified
     if log_file:
         try:
             file_handler = logging.FileHandler(log_file)
@@ -94,11 +94,11 @@ def setup_logging(
         except Exception as e:
             logger.warning(f"Failed to create log file at {log_file}: {e}")
 
-    # Add all handlers
+    # Register all handlers
     for handler in handlers:
         logger.addHandler(handler)
 
-    # Log setup completion
+    # Confirm configuration
     logger.debug(f"Logging configured with level {level}")
 
 
@@ -125,11 +125,11 @@ def safe_json_loads(s: Union[str, bytes]) -> Any:
         # Handle string input
         return json.loads(s)
     except json.JSONDecodeError as e:
-        # Provide detailed error context
+        # Add position context for errors
         line_col = f"line {e.lineno}, column {e.colno}" if hasattr(e, "lineno") else ""
         raise ParsingError(f"Invalid JSON format at {line_col}: {str(e)}") from e
     except Exception as e:
-        # Generic fallback
+        # Generic error handler
         raise ParsingError(f"JSON parsing error: {str(e)}") from e
 
 
@@ -205,7 +205,7 @@ def error_context(
     Returns:
         Decorated function
     """
-    # Default wrapper uses ProcessingError if not specified
+    # Default to ProcessingError if no wrapper provided
     if wrap_as is None:
 
         def wrap_as(e: Exception) -> ProcessingError:
@@ -217,7 +217,7 @@ def error_context(
             try:
                 return func(*args, **kwargs)
             except Exception as e:
-                # Format the error message with function info
+                # Create detailed error message
                 func_name = func.__qualname__
                 arg_str = ", ".join(
                     [str(a) for a in args] + [f"{k}={v}" for k, v in kwargs.items()]
@@ -227,7 +227,7 @@ def error_context(
 
                 error_msg = f"{context_message} in {func_name}({arg_str}): {str(e)}"
 
-                # Log the exception if requested
+                # Log based on configuration
                 if log_exceptions:
                     logger.error(error_msg)
                     if not isinstance(e, TransmogError):
@@ -237,31 +237,27 @@ def error_context(
                             )
                         )
 
-                # Try recovery if recovery strategy is available
+                # Attempt recovery if strategy exists
                 recovery_strategy = kwargs.get("recovery_strategy")
                 if recovery_strategy and hasattr(recovery_strategy, "recover"):
-                    # Get current path parts if available for better error context
+                    # Extract path context for recovery
                     path = kwargs.get("path_parts", [])
                     if "parent_path" in kwargs and not path and kwargs["parent_path"]:
-                        # Try to extract path from parent_path using separator
                         separator = kwargs.get("separator", "_")
                         path = kwargs["parent_path"].split(separator)
 
                     try:
-                        # Try generic recovery with path context
                         recovery_result = recovery_strategy.recover(e, path=path)
                         return cast(R, recovery_result)
                     except Exception as re:
-                        # If recovery fails, continue with normal error handling
                         logger.warning(f"Recovery failed: {str(re)}")
 
-                # Wrap exception and handle reraising
+                # Process exception
                 new_exception = wrap_as(e)
                 if hasattr(new_exception, "__cause__"):
                     new_exception.__cause__ = e
                 if reraise:
                     raise new_exception from e
-                # Return None when not reraising
                 return None
 
         return wrapper
@@ -305,7 +301,7 @@ def try_with_recovery(
         if recovery_func:
             return recovery_func(e)
 
-        # If no recovery is possible, re-raise the exception
+        # No recovery options available
         raise
 
 
@@ -348,7 +344,7 @@ def validate_input(
             f"{param_name} must be of type {expected_type_name}, got {actual_type}"
         )
 
-    # Additional validation if provided
+    # Run custom validation
     if validation_func:
         is_valid, error_msg = validation_func(data)
         if not is_valid:
