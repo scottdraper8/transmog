@@ -22,6 +22,22 @@ The documentation is organized into a hierarchical structure:
   - **Intermediate** (`/tutorials/intermediate/`) - More complex use cases
   - **Advanced** (`/tutorials/advanced/`) - Advanced techniques and optimizations
 
+## Development Setup
+
+The easiest way to set up a development environment is to use the provided setup script:
+
+```bash
+python scripts/setup_dev.py
+```
+
+This script:
+1. Creates and activates a virtual environment
+2. Installs development dependencies
+3. Sets up pre-commit hooks
+4. Prepares the documentation environment
+5. Creates required directories for benchmarks
+6. Validates dependencies
+
 ## Building the Documentation
 
 The documentation is built using [Sphinx](https://www.sphinx-doc.org/) with the MyST parser for Markdown support.
@@ -34,33 +50,23 @@ To build the documentation:
 pip install -r docs/requirements.txt
 ```
 
-1. Build the documentation:
+2. Build the documentation:
 
 ```bash
 cd docs
 make html
 ```
 
-1. View the built documentation:
+3. View the built documentation:
 
 ```bash
 open _build/html/index.html
 ```
 
-## Documentation Status
-
-The documentation is currently undergoing a major restructuring. The new structure is in place, but there
-are still several tasks remaining:
-
-- **Content Migration**: Moving content from the old flat structure to the new hierarchical structure
-- **Content Validation**: Ensuring all examples and API references are accurate
-- **Style Standardization**: Updating content to follow consistent tone and style guidelines
-- **Final Testing**: Testing all examples and tutorials
-
 ## Contributing to Documentation
 
-Please see the [CONTRIBUTING.md](https://github.com/scottdraper8/transmog/blob/main/CONTRIBUTING.md)
-file for guidelines on contributing to the documentation.
+Please see the [CONTRIBUTING.md](https://github.com/scottdraper8/transmog/blob/main/CONTRIBUTING.md) file 
+for guidelines on contributing to the documentation.
 
 ## Documentation Map
 

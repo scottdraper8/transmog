@@ -6,7 +6,7 @@
 >
 > **Related Guides**:
 >
-> - [Streaming Guide](../advanced/streaming.md) - For streaming processing techniques
+> - [Streaming Guide](../../user/advanced/streaming.md) - For streaming processing techniques
 > - [File Processing Guide](file-processing.md) - For file-specific processing options
 
 This guide provides a comprehensive overview of Transmog's processing capabilities, combining core concepts

@@ -34,6 +34,24 @@ pip install transmog[dev]
 
 Includes tools for testing, development, and linting.
 
+#### Development Setup Script
+
+The easiest way to set up a complete development environment is to use the provided setup script:
+
+```bash
+python scripts/setup_dev.py
+```
+
+This script automates the development setup process by:
+1. Creating and activating a virtual environment
+2. Checking Python version compatibility
+3. Installing development dependencies
+4. Setting up pre-commit and pre-push hooks
+5. Running pre-commit hooks against all files
+6. Setting up documentation dependencies and testing the build
+7. Validating optional dependencies for performance optimization
+8. Creating required directories for benchmarks and documentation
+
 ### Full Installation
 
 Install all optional dependencies:
@@ -143,4 +161,4 @@ pip install --no-cache-dir transmog
 
 ## Next Steps
 
-After installation, see the [Getting Started Guide](user/essentials/getting-started.md).
+After installation, see the [Getting Started Guide](./user/essentials/getting-started.md).
