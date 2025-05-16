@@ -112,7 +112,9 @@ updated_processor = processor.with_metadata(
 
 # Create a new processor with updated error handling settings
 updated_processor = processor.with_error_handling(
-    recovery_strategy="skip"
+    recovery_strategy="skip",
+    allow_malformed_data=True,
+    max_retries=3
 )
 
 # Create a new processor with updated caching settings

@@ -377,8 +377,9 @@ Create a new processor with updated error handling settings.
 ```python
 with_error_handling(
     recovery_strategy: str = "strict",
-    log_errors: bool = True,
-    max_errors: Optional[int] = None
+    allow_malformed_data: bool = False,
+    max_retries: int = 3,
+    error_log_path: Optional[str] = None
 ) -> Processor
 ```
 
@@ -387,14 +388,15 @@ with_error_handling(
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | recovery_strategy | str | "strict" | Recovery strategy ("strict", "skip", "partial") |
-| log_errors | bool | True | Whether to log errors |
-| max_errors | int | None | Maximum number of errors before failing |
+| allow_malformed_data | bool | False | Whether to allow malformed data |
+| max_retries | int | 3 | Maximum number of retry attempts |
+| error_log_path | Optional[str] | None | Path to write error logs to (None for no logging) |
 
 #### Example
 
 ```python
 # Create a processor that skips records with errors
-processor = processor.with_error_handling(recovery_strategy="skip", max_errors=100)
+processor = processor.with_error_handling(recovery_strategy="skip", allow_malformed_data=True)
 
 # Process data that may contain errors
 result = processor.process(data_with_errors, entity_name="records")

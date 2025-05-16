@@ -59,18 +59,22 @@ Error handling configuration using the `ErrorHandlingConfig` class:
 import transmog as tm
 
 # Create a configuration with error handling settings
+processor = tm.Processor().with_error_handling(
+    recovery_strategy="skip",
+    allow_malformed_data=True,
+    max_retries=3
+)
+
+# Or with the fluent API during creation
 config = (
     tm.TransmogConfig.default()
     .with_error_handling(
-        allow_malformed_data=True,  # Allow malformed data
-        recovery_strategy="skip",   # "strict", "skip", or "partial"
-        max_retries=3,             # Maximum retry attempts
-        error_log_path="errors.log" # Path for error logging
+        recovery_strategy="skip",
+        allow_malformed_data=True,
+        max_retries=3,
+        error_log_path="errors.log"
     )
 )
-
-# Use the configuration
-processor = tm.Processor(config=config)
 ```
 
 ## Recovery Strategy Classes

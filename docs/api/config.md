@@ -243,8 +243,9 @@ class ProcessingConfig:
     include_empty: bool = False
     skip_null: bool = True
     max_nesting_depth: Optional[int] = None
+    max_depth: int = 100  # Maximum recursion depth
     path_parts_optimization: bool = True
-    visit_arrays: bool = False
+    visit_arrays: bool = True
     batch_size: int = 1000
     processing_mode: ProcessingMode = ProcessingMode.STANDARD
 ```
@@ -255,8 +256,9 @@ class ProcessingConfig:
 - **include_empty** (`bool`, default: `False`): Whether to include empty values.
 - **skip_null** (`bool`, default: `True`): Whether to skip null values.
 - **max_nesting_depth** (`Optional[int]`, default: `None`): Maximum nesting depth (None for unlimited).
+- **max_depth** (`int`, default: `100`): Maximum recursion depth for nested structures.
 - **path_parts_optimization** (`bool`, default: `True`): Whether to optimize path handling.
-- **visit_arrays** (`bool`, default: `False`): Whether to process arrays as separate tables.
+- **visit_arrays** (`bool`, default: `True`): Whether to process arrays as separate tables.
 - **batch_size** (`int`, default: `1000`): Batch size for processing.
 - **processing_mode** (`ProcessingMode`, default: `ProcessingMode.STANDARD`): Processing mode.
 
