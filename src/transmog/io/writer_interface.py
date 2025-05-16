@@ -1,63 +1,115 @@
-"""
-Writer interface for Transmog output formats.
+"""Writer interfaces for Transmog.
 
-This module defines the interface that all format writers must implement.
+This module defines abstract base classes for data writers.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, BinaryIO, Optional, TextIO, Union
+
+from typing_extensions import Literal
+
+from transmog.types.base import JsonDict
+from transmog.types.io_types import StreamingWriterProtocol, WriterProtocol
 
 
-class DataWriter(ABC):
-    """Interface for data writers that output ProcessingResult data to various formats."""
+class DataWriter(ABC, WriterProtocol):
+    """Abstract base class for data writers.
 
-    @classmethod
-    @abstractmethod
-    def format_name(cls) -> str:
-        """Return the name of the format this writer handles."""
-        pass
-
-    @classmethod
-    @abstractmethod
-    def is_available(cls) -> bool:
-        """Check if this writer's dependencies are available."""
-        pass
+    Data writers handle writing processed data to various output formats.
+    """
 
     @abstractmethod
-    def write_table(
-        self, table_data: List[Dict[str, Any]], output_path: str, **kwargs
-    ) -> str:
-        """Write a single table to the output format.
+    def write(
+        self, data: Any, destination: Union[str, BinaryIO], **options: Any
+    ) -> Any:
+        """Write data to the specified destination.
 
         Args:
-            table_data: List of records to write
-            output_path: Path to write the output file
-            **kwargs: Format-specific options
+            data: Data to write
+            destination: Path or file-like object to write to
+            **options: Format-specific options
 
         Returns:
-            Path to the written file
+            Format-specific result
         """
         pass
 
-    @abstractmethod
-    def write_all_tables(
+
+class StreamingWriter(ABC, StreamingWriterProtocol):
+    """Abstract base class for streaming writers.
+
+    Streaming writers handle writing data incrementally without
+    storing the entire dataset in memory.
+    """
+
+    def __init__(
         self,
-        main_table: List[Dict[str, Any]],
-        child_tables: Dict[str, List[Dict[str, Any]]],
-        base_path: str,
-        entity_name: str,
-        **kwargs,
-    ) -> Dict[str, str]:
-        """Write main and child tables to the output format.
+        destination: Optional[Union[str, BinaryIO, TextIO]] = None,
+        entity_name: str = "entity",
+        **options: Any,
+    ):
+        """Initialize the streaming writer.
 
         Args:
-            main_table: Main table data
-            child_tables: Dict of child table name to table data
-            base_path: Base directory for output
-            entity_name: Name of the main entity
-            **kwargs: Format-specific options
+            destination: Output destination (file path or file-like object)
+            entity_name: Name of the entity being processed
+            **options: Format-specific options
+        """
+        self.destination = destination
+        self.entity_name = entity_name
+        self.options = options
+        self.initialized = False
+        self.child_tables: dict[str, Any] = {}
 
-        Returns:
-            Dict mapping table names to output file paths
+    @abstractmethod
+    def write_main_records(self, records: list[JsonDict]) -> None:
+        """Write a batch of main records.
+
+        Args:
+            records: List of main table records to write
         """
         pass
+
+    @abstractmethod
+    def initialize_child_table(self, table_name: str) -> None:
+        """Initialize a child table for streaming.
+
+        Args:
+            table_name: Name of the child table
+        """
+        pass
+
+    @abstractmethod
+    def write_child_records(self, table_name: str, records: list[JsonDict]) -> None:
+        """Write a batch of child records.
+
+        Args:
+            table_name: Name of the child table
+            records: List of child records to write
+        """
+        pass
+
+    @abstractmethod
+    def finalize(self) -> None:
+        """Finalize the output.
+
+        This method is called after all data has been written.
+        """
+        pass
+
+    def close(self) -> None:
+        """Clean up resources and complete writing.
+
+        By default, calls finalize() to ensure proper resource cleanup.
+        This method is called as part of resource cleanup, typically in finally blocks.
+        """
+        self.finalize()
+
+    def __enter__(self) -> "StreamingWriter":
+        """Support for context manager protocol."""
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> Literal[False]:
+        """Finalize when exiting context."""
+        self.close()
+        return False  # Don't suppress exceptions

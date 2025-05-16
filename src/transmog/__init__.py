@@ -1,5 +1,4 @@
-"""
-Transmog: JSON to tabular normalization and flattening utility
+"""Transmog: JSON to tabular normalization and flattening utility.
 
 A library for transforming nested JSON structures into flattened formats
 with parent-child relationship preservation and metadata annotation.
@@ -7,102 +6,194 @@ with parent-child relationship preservation and metadata annotation.
 
 __version__ = "0.1.2.5"
 
-# Imports for use within the package itself
+# Import dependencies and features early to enable detection
+# Configuration functionality
+from transmog.config import (
+    ErrorHandlingConfig,
+    MetadataConfig,
+    NamingConfig,
+    ProcessingConfig,
+    ProcessingMode,
+    TransmogConfig,
+    configure,
+    extensions,
+    load_config,
+    load_profile,
+    settings,
+)
+from transmog.core.extractor import extract_arrays, stream_extract_arrays
+
+# Core functionality
 from transmog.core.flattener import flatten_json
-from transmog.core.extractor import extract_arrays
 from transmog.core.hierarchy import (
-    process_structure,
     process_record_batch,
     process_records_in_single_pass,
+    process_structure,
+    stream_process_records,
 )
 from transmog.core.metadata import (
-    generate_extract_id,
     annotate_with_metadata,
-    get_current_timestamp,
     create_batch_metadata,
+    generate_extract_id,
+    get_current_timestamp,
 )
-from transmog.naming.conventions import (
-    get_table_name,
-    sanitize_name,
-    get_standard_field_name,
+
+# Error handling and exceptions
+from transmog.error import (
+    DEFAULT,
+    LENIENT,
+    STRICT,
+    ConfigurationError,
+    FileError,
+    MissingDependencyError,
+    OutputError,
+    ParsingError,
+    PartialProcessingRecovery,
+    ProcessingError,
+    # Recovery strategies
+    RecoveryStrategy,
+    SkipAndLogRecovery,
+    StrictRecovery,
+    # Exceptions
+    TransmogError,
+    ValidationError,
+    # Error handling utilities
+    error_context,
+    setup_logging,
+    with_recovery,
 )
+
+# IO utilities
+from transmog.io import (
+    DataWriter,
+    FormatRegistry,
+    # Streaming writer interface
+    StreamingWriter,
+    create_streaming_writer,
+    create_writer,
+    detect_format,
+    get_supported_streaming_formats,
+    initialize_io_features,
+    is_streaming_format_available,
+)
+
+# Specific writer implementations
+from transmog.io.writers.parquet import ParquetStreamingWriter
 from transmog.naming.abbreviator import (
-    abbreviate_table_name,
     abbreviate_field_name,
+    abbreviate_table_name,
     get_common_abbreviations,
     merge_abbreviation_dicts,
 )
 
-# High-level processor class for one-step processing
-from transmog.processor import Processor, ProcessingResult
-
-# Configuration functionality
-from transmog.config import (
-    settings,
-    extensions,
-    load_profile,
-    load_config,
-    configure,
+# Naming utilities
+from transmog.naming.conventions import (
+    get_standard_field_name,
+    get_table_name,
+    sanitize_name,
 )
 
-# IO utilities - using lazy imports to avoid circular dependencies
-import importlib.util
-import logging
-from typing import List, Optional
+# High-level processor class for one-step processing
+from transmog.process import (
+    BatchStrategy,
+    ChunkedStrategy,
+    CSVStrategy,
+    FileStrategy,
+    InMemoryStrategy,
+    ProcessingResult,
+    ProcessingStrategy,
+    Processor,
+)
 
-logger = logging.getLogger(__name__)
+# For backwards compatibility, alias the DependencyManager
+# This ensures existing imports that use IoDependencyManager continue to work
+from .dependencies import DependencyManager, DependencyManager as IoDependencyManager
+from .features import Features
 
-# Track IO module availability
-_io_module_checked = False
-_io_module_available = False
-_writer_registry = None
+# Initialize IO features
+initialize_io_features()
 
-
-def _ensure_io_module():
-    """
-    Lazily import the IO module to avoid circular imports.
-
-    Returns:
-        bool: Whether the IO module is available
-    """
-    global _io_module_checked, _io_module_available, _writer_registry
-
-    if not _io_module_checked:
-        try:
-            # Use importlib for lazy loading
-            io_module = importlib.import_module("transmog.io")
-            _writer_registry = io_module.WriterRegistry
-            _io_module_available = True
-        except (ImportError, AttributeError):
-            _io_module_available = False
-
-        _io_module_checked = True
-
-    return _io_module_available
-
-
-def list_available_formats() -> List[str]:
-    """
-    List all available output formats.
-
-    Returns:
-        List of available format names
-    """
-    if _ensure_io_module() and _writer_registry is not None:
-        return _writer_registry.list_available_formats()
-    return []
-
-
-def is_format_available(format_name: str) -> bool:
-    """
-    Check if a specific output format is available.
-
-    Args:
-        format_name: Name of the format to check
-
-    Returns:
-        Whether the format is available
-    """
-    if _ensure_io_module() and _writer_registry is not None:
-        return _writer_registry.is_format_available(format_name)
-    return False
+# Public API
+__all__ = [
+    # Main classes
+    "Processor",
+    "ProcessingResult",
+    # Strategy pattern classes
+    "ProcessingStrategy",
+    "InMemoryStrategy",
+    "FileStrategy",
+    "BatchStrategy",
+    "ChunkedStrategy",
+    "CSVStrategy",
+    # Configuration
+    "TransmogConfig",
+    "ProcessingMode",
+    "NamingConfig",
+    "ProcessingConfig",
+    "MetadataConfig",
+    "ErrorHandlingConfig",
+    # Configuration utilities
+    "settings",
+    "extensions",
+    "load_profile",
+    "load_config",
+    "configure",
+    # Format utilities
+    "FormatRegistry",
+    "detect_format",
+    "create_writer",
+    "DataWriter",
+    # Streaming features
+    "StreamingWriter",
+    "create_streaming_writer",
+    "get_supported_streaming_formats",
+    "is_streaming_format_available",
+    # Specific writer implementations
+    "ParquetStreamingWriter",
+    # Features and dependencies
+    "Features",
+    "DependencyManager",
+    "IoDependencyManager",
+    # Exceptions
+    "TransmogError",
+    "ProcessingError",
+    "ValidationError",
+    "ParsingError",
+    "FileError",
+    "MissingDependencyError",
+    "ConfigurationError",
+    "OutputError",
+    # Error handling
+    "error_context",
+    "setup_logging",
+    # Recovery strategies
+    "RecoveryStrategy",
+    "StrictRecovery",
+    "SkipAndLogRecovery",
+    "PartialProcessingRecovery",
+    "with_recovery",
+    "STRICT",
+    "DEFAULT",
+    "LENIENT",
+    # Core functionality
+    "flatten_json",
+    "process_record_batch",
+    "process_records_in_single_pass",
+    "process_structure",
+    "stream_process_records",
+    "extract_arrays",
+    "stream_extract_arrays",
+    # Metadata
+    "annotate_with_metadata",
+    "create_batch_metadata",
+    "generate_extract_id",
+    "get_current_timestamp",
+    # Naming utilities
+    "abbreviate_field_name",
+    "abbreviate_table_name",
+    "get_common_abbreviations",
+    "merge_abbreviation_dicts",
+    "get_standard_field_name",
+    "get_table_name",
+    "sanitize_name",
+]

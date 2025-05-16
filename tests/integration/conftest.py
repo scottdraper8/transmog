@@ -2,12 +2,13 @@
 Pytest configuration and fixtures for integration tests.
 """
 
-import os
-import json
 import csv
-import pytest
-import tempfile
+import json
+import os
 import shutil
+import tempfile
+
+import pytest
 
 
 @pytest.fixture

@@ -1,6 +1,6 @@
 # Getting Started with Transmog
 
-This guide will help you get started with Transmog to transform nested JSON into flattened formats.
+This guide covers basic usage of Transmog for transforming nested JSON into flattened formats.
 
 ## Installation
 
@@ -14,7 +14,7 @@ pip install transmog[all]
 
 ## Basic Usage
 
-A common use case for Transmog is flattening nested JSON structures:
+Flattening nested JSON structures:
 
 ```python
 import transmog as tm
@@ -35,17 +35,17 @@ data = {
     }
 }
 
-# Create a processor
+# Create a processor with default configuration
 processor = tm.Processor()
 
-# Process the data
-result = processor.process(data, entity_name="test")
+# Process the data - entity_name is a required parameter
+result = processor.process(data, entity_name="users")
 
 # View the flattened data
 print(result.get_main_table())
 ```
 
-This will output a list containing the flattened record:
+This outputs a list containing the flattened record:
 
 ```python
 [
@@ -62,27 +62,42 @@ This will output a list containing the flattened record:
 
 ## Core Concepts
 
-Transmog is built around a few key concepts:
+Transmog consists of:
 
-- **Processor**: The main entry point for transforming data
-- **ProcessingResult**: Contains the output tables after processing
-- **ID Generation**: Methods for consistent record identification
-- **Output formats**: Different ways to export your transformed data
+- **Processor**: Entry point for transforming data
+- **ProcessingResult**: Contains the output tables
+- **Configuration**: System for customizing processing behavior
+- **ID Generation**: Methods for record identification
+- **Output formats**: Options to export transformed data
 
 ## Common Customizations
 
-### Custom Separators
+### Using Pre-configured Modes
 
-Change the character used to separate nested keys:
+Pre-configured modes for common use cases:
 
 ```python
-# Use a forward slash as the separator
-processor = tm.Processor(separator="/")
-result = processor.process(data, entity_name="test")
+# Memory-optimized configuration
+processor = tm.Processor.memory_optimized()
+
+# Performance-optimized configuration
+processor = tm.Processor.performance_optimized()
+```
+
+### Custom Separators
+
+Change the separator for nested keys:
+
+```python
+# Create a processor with custom separator
+processor = tm.Processor(
+    tm.TransmogConfig.default().with_naming(separator="/")
+)
+result = processor.process(data, entity_name="users")
 print(result.get_main_table())
 ```
 
-Output would include paths separated by forward slashes:
+Output with forward slash separators:
 
 ```python
 [
@@ -103,7 +118,7 @@ By default, Transmog extracts arrays into separate child tables:
 
 ```python
 processor = tm.Processor()
-result = processor.process(data, entity_name="test")
+result = processor.process(data, entity_name="users")
 
 # Get the main flattened data
 main_data = result.get_main_table()
@@ -114,7 +129,7 @@ table_names = result.get_table_names()
 print("Tables:", table_names)
 
 # Access the orders table
-orders_table = result.get_child_table("test_user_orders")
+orders_table = result.get_child_table("users_user_orders")
 print("Orders:", orders_table)
 ```
 
@@ -132,7 +147,7 @@ Main data: [
     }
 ]
 
-Tables: ['main', 'test_user_orders']
+Tables: ['users_user_orders']
 
 Orders: [
     {
@@ -140,41 +155,48 @@ Orders: [
         "__parent_extract_id": "12345678-90ab-cdef-1234-567890abcdef",
         "__extract_datetime": "2023-01-01T12:00:00",
         "id": "101",
-        "amount": "99.99"
+        "amount": "99.99",
+        "__array_field": "orders",
+        "__array_index": 0
     },
     {
         "__extract_id": "3456789a-bcde-f123-4567-89abcdef0123",
         "__parent_extract_id": "12345678-90ab-cdef-1234-567890abcdef",
         "__extract_datetime": "2023-01-01T12:00:00",
         "id": "102",
-        "amount": "45.50"
+        "amount": "45.50",
+        "__array_field": "orders",
+        "__array_index": 1
     }
 ]
 ```
 
 ### Processing Options
 
-Transmog provides several processing options:
+Configuration system:
 
 ```python
-processor = tm.Processor(
-    # Value handling
-    cast_to_string=True,  # Convert all values to strings
-    include_empty=False,  # Skip empty strings
-    skip_null=True,       # Skip null values
-    
-    # Performance options
-    optimize_for_memory=True,  # Optimize for memory usage
-    batch_size=500,            # Process in batches of 500
-    
-    # Formatting
-    separator="_",             # Use underscore as path separator
+# Create a custom configuration
+config = (
+    tm.TransmogConfig.default()
+    .with_processing(
+        cast_to_string=True,  # Convert all values to strings
+        include_empty=False,  # Skip empty strings
+        skip_null=True,       # Skip null values
+        batch_size=500        # Process in batches of 500
+    )
+    .with_naming(
+        separator="_"         # Use underscore as path separator
+    )
 )
+
+# Use the configuration
+processor = tm.Processor(config=config)
 ```
 
 ## Exporting Data
 
-Transmog supports exporting to multiple formats:
+Output format options:
 
 ```python
 # Get structured output
@@ -194,39 +216,66 @@ result.write_all_parquet("output_dir/parquet")
 
 ## Error Handling
 
-Transmog provides error recovery strategies:
+Error recovery strategies:
 
 ```python
-from transmog.recovery import SkipAndLogRecovery
-
-# Create a processor with error recovery
-processor = tm.Processor(
-    recovery_strategy=SkipAndLogRecovery()
+# Create a configuration with error handling
+config = (
+    tm.TransmogConfig.default()
+    .with_error_handling(
+        allow_malformed_data=True,
+        recovery_strategy="skip",
+        max_retries=3
+    )
 )
 
+# Use the configuration
+processor = tm.Processor(config=config)
+
 # Process potentially problematic data
-result = processor.process(data, entity_name="test")
+result = processor.process(data, entity_name="users")
 ```
 
 ## Deterministic IDs
 
-For consistent IDs across processing runs:
+Configure deterministic IDs for consistent processing:
 
 ```python
-processor = tm.Processor(
-    deterministic_id_fields={
-        "": "id",                     # Root level uses "id" field
-        "user_orders": "id"           # Order records use "id" field
-    }
-)
+# Configure deterministic IDs based on specific fields
+processor = tm.Processor.with_deterministic_ids({
+    "": "id",                     # Root level uses "id" field
+    "users_user_orders": "id"     # Order records use "id" field
+})
 
-# Process data - IDs will be consistent across runs
-result = processor.process(data, entity_name="test")
+# Process data with deterministic IDs
+result = processor.process(data, entity_name="users")
+```
+
+## Processing Different Input Types
+
+Transmog automatically selects the appropriate processing strategy based on the input type:
+
+```python
+# Process in-memory data (dictionary or list)
+result = processor.process(data, entity_name="users")
+
+# Process a file directly
+result = processor.process("data.json", entity_name="users")
+
+# Process data in chunks for large datasets
+result = processor.process_chunked("large_data.jsonl", entity_name="users", chunk_size=1000)
+
+# Process a CSV file
+result = processor.process_csv("data.csv", entity_name="users", has_header=True)
+
+# Process a batch of records
+batch_data = [{"id": 1}, {"id": 2}, {"id": 3}]
+result = processor.process_batch(batch_data, entity_name="users")
 ```
 
 ## Next Steps
 
-- [Flattening Options](flattening.md) - More details on flattening options
-- [Working with Arrays](arrays.md) - Deep dive into array handling
-- [Deterministic IDs](deterministic-ids.md) - Learn about ID generation options
-- [Output Formats](output-formats.md) - Explore different output formats 
+- Check out the [Configuration Guide](configuration.md) for detailed configuration options
+- Learn about [Processing Strategies](strategies.md) for handling different data types
+- Explore [Output Formats](output-formats.md) for working with processed data
+- Read about [Error Handling](error-handling.md) to handle problematic data gracefully

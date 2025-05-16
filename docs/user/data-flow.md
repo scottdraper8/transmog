@@ -1,6 +1,7 @@
 # Data Processing Flow
 
-Transmog organizes data processing into a structured flow that ensures predictable and controllable transformations. This guide explains how data flows through the system and the various stages available.
+Transmog organizes data processing into a structured flow that ensures predictable and controllable transformations.
+This guide explains how data flows through the system and the various stages available.
 
 ## Overview
 
@@ -12,7 +13,7 @@ When processing data with Transmog, your data goes through several well-defined 
 4. **Validation** - Schema-based validation checks
 5. **Output** - Data is sent to its destination
 
-```
+```text
 ┌─────────┐     ┌──────────────┐     ┌────────────┐     ┌────────────┐     ┌────────┐
 │  Input  │ ──▶ │ Preprocessing│ ──▶ │ Transforms │ ──▶ │ Validation │ ──▶ │ Output │
 └─────────┘     └──────────────┘     └────────────┘     └────────────┘     └────────┘
@@ -225,7 +226,7 @@ import transmog as tm
 def calculate_total(data):
     """Calculate order total from items."""
     if "items" in data and isinstance(data["items"], list):
-        data["total"] = sum(item.get("price", 0) * item.get("quantity", 0) 
+        data["total"] = sum(item.get("price", 0) * item.get("quantity", 0)
                            for item in data["items"])
     return data
 
@@ -361,4 +362,4 @@ else:
 - Use preprocessing to standardize input before applying custom logic
 - Create reusable transform functions for common operations
 - Test your processors with both valid and invalid data
-- Use entity_name to make logs and errors more descriptive 
+- Use entity_name to make logs and errors more descriptive

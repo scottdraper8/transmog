@@ -1,6 +1,7 @@
 # Architecture Overview
 
-This document provides an overview of Transmog's internal architecture to help contributors understand how the components fit together.
+This document provides an overview of Transmog's internal architecture to help contributors understand
+how the components fit together.
 
 ## High-Level Architecture
 
@@ -29,6 +30,7 @@ The `Transformer` class is the main entry point for users. It orchestrates the t
 4. Building the result object
 
 Key files:
+
 - `src/transmog/transformer.py` - Main implementation
 - `src/transmog/config.py` - Configuration options
 
@@ -42,6 +44,7 @@ The path resolution system handles the traversal of nested data structures based
 - Advanced selectors: `data[?(@.active==true)].name` (JSONPath-like)
 
 Key files:
+
 - `src/transmog/path.py` - Path expression parsing
 - `src/transmog/resolver.py` - Path resolution logic
 
@@ -55,6 +58,7 @@ Value processors transform raw data values during extraction. This system allows
 - Custom transformations
 
 Key files:
+
 - `src/transmog/processors.py` - Built-in processors
 - `src/transmog/hooks.py` - Extension points for custom processors
 
@@ -68,6 +72,7 @@ The `TransformResult` class manages the output data and provides methods to:
 - Stream results for large datasets
 
 Key files:
+
 - `src/transmog/result.py` - Result implementation
 - `src/transmog/io/` - Output format handlers
 
@@ -80,6 +85,7 @@ The I/O system handles reading input data and writing output in various formats:
 - Parquet (via PyArrow)
 
 Key files:
+
 - `src/transmog/io/json.py` - JSON handling
 - `src/transmog/io/csv.py` - CSV handling
 - `src/transmog/io/parquet.py` - Parquet handling
@@ -93,6 +99,7 @@ The error handling system provides configurable strategies for dealing with erro
 - Custom recovery strategies
 
 Key files:
+
 - `src/transmog/errors.py` - Error definitions
 - `src/transmog/recovery.py` - Recovery strategies
 
@@ -100,23 +107,23 @@ Key files:
 
 A typical data flow through the system works as follows:
 
-1. **Input Phase**: 
+1. **Input Phase**:
    - Raw JSON/Dict data enters the system
    - Configuration options are applied
 
-2. **Resolution Phase**: 
+2. **Resolution Phase**:
    - Path expressions are resolved against the input data
    - Nested paths are navigated to extract values
 
-3. **Processing Phase**: 
+3. **Processing Phase**:
    - Extracted values are passed through processors
    - Transformations are applied (type conversion, formatting, etc.)
 
-4. **Collection Phase**: 
+4. **Collection Phase**:
    - Processed key-value pairs are collected into the result
    - Metadata is attached (if enabled)
 
-5. **Output Phase**: 
+5. **Output Phase**:
    - Result is formatted into the requested output format
    - Data is returned or written to files
 
@@ -124,14 +131,16 @@ A typical data flow through the system works as follows:
 
 Transmog provides several extension points for customization:
 
-1. **Custom Value Processors**: 
+1. **Custom Value Processors**:
+
    ```python
    def my_processor(value, path=None, context=None):
        # Custom transformation logic
        return transformed_value
    ```
 
-2. **Custom Path Expressions**: 
+2. **Custom Path Expressions**:
+
    ```python
    class MyPathResolver(BasePathResolver):
        def resolve(self, data, path_expression):
@@ -139,7 +148,8 @@ Transmog provides several extension points for customization:
            return resolved_values
    ```
 
-3. **Custom Output Formats**: 
+3. **Custom Output Formats**:
+
    ```python
    class MyOutputFormatter(BaseFormatter):
        def format(self, data):
@@ -147,7 +157,8 @@ Transmog provides several extension points for customization:
            return formatted_data
    ```
 
-4. **Custom Recovery Strategies**: 
+4. **Custom Recovery Strategies**:
+
    ```python
    class MyRecoveryStrategy(RecoveryStrategy):
        def recover(self, error, context=None):
@@ -159,19 +170,19 @@ Transmog provides several extension points for customization:
 
 Transmog includes several performance techniques:
 
-1. **Implementation Approaches**: 
+1. **Implementation Approaches**:
    - Specific optimizations for common cases
    - Alternative implementations for less common scenarios
 
-2. **Evaluation Patterns**: 
+2. **Evaluation Patterns**:
    - Path expressions are evaluated when needed
    - Results are generated on-demand when possible
 
-3. **Chunked Processing**: 
+3. **Chunked Processing**:
    - Data processing in chunks to manage memory usage
    - Incremental result building for large datasets
 
-4. **Result Reuse**: 
+4. **Result Reuse**:
    - Path resolution results may be cached
    - Compiled path expressions can be reused
 
@@ -192,4 +203,4 @@ When contributing new code, please follow this testing approach for consistency.
 - CSV
 - Parquet (via PyArrow)
 - PyArrow Table
-- Python Dictionary 
+- Python Dictionary

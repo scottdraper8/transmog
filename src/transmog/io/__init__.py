@@ -1,129 +1,67 @@
-"""
-IO module for Transmog.
+"""IO module for Transmog.
 
-This module provides utilities for reading and writing data in different formats.
+This module provides I/O interfaces and utilities for reading and writing data.
 """
 
 import logging
 
+# Import dependency manager
+from transmog.dependencies import DependencyManager
+
+# Import format utilities
+from transmog.io.formats import (
+    FormatRegistry,
+    detect_format,
+)
+
+# Import factory functions
+from transmog.io.writer_factory import (
+    create_streaming_writer,
+    create_writer,
+    get_supported_formats,
+    get_supported_streaming_formats,
+    is_format_available,
+    is_streaming_format_available,
+    register_streaming_writer,
+    register_writer,
+)
+
+# Import writer interface implementation
+from transmog.io.writer_interface import DataWriter, StreamingWriter
+
+# Configure logging
 logger = logging.getLogger(__name__)
 
-# Define available formats
-SUPPORTED_FORMATS = ["json", "csv", "parquet"]
 
-# Track which formats are actually available with current dependencies
-_available_formats = {"json": True}  # JSON is always available
-_available_readers = {"json": True}  # JSON reader is always available
+def initialize_io_features() -> None:
+    """Initialize IO features based on available dependencies.
 
-# Try to import format-specific modules
-try:
-    import csv
-
-    _available_formats["csv"] = True
-    _available_readers["csv"] = True
-except ImportError:
-    _available_formats["csv"] = False
-    _available_readers["csv"] = False
-
-try:
-    import pyarrow
-
-    _available_formats["parquet"] = True
-    _available_readers["csv"] = True  # PyArrow improves CSV reading
-    PYARROW_AVAILABLE = True
-except ImportError:
-    _available_formats["parquet"] = False
-    PYARROW_AVAILABLE = False
-    # CSV reader will fall back to built-in if PyArrow not available
-
-# Import the writer registry
-from transmog.io.writer_registry import WriterRegistry
-
-# Import reader functions for convenience
-try:
-    from transmog.io.json_reader import (
-        read_json_file,
-        read_jsonl_file,
-        read_json_stream,
-    )
-except ImportError:
-    logger.debug("Could not import JSON reader functions")
-
-try:
-    from transmog.io.csv_reader import (
-        read_csv_file,
-        read_csv_stream,
-        CSVReader,
-    )
-except ImportError:
-    logger.debug("Could not import CSV reader functions")
-
-
-# Pre-register writer classes without importing them directly
-# This prevents circular imports while ensuring writers are registered
-def _register_default_writers():
-    """Register default writers with the registry."""
-    # Always register JSON writer (no external dependencies)
-    WriterRegistry.register_format("json", "transmog.io.json_writer", "JsonWriter")
-
-    # Register CSV writer if available
-    if _available_formats.get("csv"):
-        WriterRegistry.register_format("csv", "transmog.io.csv_writer", "CsvWriter")
-
-    # Register Parquet writer if available
-    if _available_formats.get("parquet"):
-        WriterRegistry.register_format(
-            "parquet", "transmog.io.parquet_writer", "ParquetWriter"
-        )
-
-
-# Run the registration
-_register_default_writers()
-
-
-# Functions to check writer availability
-def is_writer_available(format_name: str) -> bool:
+    This function checks for optional dependencies and registers
+    available formats and handlers.
     """
-    Check if a specific writer is available.
-
-    Args:
-        format_name: Format to check
-
-    Returns:
-        Whether the writer is available
-    """
-    return format_name in _available_formats and _available_formats[format_name]
+    # Nothing special to do for now, as the imports above
+    # handle registration of basic formats
+    pass
 
 
-def list_available_writers() -> list:
-    """
-    List all available writers.
-
-    Returns:
-        List of available writer format names
-    """
-    return [fmt for fmt, available in _available_formats.items() if available]
-
-
-# Functions to check reader availability
-def is_reader_available(format_name: str) -> bool:
-    """
-    Check if a specific reader is available.
-
-    Args:
-        format_name: Format to check
-
-    Returns:
-        Whether the reader is available
-    """
-    return format_name in _available_readers and _available_readers[format_name]
-
-
-def list_available_readers() -> list:
-    """
-    List all available readers.
-
-    Returns:
-        List of available reader format names
-    """
-    return [fmt for fmt, available in _available_readers.items() if available]
+# Define public API
+__all__ = [
+    # Formats
+    "FormatRegistry",
+    "DependencyManager",
+    "detect_format",
+    # Factory functions
+    "create_writer",
+    "create_streaming_writer",
+    "register_writer",
+    "register_streaming_writer",
+    "get_supported_formats",
+    "get_supported_streaming_formats",
+    "is_format_available",
+    "is_streaming_format_available",
+    # Writer interfaces
+    "DataWriter",
+    "StreamingWriter",
+    # Feature initialization
+    "initialize_io_features",
+]

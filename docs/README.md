@@ -1,87 +1,82 @@
 # Transmog Documentation
 
-This directory contains the documentation for the Transmog project. The documentation is built using Sphinx with MyST Markdown.
-
-## Documentation Structure
-
-- **Getting Started**
-  - `user/getting-started.md`: Quick start guide and overview
-  - `installation.md`: Installation instructions
-
-- **User Guide**
-  - `user/flattening.md`: Guide to JSON flattening
-  - `user/arrays.md`: Working with arrays
-  - `user/error-handling.md`: Error handling and recovery strategies
-  - `user/concurrency.md`: Parallel processing with Transmog
-  
-- **API Reference**
-  - `api/processor.md`: Processor class documentation
-  - `api/processing-result.md`: ProcessingResult class documentation
-
-- **Developer Guide**
-  - `../CONTRIBUTING.md`: Contributing guidelines (main file in repository root)
-  - `dev/architecture.md`: Architectural overview
-  - `dev/code-style.md`: Code style guidelines
-  - `dev/extending.md`: How to extend Transmog
-  - `dev/release-process.md`: Release process documentation
-  - `dev/testing.md`: Testing guidelines
-
-- **Examples**
-  - `examples/basic.md`: Basic usage examples
-
-## Files To Be Created
-
-The following files still need to be created to complete the documentation:
-
-### API Reference
-- `api/recovery.md`: Error recovery strategies
-- `api/core.md`: Core functionality
-- `api/io.md`: Input/output utilities
-- `api/config.md`: Configuration options
-
-### Examples
-- `examples/advanced.md`: Advanced usage examples
-- `examples/large_datasets.md`: Handling large datasets
-- `examples/concurrency.md`: Parallel processing examples
+This directory contains documentation for Transmog, a Python library for transforming nested JSON data into flat,
+structured formats.
 
 ## Building the Documentation
 
-To build the documentation:
+Documentation is built using [Sphinx](https://www.sphinx-doc.org/) with the
+[MyST Parser](https://myst-parser.readthedocs.io/) extension for Markdown support.
 
-1. Install the documentation dependencies:
+To build locally:
+
+1. Install development dependencies:
+
    ```bash
-   pip install -r requirements.txt
+   pip install -e ".[dev]"
    ```
 
-2. Build the HTML documentation:
+2. Navigate to the docs directory:
+
    ```bash
-   sphinx-build -b html . _build/html
+   cd docs
    ```
 
-3. View the documentation:
+3. Build the documentation:
+
+   ```bash
+   make html
+   ```
+
+4. View the documentation:
+
    ```bash
    open _build/html/index.html  # On macOS
-   # or
-   start _build/html/index.html  # On Windows
-   # or
+   # Or
    xdg-open _build/html/index.html  # On Linux
+   # Or
+   start _build/html/index.html  # On Windows
    ```
 
-## Documentation Standards
+## Documentation Structure
 
-- Use MyST Markdown for all documentation files
-- Follow the Google style for code examples and docstrings
-- Include practical examples in all guides
-- Maintain consistent terminology throughout the documentation
-- Use kebab-case for file names (e.g., `getting-started.md` instead of `getting_started.md`)
-- Keep file paths and import statements up-to-date
+- `index.md`: Main entry point and overview
+- `installation.md`: Installation instructions
+- `user/`: User guides and tutorials
+  - `getting-started.md`: Quick start guide
+  - `configuration.md`: Configuration options
+  - `flattening.md`: Flattening nested data
+  - `arrays.md`: Working with arrays
+  - `metadata.md`: Metadata features
+  - `deterministic-ids.md`: Deterministic ID generation
+  - `streaming.md`: Streaming processing
+  - `error-handling.md`: Error handling strategies
+  - `output-formats.md`: Output format options
+- `api/`: API reference
+  - `processor.md`: Processor API
+  - `processing-result.md`: ProcessingResult API
+  - `config.md`: Configuration API
+- `dev/`: Developer documentation
+  - `architecture.md`: System architecture
+  - `extending.md`: Extending Transmog
+  - `testing.md`: Testing guide
 
-## Contributing to Documentation
+## Contributing to the Documentation
 
-If you'd like to improve the documentation:
+1. Make changes to the Markdown files
+2. Build the documentation to preview changes
+3. Submit a pull request
 
-1. Check the "Files To Be Created" section above for high-priority documentation needs
-2. Follow the contributing guidelines in the main CONTRIBUTING.md file
-3. Submit a pull request with your documentation changes
+See the Contributing Guide in the repository root for more information.
 
-Thank you for helping improve Transmog's documentation! 
+## Documentation Conventions
+
+- Use Markdown (.md) files for documentation
+- Place code examples in fenced code blocks with language tags
+- Use relative links for internal references
+- Include section headers for major sections
+- Follow PEP 8 style for Python code examples
+
+## Current Version
+
+This documentation reflects Transmog v0.1.2.5.

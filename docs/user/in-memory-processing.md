@@ -1,6 +1,7 @@
 # In-Memory Processing
 
-Transmog offers robust in-memory processing capabilities for JSON data. This guide explains how to use the library to process JSON objects or arrays in memory efficiently.
+Transmog offers robust in-memory processing capabilities for JSON data. This guide explains how to use
+the library to process JSON objects or arrays in memory efficiently.
 
 ## Basic In-Memory Processing
 
@@ -13,7 +14,7 @@ processor = Processor()
 
 # Process a single JSON object
 data = {
-    "id": 1, 
+    "id": 1,
     "name": "John Smith",
     "age": 30,
     "address": {
@@ -68,11 +69,14 @@ result = processor._process_data(
 
 ### Choosing the Right Memory Mode
 
-1. **Standard Mode** (`ProcessingMode.STANDARD`): The default mode that balances memory usage and performance. This is suitable for most applications.
+1. **Standard Mode** (`ProcessingMode.STANDARD`): The default mode that balances memory usage and performance.
+This is suitable for most applications.
 
-2. **Low Memory Mode** (`ProcessingMode.LOW_MEMORY`): Optimized for processing large datasets with minimal memory footprint. Use this mode when working with very large datasets that might cause memory pressure.
+2. **Low Memory Mode** (`ProcessingMode.LOW_MEMORY`): Optimized for processing large datasets.
+   Use this mode when working with very large datasets that might cause memory pressure.
 
-3. **High Performance Mode** (`ProcessingMode.HIGH_PERFORMANCE`): Optimized for speed at the cost of higher memory usage. This mode is ideal for processing smaller datasets quickly.
+3. **High Performance Mode** (`ProcessingMode.HIGH_PERFORMANCE`): Optimized for speed at the cost of higher memory usage.
+   This mode is ideal for processing smaller datasets quickly.
 
 ## Processing Large Datasets in Chunks
 
@@ -97,7 +101,9 @@ print(f"Processed {len(result.get_main_table())} records")
 
 ### Streaming Data Sources
 
-The `process_chunked` method also supports streaming data sources (any iterable that yields dictionaries), allowing processing of datasets larger than available memory:
+The `process_chunked` method also supports streaming data sources
+(any iterable that yields dictionaries),
+allowing processing of datasets larger than available memory:
 
 ```python
 # Process a generator of records
@@ -144,7 +150,8 @@ result = processor.process_chunked(
 
 ## Unified Data Interface
 
-Transmog provides a unified interface for handling various data sources. The system automatically detects the input format:
+Transmog provides a unified interface for handling various data sources.
+The system automatically detects the input format:
 
 ```python
 # These all work seamlessly with the same API:
@@ -208,7 +215,9 @@ result = processor.process_chunked(
 
 ### Handling Large Arrays
 
-When processing JSON with large arrays, the processor can extract these arrays as separate tables, reducing memory pressure:
+When processing JSON with large arrays,
+the processor can extract these arrays as separate tables,
+reducing memory pressure:
 
 ```python
 data = {
@@ -242,4 +251,4 @@ result = processor.process_chunked(
 
 # The result contains all processed records combined
 total_count = len(result.get_main_table())
-print(f"Processed {total_count} records in total") 
+print(f"Processed {total_count} records in total")

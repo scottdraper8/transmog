@@ -1,13 +1,17 @@
 # Schema Definition and Validation
 
-Transmog provides a flexible schema system that allows you to define the structure of your data, apply validations, and enforce constraints. This guide explains how to leverage schemas for more controlled and predictable data processing.
+Transmog provides a flexible schema system that allows you to define the structure of your data, apply
+validations, and enforce constraints. This guide explains how to leverage schemas for more controlled
+and predictable data processing.
 
 ## Basic Schema Definition
 
-Schemas in Transmog are defined using a dictionary-like structure where keys represent field names and values define field properties:
+Schemas in Transmog are defined using a dictionary-like structure where keys represent field names and
+values define field properties:
 
 ```python
 import transmog as tm
+from transmog.error import ValidationError
 
 # Define a schema
 user_schema = {
@@ -155,7 +159,8 @@ processor = tm.Processor(
 ### Available Schema Options
 
 - `strict` (default: `False`): When true, rejects any fields not defined in the schema
-- `fail_on_error` (default: `True`): When true, raises a ValidationError for invalid data; when false, adds errors to the result
+- `fail_on_error` (default: `True`): When true, raises a ValidationError for invalid data; when false, adds errors to
+  the result
 - `coerce_types` (default: `True`): When true, attempts to convert values to the correct type (e.g., string to int)
 - `allow_unknown` (default: `True`): Synonym for `not strict`, allows fields not in schema
 
@@ -194,7 +199,7 @@ When validation fails and `fail_on_error` is `True`, a `ValidationError` is rais
 
 ```python
 import transmog as tm
-from transmog.exceptions import ValidationError
+from transmog.error import ValidationError
 
 schema = {
     "age": {"type": "integer", "min": 0, "required": True}
@@ -207,9 +212,9 @@ try:
     result = processor.process({"age": -5}, entity_name="person")
 except ValidationError as e:
     print(f"Validation failed: {e}")
-    # Access details about the error
-    for error in e.errors:
-        print(f"Field: {error.field}, Error: {error.message}")
+    print(f"Path: {e.path}")
+    print(f"Value: {e.value}")
+    print(f"Schema: {e.schema}")
 ```
 
 When `fail_on_error` is `False`, errors are included in the processing result:
@@ -244,6 +249,7 @@ processor = tm.Processor(schema=schema)
 ```
 
 Custom validators should accept three parameters:
+
 1. `field`: The name of the field being validated
 2. `value`: The value to validate
 3. `error`: A function to call to record validation errors
@@ -288,4 +294,7 @@ user_schema = {
 - Always provide descriptive error messages for custom validators
 - Use schemas to document your data structures
 - Consider breaking complex schemas into reusable components
-- Test your schemas with both valid and invalid data to ensure they behave as expected 
+- Test your schemas with both valid and invalid data to ensure they behave as expected
+
+For examples of error handling with schema validation, see the error handling examples provided in
+the examples directory.

@@ -1,24 +1,21 @@
-"""
-Performance comparison example demonstrating Transmog optimizations.
+"""Performance comparison example demonstrating Transmog optimizations.
 
 This example compares different configuration options and their impact
 on performance for processing nested JSON data.
 """
 
-import json
 import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List
 
 # Add parent directory to path to import transmog without installing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from transmog import Processor, ProcessingResult
+from transmog import ProcessingResult, Processor
 
 
-def generate_complex_data(count: int = 100) -> List[Dict]:
+def generate_complex_data(count: int = 100) -> list[dict]:
     """Generate complex nested data for performance testing."""
     data = []
     for i in range(count):
@@ -96,7 +93,7 @@ def run_test(name: str, func, *args, **kwargs) -> float:
     return elapsed
 
 
-def test_standard_processing(data: List[Dict]) -> ProcessingResult:
+def test_standard_processing(data: list[dict]) -> ProcessingResult:
     """Test standard processing approach.
 
     This uses direct extraction without any optimizations.
@@ -161,7 +158,7 @@ def test_standard_processing(data: List[Dict]) -> ProcessingResult:
     )
 
 
-def test_single_pass_processing(data: List[Dict]) -> ProcessingResult:
+def test_single_pass_processing(data: list[dict]) -> ProcessingResult:
     """Test optimized single-pass processing."""
     # Use the high-level processor with use_single_pass=True for optimized processing
     processor = Processor(cast_to_string=True)
@@ -172,7 +169,7 @@ def test_single_pass_processing(data: List[Dict]) -> ProcessingResult:
     )
 
 
-def test_batch_processing(data: List[Dict], batch_size: int = 50) -> ProcessingResult:
+def test_batch_processing(data: list[dict], batch_size: int = 50) -> ProcessingResult:
     """Test batch processing for memory efficiency."""
     processor = Processor(
         cast_to_string=True,
@@ -186,7 +183,7 @@ def test_batch_processing(data: List[Dict], batch_size: int = 50) -> ProcessingR
     )
 
 
-def test_parallel_processing(data: List[Dict], workers: int = 4) -> ProcessingResult:
+def test_parallel_processing(data: list[dict], workers: int = 4) -> ProcessingResult:
     """Test parallel processing with multiple threads."""
     processor = Processor(cast_to_string=True)
 

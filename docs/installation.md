@@ -1,28 +1,28 @@
 # Installation Guide
 
-This guide covers the different ways to install Transmog.
+This document covers installation options for Transmog.
 
 ## Basic Installation
 
-For most users, the standard installation is recommended:
+Standard installation:
 
 ```bash
 pip install transmog
 ```
 
-This installs Transmog with its required dependencies.
+Installs Transmog with required dependencies.
 
 ## Installation Options
 
 ### Minimal Installation
 
-For environments with strict dependency requirements:
+For environments with strict requirements:
 
 ```bash
 pip install transmog[minimal]
 ```
 
-This installs Transmog with minimal dependencies.
+Installs Transmog with minimal dependencies.
 
 ### Development Installation
 
@@ -32,11 +32,11 @@ For contributors and developers:
 pip install transmog[dev]
 ```
 
-This includes additional tools for testing, development, and linting.
+Includes tools for testing, development, and linting.
 
 ### Full Installation
 
-To install all optional dependencies:
+Install all optional dependencies:
 
 ```bash
 pip install transmog[all]
@@ -44,7 +44,7 @@ pip install transmog[all]
 
 ## Installing from Source
 
-To install the latest development version:
+To install the development version:
 
 ```bash
 git clone https://github.com/scottdraper8/transmog.git
@@ -52,53 +52,81 @@ cd transmog
 pip install -e .
 ```
 
-## Optional Dependencies
-
-Transmog can use these optional packages:
-
-- **pyarrow**: For Parquet file support
-- **orjson**: For faster JSON processing
-
-Install any of these directly:
+For development with dev dependencies:
 
 ```bash
-pip install pyarrow
+pip install -e ".[dev]"
+```
+
+## Optional Dependencies
+
+Optional packages:
+
+- **pyarrow**: For Parquet file support and PyArrow Table output
+- **orjson**: For faster JSON processing
+- **pandas**: For CSV processing with pandas
+
+To install optional dependencies:
+
+```bash
+pip install pyarrow orjson pandas
 ```
 
 ## System Requirements
 
-- Python 3.7 or higher
+- Python 3.9 or higher
 - Compatible with Windows, macOS, and Linux
 
 ## Verifying Installation
 
-To verify your installation:
+To verify installation:
 
 ```python
 import transmog
 
 # Check version
 print(transmog.__version__)
+
+# Check available features
+from transmog.features import Features
+print(f"PyArrow available: {Features.has_pyarrow()}")
+print(f"Orjson available: {Features.has_orjson()}")
+print(f"Pandas available: {Features.has_pandas()}")
 ```
 
 ## Troubleshooting
 
+### Missing Optional Dependencies
+
+Check dependencies for features:
+
+```python
+from transmog.dependencies import DependencyManager
+
+# Check which features require which packages
+DependencyManager.get_required_packages_for_feature("parquet")  # Returns ["pyarrow"]
+DependencyManager.check_feature_available("parquet")  # Returns True/False
+```
+
 ### Missing Compiler Tools
 
-If you encounter build errors, you may need compiler tools:
+If you encounter build errors:
 
 **Windows:**
+
 - Install Visual C++ Build Tools
 
 **macOS:**
+
 - Install command-line tools: `xcode-select --install`
 
 **Linux:**
+
 - Install required packages: `apt-get install build-essential python3-dev`
 
 ### Version Conflicts
 
-If you experience dependency conflicts:
+For dependency conflicts:
 
 ```bash
 pip install --upgrade transmog --no-deps
@@ -115,4 +143,4 @@ pip install --no-cache-dir transmog
 
 ## Next Steps
 
-After installation, refer to the [Getting Started Guide](user/getting-started.md) for usage information. 
+After installation, see the [Getting Started Guide](user/getting-started.md).

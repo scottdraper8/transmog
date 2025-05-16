@@ -1,355 +1,259 @@
-"""
-Example demonstrating advanced error recovery strategies in Transmog.
+"""Error Recovery Example.
 
-This example shows how to implement and use custom error recovery strategies
-when processing problematic JSON data that might have inconsistencies or errors.
+This example demonstrates Transmog's error recovery capabilities
+for handling problematic data with different recovery strategies.
 """
 
-import json
 import os
 import sys
-import logging
-import traceback
-import functools
-from typing import Any, Dict, List, Optional, Tuple, Callable
 
 # Add parent directory to path to import transmog without installing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# Import from src package
-from transmog import Processor
-from transmog.recovery import RecoveryStrategy, STRICT
-from transmog.exceptions import (
+# Import from transmog package
+from transmog import Processor, TransmogConfig
+from transmog.error import (
+    LENIENT,  # Partial recovery: preserve valid portions
     ProcessingError,
-    ValidationError,
-    ParsingError,
-    CircularReferenceError,
+    SkipAndLogRecovery,
 )
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger("error_recovery_example")
-
-
-# Sample data with various issues
-PROBLEMATIC_DATA = [
-    # Valid record
-    {
-        "id": 1,
-        "name": "Good Record",
-        "details": {"status": "active", "score": 95},
-    },
-    # Record with circular reference
-    {
-        "id": 2,
-        "name": "Circular Reference",
-        "details": {},  # Will be set to self-reference
-    },
-    # Record with invalid nested values
-    {
-        "id": 3,
-        "name": "Invalid Nested Value",
-        "details": {"status": float("nan"), "tags": ["good", float("inf")]},
-    },
-    # Record with extremely deep nesting
-    {
-        "id": 4,
-        "name": "Too Deep",
-        "details": {},  # Will be nested 500 levels deep
-    },
-    # Valid record
-    {
-        "id": 5,
-        "name": "Another Good Record",
-        "details": {"status": "inactive", "score": 75},
-    },
-]
-
-
-def prepare_problematic_data() -> List[Dict[str, Any]]:
-    """Prepare problematic data with specific issues."""
-    data = PROBLEMATIC_DATA.copy()
-
-    # Create circular reference in record #1
-    data[1]["details"]["self"] = data[1]
-
-    # Create extremely deep nesting in record #3
-    deep_obj = {}
-    current = deep_obj
-    for i in range(500):
-        current["level"] = i
-        current["next"] = {}
-        current = current["next"]
-    data[3]["details"] = deep_obj
-
-    return data
-
-
-class CustomRecoveryStrategy(RecoveryStrategy):
-    """
-    Custom recovery strategy with specialized handling for different error types.
-
-    This strategy:
-    1. Logs all errors with different severity based on type
-    2. Provides replacement values for specific error cases
-    3. Tracks statistics about encountered errors
-    """
-
-    def __init__(self):
-        """Initialize the recovery strategy with counters."""
-        self.error_counts = {
-            "circular_reference": 0,
-            "validation": 0,
-            "parsing": 0,
-            "max_depth": 0,
-            "other": 0,
-            "total": 0,
-        }
-
-    def recover(
-        self, error: Exception, context: Optional[Dict[str, Any]] = None
-    ) -> Tuple[bool, Any]:
-        """
-        Attempt to recover from the error.
-
-        Args:
-            error: The exception that was raised
-            context: Additional context about the error
-
-        Returns:
-            Tuple of (recovered, replacement_value)
-            - recovered: Whether recovery was successful
-            - replacement_value: Value to use if recovered
-        """
-        self.error_counts["total"] += 1
-
-        # Extract context information
-        path = context.get("path", "") if context else ""
-        record_id = context.get("record_id") if context else "unknown"
-
-        # Different handling based on error type
-        if isinstance(error, CircularReferenceError):
-            self.error_counts["circular_reference"] += 1
-            logger.warning(
-                f"Circular reference detected at {path} in record {record_id}"
-            )
-            # Replace with a simple string reference indicator
-            return True, {"__circular_reference": True}
-
-        elif isinstance(error, ValidationError):
-            self.error_counts["validation"] += 1
-            logger.info(
-                f"Validation error: {str(error)} at {path} in record {record_id}"
-            )
-
-            # For validation errors on numeric fields, provide default values
-            if "nan" in str(error) or "inf" in str(error):
-                return True, None  # Replace with null
-
-            return True, "[invalid value]"  # Generic replacement
-
-        elif isinstance(error, ParsingError):
-            self.error_counts["parsing"] += 1
-            logger.error(f"Parsing error: {str(error)} at {path} in record {record_id}")
-            return False, None  # Cannot recover, skip entire record
-
-        elif "maximum recursion depth exceeded" in str(error) or "max_depth" in str(
-            error
-        ):
-            self.error_counts["max_depth"] += 1
-            logger.warning(f"Max depth exceeded at {path} in record {record_id}")
-            return True, {"__max_depth_exceeded": True}
-
-        else:
-            self.error_counts["other"] += 1
-            logger.error(
-                f"Unhandled error: {str(error)} at {path} in record {record_id}"
-            )
-            logger.debug(traceback.format_exc())
-            return False, None  # Cannot recover, skip entire record
-
-    def handle_processing_error(
-        self, error: ProcessingError, entity_name: Optional[str] = None
-    ) -> Any:
-        """Handle processing errors with our custom recovery."""
-        logger.warning(f"Handling processing error: {str(error)}")
-        recovered, value = self.recover(error, {"entity_name": entity_name})
-        if recovered:
-            return value
-        raise error
-
-    def handle_circular_reference(
-        self, error: CircularReferenceError, path: List[str]
-    ) -> Any:
-        """Handle circular reference errors with our custom recovery."""
-        logger.warning(
-            f"Handling circular reference at: {'.'.join(path) if path else 'unknown'}"
-        )
-        recovered, value = self.recover(error, {"path": ".".join(path) if path else ""})
-        if recovered:
-            return value
-        raise error
-
-    def get_report(self) -> Dict[str, int]:
-        """Get a report of encountered errors."""
-        return self.error_counts
-
-
-def run_with_custom_recovery(data: List[Dict[str, Any]]) -> None:
-    """
-    Process data using a custom recovery strategy.
-
-    Args:
-        data: The data to process
-    """
-    # Create recovery strategy
-    recovery_strategy = CustomRecoveryStrategy()
-
-    # Create processor with custom recovery
-    processor = Processor(
-        cast_to_string=True,
-        include_empty=False,
-        recovery_strategy=recovery_strategy,
-        allow_malformed_data=True,  # Allow and attempt to recover from malformed data
-        max_nesting_depth=50,  # Set a reasonable max depth
-    )
-
-    try:
-        # Process data with recovery
-        result = processor.process(data=data, entity_name="problematic_records")
-
-        # Report success
-        logger.info(f"Successfully processed {len(result.get_main_table())} records")
-
-        # Report errors
-        error_report = recovery_strategy.get_report()
-        logger.info(f"Error report: {error_report}")
-
-        # Create output directory
-        output_dir = os.path.join(os.path.dirname(__file__), "output")
-        os.makedirs(output_dir, exist_ok=True)
-
-        # Write results
-        output_path = os.path.join(output_dir, "recovered_output.json")
-        with open(output_path, "w") as f:
-            json.dump(result.get_main_table(), f, indent=2)
-
-        logger.info(f"Results written to {output_path}")
-
-    except ProcessingError as e:
-        logger.error(f"Critical processing error: {str(e)}")
-
-
-# Create a custom recovery strategy for the decorator example
-decorator_recovery = CustomRecoveryStrategy()
-
-
-# Define our own with_recovery decorator function for the example
-def with_recovery_decorator(func: Callable) -> Callable:
-    """Custom decorator that wraps a function with error recovery."""
-
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            logger.warning(f"Error in {func.__name__}: {str(e)}")
-
-            # Use our recovery strategy
-            if isinstance(e, ProcessingError):
-                return decorator_recovery.handle_processing_error(e)
-            elif isinstance(e, CircularReferenceError):
-                path = getattr(e, "path", [])
-                return decorator_recovery.handle_circular_reference(e, path)
-            else:
-                # Wrap other exceptions in ProcessingError
-                wrapped = ProcessingError(f"Error processing data: {str(e)}")
-                return decorator_recovery.handle_processing_error(wrapped)
-
-    return wrapper
-
-
-@with_recovery_decorator
-def process_single_record(data: Dict[str, Any], record_id: str) -> Dict[str, Any]:
-    """
-    Process a single record with error recovery decorator.
-
-    This demonstrates using a custom recovery decorator for fine-grained
-    control at the function level.
-
-    Args:
-        data: The record to process
-        record_id: Identifier for the record
-
-    Returns:
-        Processed record
-    """
-    # Simulate processing that might fail
-    processed = {}
-
-    for key, value in data.items():
-        if isinstance(value, dict):
-            try:
-                # This could fail with circular references or max depth
-                processed[key] = process_single_record(value, f"{record_id}.{key}")
-            except Exception as e:
-                # The @with_recovery decorator will handle this
-                raise ProcessingError(f"Failed to process {key}: {str(e)}")
-        else:
-            processed[key] = str(value) if value is not None else None
-
-    return processed
-
-
-def run_with_decorator_recovery(data: List[Dict[str, Any]]) -> None:
-    """
-    Process data using the @with_recovery decorator.
-
-    Args:
-        data: The data to process
-    """
-    results = []
-
-    for record in data:
-        try:
-            processed = process_single_record(
-                record, f"record_{record.get('id', 'unknown')}"
-            )
-            results.append(processed)
-        except ProcessingError as e:
-            logger.error(f"Failed to process record: {str(e)}")
-
-    logger.info(f"Processed {len(results)} records with decorator-based recovery")
-
-    # Create output directory
-    output_dir = os.path.join(os.path.dirname(__file__), "output")
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Write results
-    output_path = os.path.join(output_dir, "decorator_recovered_output.json")
-    with open(output_path, "w") as f:
-        json.dump(results, f, indent=2)
-
-    logger.info(f"Results written to {output_path}")
-
-    # Report errors
-    error_report = decorator_recovery.get_report()
-    logger.info(f"Decorator error report: {error_report}")
 
 
 def main():
-    """Run the example."""
-    logger.info("Preparing problematic data...")
-    data = prepare_problematic_data()
+    """Run the error recovery example."""
+    # Create output directory
+    output_dir = os.path.join(os.path.dirname(__file__), "output", "error_recovery")
+    os.makedirs(output_dir, exist_ok=True)
 
-    logger.info("\n\n=== Running with Custom Recovery Strategy ===\n")
-    run_with_custom_recovery(data)
+    # Sample dataset with problematic records
+    good_data = {
+        "id": 123,
+        "name": "Good Record",
+        "values": [10, 20, 30],
+        "metadata": {"created_at": "2023-01-01", "status": "active"},
+    }
 
-    logger.info("\n\n=== Running with Decorator-based Recovery ===\n")
-    run_with_decorator_recovery(data)
+    # Problem 1: Inconsistent types
+    inconsistent_data = {
+        "id": "abc",  # String instead of number
+        "name": 456,  # Number instead of string
+        "values": "not an array",  # String instead of array
+        "metadata": {
+            "created_at": 20230101,  # Number instead of string
+            "status": True,  # Boolean instead of string
+        },
+    }
+
+    # Problem 2: Missing required fields
+    missing_fields_data = {
+        # Missing "id" field
+        "name": "Missing Fields Record",
+        # Missing "values" array
+        "metadata": {
+            # Missing "created_at"
+            "status": "active"
+        },
+    }
+
+    # Problem 3: Malformed nested structure
+    malformed_data = {
+        "id": 789,
+        "name": "Malformed Record",
+        "values": [40, 50, "invalid", {"nested": "object"}],  # Mixed types
+        "metadata": "not an object",  # String instead of object
+    }
+
+    # Problem 4: Infinite/NaN values
+    invalid_numeric_data = {
+        "id": 456,
+        "name": "Invalid Numeric",
+        "values": [float("inf"), float("-inf"), float("nan")],
+        "metadata": {"created_at": "2023-01-02", "status": "active"},
+    }
+
+    # Create a combined dataset with problematic records
+    mixed_dataset = [
+        good_data,
+        inconsistent_data,
+        missing_fields_data,
+        malformed_data,
+        invalid_numeric_data,
+    ]
+
+    print("=== Sample Dataset ===")
+    print(f"Total records: {len(mixed_dataset)}")
+    print("Types of problems included:")
+    print("1. Inconsistent types")
+    print("2. Missing required fields")
+    print("3. Malformed nested structures")
+    print("4. Invalid numeric values (Inf/NaN)")
+
+    # Example 1: Strict Recovery (Default)
+    print("\n=== Example 1: Strict Recovery (Default) ===")
+    processor = Processor.default()  # Uses STRICT recovery by default
+
+    try:
+        # This will fail on the first problematic record
+        result = processor.process(mixed_dataset, entity_name="records")
+        print("Processing completed successfully (unexpected)")
+    except ProcessingError as e:
+        print(f"Error encountered (expected): {e}")
+        print("Strict recovery fails on first error (default behavior)")
+
+    # Example 2: Individual processing with try/except
+    print("\n=== Example 2: Manual Error Handling ===")
+    processor = Processor.default()
+
+    # Process records individually with manual error handling
+    successful = []
+    failed = []
+
+    for i, record in enumerate(mixed_dataset):
+        try:
+            result = processor.process(record, entity_name="record")
+            successful.append(i)
+        except Exception as e:
+            failed.append((i, str(e)))
+
+    print(f"Successfully processed: {len(successful)} records")
+    print(f"Failed to process: {len(failed)} records")
+    for idx, error in failed:
+        print(f"  Record {idx}: {error[:60]}...")
+
+    # Example 3: Skip and Log Recovery
+    print("\n=== Example 3: Skip and Log Recovery ===")
+
+    # Create a processor with skip_and_log recovery
+    skip_config = TransmogConfig.default().with_error_handling(
+        recovery_strategy=SkipAndLogRecovery(), allow_malformed_data=True
+    )
+    processor = Processor(skip_config)
+
+    # Process with skip and log
+    result = processor.process(mixed_dataset, entity_name="records")
+
+    print(f"Processed with skip_and_log: {len(result.get_main_table())} records")
+    print("Skipped problematic records, continued processing")
+
+    # Write to output
+    result.write_all_json(os.path.join(output_dir, "skip_and_log"))
+    print(f"Output written to: {os.path.join(output_dir, 'skip_and_log')}")
+
+    # Example 4: Partial (Lenient) Recovery
+    print("\n=== Example 4: Partial (Lenient) Recovery ===")
+
+    # Create processor with partial recovery
+    processor = Processor.with_partial_recovery()  # Pre-configured factory method
+
+    # Process with partial recovery
+    result = processor.process(mixed_dataset, entity_name="records")
+
+    print(f"Processed with partial recovery: {len(result.get_main_table())} records")
+    main_table = result.get_main_table()
+
+    # Show what was recovered
+    print("\nRecovered Records:")
+    for i, record in enumerate(main_table):
+        has_error = any(k.startswith("__error") for k in record.keys())
+        error_count = sum(1 for k in record.keys() if k.startswith("__error"))
+        status = "With errors" if has_error else "Clean"
+        print(f"  Record {i}: {status}, Fields: {len(record)}, Errors: {error_count}")
+
+    # Show sample of error fields from first problematic record
+    for record in main_table:
+        error_fields = {k: v for k, v in record.items() if k.startswith("__error")}
+        if error_fields:
+            print("\nSample Error Fields:")
+            for k, v in list(error_fields.items())[:3]:  # Show first 3 errors
+                print(f"  {k}: {v}")
+            break
+
+    # Write to output
+    result.write_all_json(os.path.join(output_dir, "partial_recovery"))
+    print(f"Output written to: {os.path.join(output_dir, 'partial_recovery')}")
+
+    # Example 5: Customizing Error Handling
+    print("\n=== Example 5: Customizing Error Handling ===")
+
+    # Create a configuration with custom error handling
+    custom_error_config = (
+        TransmogConfig.default()
+        .with_error_handling(
+            recovery_strategy=LENIENT,
+            allow_malformed_data=True,
+            max_retries=2,
+            log_level="WARNING",
+        )
+        .with_processing(
+            cast_to_string=True,  # Cast all values to strings for consistency
+            include_empty=True,  # Include empty values
+            skip_null=False,  # Don't skip null values
+        )
+    )
+
+    processor = Processor(custom_error_config)
+    result = processor.process(mixed_dataset, entity_name="records")
+
+    print(
+        f"Processed with custom error handling: {len(result.get_main_table())} records"
+    )
+
+    # Write to output
+    result.write_all_json(os.path.join(output_dir, "custom_error_handling"))
+    print(f"Output written to: {os.path.join(output_dir, 'custom_error_handling')}")
+
+    # Example 6: Working with recovered data
+    print("\n=== Example 6: Working with Recovered Data ===")
+
+    # Process with lenient recovery
+    processor = Processor.with_partial_recovery()
+    result = processor.process(mixed_dataset, entity_name="records")
+
+    # Extract data with and without errors
+    main_table = result.get_main_table()
+    clean_records = []
+    error_records = []
+
+    for record in main_table:
+        has_error = any(k.startswith("__error") for k in record.keys())
+        if has_error:
+            error_records.append(record)
+        else:
+            clean_records.append(record)
+
+    print(f"Total records: {len(main_table)}")
+    print(f"Clean records: {len(clean_records)}")
+    print(f"Records with errors: {len(error_records)}")
+
+    # Demonstrate accessing data
+    if clean_records:
+        print("\nExample of clean record fields:")
+        sample = clean_records[0]
+        for key in list(sample.keys())[:5]:  # First 5 fields
+            print(f"  {key}: {sample[key]}")
+
+    if error_records:
+        print("\nExample of error record fields:")
+        sample = error_records[0]
+        normal_fields = {k: v for k, v in sample.items() if not k.startswith("__error")}
+        error_fields = {k: v for k, v in sample.items() if k.startswith("__error")}
+
+        print(f"  Normal fields: {len(normal_fields)}")
+        print(f"  Error fields: {len(error_fields)}")
+
+        # Show a few normal fields
+        for key in list(normal_fields.keys())[:3]:
+            print(f"  {key}: {normal_fields[key]}")
+
+        # Show error annotations
+        for key in list(error_fields.keys())[:2]:
+            print(f"  {key}: {error_fields[key]}")
+
+    print("\nConclusion:")
+    print("1. STRICT (default): Fails on first error")
+    print("2. Skip and Log: Skips problematic records, processes valid ones")
+    print("3. LENIENT: Preserves as much data as possible, includes error annotations")
+    print("Choose based on your data quality and requirements")
 
 
 if __name__ == "__main__":

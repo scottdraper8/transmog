@@ -1,6 +1,7 @@
 # JSON Processing
 
-Transmog provides comprehensive support for processing JSON data, with powerful features for handling complex nested structures, arrays, and large datasets.
+Transmog provides comprehensive support for processing JSON data, with powerful features for handling
+complex nested structures, arrays, and large datasets.
 
 ## Basic JSON Processing
 
@@ -211,9 +212,6 @@ json_output = result.to_json()
 
 # Export as CSV
 csv_output = result.to_csv()
-
-# Get as a pandas DataFrame (if pandas is installed)
-df = result.to_pandas()
 ```
 
 ## Advanced JSON Processing
@@ -247,48 +245,10 @@ with open("very_large.json", "r") as f:
     results = []
     for chunk in processor.process_json_stream(f, chunk_size=100):
         results.append(chunk)
-    
+
     # Combine the results if needed
     from transmog.processing_result import ProcessingResult
     combined_result = ProcessingResult.combine(results)
-```
-
-### JSON to Database Integration
-
-Easily move JSON data into databases:
-
-```python
-import sqlite3
-
-# Process the JSON file
-result = processor.process_json_file("products.json", entity_name="products")
-
-# Get the data as a list of dictionaries
-products_data = result.get_main_table()
-
-# Connect to a database
-conn = sqlite3.connect("products_db.db")
-cursor = conn.cursor()
-
-# Create a table (example schema)
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS products (
-    id TEXT PRIMARY KEY,
-    name TEXT,
-    price REAL,
-    category TEXT
-)
-''')
-
-# Insert the processed data
-for product in products_data:
-    cursor.execute(
-        "INSERT INTO products VALUES (?, ?, ?, ?)",
-        (product["id"], product["name"], product["price"], product.get("category", ""))
-    )
-
-conn.commit()
-conn.close()
 ```
 
 ## Performance Considerations
@@ -296,4 +256,4 @@ conn.close()
 - For very large JSON files, use `optimize_for_memory=True`
 - When processing arrays of objects, consider chunking to process in batches
 - Use `process_jsonl_file` for large collections of JSON objects (one per line)
-- For maximum performance with clean data, use `validate=False` to skip validation 
+- For maximum performance with clean data, use `validate=False` to skip validation

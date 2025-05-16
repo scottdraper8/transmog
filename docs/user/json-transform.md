@@ -1,6 +1,7 @@
 # JSON Transform
 
-Transmog provides powerful capabilities for transforming JSON data before processing. This feature allows you to modify, restructure, augment, or filter your data prior to extraction.
+Transmog provides powerful capabilities for transforming JSON data before processing. This feature allows
+you to modify, restructure, augment, or filter your data prior to extraction.
 
 ## Basic Usage
 
@@ -150,7 +151,7 @@ def enrich_user_data(data):
         # Add domain from email
         email = data['email']
         data['email_domain'] = email.split('@')[-1] if '@' in email else None
-        
+
         # Add user type based on domain
         if data.get('email_domain') == 'company.com':
             data['user_type'] = 'employee'
@@ -165,17 +166,17 @@ def enrich_user_data(data):
 def clean_data(data):
     if not isinstance(data, dict):
         return data
-        
+
     # Remove null values
     for key in list(data.keys()):
         if data[key] is None:
             del data[key]
-            
+
     # Trim whitespace from strings
     for key, value in data.items():
         if isinstance(value, str):
             data[key] = value.strip()
-            
+
     return data
 ```
 
@@ -213,4 +214,4 @@ def restructure_address(data):
 - Document your transform functions clearly
 - Use descriptive names for transform functions
 - Keep transforms focused on a single responsibility
-- Test edge cases to ensure robust transformations 
+- Test edge cases to ensure robust transformations

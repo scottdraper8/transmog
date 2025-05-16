@@ -40,7 +40,8 @@ Output:
 
 ## Custom Separators
 
-By default, Transmog uses an underscore (`_`) as the separator between nested keys. You can customize this with the `separator` parameter:
+By default, Transmog uses an underscore (`_`) as the separator between nested keys. You can customize
+this with the `separator` parameter:
 
 ```python
 # Use a forward slash as the separator
@@ -241,4 +242,4 @@ For more advanced information on transforming data:
 
 - Learn about [Working with Arrays](arrays.md)
 - Explore [Error Handling](error-handling.md)
-- See [Concurrency](concurrency.md) for parallel processing 
+- See [Concurrency](concurrency.md) for parallel processing

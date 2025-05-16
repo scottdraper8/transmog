@@ -1,6 +1,7 @@
 # CSV Reader API Reference
 
-The CSV Reader functionality in Transmog provides capabilities for processing CSV files and converting them into structured data.
+The CSV Reader functionality in Transmog provides capabilities for processing CSV files and converting
+them into structured data.
 
 ## Import
 
@@ -132,8 +133,9 @@ result = processor.process_csv(
 ```
 
 Common null value indicators include:
+
 - Empty strings (`""`)
-- The strings "NULL", "null", "NA", "N/A" 
+- The strings "NULL", "null", "NA", "N/A"
 - Dashes or other placeholders
 
 ### Column Name Sanitization
@@ -146,6 +148,7 @@ When `sanitize_column_names` is enabled, column names are transformed to make th
 - SQL reserved words are prefixed with underscores
 
 For example:
+
 - "First Name" → "first_name"
 - "Sales $" → "sales_"
 - "GROUP" → "_group"
@@ -250,4 +253,4 @@ result = processor.process_csv(
 )
 ```
 
-Fields containing the delimiter character must be quoted to be processed correctly. 
+Fields containing the delimiter character must be quoted to be processed correctly.

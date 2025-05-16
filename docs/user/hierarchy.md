@@ -1,6 +1,7 @@
 # Working with Data Hierarchies
 
-Transmog excels at handling nested data structures and preserving parent-child relationships when flattening complex hierarchical data.
+Transmog excels at handling nested data structures and preserving parent-child relationships when flattening
+complex hierarchical data.
 
 ## Understanding the Extraction Process
 
@@ -79,7 +80,7 @@ print(f"Customer extract ID: {main_table[0]['__extract_id']}")
 
 for order in orders_table:
     print(f"Order {order['order_id']} has parent ID {order['__parent_id']}")
-    
+
 for item in items_table:
     print(f"Item {item['product']} has parent ID {item['__parent_id']}")
 ```
@@ -121,7 +122,7 @@ from transmog.id_generation import IdGenerationStrategy
 class SequentialIdStrategy(IdGenerationStrategy):
     def __init__(self):
         self.counter = 0
-        
+
     def generate_id(self, record, entity_name):
         self.counter += 1
         return f"{entity_name}_{self.counter}"
@@ -154,4 +155,4 @@ all_orders = combined.get_child_table("customer_orders")
 - For deterministic processing, use `DeterministicIdStrategy` with stable identifier fields
 - When processing large datasets, consider batch processing and then combining results
 - Use meaningful table names by choosing good entity names and field paths
-- Access child tables by name using `get_child_table()` rather than attempting to construct the path manually 
+- Access child tables by name using `get_child_table()` rather than attempting to construct the path manually

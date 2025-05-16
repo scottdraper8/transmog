@@ -1,7 +1,9 @@
 {
     "default": true,
     "MD013": {
-        "line_length": 120
+        "line_length": 120,
+        "headings": false,
+        "code_blocks": false
     },
     "MD033": {
         "allowed_elements": [
@@ -15,7 +17,8 @@
         "style": "backtick"
     },
     "MD024": {
-        "allow_different_nesting": true
+        "allow_different_nesting": true,
+        "siblings_only": true
     },
     "MD026": {
         "punctuation": ".,;:!"
@@ -25,5 +28,12 @@
     },
     "MD046": {
         "style": "consistent"
+    },
+    "MD025": {
+        "front_matter_title": ""
+    },
+    "MD040": true,
+    "MD004": {
+        "style": "dash"
     }
 }

@@ -28,7 +28,7 @@ with open("large_dataset.json", "r") as f:
 def split_into_chunks(data, chunk_size=1000):
     """Split a list into chunks of specified size."""
     return [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)]
-    
+
 chunks = split_into_chunks(data, chunk_size=1000)
 
 # Process in parallel
@@ -44,10 +44,10 @@ with ThreadPoolExecutor(max_workers=4) as executor:
         )
         for chunk in chunks
     ]
-    
+
     # Collect results
     results = [future.result() for future in futures]
-    
+
 # Combine results
 combined_result = tm.ProcessingResult.combine_results(results)
 
@@ -104,7 +104,7 @@ def process_file_chunk(file_path, start_line, num_lines, entity_name):
                     records.append(json.loads(line))
             except StopIteration:
                 break
-    
+
     # Process chunk
     processor = tm.Processor(cast_to_string=True)
     return processor.process_batch(records, entity_name=entity_name)
@@ -117,9 +117,9 @@ def count_lines(file_path):
 # Process large file in parallel chunks
 def process_large_file(file_path, entity_name, chunk_size=10000, workers=4):
     total_lines = count_lines(file_path)
-    chunks = [(i, min(chunk_size, total_lines - i)) 
+    chunks = [(i, min(chunk_size, total_lines - i))
               for i in range(0, total_lines, chunk_size)]
-    
+
     with ProcessPoolExecutor(max_workers=workers) as executor:
         futures = [
             executor.submit(
@@ -131,16 +131,16 @@ def process_large_file(file_path, entity_name, chunk_size=10000, workers=4):
             )
             for start_line, num_lines in chunks
         ]
-        
+
         # Collect results
         results = [future.result() for future in futures]
-    
+
     # Combine results
     return tm.ProcessingResult.combine_results(results, entity_name=entity_name)
 
 # Usage
 result = process_large_file(
-    "huge_dataset.jsonl", 
+    "huge_dataset.jsonl",
     entity_name="events",
     chunk_size=50000,
     workers=os.cpu_count()
@@ -177,7 +177,7 @@ with ThreadPoolExecutor(max_workers=4) as executor:
         executor.submit(processor.process_batch, chunk, "records"): i
         for i, chunk in enumerate(chunks)
     }
-    
+
     for future in as_completed(futures):
         chunk_index = futures[future]
         try:
@@ -204,4 +204,4 @@ else:
 2. **Balance chunk size**: Smaller chunks provide better load balancing but increase overhead
 3. **Monitor memory usage**: Watch memory consumption during processing and adjust as needed
 4. **Handle errors gracefully**: Always catch and handle exceptions in concurrent processing
-5. **Consider data locality**: For distributed processing, try to keep data close to the compute 
+5. **Consider data locality**: For distributed processing, try to keep data close to the compute

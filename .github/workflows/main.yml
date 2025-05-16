@@ -13,31 +13,34 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11']
-    
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         python -m pip install -e ".[dev]"
-    
+
     - name: Run tests
       run: |
-        pytest tests/ --cov=src/transmog
-    
+        pytest tests/ --cov=transmog
+
     - name: Test output format methods
       run: |
         cat > test_output_formats.py << 'EOF'
         import sys
-        from src.transmog import Processor
+        import tempfile
+        import os
+        import json
+        from transmog import Processor, TransmogConfig, ProcessingMode
 
         # Sample data
         data = {
@@ -47,36 +50,149 @@ jobs:
             'items': [{'id': 1}, {'id': 2}]
         }
 
-        # Process data
+        # Process data with default processor
         processor = Processor()
         result = processor.process(data, entity_name='test_entity')
 
-        # Test all output methods
+        # Test all output methods for ProcessingResult
+        print("Testing native data structure outputs...")
         tables = result.to_dict()
         json_obj = result.to_json_objects()
+
+        # Test bytes output methods
+        print("Testing bytes serialization outputs...")
         json_bytes = result.to_json_bytes()
         csv_bytes = result.to_csv_bytes()
 
-        # Print result types for verification
-        print('to_dict type:', type(tables))
-        print('to_json_objects type:', type(json_obj))
-        print('to_json_bytes type:', type(json_bytes))
-        print('to_csv_bytes type:', type(csv_bytes))
+        # Test PyArrow outputs if available
+        try:
+            print("Testing PyArrow outputs...")
+            pa_tables = result.to_pyarrow_tables()
+            parquet_bytes = result.to_parquet_bytes()
+            has_pyarrow = True
+            print("PyArrow available and working")
+        except ImportError:
+            has_pyarrow = False
+            print("PyArrow not available - skipping related tests")
 
-        # Check results
-        if not isinstance(tables, dict) or not isinstance(json_bytes, dict):
+        # Create temp directory for testing file outputs
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Test direct file writing methods
+            print("Testing file writing methods...")
+            json_files = result.write_all_json(os.path.join(temp_dir, "json"))
+            csv_files = result.write_all_csv(os.path.join(temp_dir, "csv"))
+
+            if has_pyarrow:
+                parquet_files = result.write_all_parquet(os.path.join(temp_dir, "parquet"))
+
+            # Test the streaming API
+            print("Testing streaming API...")
+            json_output_path = os.path.join(temp_dir, 'test_streaming.json')
+            processor.stream_process(
+                data=data,
+                entity_name='streaming_test',
+                output_format='json',
+                output_destination=json_output_path
+            )
+
+            # Check streaming output
+            if not os.path.exists(json_output_path):
+                print(f"Error: Streaming JSON file not created at {json_output_path}")
+                sys.exit(1)
+
+            # Test CSV streaming
+            csv_output_path = os.path.join(temp_dir, 'test_streaming.csv')
+            processor.stream_process(
+                data=data,
+                entity_name='streaming_test',
+                output_format='csv',
+                output_destination=csv_output_path
+            )
+
+            if has_pyarrow:
+                # Test parquet streaming
+                parquet_output_path = os.path.join(temp_dir, 'test_streaming')
+                os.makedirs(parquet_output_path, exist_ok=True)
+                processor.stream_process(
+                    data=data,
+                    entity_name='streaming_test',
+                    output_format='parquet',
+                    output_destination=parquet_output_path
+                )
+
+            # Test file streaming to file methods
+            print("Testing file streaming methods...")
+
+            # Create a JSON file to process
+            source_json_path = os.path.join(temp_dir, 'source_data.json')
+            with open(source_json_path, 'w') as f:
+                json.dump(data, f)
+
+            # Process the file using the fixed API
+            processor.stream_process_file_with_format(
+                file_path=source_json_path,
+                entity_name='file_streaming_test',
+                output_format='csv',
+                format_type='json',
+                output_destination=os.path.join(temp_dir, 'file_output.csv')
+            )
+
+        # Test configuration system with builder pattern
+        print("Testing configuration system...")
+        custom_config = (
+            TransmogConfig.default()
+            .with_naming(separator='.', abbreviate_table_names=False)
+            .with_processing(cast_to_string=True, skip_null=False)
+            .with_metadata(id_field='record_id', parent_field='parent_id')
+            .with_error_handling(recovery_strategy='strict')
+            .with_caching(enabled=True, maxsize=5000)
+        )
+        processor_custom = Processor(config=custom_config)
+        result_custom = processor_custom.process(data, entity_name='config_test')
+
+        # Test custom field names in result
+        if 'record_id' not in result_custom.get_main_table()[0]:
+            print("Error: Custom ID field not found in result")
             sys.exit(1)
+
+        # Test specialized processor factory methods
+        print("Testing processor factory methods...")
+        # Memory optimized config
+        processor_memory = Processor.memory_optimized()
+        result_memory = processor_memory.process(data, entity_name='memory_test')
+
+        # Performance optimized config
+        processor_perf = Processor.performance_optimized()
+        result_perf = processor_perf.process(data, entity_name='perf_test')
+
+        # Deterministic IDs
+        processor_deterministic = Processor.with_deterministic_ids('id')
+        result_deterministic = processor_deterministic.process(data, entity_name='deterministic_test')
+
+        # Recovery strategy
+        processor_recovery = Processor.with_partial_recovery()
+        result_recovery = processor_recovery.process(data, entity_name='recovery_test')
+
+        # Print result statistics for verification
+        print('\nResults summary:')
+        print(f'Main table record count: {len(result.get_main_table())}')
+        print(f'Child tables count: {len(result.get_table_names())}')
+
+        # Get detailed record counts
+        record_counts = result.count_records()
+        print(f'Total records across all tables: {sum(record_counts.values())}')
+
         print('All output format methods working!')
         EOF
         python test_output_formats.py
-    
+
     # Only build docs on Python 3.9 to verify they build correctly during CI
     - name: Build docs
       if: matrix.python-version == '3.9'
       run: |
         python -m pip install -e ".[docs]"
         cd docs && make html
-    
+
     - name: Upload docs
       uses: actions/upload-artifact@v4
       if: matrix.python-version == '3.9'
@@ -86,32 +202,32 @@ jobs:
 
   package:
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
+
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
-    
+
     - name: Install build dependencies
       run: |
         python -m pip install --upgrade pip
         python -m pip install build wheel twine
-    
+
     - name: Build package
       run: |
         python -m build
-    
+
     - name: Test package
       run: |
         python -m twine check dist/*
-    
+
     - name: Upload package artifacts
       uses: actions/upload-artifact@v4
       with:
         name: dist
-        path: dist/ 
+        path: dist/

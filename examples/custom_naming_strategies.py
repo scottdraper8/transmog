@@ -1,5 +1,4 @@
-"""
-Example demonstrating custom naming strategies in Transmog.
+"""Example demonstrating custom naming strategies in Transmog.
 
 This example shows how to implement and use custom naming strategies
 for table and field names when processing complex JSON structures.
@@ -9,19 +8,16 @@ more intuitive table names for business users.
 
 import json
 import os
-import sys
 import re
-from typing import Any, Dict, List, Tuple, Optional
+import sys
+from typing import Any, Optional
 
 # Add parent directory to path to import transmog without installing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# Import from src package
-from transmog import Processor
-from transmog.config import extensions
-from transmog.config.settings import settings
-from transmog.config import configure
-
+# Import from transmog package
+from transmog import Processor, TransmogConfig
+from transmog.naming import register_field_name_strategy, register_table_name_strategy
 
 # Sample complex nested JSON with deeply nested fields
 COMPLEX_DATA = {
@@ -86,9 +82,8 @@ COMPLEX_DATA = {
 }
 
 
-def camel_case_strategy(components: List[str]) -> str:
-    """
-    Convert path components to camelCase.
+def camel_case_strategy(components: list[str]) -> str:
+    """Convert path components to camelCase.
 
     Args:
         components: List of path components
@@ -109,9 +104,8 @@ def camel_case_strategy(components: List[str]) -> str:
     return result
 
 
-def snake_case_strategy(components: List[str]) -> str:
-    """
-    Convert path components to snake_case.
+def snake_case_strategy(components: list[str]) -> str:
+    """Convert path components to snake_case.
 
     Args:
         components: List of path components
@@ -132,9 +126,10 @@ def snake_case_strategy(components: List[str]) -> str:
     return "_".join(processed_components)
 
 
-class DomainSpecificTableStrategy:
-    """
-    A class-based approach to domain-specific table naming.
+def domain_specific_table_strategy(
+    components: list[str], entity_name: str, path: str
+) -> Optional[str]:
+    """Create domain-specific table names based on component path.
 
     This strategy creates more intuitive table names by mapping technical path names
     to business-friendly domain names:
@@ -143,309 +138,248 @@ class DomainSpecificTableStrategy:
     - Campaigns become organization_marketing_campaigns
     - Channels become organization_marketing_channels
 
-    This approach is suitable for production environments where table naming
-    needs to be customized according to business domains.
-    """
-
-    def __init__(self):
-        """Initialize the strategy."""
-        self.original_extract_arrays = None
-        self.created_tables = {}
-
-    def get_domain_table_name(
-        self, path: str, entity_name: str, separator: str
-    ) -> Optional[str]:
-        """
-        Get a domain-specific table name based on the path.
-
-        Args:
-            path: Original path
-            entity_name: Entity name
-            separator: Separator character
-
-        Returns:
-            Domain-specific table name or None to use the default
-        """
-        path_lower = path.lower()
-
-        # Apply specific domain rules
-        if path_lower.endswith("departments"):
-            return f"{entity_name}_departments"
-
-        if "subdepartment" in path_lower:
-            return f"{entity_name}_teams"
-
-        if "campaign" in path_lower:
-            return f"{entity_name}_marketing_campaigns"
-
-        if "channel" in path_lower:
-            return f"{entity_name}_marketing_channels"
-
-        # Return None to use the default name
-        return None
-
-    def extract_arrays_wrapper(self, *args, **kwargs):
-        """
-        Wrapper for extract_arrays that applies domain-specific naming.
-
-        This is the function that will replace the original extract_arrays.
-        """
-        # Call the original function
-        result = self.original_extract_arrays(*args, **kwargs)
-
-        # Apply domain-specific naming to the result keys
-        entity_name = kwargs.get("entity_name", "root")
-        separator = kwargs.get("separator", "_")
-
-        # Only apply for our specific entity type
-        if entity_name == "organization":
-            new_result = {}
-
-            for path, items in result.items():
-                # Try to get a domain-specific name
-                domain_name = self.get_domain_table_name(path, entity_name, separator)
-
-                if domain_name:
-                    # Use the domain-specific name
-                    self.created_tables[path] = domain_name
-
-                    # If we already have items for this domain name, extend them
-                    if domain_name in new_result:
-                        new_result[domain_name].extend(items)
-                    else:
-                        new_result[domain_name] = items
-                else:
-                    # Keep the original key
-                    new_result[path] = items
-
-            return new_result
-
-        # For other entity types, return the original result
-        return result
-
-    def apply(self):
-        """
-        Apply this strategy by patching the extract_arrays function.
-
-        Returns:
-            The strategy instance for method chaining
-        """
-        from transmog.core import extractor
-
-        # Store the original function
-        self.original_extract_arrays = extractor.extract_arrays
-
-        # Replace with our wrapper
-        extractor.extract_arrays = self.extract_arrays_wrapper
-
-        return self
-
-    def restore(self):
-        """
-        Restore the original extract_arrays function.
-
-        Returns:
-            The strategy instance for method chaining
-        """
-        if self.original_extract_arrays:
-            from transmog.core import extractor
-
-            extractor.extract_arrays = self.original_extract_arrays
-
-        return self
-
-    def print_mapping(self):
-        """Print the mapping of original to domain-specific table names."""
-        if self.created_tables:
-            print("\nDomain-specific table mappings:")
-            for original, renamed in self.created_tables.items():
-                print(f"  {original} -> {renamed}")
-
-
-def register_custom_strategies() -> None:
-    """Register custom naming strategies with Transmog."""
-    # Register field naming strategies
-    extensions.register_naming_strategy("camelCase", camel_case_strategy)
-    extensions.register_naming_strategy("snake_case", snake_case_strategy)
-
-    # Note: The domain table strategy is implemented through the
-    # DomainSpecificTableStrategy class which directly patches the
-    # extract_arrays function, since the current extension API doesn't
-    # fully support custom table naming.
-
-
-def process_with_camel_case() -> Dict[str, Any]:
-    """
-    Process data using camelCase field naming.
+    Args:
+        components: Path components
+        entity_name: Entity name
+        path: Original path string
 
     Returns:
-        Processing result
+        Domain-specific table name or None to use default
     """
-    # Set the naming strategy - create a monkey-patched function that uses camelCase
-    from transmog.naming import conventions
+    path_lower = path.lower()
 
-    # Store the original function if we haven't already
-    if not hasattr(settings, "_original_field_name"):
-        settings._original_field_name = conventions.get_standard_field_name
+    # Apply specific domain rules
+    if "departments" in path_lower and "subdepartments" not in path_lower:
+        return f"{entity_name}_departments"
 
-    # Create a camelCase version
+    if "subdepartment" in path_lower:
+        return f"{entity_name}_teams"
+
+    if "campaign" in path_lower:
+        return f"{entity_name}_marketing_campaigns"
+
+    if "channel" in path_lower:
+        return f"{entity_name}_marketing_channels"
+
+    # Return None to use the default name
+    return None
+
+
+def print_mapping(table_mapping: dict[str, str]) -> None:
+    """Print table path to table name mapping."""
+    print("\nTable Path to Name Mapping:")
+    print("-" * 80)
+    for original_path, table_name in sorted(table_mapping.items()):
+        print(f"{original_path:40} -> {table_name}")
+
+
+def process_with_camel_case() -> dict[str, Any]:
+    """Process the data with camel case naming strategy."""
+    print("\n=== Processing with camelCase naming strategy ===")
+
+    # Define the camelCase field name function
     def camel_case_field_name(path: str, separator: str = ".") -> str:
-        components = path.split(separator) if path else []
+        """Convert dot-separated path to camelCase."""
+        if not path:
+            return ""
+
+        # Split by separator
+        components = path.split(separator)
         return camel_case_strategy(components)
 
-    # Replace the function
-    conventions.get_standard_field_name = camel_case_field_name
-
-    # Create processor with camelCase for field names
-    processor = Processor(
-        cast_to_string=True,
-        include_empty=False,
-        separator=".",  # Using dot notation for paths
+    # Create configuration with camelCase field naming
+    config = TransmogConfig.default().with_custom_naming(
+        field_name_strategy=camel_case_field_name
     )
 
-    # Process the data
-    result = processor.process(data=COMPLEX_DATA, entity_name="organization")
+    # Create processor and process the data
+    processor = Processor(config)
+    result = processor.process(COMPLEX_DATA, entity_name="organization")
 
-    # Restore original function
-    if hasattr(settings, "_original_field_name"):
-        conventions.get_standard_field_name = settings._original_field_name
+    # Print sample of the field names
+    tables = result.to_dict()
+    print("\nSample camelCase field names:")
+    print("-" * 80)
+    for name, values in tables.items():
+        if values:
+            print(f"Table: {name}")
+            print("Fields:", ", ".join(sorted(values[0].keys())[:5]) + "...")
+            break
 
-    return result
+    return tables
 
 
-def process_with_snake_case() -> Dict[str, Any]:
-    """
-    Process data using snake_case field naming.
+def process_with_snake_case() -> dict[str, Any]:
+    """Process the data with snake case naming strategy."""
+    print("\n=== Processing with snake_case naming strategy ===")
 
-    Returns:
-        Processing result
-    """
-    # Set the naming strategy - create a monkey-patched function that uses snake_case
-    from transmog.naming import conventions
-
-    # Store the original function if we haven't already
-    if not hasattr(settings, "_original_field_name"):
-        settings._original_field_name = conventions.get_standard_field_name
-
-    # Create a snake_case version
+    # Define the snake_case field name function
     def snake_case_field_name(path: str, separator: str = "_") -> str:
-        components = path.split(separator) if path else []
+        """Convert underscore-separated path to snake_case."""
+        if not path:
+            return ""
+
+        # Split by separator
+        components = path.split(separator)
         return snake_case_strategy(components)
 
-    # Replace the function
-    conventions.get_standard_field_name = snake_case_field_name
-
-    # Create processor with snake_case for field names
-    processor = Processor(
-        cast_to_string=True,
-        include_empty=False,
-        separator="_",  # Using underscore for paths
+    # Create configuration with snake_case field naming
+    config = TransmogConfig.default().with_custom_naming(
+        field_name_strategy=snake_case_field_name
     )
 
+    # Create processor and process the data
+    processor = Processor(config)
+    result = processor.process(COMPLEX_DATA, entity_name="organization")
+
+    # Print sample of the field names
+    tables = result.to_dict()
+    print("\nSample snake_case field names:")
+    print("-" * 80)
+    for name, values in tables.items():
+        if values:
+            print(f"Table: {name}")
+            print("Fields:", ", ".join(sorted(values[0].keys())[:5]) + "...")
+            break
+
+    return tables
+
+
+def process_with_domain_tables() -> dict[str, Any]:
+    """Process the data with domain-specific table naming."""
+    print("\n=== Processing with domain-specific table naming ===")
+
+    # Register the domain-specific table naming strategy
+    register_table_name_strategy(domain_specific_table_strategy)
+
+    # Create a processor with default configuration
+    processor = Processor()
+
     # Process the data
-    result = processor.process(data=COMPLEX_DATA, entity_name="organization")
+    result = processor.process(COMPLEX_DATA, entity_name="organization")
 
-    # Restore original function
-    if hasattr(settings, "_original_field_name"):
-        conventions.get_standard_field_name = settings._original_field_name
+    # Get the tables
+    tables = result.to_dict()
 
-    return result
+    # Print the tables and their row counts
+    print("\nDomain-specific tables:")
+    print("-" * 80)
+    for table_name, rows in sorted(tables.items()):
+        print(f"{table_name:40} ({len(rows)} rows)")
+
+    return tables
 
 
-def process_with_domain_tables() -> Dict[str, Any]:
-    """
-    Process data using domain-specific table naming.
+def process_with_combined_strategies() -> dict[str, Any]:
+    """Process the data with combined naming strategies."""
+    print("\n=== Processing with combined naming strategies ===")
 
-    This approach uses a class-based strategy to create more intuitive,
-    business-friendly table names from technical paths:
-    - Departments -> organization_departments
-    - SubDepartments -> organization_teams
-    - Campaigns -> organization_marketing_campaigns
-    - Channels -> organization_marketing_channels
+    # Register both strategies
+    register_table_name_strategy(domain_specific_table_strategy)
+    register_field_name_strategy(camel_case_strategy)
 
-    Returns:
-        Processing result with domain-specific table names
-    """
-    # Create and apply the strategy
-    strategy = DomainSpecificTableStrategy().apply()
+    # Create a processor with custom configuration
+    config = TransmogConfig.default().with_naming(
+        # Setting other naming options
+        abbreviate_field_names=True,
+        max_field_component_length=8,
+        preserve_root_component=True,
+        preserve_leaf_component=True,
+        # Adding custom abbreviations
+        custom_abbreviations={
+            "organization": "org",
+            "headquarters": "hq",
+            "location": "loc",
+            "department": "dept",
+            "marketing": "mkt",
+        },
+    )
 
-    try:
-        # Create processor
-        processor = Processor(
-            cast_to_string=True,
-            include_empty=False,
-            separator=".",  # Using dot notation for paths
-        )
+    processor = Processor(config)
 
-        # Process the data
-        result = processor.process(data=COMPLEX_DATA, entity_name="organization")
+    # Process the data
+    result = processor.process(COMPLEX_DATA, entity_name="organization")
 
-        # Print debug info
-        strategy.print_mapping()
+    # Get the tables
+    tables = result.to_dict()
 
-        return result
-    finally:
-        # Always restore the original function
-        strategy.restore()
+    # Print the tables and a sample of their fields
+    print("\nCombined naming strategies result:")
+    print("-" * 80)
+    for table_name, rows in sorted(tables.items()):
+        if rows:
+            print(f"Table: {table_name} ({len(rows)} rows)")
+            print("Sample fields:")
+            for field_name in sorted(rows[0].keys())[:5]:
+                print(f"  - {field_name}")
+            print("")
+
+    return tables
 
 
 def main():
-    """Run the example."""
-    # Register custom strategies
-    register_custom_strategies()
-
+    """Run the naming strategies example."""
     # Create output directory
-    output_dir = os.path.join(os.path.dirname(__file__), "output")
+    output_dir = os.path.join(os.path.dirname(__file__), "output", "naming_strategies")
     os.makedirs(output_dir, exist_ok=True)
 
-    # Process with camelCase fields
-    print("\n=== Processing with camelCase field names ===")
-    camel_result = process_with_camel_case()
+    print("Custom Naming Strategies Example")
+    print("================================")
+    print(
+        "\nThis example demonstrates different naming strategies for tables and fields."
+    )
 
-    # Write camelCase results
-    camel_out_path = os.path.join(output_dir, "camel_case_main.json")
-    with open(camel_out_path, "w") as f:
-        json.dump(camel_result.get_main_table(), f, indent=2)
+    # Process with camelCase field names
+    camel_case_tables = process_with_camel_case()
 
-    print(f"Main table written to {camel_out_path}")
-    print(f"Child tables: {camel_result.get_table_names()}")
-
-    # Process with snake_case fields
-    print("\n=== Processing with snake_case field names ===")
-    snake_result = process_with_snake_case()
-
-    # Write snake_case results
-    snake_out_path = os.path.join(output_dir, "snake_case_main.json")
-    with open(snake_out_path, "w") as f:
-        json.dump(snake_result.get_main_table(), f, indent=2)
-
-    print(f"Main table written to {snake_out_path}")
-    print(f"Child tables: {snake_result.get_table_names()}")
+    # Process with snake_case field names
+    snake_case_tables = process_with_snake_case()
 
     # Process with domain-specific table names
-    print("\n=== Processing with domain-specific table names ===")
-    domain_result = process_with_domain_tables()
+    domain_tables = process_with_domain_tables()
 
-    # Write domain-specific results
-    domain_out_path = os.path.join(output_dir, "domain_tables_main.json")
-    with open(domain_out_path, "w") as f:
-        json.dump(domain_result.get_main_table(), f, indent=2)
+    # Process with combined strategies
+    combined_tables = process_with_combined_strategies()
 
-    print(f"Main table written to {domain_out_path}")
-    print(f"Child tables: {domain_result.get_table_names()}")
+    # Save results to files for inspection
+    # CamelCase
+    with open(os.path.join(output_dir, "camel_case_output.json"), "w") as f:
+        json.dump(camel_case_tables, f, indent=2)
 
-    # Compare the table names from different strategies
-    print("\n=== Table Name Comparison ===")
-    camel_tables = camel_result.get_table_names()
-    domain_tables = domain_result.get_table_names()
+    # Snake case
+    with open(os.path.join(output_dir, "snake_case_output.json"), "w") as f:
+        json.dump(snake_case_tables, f, indent=2)
 
-    print("Default naming strategy tables:")
-    for table in camel_tables:
-        print(f"  - {table}")
+    # Domain-specific
+    with open(os.path.join(output_dir, "domain_specific_output.json"), "w") as f:
+        json.dump(domain_tables, f, indent=2)
 
-    print("\nDomain-specific naming strategy tables:")
-    for table in domain_tables:
-        print(f"  - {table}")
+    # Combined strategies
+    with open(os.path.join(output_dir, "combined_strategies_output.json"), "w") as f:
+        json.dump(combined_tables, f, indent=2)
+
+    print(f"\nAll results written to: {output_dir}")
+
+    print("\nSummary of Naming Strategies:")
+    print("-" * 80)
+    print("1. Field Name Strategies:")
+    print("   - camelCase: Converts 'first_name' to 'firstName'")
+    print("   - snake_case: Converts 'firstName' to 'first_name'")
+
+    print("\n2. Table Name Strategies:")
+    print("   - Domain-specific: Maps technical paths to business domain names")
+    print(
+        "     e.g., 'organization_departments_subDepartments' -> 'organization_teams'"
+    )
+
+    print("\n3. Combined Strategies:")
+    print("   - Leverage both table and field naming together")
+    print("   - Add abbreviations and other naming options for complete customization")
+
+    print("\nImplementation Approaches:")
+    print("1. Function-based: Simple functions that map components to names")
+    print("2. Registration: Register strategies with the transmog naming system")
+    print("3. Configuration: Configure naming options through TransmogConfig")
 
 
 if __name__ == "__main__":

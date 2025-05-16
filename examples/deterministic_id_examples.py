@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
-"""
-Examples of deterministic ID generation in Transmog.
+"""Examples of deterministic ID generation in Transmog.
 
-This script demonstrates the different approaches to ID generation:
-1. Default random UUIDs
-2. Field-based deterministic IDs at different path levels
-3. Custom ID generation with a custom function
+This script demonstrates different approaches to generating
+deterministic IDs in Transmog, which ensures consistent IDs
+across multiple processing runs with the same data.
 
 Each example processes the same data twice to demonstrate the
 consistency (or lack thereof) of IDs across multiple runs.
 """
 
+import os
+import sys
 import uuid
-import json
-from datetime import datetime
-import pandas as pd
+
+# Add parent directory to path to import transmog without installing
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# Import from transmog package
 from transmog import Processor
 
 
@@ -72,13 +74,14 @@ def example_random_uuids():
     print_ids(result2, "Second Run")
 
     print(
-        "\nNotice that the IDs are different in each run, even though the data is the same."
+        "\nNotice that the IDs are different in each run, "
+        "even though the data is the same."
     )
 
 
 def example_root_deterministic_ids():
-    """Example of deterministic IDs at the root level only."""
-    print_header("Example 2: Root-level Deterministic IDs")
+    """Example of deterministic IDs at root level only."""
+    print_header("Example 2: Root-Level Deterministic IDs")
 
     # Create test data
     data = {
@@ -89,8 +92,9 @@ def example_root_deterministic_ids():
     }
 
     # Create processor with deterministic ID for root level only
-    processor = Processor(
-        deterministic_id_fields={
+    # Use the with_deterministic_ids factory method with table-prefixed mapping
+    processor = Processor.with_deterministic_ids(
+        {
             "": "id"  # Root level uses "id" field
         }
     )
@@ -133,13 +137,13 @@ def example_multi_level_deterministic_ids():
         ],
     }
 
-    # Create processor with deterministic IDs at multiple levels
-    processor = Processor(
-        deterministic_id_fields={
+    # Create processor with deterministic IDs at multiple levels using table names
+    processor = Processor.with_deterministic_ids(
+        {
             "": "id",  # Root level uses "id" field
-            "customers": "customer_id",  # Customers use "customer_id" field
-            "customers_orders": "order_id",  # Orders use "order_id" field
-            "products": "sku",  # Products use "sku" field
+            "store_customers": "customer_id",  # Customers use "customer_id" field
+            "store_customers_orders": "order_id",  # Orders use "order_id" field
+            "store_products": "sku",  # Products use "sku" field
         }
     )
 
@@ -156,9 +160,9 @@ def example_multi_level_deterministic_ids():
     print("ensuring consistency across processing.")
 
 
-def example_wildcard_pattern():
-    """Example of using wildcard patterns for deterministic IDs."""
-    print_header("Example 4: Wildcard Pattern for Deterministic IDs")
+def example_table_name_strategy():
+    """Example of using table names for deterministic IDs."""
+    print_header("Example 4: Table Name Strategy for Deterministic IDs")
 
     # Create test data
     data = {
@@ -172,15 +176,19 @@ def example_wildcard_pattern():
         ],
     }
 
-    # Create processor with wildcard pattern
-    processor = Processor(
-        deterministic_id_fields={
-            "*": "id"  # Use "id" field at all paths
+    # Create processor with table name-based deterministic IDs
+    # Note: This differs from the old wildcard pattern approach
+    processor = Processor.with_deterministic_ids(
+        {
+            "": "id",  # Root level uses "id" field
+            "store_customers": "id",  # Customers table uses "id" field
+            "store_products": "id",  # Products table uses "id" field
+            "store_events": "id",  # Events table uses "id" field
         }
     )
 
     # Process the same data twice
-    print("\nProcessing the same data twice with wildcard pattern...")
+    print("\nProcessing the same data twice with table name strategy...")
     result1 = processor.process(data, entity_name="store")
     result2 = processor.process(data, entity_name="store")
 
@@ -230,7 +238,7 @@ def example_custom_id_generation():
         return str(uuid.uuid4())
 
     # Create processor with custom ID generation
-    processor = Processor(id_generation_strategy=custom_id_generator)
+    processor = Processor.with_custom_id_generation(custom_id_generator)
 
     # Process the same data twice
     print("\nProcessing the same data twice with custom ID generation...")
@@ -245,217 +253,156 @@ def example_custom_id_generation():
     print("while still maintaining consistency across runs.")
 
 
-def example_incremental_loading():
-    """Example demonstrating incremental loading with deterministic IDs."""
-    print_header("Example 6: Incremental Loading with Deterministic IDs")
-
-    # Initial data set
-    initial_data = {
-        "id": "STORE001",
-        "name": "Main Store",
-        "customers": [
-            {"customer_id": "CUST001", "name": "Customer 1"},
-            {"customer_id": "CUST002", "name": "Customer 2"},
-        ],
-        "products": [
-            {"sku": "PROD001", "name": "Product 1", "price": 25.00},
-            {"sku": "PROD002", "name": "Product 2", "price": 50.00},
-        ],
-    }
-
-    # Additional data (incremental update)
-    additional_data = {
-        "id": "STORE001",
-        "name": "Main Store Updated",  # Name updated
-        "customers": [
-            {
-                "customer_id": "CUST002",
-                "name": "Customer 2 Updated",
-            },  # Updated customer
-            {"customer_id": "CUST003", "name": "Customer 3"},  # New customer
-        ],
-        "products": [
-            {"sku": "PROD003", "name": "Product 3", "price": 75.00}  # New product
-        ],
-    }
-
-    # Create processor with deterministic IDs
-    processor = Processor(
-        deterministic_id_fields={
-            "": "id",
-            "customers": "customer_id",
-            "products": "sku",
-        }
-    )
-
-    # Process initial data
-    print("\nProcessing initial data...")
-    initial_result = processor.process(initial_data, entity_name="store")
-    print_ids(initial_result, "Initial Data")
-
-    # Process additional data (incremental update)
-    print("\nProcessing additional data (incremental update)...")
-    additional_result = processor.process(additional_data, entity_name="store")
-    print_ids(additional_result, "Additional Data")
-
-    # Show how to identify new vs. updated records
-    print("\nDemonstrating record matching across batches:")
-
-    # Extract IDs from both runs
-    initial_tables = initial_result.to_dict()
-    additional_tables = additional_result.to_dict()
-
-    # Compare customer IDs
-    print("\nCustomer Records Analysis:")
-    initial_customer_ids = {
-        r["customer_id"]: r["__extract_id"]
-        for r in initial_tables.get("store_customers", [])
-    }
-    additional_customer_ids = {
-        r["customer_id"]: r["__extract_id"]
-        for r in additional_tables.get("store_customers", [])
-    }
-
-    # Check for matching IDs (updated records)
-    for customer_id, extract_id in additional_customer_ids.items():
-        if customer_id in initial_customer_ids:
-            match = (
-                "MATCH (updated)"
-                if extract_id == initial_customer_ids[customer_id]
-                else "ID MISMATCH"
-            )
-            print(f"  Customer {customer_id}: {match}")
-        else:
-            print(f"  Customer {customer_id}: NEW")
-
-    print("\nThis demonstrates how deterministic IDs allow you to match records across")
-    print(
-        "incremental data loads, making it easier to identify new vs. updated records."
-    )
-
-
 def example_comparison_table():
-    """Create a comparison table of the different ID generation approaches."""
+    """Create a comparison of different ID generation approaches."""
     print_header("Comparison of ID Generation Approaches")
 
-    # Create simple test data
+    # Create test data
     data = {
-        "id": "RECORD123",
-        "name": "Test Record",
-        "items": [
-            {"item_id": "ITEM001", "name": "Item 1"},
-            {"item_id": "ITEM002", "name": "Item 2"},
+        "id": "ROOT123",
+        "customer_id": "ROOT_CUST",
+        "name": "Example Root",
+        "customers": [
+            {
+                "id": "CUST001_ID",
+                "customer_id": "CUST001",
+                "name": "Customer 1",
+                "orders": [{"id": "ORD001_ID", "order_id": "ORD001", "total": 100.50}],
+            }
         ],
     }
 
-    # Define processors with different strategies
-    processors = {
-        "Random UUIDs (Default)": Processor(),
-        "Root Deterministic": Processor(deterministic_id_fields={"": "id"}),
-        "Multi-level Deterministic": Processor(
-            deterministic_id_fields={"": "id", "items": "item_id"}
-        ),
-        "Custom Function": Processor(
-            id_generation_strategy=lambda r: f"CUSTOM-{r.get('id', r.get('item_id', 'UNKNOWN'))}"
-        ),
-    }
+    # 1. Default random UUIDs
+    random_processor = Processor.default()
+    random_result = random_processor.process(data, entity_name="store")
 
-    # Process data with each strategy twice
-    results = {}
-    for name, processor in processors.items():
-        # Process twice to show consistency (or lack thereof)
-        run1 = processor.process(data, entity_name="test")
-        run2 = processor.process(data, entity_name="test")
+    # 2. Root-level deterministic IDs
+    root_processor = Processor.with_deterministic_ids({"": "id"})
+    root_result = root_processor.process(data, entity_name="store")
 
-        # Store results
-        results[name] = {"Run 1": run1, "Run 2": run2}
+    # 3. Multi-level with customer_id and order_id fields
+    multilevel_processor = Processor.with_deterministic_ids(
+        {
+            "": "id",
+            "store_customers": "customer_id",
+            "store_customers_orders": "order_id",
+        }
+    )
+    multilevel_result = multilevel_processor.process(data, entity_name="store")
 
-    # Create comparison table
-    print("\nID Consistency Across Multiple Runs:\n")
+    # 4. Multi-level with id field consistently
+    consistent_id_processor = Processor.with_deterministic_ids(
+        {
+            "": "id",
+            "store_customers": "id",
+            "store_customers_orders": "id",
+        }
+    )
+    consistent_id_result = consistent_id_processor.process(data, entity_name="store")
 
-    # Table headers
-    headers = [
-        "Strategy",
-        "Root ID (Run 1)",
-        "Root ID (Run 2)",
-        "Same?",
-        "Item IDs Same?",
-        "Notes",
-    ]
+    # 5. Custom ID generation
+    def prefix_id_generator(record):
+        """Generate IDs with prefixes based on available fields."""
+        if "id" in record:
+            return f"PREFIX-{record['id']}"
+        elif "customer_id" in record:
+            return f"PREFIX-{record['customer_id']}"
+        elif "order_id" in record:
+            return f"PREFIX-{record['order_id']}"
+        return str(uuid.uuid4())
 
-    # Table rows
-    rows = []
-    for name, runs in results.items():
-        root_id1 = runs["Run 1"].to_dict()["main"][0]["__extract_id"]
-        root_id2 = runs["Run 2"].to_dict()["main"][0]["__extract_id"]
+    custom_processor = Processor.with_custom_id_generation(prefix_id_generator)
+    custom_result = custom_processor.process(data, entity_name="store")
 
-        # Check if item IDs are the same across runs
-        items1 = runs["Run 1"].to_dict().get("test_items", [])
-        items2 = runs["Run 2"].to_dict().get("test_items", [])
+    # Print comparison table
+    print("\nComparison of different ID generation approaches:\n")
+    print(
+        f"{'Approach':<30} | {'Root ID':<36} | {'Customer ID':<36} | {'Order ID':<36}"
+    )
+    print("-" * 140)
 
-        if items1 and items2:
-            # Sort by item_id for consistent comparison
-            items1.sort(key=lambda x: x.get("item_id", ""))
-            items2.sort(key=lambda x: x.get("item_id", ""))
-
-            items_same = all(
-                items1[i]["__extract_id"] == items2[i]["__extract_id"]
-                for i in range(min(len(items1), len(items2)))
-            )
-        else:
-            items_same = "N/A"
-
-        # Add notes based on strategy
-        if name == "Random UUIDs (Default)":
-            notes = "Different IDs each run"
-        elif name == "Root Deterministic":
-            notes = "Consistent root ID, random item IDs"
-        elif name == "Multi-level Deterministic":
-            notes = "Consistent IDs at all levels"
-        else:
-            notes = "Custom formatting with consistency"
-
-        # Add row
-        rows.append(
-            [
-                name,
-                root_id1[:8] + "...",  # Truncate for display
-                root_id2[:8] + "...",
-                "Yes" if root_id1 == root_id2 else "No",
-                "Yes"
-                if items_same == True
-                else "No"
-                if items_same == False
-                else items_same,
-                notes,
-            ]
+    def get_ids(result):
+        """Extract IDs from tables in result."""
+        tables = result.to_dict()
+        root_id = tables["main"][0]["__extract_id"] if tables["main"] else "N/A"
+        customer_id = (
+            tables["store_customers"][0]["__extract_id"]
+            if "store_customers" in tables and tables["store_customers"]
+            else "N/A"
         )
+        order_id = (
+            tables["store_customers_orders"][0]["__extract_id"]
+            if "store_customers_orders" in tables and tables["store_customers_orders"]
+            else "N/A"
+        )
+        return root_id, customer_id, order_id
 
-    # Print as markdown table
-    print(f"| {' | '.join(headers)} |")
-    print(f"| {' | '.join(['---' for _ in headers])} |")
-    for row in rows:
-        print(f"| {' | '.join(str(cell) for cell in row)} |")
+    random_ids = get_ids(random_result)
+    root_ids = get_ids(root_result)
+    multilevel_ids = get_ids(multilevel_result)
+    consistent_ids = get_ids(consistent_id_result)
+    custom_ids = get_ids(custom_result)
+
+    print(
+        f"{'1. Default Random UUIDs':<30} | {random_ids[0]:<36} | "
+        f"{random_ids[1]:<36} | {random_ids[2]:<36}"
+    )
+    print(
+        f"{'2. Root-level Deterministic':<30} | {root_ids[0]:<36} | "
+        f"{root_ids[1]:<36} | {root_ids[2]:<36}"
+    )
+    print(
+        f"{'3. Multi-level (different fields)':<30} | {multilevel_ids[0]:<36} | "
+        f"{multilevel_ids[1]:<36} | {multilevel_ids[2]:<36}"
+    )
+    print(
+        f"{'4. Multi-level (consistent field)':<30} | {consistent_ids[0]:<36} | "
+        f"{consistent_ids[1]:<36} | {consistent_ids[2]:<36}"
+    )
+    print(
+        f"{'5. Custom ID generator':<30} | {custom_ids[0]:<36} | "
+        f"{custom_ids[1]:<36} | {custom_ids[2]:<36}"
+    )
+
+    print("\nKey observations:")
+    print("- Default: All IDs are random UUIDs")
+    print("- Root-level: Only the root record has a deterministic ID")
+    print("- Multi-level (different fields): Each level uses a different source field")
+    print(
+        "- Multi-level (consistent field): All levels use the 'id' field consistently"
+    )
+    print("- Custom generator: Complete flexibility with custom prefixing and logic")
 
 
 def main():
     """Run all examples."""
-    print("\nDeterministic ID Generation Examples")
-    print(
-        "\nThis script demonstrates different approaches to ID generation in Transmog,"
-    )
-    print("including random UUIDs, deterministic IDs, and custom ID generation.")
+    print("\nTransmog Deterministic ID Examples")
+    print("===================================")
+    print("This script demonstrates various approaches to generating")
+    print("deterministic IDs in Transmog, ensuring consistency across")
+    print("multiple processing runs with the same data.")
 
-    # Run individual examples
+    # Create output directory for any file outputs
+    output_dir = os.path.join(os.path.dirname(__file__), "output", "deterministic_ids")
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Example 1: Default Random UUIDs
     example_random_uuids()
-    example_root_deterministic_ids()
-    example_multi_level_deterministic_ids()
-    example_wildcard_pattern()
-    example_custom_id_generation()
-    example_incremental_loading()
-    example_comparison_table()
 
-    print("\nEnd of examples.")
+    # Example 2: Root-Level Deterministic IDs
+    example_root_deterministic_ids()
+
+    # Example 3: Multi-level Deterministic IDs
+    example_multi_level_deterministic_ids()
+
+    # Example 4: Table Name Strategy
+    example_table_name_strategy()
+
+    # Example 5: Custom ID Generation
+    example_custom_id_generation()
+
+    # Additional: Comparison Table
+    example_comparison_table()
 
 
 if __name__ == "__main__":

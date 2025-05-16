@@ -2,6 +2,8 @@
 
 This guide provides instructions and best practices for testing contributions to Transmog.
 
+> **Note**: A more concise summary of the test structure is also available in the tests directory.
+
 ## Testing Approach
 
 Transmog uses these testing practices:
@@ -11,32 +13,80 @@ Transmog uses these testing practices:
 3. **Multiple test types**: Include unit, integration, and performance tests
 4. **Test cases**: Use realistic examples where possible
 5. **Continuous integration**: Tests run automatically in CI/CD
+6. **Interface-based testing**: Tests focus on behavior rather than implementation details
 
 ## Test Structure
 
-The test suite is organized as follows:
+The test suite is organized with an interface-based approach that focuses on behavior rather than implementation
+details:
 
-```
+```text
 tests/
-├── unit/               # Unit tests for individual components
-│   ├── test_transformer.py
-│   ├── test_path.py
-│   ├── test_processors.py
-│   └── ...
-├── integration/        # Integration tests for component interactions
+├── benchmarks/           # Performance benchmark tests
+│   ├── test_csv_reader_benchmarks.py
+│   └── test_output_format_benchmarks.py
+├── config/               # Configuration tests
+│   ├── test_config_propagation.py
+│   └── test_settings.py
+├── core/                 # Core functionality tests
+│   ├── test_extractor.py
+│   ├── test_flattener.py
+│   ├── test_hierarchy.py
+│   ├── test_metadata.py
+│   ├── test_processor.py
+│   └── test_*_strategy.py
+├── dependencies/         # Dependency management tests
+│   └── test_dependency_manager.py
+├── error/                # Error handling tests
+│   └── test_error_handling.py
+├── fixtures/             # Test data files
+│   ├── sample.csv
+│   ├── sample_bad_format.csv
+│   ├── sample_empty.csv
+│   └── sample_with_nulls.csv
+├── formats/              # Format conversion tests
+│   └── test_native_formats.py
+├── helpers/              # Shared test utilities and mixins
+├── integration/          # End-to-end integration tests
+│   ├── test_csv_integration.py
+│   ├── test_json_integration.py
 │   ├── test_end_to_end.py
-│   ├── test_io_formats.py
-│   └── ...
-├── performance/        # Performance benchmarks
-│   ├── test_large_datasets.py
-│   ├── test_nested_structures.py
-│   └── ...
-├── fixtures/           # Test data and fixtures
-│   ├── sample_data.json
-│   ├── expected_results.json
-│   └── ...
-└── conftest.py         # Shared pytest fixtures
+│   └── test_*_integration.py
+├── interfaces/           # Interface contracts definitions
+│   ├── test_flattener_interface.py
+│   ├── test_processor_interface.py
+│   ├── test_strategy_interface.py
+│   └── test_*_interface.py
+├── process/              # Process tests
+│   └── test_streaming_result.py
+├── readers/              # Input format reader tests
+│   ├── test_csv_reader.py
+│   └── test_json_reader.py
+└── writers/              # Output format writer tests
+    ├── test_csv_writer.py
+    ├── test_json_writer.py
+    ├── test_parquet_writer.py
+    └── test_*_streaming_writer.py
 ```
+
+### Test Organization Philosophy
+
+Tests are organized based on the component they test, not by test type. Each component has its own directory
+with tests that verify its behavior.
+
+The `interfaces/` directory contains abstract test classes that define the expected behavior for each
+component. The concrete test implementations in other directories inherit from these interfaces.
+
+This approach ensures that components are tested against their interfaces rather than implementation
+details, making the tests more resilient to refactoring.
+
+The test suite follows these key principles:
+
+1. **Interface-First Testing**: Tests define the expected behavior through interfaces
+2. **Component Separation**: Each component has its own dedicated test modules
+3. **Integration Tests**: End-to-end tests ensure components work together correctly
+4. **Benchmarks**: Performance tests are separated to avoid slowing down the regular test suite
+5. **Fixtures**: Common test data is shared through fixtures
 
 ## Running Tests
 
@@ -52,10 +102,28 @@ pytest
 pytest -v
 
 # Run a specific test file
-pytest tests/unit/test_transformer.py
+pytest tests/core/test_flattener.py
 
 # Run a specific test
-pytest tests/unit/test_transformer.py::test_transform_nested_dict
+pytest tests/core/test_flattener.py::test_flattener_with_config
+
+# Run tests by directory
+pytest tests/integration/
+
+# Run tests by pattern matching
+pytest -k "flattener"
+```
+
+### Special Test Categories
+
+Some tests are tagged with markers for selective execution:
+
+```bash
+# Run benchmark tests only
+pytest -m benchmark
+
+# Run memory usage tests only
+pytest -m memory
 ```
 
 ### Test Coverage
@@ -83,86 +151,179 @@ Performance tests are separate from regular tests to avoid increasing the durati
 
 ```bash
 # Run performance tests
-pytest tests/performance/
+pytest tests/benchmarks/
 
 # Run a specific performance test
-pytest tests/performance/test_large_datasets.py
+pytest tests/benchmarks/test_output_format_benchmarks.py
 ```
 
 ## Writing Tests
 
 ### Unit Tests
 
-Unit tests focus on testing individual components in isolation. Here's an example of a unit test:
+Unit tests focus on testing individual components in isolation. Here's an example that shows interface-based
+testing from `tests/core/test_flattener.py`:
 
 ```python
+"""
+Tests for the flattener implementation.
+
+This module tests the core flattener functionality using the interface-based approach.
+"""
+
 import pytest
-from transmog import Transformer
-from transmog.processors import string_processor
+from typing import Dict, List, Any, Optional
 
-def test_string_processor():
-    """Test that the string processor correctly handles strings."""
-    # Test with a string value
-    assert string_processor("hello") == "hello"
-    
-    # Test with a non-string value
-    assert string_processor(123) == 123
-    
-    # Test with None
-    assert string_processor(None) is None
+from transmog.core.flattener import flatten_json
+from transmog.error import ProcessingError
+from transmog.config import TransmogConfig
 
-def test_transformer_init():
-    """Test that a Transformer can be initialized with various options."""
-    # Test default initialization
-    transformer = Transformer()
-    assert transformer.delimiter == "."
-    
-    # Test custom initialization
-    transformer = Transformer(delimiter="/", preserve_arrays=True)
-    assert transformer.delimiter == "/"
-    assert transformer.preserve_arrays is True
+# Import and inherit from the interface
+from tests.interfaces.test_flattener_interface import AbstractFlattenerTest
+
+
+class TestFlattener(AbstractFlattenerTest):
+    """
+    Tests for the flattener module.
+
+    Inherits from AbstractFlattenerTest to ensure it follows the interface-based testing pattern.
+    """
+
+    def test_flattener_with_config(self, simple_data):
+        """Test flattening with a TransmogConfig object."""
+        # Create processor with explicit configuration
+        proc_config = (
+            TransmogConfig.default()
+            .with_naming(separator="_", abbreviate_field_names=False)
+            .with_processing(cast_to_string=False)
+        )
+
+        # Use the TransmogConfig to get the parameters
+        flattened = flatten_json(
+            simple_data,
+            separator=proc_config.naming.separator,
+            cast_to_string=proc_config.processing.cast_to_string,
+            abbreviate_field_names=proc_config.naming.abbreviate_field_names,
+        )
+
+        # Check basic fields are preserved
+        assert flattened["id"] == 1
+        assert flattened["name"] == "Test"
+
+        # Check nested fields are flattened
+        assert "address_street" in flattened
+        assert "address_city" in flattened
+        assert "address_state" in flattened
 ```
+
+### Interface-Based Testing
+
+Transmog uses an interface-based testing approach where abstract test classes define the expected behavior,
+and concrete test implementations inherit from them. Here's an example from `tests/interfaces/test_processor_interface.p
+y`:
+
+```python
+class AbstractProcessorTest:
+    """
+    Abstract base class for processor tests.
+
+    This class defines a standardized set of tests that should apply to all processor implementations.
+    Subclasses must define appropriate fixtures.
+    """
+
+    @pytest.fixture
+    def processor(self):
+        """Create a standard processor instance."""
+        config = (
+            TransmogConfig.default()
+            .with_processing(cast_to_string=True)
+            .with_naming(separator="_", abbreviate_field_names=False)
+        )
+        return Processor(config=config)
+
+    @pytest.fixture
+    def simple_data(self):
+        """Create a simple data structure."""
+        return {
+            "id": "123",
+            "name": "Test Entity",
+            "addr": {"street": "123 Main St", "city": "Anytown", "zip": "12345"},
+        }
+
+    def test_process_simple_data(self, processor, simple_data):
+        """Test processing simple data."""
+        result = processor.process(simple_data, entity_name="test")
+
+        # Verify the result is a ProcessingResult
+        assert isinstance(result, ProcessingResult)
+
+        # Verify main records
+        main_records = result.get_main_table()
+        assert len(main_records) == 1
+        assert main_records[0]["id"] == "123"
+        assert main_records[0]["name"] == "Test Entity"
+
+        # Check for flattened address fields
+        assert "addr_street" in main_records[0]
+        assert "addr_city" in main_records[0]
+        assert "addr_zip" in main_records[0]
+```
+
+This approach ensures that any implementation of the processor interface will be tested consistently
+against the same behavioral expectations.
 
 ### Integration Tests
 
-Integration tests check how components work together:
+Integration tests ensure different components work together correctly. Here's an example of how integration
+tests are structured:
 
 ```python
-import pytest
-from transmog import Transformer
-from transmog.path import PathResolver
-from transmog.processors import default_processors
-
-def test_end_to_end_transformation():
-    """Test a complete transformation process."""
-    # Sample input data
+# From tests/integration/test_end_to_end.py
+def test_process_complex_data_with_deterministic_ids():
+    """Test end-to-end processing of complex nested data with deterministic IDs."""
+    # Sample data with nested structures and arrays
     data = {
         "user": {
-            "id": 1,
+            "id": "user123",
             "name": "Test User",
-            "addresses": [
-                {"type": "home", "city": "New York"},
-                {"type": "work", "city": "Boston"}
+            "contact": {
+                "email": "test@example.com",
+                "phone": "555-1234"
+            },
+            "orders": [
+                {"id": "order1", "amount": 99.99},
+                {"id": "order2", "amount": 45.50}
             ]
         }
     }
-    
-    # Expected output
-    expected = {
-        "user.id": 1,
-        "user.name": "Test User",
-        "user.addresses.0.type": "home",
-        "user.addresses.0.city": "New York",
-        "user.addresses.1.type": "work",
-        "user.addresses.1.city": "Boston"
-    }
-    
-    # Perform transformation
-    transformer = Transformer()
-    result = transformer.transform(data)
-    
-    # Verify the result
-    assert result.to_dict() == expected
+
+    # Configure processor with deterministic IDs
+    config = TransmogConfig.with_deterministic_ids({
+        "": "id",                     # Root level uses "id" field
+        "user_orders": "id"           # Order records use "id" field
+    })
+
+    processor = Processor(config=config)
+
+    # Process the data
+    result = processor.process(data)
+
+    # Verify main table
+    main_table = result.to_dict()["main"]
+    assert len(main_table) == 1
+    assert main_table[0]["user_id"] == "user123"
+
+    # Verify orders table
+    orders_table = result.to_dict()["user_orders"]
+    assert len(orders_table) == 2
+
+    # Verify deterministic IDs were used
+    assert orders_table[0]["__extract_id"].startswith("order1")
+    assert orders_table[1]["__extract_id"].startswith("order2")
+
+    # Verify parent-child relationships
+    assert orders_table[0]["__parent_extract_id"] == main_table[0]["__extract_id"]
+    assert orders_table[1]["__parent_extract_id"] == main_table[0]["__extract_id"]
 ```
 
 ### Testing with Fixtures
@@ -178,12 +339,12 @@ import os
 def sample_data():
     """Load sample data from a fixture file."""
     fixture_path = os.path.join(
-        os.path.dirname(__file__), 
-        "..", 
-        "fixtures", 
+        os.path.dirname(__file__),
+        "..",
+        "fixtures",
         "sample_data.json"
     )
-    
+
     with open(fixture_path, 'r') as f:
         return json.load(f)
 
@@ -191,12 +352,12 @@ def sample_data():
 def expected_result():
     """Load expected result from a fixture file."""
     fixture_path = os.path.join(
-        os.path.dirname(__file__), 
-        "..", 
-        "fixtures", 
+        os.path.dirname(__file__),
+        "..",
+        "fixtures",
         "expected_results.json"
     )
-    
+
     with open(fixture_path, 'r') as f:
         return json.load(f)
 
@@ -219,23 +380,14 @@ from transmog.errors import TransformError
 def test_invalid_input():
     """Test that appropriate errors are raised for invalid inputs."""
     transformer = Transformer()
-    
+
     # Test with None
     with pytest.raises(ValueError):
         transformer.transform(None)
-    
+
     # Test with invalid type
     with pytest.raises(TypeError):
         transformer.transform(123)
-    
-    # Test with circular reference
-    circular = {}
-    circular["self"] = circular
-    
-    with pytest.raises(TransformError) as excinfo:
-        transformer.transform(circular)
-    
-    assert "circular reference" in str(excinfo.value).lower()
 ```
 
 ### Parametrized Tests
@@ -260,61 +412,123 @@ def test_parse_path(path_string, expected_parts):
 
 ## Performance Testing
 
-Performance tests ensure that the library remains efficient:
+Transmog uses the pytest-benchmark plugin for performance testing. Here's an example from `tests/benchmarks/test_output_
+format_benchmarks.py`:
 
 ```python
+"""
+Benchmarks for output format methods.
+
+This module contains benchmark tests for the new output format methods
+added to ProcessingResult.
+"""
+
 import pytest
-import time
-import random
-import string
-from transmog import Transformer
+from typing import Dict, List, Any
 
-def generate_large_dataset(size=1000, depth=5, width=5):
-    """Generate a large nested dataset for performance testing."""
-    def _generate_nested(current_depth):
-        if current_depth >= depth:
-            return random.choice([
-                random.randint(1, 1000),
-                "".join(random.choices(string.ascii_letters, k=10)),
-                random.random()
-            ])
-        
-        result = {}
-        for i in range(width):
-            key = f"key_{i}"
-            if random.random() < 0.2 and current_depth < depth - 1:
-                # Create an array occasionally
-                result[key] = [
-                    _generate_nested(current_depth + 1)
-                    for _ in range(random.randint(1, 5))
-                ]
-            else:
-                result[key] = _generate_nested(current_depth + 1)
-        
-        return result
-    
-    return [_generate_nested(0) for _ in range(size)]
+from transmog import Processor
+from transmog.config import TransmogConfig
 
-def test_performance_large_dataset():
-    """Test performance with a large dataset."""
-    # Generate a large dataset
-    data = generate_large_dataset()
-    
-    # Initialize transformer
-    transformer = Transformer()
-    
-    # Measure transformation time
-    start_time = time.time()
-    result = transformer.transform_many(data)
-    end_time = time.time()
-    
-    # Check that it completes within a reasonable time
-    elapsed = end_time - start_time
-    print(f"Processed {len(data)} records in {elapsed:.2f} seconds")
-    
-    # This is a flexible threshold - adjust based on your performance expectations
-    assert elapsed < 5.0, f"Performance test failed: {elapsed:.2f}s > 5.0s threshold"
+
+def generate_test_data(num_records: int = 100) -> List[Dict[str, Any]]:
+    """Generate synthetic test data for benchmarks."""
+    data = []
+    for i in range(num_records):
+        data.append(
+            {
+                "id": f"record-{i}",
+                "metadata": {
+                    "created": "2023-01-01",
+                    "modified": "2023-03-15",
+                    "source": "benchmark",
+                },
+                "details": {
+                    "name": f"Record {i}",
+                    "description": f"Test record {i} for benchmarking",
+                    "value": i * 10,
+                    "tags": ["test", "benchmark", f"tag-{i}"],
+                },
+                "items": [
+                    {"item_id": f"item-{i}-1", "value": i * 10},
+                    {"item_id": f"item-{i}-2", "value": i * 20},
+                    {"item_id": f"item-{i}-3", "value": i * 30},
+                ],
+                "status": {
+                    "active": i % 2 == 0,
+                    "approved": i % 3 == 0,
+                    "visible": i % 5 != 0,
+                },
+            }
+        )
+    return data
+
+
+@pytest.fixture
+def processed_result():
+    """Create a ProcessingResult with test data."""
+    # Generate test data
+    data = generate_test_data(100)
+
+    # Process the data
+    config = TransmogConfig.default().with_processing(visit_arrays=True)
+    processor = Processor(config=config)
+    return processor.process_batch(data, entity_name="benchmark")
+
+
+def test_benchmark_to_dict(processed_result, benchmark):
+    """Benchmark the to_dict method."""
+    benchmark(processed_result.to_dict)
+
+
+def test_benchmark_to_json_objects(processed_result, benchmark):
+    """Benchmark the to_json_objects method."""
+    benchmark(processed_result.to_json_objects)
+
+
+@pytest.mark.skipif(
+    not pytest.importorskip("pyarrow", reason="PyArrow not available"),
+    reason="PyArrow required for this benchmark",
+)
+def test_benchmark_to_pyarrow_tables(processed_result, benchmark):
+    """Benchmark the to_pyarrow_tables method."""
+    benchmark(processed_result.to_pyarrow_tables)
+
+
+def test_benchmark_to_json_bytes(processed_result, benchmark):
+    """Benchmark the to_json_bytes method."""
+    # Test with no indentation for best performance
+    benchmark(processed_result.to_json_bytes, indent=None)
+
+
+def test_benchmark_to_csv_bytes(processed_result, benchmark):
+    """Benchmark the to_csv_bytes method."""
+    benchmark(processed_result.to_csv_bytes)
 ```
+
+### Running Performance Tests
+
+To run benchmark tests:
+
+```bash
+# Run all benchmark tests
+pytest tests/benchmarks/
+
+# Run a specific benchmark file
+pytest tests/benchmarks/test_output_format_benchmarks.py
+
+# Run a specific benchmark test
+pytest tests/benchmarks/test_output_format_benchmarks.py::test_benchmark_to_dict
+```
+
+The pytest-benchmark plugin will output detailed statistics about each benchmark, including:
+
+- Min/max/mean execution time
+- Standard deviation
+- Number of iterations
+- Rounds
+- Total time
+
+For detailed performance analysis, see the [Benchmarking Guide](benchmarking.md).
 
 ## Mocking
 
@@ -332,18 +546,29 @@ def test_parquet_writing():
         # Set up mock behavior
         mock_table = MagicMock()
         mock_pa.Table.from_pydict.return_value = mock_table
-        
+
         # Create a writer and write data
         writer = ParquetWriter()
         data = {"column1": [1, 2, 3], "column2": ["a", "b", "c"]}
         writer.write(data, "test.parquet")
-        
+
         # Verify the mock was called correctly
         mock_pa.Table.from_pydict.assert_called_once_with(data)
         # Verify that certain methods weren't called unnecessarily
         mock_table.write_parquet.assert_called_once()
-        
+
         # Check the file path was passed correctly
         args, kwargs = mock_table.write_parquet.call_args
         assert args[0] == "test.parquet"
 ```
+
+## Performance Testing and Benchmarking
+
+For detailed information on performance testing and benchmarking, see the [Benchmarking Guide](benchmarking.md).
+The benchmarking guide covers:
+
+- Using the command-line benchmarking script
+- Working with pytest benchmark tests
+- When to use each approach
+- Performance optimization tips
+- Contributing performance improvements

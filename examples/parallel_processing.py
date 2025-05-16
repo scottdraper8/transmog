@@ -1,24 +1,21 @@
-"""
-Example demonstrating parallel processing with Transmog.
+"""Example demonstrating parallel processing with Transmog.
 
 This example shows how to use concurrent.futures with Transmog
 to process data in parallel for better performance.
 """
 
-import json
 import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List
 
 # Add parent directory to path to import transmog without installing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from transmog import Processor, ProcessingResult
+from transmog import ProcessingResult, Processor
 
 
-def generate_sample_data(count: int = 100) -> List[Dict]:
+def generate_sample_data(count: int = 100) -> list[dict]:
     """Generate sample data for testing."""
     data = []
     for i in range(count):
@@ -63,7 +60,7 @@ def generate_sample_data(count: int = 100) -> List[Dict]:
 
 
 def process_chunk(
-    processor: Processor, chunk: List[Dict], entity_name: str
+    processor: Processor, chunk: list[dict], entity_name: str
 ) -> ProcessingResult:
     """Process a chunk of data."""
     return processor.process_batch(batch_data=chunk, entity_name=entity_name)
@@ -105,7 +102,8 @@ def main():
                 # Get result without doing anything with it yet
                 future.result()
                 print(
-                    f"Completed chunk {chunk_index + 1}/{len(chunks)} ({completed / len(chunks) * 100:.1f}%)"
+                    f"Completed chunk {chunk_index + 1}/{len(chunks)} "
+                    f"({completed / len(chunks) * 100:.1f}%)"
                 )
             except Exception as e:
                 print(f"Chunk {chunk_index} failed: {str(e)}")
@@ -120,7 +118,8 @@ def main():
     for i, chunk in enumerate(chunks):
         processor.process_batch(batch_data=chunk, entity_name="customers")
         print(
-            f"Completed chunk {i + 1}/{len(chunks)} ({(i + 1) / len(chunks) * 100:.1f}%)"
+            f"Completed chunk {i + 1}/{len(chunks)} "
+            f"({(i + 1) / len(chunks) * 100:.1f}%)"
         )
 
     sequential_time = time.time() - start_time

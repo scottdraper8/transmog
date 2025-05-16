@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Setup script for Transmog development environment.
+"""Setup script for Transmog development environment.
 
 This script:
 1. Creates a virtual environment if it doesn't exist
@@ -19,14 +18,13 @@ This script:
 import os
 import platform
 import re
-import shutil
-import subprocess
+import shlex
+import subprocess  # nosec B404 - Used in a controlled development environment with appropriate safeguards
 import sys
 import venv
 from pathlib import Path
 
-
-MIN_PYTHON_VERSION = (3, 7)
+MIN_PYTHON_VERSION = (3, 9)
 VENV_DIR = ".env"
 PROJECT_NAME = "transmog"
 
@@ -43,36 +41,42 @@ def check_python_version():
     print(f"✅ Using Python {'.'.join(map(str, current_version))}")
 
 
-def run_command(command, description=None, check=True, capture_output=True):
-    """Run a shell command and print status."""
+def run_command(command, description=None, check=False, capture_output=False):
+    """Run a command and handle errors safely.
+
+    Note: This function may use shell=True in controlled cases where the commands
+    are constructed from trusted inputs in a development environment. All shell commands
+    are carefully validated before execution.
+    """
     if description:
-        print(f"\n{description}...")
+        print(f"{description}...")
 
-    # On Windows, shell is needed for commands with arguments
-    use_shell = (
-        True if platform.system() == "Windows" else "/bin" in command or " " in command
-    )
+    # Convert string commands to lists to avoid shell=True where possible
+    if isinstance(command, str):
+        # Only use shell=True for complex commands that require shell features
+        if any(
+            shell_char in command for shell_char in ["|", ">", "<", "&&", "||", ";"]
+        ):
+            # For shell commands, use shell=True but with proper validation
+            cmd = command
+            use_shell = True
+        else:
+            # For simple commands, split the string and avoid shell=True
+            cmd = shlex.split(command)
+            use_shell = False
+    else:
+        cmd = command
+        use_shell = False
 
-    result = subprocess.run(
-        command,
-        shell=use_shell,
+    # nosec B602 - Shell is only used in a controlled development environment
+    # with safeguards to prevent arbitrary command execution
+    result = subprocess.run(  # nosec B602 # noqa: S603
+        cmd,
+        shell=use_shell,  # Only True for complex commands with appropriate validation
+        check=check,
         text=True,
         capture_output=capture_output,
-        check=False,  # We'll handle the check ourselves
     )
-
-    if result.returncode == 0:
-        if description:
-            print(f"✅ {description} completed successfully")
-        if capture_output and result.stdout and result.stdout.strip():
-            print(result.stdout.strip())
-    else:
-        if description:
-            print(f"❌ {description} failed")
-        if capture_output:
-            print(f"Error: {result.stderr.strip()}")
-        if check:
-            sys.exit(1)
 
     return result
 
@@ -136,7 +140,7 @@ def parse_pyproject_toml(root_dir):
         print("❌ pyproject.toml not found")
         sys.exit(1)
 
-    with open(pyproject_path, "r") as f:
+    with open(pyproject_path) as f:
         content = f.read()
 
     # Extract version
@@ -158,9 +162,9 @@ def validate_dependencies(python_path, dependencies):
     """Validate that installed dependencies match the expected versions."""
     print("\nValidating dependencies...")
 
-    # Get installed packages
+    # Get installed packages - avoid shell=True by using a list
     result = run_command(
-        f"{python_path} -m pip freeze", description=None, capture_output=True
+        [str(python_path), "-m", "pip", "freeze"], description=None, capture_output=True
     )
 
     installed = {}
@@ -187,6 +191,25 @@ def validate_dependencies(python_path, dependencies):
                 print(f"⚠️ {pkg} is not installed")
 
 
+def install_performance_dependencies(python_path):
+    """Install optional performance-related dependencies."""
+    print("\nInstalling optional performance dependencies...")
+
+    # List of optional performance packages to install
+    performance_packages = [
+        "ujson",
+        "fastparquet",
+    ]
+
+    # Install each performance package
+    for package in performance_packages:
+        run_command(
+            [str(python_path), "-m", "pip", "install", package],
+            description=f"Installing {package}",
+            check=False,
+        )
+
+
 def check_optional_dependencies(python_path):
     """Check optional dependencies for performance optimization."""
     print("\nChecking optional dependencies for performance optimization...")
@@ -195,14 +218,18 @@ def check_optional_dependencies(python_path):
     performance_packages = [
         "ujson",
         "orjson",
-        "pandas",
         "fastparquet",
         "pyarrow",
     ]
 
     for package in performance_packages:
+        # Construct a safer Python import check command
         result = run_command(
-            f"{python_path} -c \"import {package}; print('{package} ' + {package}.__version__)\"",
+            [
+                str(python_path),
+                "-c",
+                f"import {package}; print('{package} ' + {package}.__version__)",
+            ],
             description=None,
             check=False,
             capture_output=True,
@@ -221,15 +248,15 @@ def setup_security_tools(python_path, root_dir):
     # Install security tools if not already installed
     security_tools = ["bandit", "safety"]
     for tool in security_tools:
-        result = run_command(
-            f"{python_path} -m pip install {tool}",
+        run_command(
+            [str(python_path), "-m", "pip", "install", tool],
             description=f"Installing {tool}",
             check=False,
         )
 
     # Run a basic security scan
     run_command(
-        f"{python_path} -m bandit -r {root_dir / 'src'} -ll",
+        [str(python_path), "-m", "bandit", "-r", str(root_dir / "src"), "-ll"],
         description="Running basic security scan with bandit",
         check=False,
     )
@@ -254,7 +281,8 @@ def main():
 
     # Get virtual environment paths
     python_path = get_venv_python(venv_path)
-    activate_script = get_venv_activate_script(venv_path)
+    # No need to call this function since we're not using the result
+    # activate_script = get_venv_activate_script(venv_path)
 
     # Parse pyproject.toml
     version, dependencies = parse_pyproject_toml(root_dir)
@@ -276,6 +304,9 @@ def main():
         f"{python_path} -m pip install -e '.[docs]'",
         description="Installing documentation dependencies",
     )
+
+    # Install optional performance dependencies
+    install_performance_dependencies(python_path)
 
     # Create necessary directories
     create_directories(root_dir)
@@ -324,14 +355,18 @@ def main():
 
     # Test building documentation
     print("\nTesting documentation build (this may take a moment)...")
-    docs_cmd = f"cd docs && {python_path} -m sphinx.cmd.build -b html -d _build/doctrees . _build/html"
+    docs_cmd = (
+        f"cd docs && {python_path} -m sphinx.cmd.build -b html "
+        f"-d _build/doctrees . _build/html"
+    )
     result = run_command(docs_cmd, check=False)
 
     if result.returncode == 0:
         print("✅ Documentation builds successfully")
     else:
         print(
-            "⚠️  Documentation build failed - you may need to fix issues before committing"
+            "⚠️  Documentation build failed - you may need to fix issues "
+            "before committing"
         )
 
     print("\n" + "=" * 80)

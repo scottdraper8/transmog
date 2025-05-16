@@ -1,10 +1,12 @@
 # Contributing to Transmog
 
-Thank you for your interest in contributing to Transmog! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to Transmog! This document provides guidelines and instructions
+for contributing.
 
 ## Code of Conduct
 
-Please note that this project is released with a [Contributor Code of Conduct](CODE_OF_CONDUCT.md). By participating in this project, you agree to abide by its terms.
+Please note that this project is released with a [Contributor Code of Conduct](CODE_OF_CONDUCT.md). By
+participating in this project, you agree to abide by its terms.
 
 ## Getting Started
 
@@ -92,21 +94,25 @@ If you have questions or need help, please open an issue with the "question" lab
 We use pre-commit hooks to ensure code quality and consistency. To set up pre-commit hooks:
 
 1. Install pre-commit:
+
    ```bash
    pip install pre-commit
    ```
 
 2. Set up the git hooks:
+
    ```bash
    pre-commit install
    ```
 
 3. (Optional) Run against all files:
+
    ```bash
    pre-commit run --all-files
    ```
 
 The pre-commit hooks will run automatically when you commit changes. The hooks include:
+
 - Code formatting and linting (ruff)
 - Type checking (mypy)
 - Documentation coverage checking (interrogate)
@@ -145,6 +151,7 @@ xdg-open _build/html/index.html  # On Linux
 - **Developer Guide** (`dev/`): Information for contributors and developers
 
 When adding new features, please update:
+
 1. Docstrings in the code (Google style)
 2. API reference if adding new classes/functions
 3. User guides if changing behavior
@@ -178,4 +185,5 @@ We follow [Semantic Versioning](https://semver.org/). The version is specified i
 
 ## License
 
-By contributing to Transmog, you agree that your contributions will be licensed under the project's [MIT License](LICENSE). 
+By contributing to Transmog, you agree that your contributions will be licensed under the project's [MIT
+License](LICENSE).

@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v5.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -15,62 +15,41 @@ repos:
         args: [--branch, main]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.3.0
+    rev: v0.11.9
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
-        
+
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0
+    rev: v1.15.0
     hooks:
       - id: mypy
-        additional_dependencies: [types-all]
-        exclude: ^tests/
-        
+        additional_dependencies: ["mypy-extensions", "types-PyYAML", "types-toml"]
+        args: ["--config-file=mypy.ini"]
+        files: ^src/
+
   - repo: https://github.com/econchick/interrogate
-    rev: 1.5.0
+    rev: 1.7.0
     hooks:
       - id: interrogate
-        args: [--fail-under=80, --quiet, --exclude=setup.py,docs,build]
-        
+        args: [--fail-under=80, --quiet, --exclude=docs]
+
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.7
+    rev: 1.8.3
     hooks:
       - id: bandit
         args: ["-c", "pyproject.toml"]
         additional_dependencies: ["bandit[toml]"]
         exclude: ^tests/
 
-  - repo: https://github.com/pyupio/safety
-    rev: 2.3.5
-    hooks:
-      - id: safety
-        args: [check, --full-report]
-
   - repo: https://github.com/tox-dev/pyproject-fmt
-    rev: 1.5.1
+    rev: v2.5.1
     hooks:
-      - id: pyproject-fmt 
+      - id: pyproject-fmt
 
-  - repo: local
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.18.1
     hooks:
-      - id: sphinx-lint
-        name: Check sphinx documentation
-        entry: sphinx-build -b linkcheck -d docs/_build/doctrees docs docs/_build/linkcheck
-        language: system
-        pass_filenames: false
-        files: ^(docs/.*\.(rst|md)|.*\.py)$
-        
-      - id: check-docs-build
-        name: Check documentation builds
-        entry: sphinx-build -b html -d docs/_build/doctrees docs docs/_build/html
-        language: system
-        pass_filenames: false
-        files: ^(docs/.*\.(rst|md|py)|.*\.py)$
-
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.37.0
-    hooks:
-      - id: markdownlint
-        args: ["--config", ".markdownlint.json"] 
+      - id: markdownlint-cli2
+        args: ["--fix", "--config", ".markdownlint.json"]

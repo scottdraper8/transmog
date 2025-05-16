@@ -131,14 +131,14 @@ Use Google-style docstrings:
 ```python
 def process_data(data, options=None):
     """Process the input data according to the given options.
-    
+
     Args:
         data (dict): The input data to process.
         options (dict, optional): Processing options. Defaults to None.
-        
+
     Returns:
         dict: The processed data.
-        
+
     Raises:
         ValueError: If data is empty or invalid.
     """
@@ -195,7 +195,7 @@ Type checking uses mypy, configured in pyproject.toml:
 
 ```toml
 [tool.mypy]
-python_version = "3.7"
+python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 ```
@@ -249,4 +249,5 @@ def test_processor_handles_empty_input():
 
 ## Final Note
 
-When in doubt, follow the established patterns in the existing codebase. Consistency within the project is more important than strictly adhering to external guidelines. 
+When in doubt, follow the established patterns in the existing codebase. Consistency within the project
+is more important than strictly adhering to external guidelines.

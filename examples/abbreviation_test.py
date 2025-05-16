@@ -1,28 +1,25 @@
-"""
-Test script for abbreviation settings with deep paths.
+"""Test script for abbreviation settings with deep paths.
 
 This script demonstrates how the abbreviation system works
 with the updated 4-character limit for intermediate components.
 """
 
-import sys
 import os
-from pprint import pprint
+import sys
 
 # Add parent directory to path to import transmog
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import from transmog
 from transmog.naming.abbreviator import (
-    abbreviate_table_name,
     abbreviate_field_name,
+    abbreviate_table_name,
     get_common_abbreviations,
 )
 
 
 def test_deep_path_abbreviation():
     """Test abbreviation with deep paths."""
-
     # Deep path example
     entity_name = "customers"
     path = "shipping_information_address_street"

@@ -82,24 +82,24 @@ from transmog.path import BasePathResolver
 
 class RegexPathResolver(BasePathResolver):
     """Resolve paths using regular expressions."""
-    
+
     def resolve(self, data, path_expression):
         """
         Resolve paths using regex patterns.
-        
-        Example path_expression: "users./^a.*/.name" matches names of users 
+
+        Example path_expression: "users./^a.*/.name" matches names of users
         whose keys start with 'a'.
         """
         # Implementation would parse the expression and extract matching paths
         import re
-        
+
         parts = path_expression.split('.')
         current = data
         results = []
-        
+
         # Your custom resolution logic here
         # ...
-        
+
         return results
 ```
 
@@ -133,19 +133,19 @@ from transmog.io import BaseFormatter
 
 class CustomFormatter(BaseFormatter):
     """Format results in a custom format."""
-    
+
     def format(self, data):
         """Convert the result data to the custom format."""
         # Implement your custom formatting logic here
         return self._convert_to_custom_format(data)
-    
+
     def write_to_file(self, data, file_path):
         """Write the formatted data to a file."""
         formatted_data = self.format(data)
-        
+
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(formatted_data)
-            
+
     def _convert_to_custom_format(self, data):
         """Helper method to convert data to custom format."""
         # Implementation details here
@@ -179,29 +179,29 @@ You can create custom recovery strategies to handle errors during transformation
 Subclass `RecoveryStrategy` to create a custom recovery approach:
 
 ```python
-from transmog.recovery import RecoveryStrategy
+from transmog.error import RecoveryStrategy
 
 class AuditingRecoveryStrategy(RecoveryStrategy):
     """Recovery strategy that audits errors before handling them."""
-    
+
     def __init__(self, audit_log_path=None):
         self.audit_log_path = audit_log_path or "transmog_audit.log"
         self.errors = []
-    
+
     def recover(self, error, context=None):
         """
         Audit the error, then decide how to recover.
-        
+
         Args:
             error: The exception that occurred
             context: Additional context information
-            
+
         Returns:
             tuple: (recovered, replacement_value)
         """
         # Log the error
         self._audit_error(error, context)
-        
+
         # Decide how to recover based on error type
         if isinstance(error, ValueError):
             return True, None  # Skip this value
@@ -209,7 +209,7 @@ class AuditingRecoveryStrategy(RecoveryStrategy):
             return True, {}  # Replace with empty dict
         else:
             return False, None  # Cannot recover
-            
+
     def _audit_error(self, error, context):
         """Record the error for auditing."""
         error_info = {
@@ -218,7 +218,7 @@ class AuditingRecoveryStrategy(RecoveryStrategy):
             "context": context
         }
         self.errors.append(error_info)
-        
+
         # Write to log file
         with open(self.audit_log_path, 'a') as f:
             f.write(f"{error_info}\n")
@@ -277,32 +277,32 @@ from transmog.config import ConfigExtension
 
 class MyConfigExtension(ConfigExtension):
     """Custom configuration extension for specialized needs."""
-    
+
     def __init__(self):
         self.register_options()
-        
+
     def register_options(self):
         """Register all options for this extension."""
         from transmog.config import register_option
-        
+
         register_option(
             name="my_extension.enabled",
             default_value=True,
             validator=lambda x: isinstance(x, bool),
             description="Enable my extension features"
         )
-        
+
         register_option(
             name="my_extension.mode",
             default_value="standard",
             validator=lambda x: x in ["standard", "advanced", "expert"],
             description="Operation mode for my extension"
         )
-        
+
     def get_settings(self):
         """Get all settings for this extension."""
         from transmog.config import get_option
-        
+
         return {
             "enabled": get_option("my_extension.enabled"),
             "mode": get_option("my_extension.mode")
@@ -325,7 +325,7 @@ For more extensive extensions, you can create a plugin package.
 
 A basic plugin structure:
 
-```
+```text
 transmog-myplugin/
 ├── src/
 │   └── transmog_myplugin/
@@ -355,7 +355,7 @@ register_path_resolver("regex", RegexPathResolver())
 def register_processors():
     from transmog import register_processor
     from .processors import uppercase_strings, format_currency
-    
+
     register_processor("uppercase", uppercase_strings)
     register_processor("currency", format_currency)
 ```
@@ -410,7 +410,7 @@ def my_pre_transform_hook(data, context=None):
     # Add a timestamp to the context
     if context is None:
         context = {}
-    
+
     context["timestamp"] = datetime.datetime.now().isoformat()
     return data, context
 
@@ -420,7 +420,7 @@ def my_post_transform_hook(result, context=None):
     for record in result.records:
         if context and "timestamp" in context:
             record["_processed_at"] = context["timestamp"]
-    
+
     return result
 
 # Register the hooks
@@ -440,4 +440,4 @@ When extending Transmog, follow these best practices:
 6. **Provide sensible defaults**: Make your extensions work reasonably well out of the box
 7. **Consider edge cases**: Handle special cases appropriately
 
-By following these guidelines, you can create powerful extensions that enhance Transmog's capabilities. 
+By following these guidelines, you can create powerful extensions that enhance Transmog's capabilities.

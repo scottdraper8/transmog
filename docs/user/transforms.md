@@ -1,6 +1,8 @@
 # Data Transforms
 
-Transmog offers powerful data transformation capabilities that allow you to modify, enrich, clean, and restructure your data during processing. This guide explains the various transform options available and how to use them effectively.
+Transmog offers powerful data transformation capabilities that allow you to modify, enrich, clean, and
+restructure your data during processing. This guide explains the various transform options available
+and how to use them effectively.
 
 ## Transform Types
 
@@ -105,7 +107,7 @@ from transmog import FieldMap, DataType
 field_maps = [
     # Simple rename: 'id' -> 'user_id'
     FieldMap(source_field="id", target_field="user_id", data_type=DataType.STRING),
-    
+
     # Transform and rename: 'name' -> 'full_name'
     FieldMap(
         source_field="name",
@@ -113,7 +115,7 @@ field_maps = [
         data_type=DataType.STRING,
         transform=lambda x: x.upper() if x else None,
     ),
-    
+
     # Add default value: 'age' -> 'age_years'
     FieldMap(
         source_field="age",
@@ -121,7 +123,7 @@ field_maps = [
         data_type=DataType.INTEGER,
         default_value=0,  # Use default value when null
     ),
-    
+
     # Computed field - not directly mapped from source
     FieldMap(
         target_field="record_status",
@@ -169,18 +171,18 @@ def type_transformer(record):
             record["created_at"] = datetime.fromisoformat(record["created_at"])
         except ValueError:
             record["created_at"] = None
-    
+
     # Convert string to numeric
     if "score" in record and isinstance(record["score"], str):
         try:
             record["score"] = float(record["score"])
         except ValueError:
             record["score"] = None
-    
+
     # Convert string to boolean
     if "active" in record and isinstance(record["active"], str):
         record["active"] = record["active"].lower() in ("true", "yes", "1", "t", "y")
-    
+
     return record
 
 # Create processor with type transformer
@@ -198,15 +200,15 @@ def clean_data(data):
     """Remove null values and whitespace from strings."""
     if not isinstance(data, dict):
         return data
-    
+
     # Remove null values
     clean_dict = {k: v for k, v in data.items() if v is not None}
-    
+
     # Trim strings
     for key, value in clean_dict.items():
         if isinstance(value, str):
             clean_dict[key] = value.strip()
-    
+
     return clean_dict
 
 def add_calculated_fields(data):
@@ -214,14 +216,14 @@ def add_calculated_fields(data):
     if isinstance(data, dict):
         if "first_name" in data and "last_name" in data:
             data["full_name"] = f"{data['first_name']} {data['last_name']}"
-        
+
         if "price" in data and "quantity" in data:
             try:
                 data["total"] = float(data["price"]) * int(data["quantity"])
             except (ValueError, TypeError):
                 # Handle conversion errors
                 pass
-    
+
     return data
 
 # Chain transforms in processing order
@@ -242,33 +244,33 @@ def clean_data(data):
     """Clean data by removing nulls, trimming strings, etc."""
     if not isinstance(data, dict):
         return data
-    
+
     result = {}
     for key, value in data.items():
         # Skip null values
         if value is None:
             continue
-            
+
         # Trim strings
         if isinstance(value, str):
             value = value.strip()
             # Skip empty strings
             if not value:
                 continue
-                
+
         # Clean nested dictionaries
         if isinstance(value, dict):
             value = clean_data(value)
-            
+
         # Clean lists
         if isinstance(value, list):
             value = [
                 clean_data(item) if isinstance(item, dict) else item
                 for item in value if item is not None
             ]
-            
+
         result[key] = value
-    
+
     return result
 ```
 
@@ -279,16 +281,16 @@ def enrich_data(data):
     """Add derived fields based on existing data."""
     if not isinstance(data, dict):
         return data
-    
+
     # Add full name
     if "first_name" in data and "last_name" in data:
         if data["first_name"] and data["last_name"]:
             data["full_name"] = f"{data['first_name']} {data['last_name']}"
-    
+
     # Extract domain from email
     if "email" in data and isinstance(data["email"], str) and "@" in data["email"]:
         data["email_domain"] = data["email"].split("@")[-1]
-        
+
     # Categorize based on age
     if "age" in data and data["age"] is not None:
         try:
@@ -301,7 +303,7 @@ def enrich_data(data):
                 data["age_group"] = "senior"
         except (ValueError, TypeError):
             pass
-    
+
     return data
 ```
 
@@ -312,18 +314,18 @@ def normalize_keys(data):
     """Normalize all dictionary keys to snake_case."""
     if not isinstance(data, dict):
         return data
-    
+
     def to_snake_case(s):
         # Convert camelCase or PascalCase to snake_case
         import re
         s = re.sub(r'([A-Z])', r'_\1', s)
         return s.lower().strip('_')
-    
+
     result = {}
     for key, value in data.items():
         # Normalize key
         new_key = to_snake_case(key)
-        
+
         # Recursively normalize nested structures
         if isinstance(value, dict):
             value = normalize_keys(value)
@@ -332,9 +334,9 @@ def normalize_keys(data):
                 normalize_keys(item) if isinstance(item, dict) else item
                 for item in value
             ]
-            
+
         result[new_key] = value
-    
+
     return result
 ```
 
@@ -373,40 +375,40 @@ def clean_input(data):
     """Clean incoming data."""
     if not isinstance(data, dict):
         return data
-    
+
     # Remove null values
     result = {k: v for k, v in data.items() if v is not None}
-    
+
     # Trim strings
     for key, value in result.items():
         if isinstance(value, str):
             result[key] = value.strip()
-    
+
     return result
 
 def normalize_fields(data):
     """Normalize field values."""
     if not isinstance(data, dict):
         return data
-    
+
     # Normalize emails to lowercase
     if "email" in data and isinstance(data["email"], str):
         data["email"] = data["email"].lower()
-    
+
     # Normalize phone numbers (remove non-digits)
     if "phone" in data and isinstance(data["phone"], str):
         data["phone"] = ''.join(c for c in data["phone"] if c.isdigit())
-    
+
     return data
 
 def add_computed_fields(data):
     """Add computed fields based on existing data."""
     if not isinstance(data, dict):
         return data
-    
+
     # Add timestamp
     data["processed_at"] = datetime.now().isoformat()
-    
+
     # Calculate age from birthdate
     if "birthdate" in data and isinstance(data["birthdate"], str):
         try:
@@ -419,14 +421,14 @@ def add_computed_fields(data):
         except ValueError:
             # Handle invalid date format
             pass
-    
+
     return data
 
 def categorize_customer(value):
     """Categorize customer based on purchase value."""
     if not isinstance(value, (int, float)):
         return None
-    
+
     if value >= 1000:
         return "platinum"
     elif value >= 500:
@@ -467,7 +469,7 @@ result = processor.process(
         "birthdate": "1985-06-15",
         "total_purchases": 750,
         "notes": None  # This will be removed
-    }, 
+    },
     entity_name="customer"
 )
 
@@ -489,20 +491,20 @@ def dynamic_transform(data):
     """Apply different transforms based on data type."""
     if not isinstance(data, dict):
         return data
-    
+
     # Apply different logic based on record type
     if "type" in data:
         if data["type"] == "user":
             # Apply user-specific transformations
             if "name" in data:
                 data["name"] = data["name"].title()
-                
+
         elif data["type"] == "product":
             # Apply product-specific transformations
             if "price" in data and isinstance(data["price"], (int, float)):
                 # Add tax calculation
                 data["price_with_tax"] = data["price"] * 1.2
-    
+
     return data
 ```
 
@@ -515,7 +517,7 @@ def conditional_transform(data):
     """Apply transforms only if certain conditions are met."""
     if not isinstance(data, dict):
         return data
-    
+
     # Only transform active records
     if data.get("status") == "active":
         # Apply enrichment
@@ -526,7 +528,7 @@ def conditional_transform(data):
                 data["tier"] = "standard"
             else:
                 data["tier"] = "basic"
-    
+
     return data
 ```
 
@@ -541,23 +543,23 @@ def transform_with_context(data, context=None):
     """Use context information in the transform."""
     if not isinstance(data, dict) or not context:
         return data
-    
+
     # Use context values
     if "config" in context:
         config = context["config"]
-        
+
         # Apply transforms based on configuration
         if config.get("add_timestamps", False) and "created" not in data:
             from datetime import datetime
             data["created"] = datetime.now().isoformat()
-            
+
         # Use environment-specific transforms
         env = config.get("environment", "dev")
         if env == "prod":
             # Apply production-specific transforms
             if "sensitive_data" in data:
                 del data["sensitive_data"]
-    
+
     return data
 
 # Create processor with context
@@ -570,4 +572,4 @@ processor = tm.Processor(
         }
     }
 )
-``` 
+```

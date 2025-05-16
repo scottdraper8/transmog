@@ -109,7 +109,7 @@ for array_name, array_data in arrays.items():
 
 Output:
 
-```
+```text
 Main data:
 {
     "order.id": "ORD-123",
@@ -269,4 +269,4 @@ processor = tm.Processor(
 
 - Learn about [Error Handling](error-handling.md) when processing complex arrays
 - Explore [Concurrency](concurrency.md) for processing large datasets with arrays
-- See the [API Reference](../api/processor.md) for all array processing options 
+- See the [API Reference](../api/processor.md) for all array processing options

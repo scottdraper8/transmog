@@ -1,138 +1,147 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
+
+requires = [ "setuptools>=42", "wheel" ]
 
 [project]
 name = "transmog"
 version = "0.1.2.5"
 description = "An ETL/ELT transformation library for converting nested JSON structures into flat, tabular formats"
 readme = "README.md"
-requires-python = ">=3.7"
-license = { text = "MIT" }
-authors = [{ name = "Scott Draper", email = "admin@scottdraper.io" }]
 keywords = [
-    "json",
-    "parquet",
-    "csv",
-    "pyarrow",
-    "normalization",
-    "flattening",
-    "etl",
-    "elt",
-    "data-pipeline",
-    "data-transformation",
-    "data-processing",
+  "csv",
+  "data-pipeline",
+  "data-processing",
+  "data-transformation",
+  "elt",
+  "etl",
+  "flattening",
+  "json",
+  "normalization",
+  "parquet",
+  "pyarrow",
 ]
+license = "MIT"
+authors = [ { name = "Scott Draper", email = "admin@scottdraper.io" } ]
+requires-python = ">=3.9"
 classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "Intended Audience :: Information Technology",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-    "Topic :: Database :: Database Engines/Servers",
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Information Technology",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Database :: Database Engines/Servers",
+  "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-dependencies = ["pyarrow>=7.0.0", "orjson>=3.8.0"]
-
-[project.optional-dependencies]
-# For users who want the absolute minimum dependencies
-minimal = []
-
-# Additional optional features
-test = ["pytest>=7.0.0", "pytest-cov>=3.0.0", "pytest-benchmark>=4.0.0"]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=3.0.0",
-    "pytest-benchmark>=4.0.0",
-    "mypy>=0.9.0",
-    "ruff>=0.3.0",
-    "pre-commit>=3.5.0",
-    "interrogate>=1.5.0",
-    "bandit>=1.7.5",
-    "safety>=2.3.5",
-    "pyproject-fmt>=1.5.1",
-    "memory-profiler>=0.60.0",
-]
-
-# Documentation dependencies
-docs = [
-    "sphinx>=7.2.0",
-    "sphinx-rtd-theme>=2.0.0",
-    "sphinx-design>=0.5.0",
-    "myst-parser>=2.0.0",
-    "sphinx-copybutton>=0.5.0",
-    "sphinx-autodoc-typehints>=1.24.0",
-    "sphinxcontrib-napoleon>=0.7",
-    "sphinx-autobuild>=2021.3.14",
-    "sphinxcontrib-mermaid>=0.8.1",
-    "sphinxcontrib-applehelp>=1.0.0",
-    "sphinxcontrib-htmlhelp>=2.0.0",
-    "sphinxcontrib-jsmath>=1.0.0",
-    "sphinxcontrib-qthelp>=1.0.0",
-    "sphinxcontrib-serializinghtml>=1.0.0",
-    "pyproject-parser>=0.7.0",
-    "linkify-it-py>=2.0.0",
-]
+dependencies = [ "orjson>=3.8", "pyarrow>=7" ]
 
 # Data integration dependencies - Optional packages for working with other data formats (empty now)
-data = []
+optional-dependencies.data = [  ]
+optional-dependencies.dev = [
+  "bandit>=1.7.5",
+  "interrogate>=1.5",
+  "memory-profiler>=0.60",
+  "mypy>=0.9",
+  "pre-commit>=3.5",
+  "pyproject-fmt>=1.5.1",
+  "pytest>=7",
+  "pytest-benchmark>=4",
+  "pytest-cov>=3",
+  "ruff>=0.3",
+  "safety>=2.3.5",
+  "types-pyyaml",
+  "types-toml",
+]
+# Documentation dependencies
+optional-dependencies.docs = [
+  "linkify-it-py>=2",
+  "myst-parser>=2",
+  "pyproject-parser>=0.7",
+  "sphinx>=7.2",
+  "sphinx-autobuild>=2021.3.14",
+  "sphinx-autodoc-typehints>=1.24",
+  "sphinx-copybutton>=0.5",
+  "sphinx-design>=0.5",
+  "sphinx-rtd-theme>=2",
+  "sphinxcontrib-applehelp>=1",
+  "sphinxcontrib-htmlhelp>=2",
+  "sphinxcontrib-jsmath>=1",
+  "sphinxcontrib-mermaid>=0.8.1",
+  "sphinxcontrib-napoleon>=0.7",
+  "sphinxcontrib-qthelp>=1",
+  "sphinxcontrib-serializinghtml>=1",
+]
+# For users who want the absolute minimum dependencies
+optional-dependencies.minimal = [  ]
+# Additional optional features
+optional-dependencies.test = [
+  "pytest>=7",
+  "pytest-benchmark>=4",
+  "pytest-cov>=3",
+]
+urls."Bug Tracker" = "https://github.com/scottdraper8/transmog/issues"
+urls."Documentation" = "https://transmog.readthedocs.io"
+urls."Homepage" = "https://github.com/scottdraper8/transmog"
 
-[project.urls]
-"Homepage" = "https://github.com/scottdraper8/transmog"
-"Documentation" = "https://transmog.readthedocs.io"
-"Bug Tracker" = "https://github.com/scottdraper8/transmog/issues"
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = [ "src" ]
+include = [ "transmog*" ]
 
 [tool.ruff]
-target-version = "py37"
+target-version = "py39"
 line-length = 88
-select = ["E", "F", "I", "C4", "B", "N", "D", "UP", "S", "A"]
-ignore = ["D203", "D213"]
+format.indent-style = "space"
+format.quote-style = "double"
+format.line-ending = "auto"
+format.skip-magic-trailing-comma = false
 
-[tool.ruff.per-file-ignores]
-"tests/*" = ["S101", "D"]
-
-# Ruff format configuration (similar to Black)
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-line-ending = "auto"
-skip-magic-trailing-comma = false
-
+lint.select = [ "A", "B", "C4", "D", "E", "F", "I", "N", "S", "UP" ]
+lint.ignore = [ "D203", "D213" ]
+lint.per-file-ignores = { "tests/*" = [
+  "S101",
+  "D",
+  "E501",
+  "N802",
+  "N803",
+  "F401",
+  "B011",
+  "S110",
+  "S112",
+  "B017",
+  "S108",
+  "F841",
+  "S311",
+  "B018",
+  "C416",
+] }
+lint.isort.combine-as-imports = true
 # Ruff isort configuration
-[tool.ruff.isort]
-known-first-party = ["transmog"]
-combine-as-imports = true
-section-order = [
-    "future",
-    "standard-library",
-    "third-party",
-    "first-party",
-    "local-folder",
+lint.isort.known-first-party = [ "transmog" ]
+lint.isort.section-order = [
+  "future",
+  "standard-library",
+  "third-party",
+  "first-party",
+  "local-folder",
 ]
+# Pydocstyle configuration
+lint.pydocstyle.convention = "google"
 
-[tool.ruff.pydocstyle]
-convention = "google"
-
-[tool.mypy]
-python_version = "3.7"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-disallow_untyped_decorators = true
-no_implicit_optional = true
-strict_optional = true
-
-[[tool.mypy.overrides]]
-module = "tests.*"
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
+[tool.pytest.ini_options]
+markers = [
+  "benchmark: mark test as a performance benchmark",
+  "memory: mark test as a memory usage test",
+]
+# Exclude benchmark tests by default
+addopts = "--ignore=tests/benchmarks"
+# Allow running benchmarks specifically with -m benchmark
 
 [tool.interrogate]
 ignore-init-method = true
@@ -144,18 +153,12 @@ ignore-property-decorators = true
 ignore-module = true
 ignore-nested-functions = true
 fail-under = 80
-exclude = ["setup.py", "docs", "build"]
+exclude = [ "docs" ]
 verbose = 0
 quiet = false
 color = true
 
 [tool.bandit]
-exclude_dirs = ["tests", "examples"]
-skips = ["B101"]
-target-version = "py37"
-
-[tool.pytest.ini_options]
-markers = [
-    "benchmark: mark test as a performance benchmark",
-    "memory: mark test as a memory usage test",
-]
+exclude_dirs = [ "tests", "examples" ]
+skips = [ "B101" ]
+target-version = "py39"

@@ -4,18 +4,19 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/transmog.svg)](https://pypi.org/project/transmog/)
 [![License](https://img.shields.io/github/license/scottdraper8/transmog.svg)](https://github.com/scottdraper8/transmog/blob/main/LICENSE)
 
-A Python library for transforming complex nested JSON data into flat, structured formats while preserving parent-child relationships.
+A Python library for transforming complex nested JSON data into flat, structured formats while preserving
+parent-child relationships.
 
 ## Features
 
 - **Multiple Input Formats**: Process JSON, JSONL (line-delimited JSON), and CSV files
 - **Flattening**: Flatten deeply nested structures with customizable delimiter options
-- **Output Flexibility**: 
+- **Output Flexibility**:
   - Native formats: Python dictionaries, JSON objects, PyArrow Tables
   - Bytes output: Serialize directly to Parquet, CSV, or JSON bytes
   - File export: Write to various file formats (JSON, CSV, Parquet)
 - **Performance Optimization**:
-  - Process large datasets with configurable memory management  
+  - Process large datasets with configurable memory management
   - Single-pass or chunked processing depending on data size
   - Stream data from files efficiently
 - **Metadata Generation**: Track data lineage with automatic ID generation and parent-child relationships
@@ -62,7 +63,7 @@ data = {
     }
 }
 
-# Process the data
+# Process the data with default configuration
 processor = tm.Processor()
 result = processor.process(data)
 
@@ -93,34 +94,109 @@ result.write_all_csv("output_dir/csv")
 result.write_all_parquet("output_dir/parquet")
 ```
 
-## Input Formats
+## Configuration
 
-Transmog supports multiple input formats:
+Transmog provides a flexible configuration system through the `TransmogConfig` class:
 
 ```python
-# Process standard JSON file
-result = processor.process_file("data.json", entity_name="entity")
+import transmog as tm
 
-# Process JSONL (line-delimited JSON)
-result = processor.process_file("data.jsonl", entity_name="entity")
+# Use pre-configured modes
+config = tm.TransmogConfig.memory_optimized()  # For large datasets
+# or
+config = tm.TransmogConfig.performance_optimized()  # For speed-critical processing
 
-# Process CSV file with options
-result = processor.process_csv(
-    "data.csv",
-    entity_name="records",
-    delimiter=",",
-    has_header=True,
-    infer_types=True
+# Create custom configuration
+config = (
+    tm.TransmogConfig.default()
+    .with_naming(
+        separator=".",
+        abbreviate_table_names=False
+    )
+    .with_processing(
+        batch_size=5000,
+        cast_to_string=True
+    )
+    .with_metadata(
+        id_field="custom_id"
+    )
+    .with_error_handling(
+        max_retries=3
+    )
 )
+
+# Use the configuration
+processor = tm.Processor(config=config)
 ```
+
+See the [configuration guide](docs/user/configuration.md) for more details.
+
+## Error Recovery Strategies
+
+Transmog provides several recovery strategies for handling problematic data:
+
+```python
+# Default strict recovery (fails on any error)
+processor = tm.Processor.default()
+
+# Skip and log recovery (skips problematic records)
+processor = tm.Processor().with_error_handling(recovery_strategy="skip")
+
+# Partial recovery (preserves valid portions of problematic records)
+processor = tm.Processor.with_partial_recovery()
+
+# Process data that may contain errors
+result = processor.process(problematic_data, entity_name="records")
+```
+
+The partial recovery strategy is particularly valuable when working with:
+
+- Data migration from legacy systems
+- Processing API responses with inconsistent structures
+- Recovering data from malformed files
+
+See the [error handling guide](docs/user/error-handling.md) for more information.
+
+## Cache Configuration
+
+Transmog provides configurable value processing cache for performance optimization:
+
+```python
+import transmog as tm
+
+# Default configuration
+processor = tm.Processor()
+
+# Disable caching completely
+processor = tm.Processor(
+    tm.TransmogConfig.default().with_caching(enabled=False)
+)
+
+# Configure cache size
+processor = tm.Processor(
+    tm.TransmogConfig.default().with_caching(maxsize=50000)
+)
+
+# Clear cache after batch processing
+processor = tm.Processor(
+    tm.TransmogConfig.default().with_caching(clear_after_batch=True)
+)
+
+# Manually clear cache
+processor.clear_cache()
+```
+
+The cache system improves performance when processing datasets with repeated values while providing memory
+usage control. See the [cache configuration guide](docs/user/caching.md) for more details.
 
 ## Processing Large Datasets
 
-For large datasets, use memory-optimized processing:
+For large datasets, use memory-optimized configuration:
 
 ```python
 # Memory-optimized processor
-processor = tm.Processor(optimize_for_memory=True)
+config = tm.TransmogConfig.memory_optimized()
+processor = tm.Processor(config=config)
 
 # Process a large file in chunks
 result = processor.process_chunked(
@@ -130,38 +206,49 @@ result = processor.process_chunked(
 )
 ```
 
-## Metadata Generation
+## Performance Benchmarking
 
-Transmog automatically adds metadata to processed records:
+Transmog provides tools to benchmark performance and identify optimization opportunities:
 
-- `__extract_id` - Unique identifier for each record
-- `__parent_extract_id` - Reference to parent record (for child tables)
-- `__extract_datetime` - Processing timestamp
+```bash
+# Command-line benchmarking script
+python scripts/run_benchmarks.py --records 5000 --complexity complex
+python scripts/run_benchmarks.py --mode streaming
+python scripts/run_benchmarks.py --strategy memory
+
+# Pytest benchmarks
+pytest tests/benchmarks/
+```
+
+The benchmarking tools help evaluate:
+
+- Overall performance with different configurations
+- Performance impact of different processing modes and strategies
+- Memory usage characteristics
+- Component-level performance metrics
+
+For more details, see the [Benchmarking Guide](docs/dev/benchmarking.md).
 
 ## Deterministic ID Generation
 
-Ensure consistent IDs across processing runs:
+Configure deterministic IDs using the new configuration system:
 
 ```python
 # Configure deterministic IDs based on specific fields
-processor = tm.Processor(
-    deterministic_id_fields={
-        "": "id",                     # Root level uses "id" field
-        "user_orders": "id"           # Order records use "id" field
-    }
-)
+config = tm.TransmogConfig.with_deterministic_ids({
+    "": "id",                     # Root level uses "id" field
+    "user_orders": "id"           # Order records use "id" field
+})
 
-# Process the data - IDs will be consistent across runs
+# Or use a custom ID generation strategy
+def custom_id_strategy(record):
+    return f"CUSTOM-{record['id']}"
+
+config = tm.TransmogConfig.with_custom_id_generation(custom_id_strategy)
+
+# Use the configuration
+processor = tm.Processor(config=config)
 result = processor.process(data)
-
-# For complex ID generation logic, use a custom function
-def custom_id_generator(record):
-    # Generate custom ID based on record contents
-    if "id" in record:
-        return f"CUSTOM-{record['id']}"
-    return str(uuid.uuid4())  # Fallback
-
-processor = tm.Processor(id_generation_strategy=custom_id_generator)
 ```
 
 See the [deterministic IDs guide](docs/user/deterministic-ids.md) for more information.
@@ -171,6 +258,7 @@ See the [deterministic IDs guide](docs/user/deterministic-ids.md) for more infor
 Transmog provides three main categories of output formats:
 
 1. **Native Data Structures** - Python objects like dictionaries and PyArrow Tables
+
    ```python
    result.to_dict()              # Python dictionaries
    result.to_json_objects()      # JSON-serializable Python objects
@@ -178,6 +266,7 @@ Transmog provides three main categories of output formats:
    ```
 
 2. **Bytes Serialization** - Raw bytes in JSON, CSV, or Parquet format
+
    ```python
    result.to_json_bytes()        # JSON bytes
    result.to_csv_bytes()         # CSV bytes
@@ -185,47 +274,48 @@ Transmog provides three main categories of output formats:
    ```
 
 3. **File Output** - Direct writing to files in different formats
+
    ```python
    result.write_all_json()       # Write to JSON files
    result.write_all_csv()        # Write to CSV files
    result.write_all_parquet()    # Write to Parquet files
+   result.stream_to_parquet()    # Stream to Parquet files with optimal memory usage
    ```
 
-## Configurable Options
+4. **Streaming Output** - Direct streaming for memory-efficient processing
 
-Transmog offers many configuration options:
+   ```python
+   # Process and stream data directly to Parquet files
+   from transmog.io import create_streaming_writer
 
-```python
-processor = tm.Processor(
-    # Data formatting
-    separator="_",                # Separator for flattened field names
-    cast_to_string=True,         # Cast all values to strings
-    include_empty=False,         # Include empty values
-    skip_null=True,              # Skip null values
-    
-    # Performance
-    optimize_for_memory=False,   # Prioritize memory efficiency over speed
-    batch_size=1000,             # Default batch size for large datasets
-    path_parts_optimization=True, # Optimize path handling for deep structures
-    
-    # Naming options
-    abbreviate_table_names=True, # Abbreviate table names
-    abbreviate_field_names=True, # Abbreviate field names
-    
-    # Error handling
-    allow_malformed_data=False   # Attempt to recover from malformed data
-)
-```
+   writer = create_streaming_writer(
+       "parquet",
+       destination="output_dir",
+       compression="snappy",
+       row_group_size=10000
+   )
+
+   with writer:
+       # Process and write data in batches
+       for batch in data_batches:
+           batch_result = processor.process_batch(batch)
+           writer.write_main_records(batch_result.get_main_table())
+
+           for table_name in batch_result.get_table_names():
+               writer.initialize_child_table(table_name)
+               writer.write_child_records(table_name, batch_result.get_child_table(table_name))
+   ```
 
 ## Documentation
 
 - [Installation Guide](docs/installation.md)
 - [Getting Started](docs/getting_started.md)
+- [Configuration Guide](docs/user/configuration.md)
 - [Output Formats](docs/user/output-formats.md)
 - [In-Memory Processing](docs/user/in-memory-processing.md)
 - [Deterministic IDs](docs/user/deterministic-ids.md)
 - [API Reference](docs/api/index.md)
-- [Examples](docs/examples/)
+- [Examples](examples/README.md)
 
 ## Use Cases
 

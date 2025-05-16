@@ -5,21 +5,21 @@ These tests verify the end-to-end functionality of CSV processing,
 including reading and transforming CSV data into various output formats.
 """
 
-import os
 import csv
-import tempfile
-import pytest
 import json
+import os
+import tempfile
+
+import pytest
+
 from transmog import Processor
-from transmog.core.processing_result import ProcessingResult
-from transmog.io.csv_reader import read_csv_file, CSVReader, PYARROW_AVAILABLE
-from transmog.exceptions import FileError, ParsingError, ProcessingError
+from transmog.config import TransmogConfig
+from transmog.io.readers.csv import PYARROW_AVAILABLE, CSVReader
+from transmog.process.result import ProcessingResult
 
 # Check if pyarrow is available
 try:
     import pyarrow as pa
-    import pyarrow.parquet as pq
-    import pyarrow.csv as pa_csv
 
     PYARROW_AVAILABLE = True
 except ImportError:
@@ -163,7 +163,8 @@ class TestCsvIntegration:
 
         try:
             # Initialize processor with cast_to_string=True
-            processor = Processor(cast_to_string=True)
+            config = TransmogConfig.default().with_processing(cast_to_string=True)
+            processor = Processor(config=config)
 
             # Process with specific options
             result = processor.process_csv(
@@ -189,15 +190,15 @@ class TestCsvIntegration:
             # The behavior for wrong delimiter is implementation-dependent
             # It might fail with an exception or produce incorrect results
             try:
-                wrong_result = processor.process_csv(
+                processor.process_csv(
                     file_path=csv_path,
                     entity_name="delimiter_test",
                     delimiter="|",  # Wrong delimiter
                 )
                 # If no exception, just verify it doesn't find our expected data
-            except:
-                # If it raises an exception, that's also fine
-                pass
+            except Exception as e:
+                # If it raises an exception, that's acceptable for this test
+                print(f"Expected exception when testing invalid delimiter: {e}")
         finally:
             # Clean up
             os.unlink(csv_path)
@@ -229,9 +230,9 @@ class TestCsvIntegration:
 
             # Test outputting to dictionary
             dict_output = result.to_dict()
-            assert "main" in dict_output
-            assert isinstance(dict_output["main"], list)
-            assert len(dict_output["main"]) > 0
+            assert "main_table" in dict_output
+            assert isinstance(dict_output["main_table"], list)
+            assert len(dict_output["main_table"]) > 0
 
             # Verify PyArrow tables if available
             if PYARROW_AVAILABLE:
@@ -296,7 +297,7 @@ class TestCsvIntegration:
                 assert os.path.exists(parquet_files["main"])
 
             # Verify that we can read back the JSON file
-            with open(json_files["main"], "r") as f:
+            with open(json_files["main"]) as f:
                 json_data = json.load(f)
                 assert isinstance(json_data, list)
                 assert len(json_data) > 0
@@ -327,10 +328,10 @@ class TestCsvIntegration:
 
         try:
             # Process with optimized settings for memory usage
-            processor = Processor(
-                cast_to_string=True,
-                optimize_for_memory=True,
+            config = TransmogConfig.memory_optimized().with_processing(
+                cast_to_string=True
             )
+            processor = Processor(config=config)
 
             # Process in chunks
             result = processor.process_csv(
@@ -393,7 +394,7 @@ class TestCsvIntegration:
                     assert "age" in keys
                     break
             else:
-                assert False, "Could not find record with expected base columns"
+                raise AssertionError("Could not find record with expected base columns")
         finally:
             os.unlink(csv_path)
 
@@ -449,7 +450,7 @@ class TestCsvIntegration:
 
                     # Check for dash column - look for 'colu' (part of 'column') and 'dash'
                     has_dash_col = any(
-                        "colu" in col and "dash" in col for col in sanitized_cols
+                        col == "column_with_dash" for col in sanitized_cols
                     )
                     assert has_dash_col, (
                         "No sanitized column found for 'column-with-dash'"
@@ -458,7 +459,9 @@ class TestCsvIntegration:
                     # Found a record with sanitized columns
                     break
             else:
-                assert False, "Could not find record with expected sanitized columns"
+                raise AssertionError(
+                    "Could not find record with expected sanitized columns"
+                )
         finally:
             os.unlink(csv_path)
 

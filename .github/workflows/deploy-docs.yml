@@ -22,31 +22,39 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
           cache: pip
-          
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[docs]"
-          
+          # Install full package with docs and all optional dependencies
+          python -m pip install -e ".[docs,dev,all]"
+
+      - name: Validate documentation
+        run: |
+          cd docs
+          # Run sphinx-build in nitpicky mode with warnings treated as errors
+          sphinx-build -b linkcheck -W --keep-going . _build/linkcheck
+
       - name: Build documentation
         run: |
           cd docs
-          make html
-          
+          # Build with nitpicky mode and fail on warning
+          make SPHINXOPTS="-W --keep-going -n" html
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
-        
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: 'docs/_build/html'
-          
+
   deploy:
     environment:
       name: github-pages
@@ -56,4 +64,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4 
+        uses: actions/deploy-pages@v4

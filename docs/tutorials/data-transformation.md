@@ -1,6 +1,7 @@
 # Data Transformation Tutorial
 
-This tutorial demonstrates how to use Transmog to transform data from one format to another, apply transformations, and handle various data scenarios.
+This tutorial demonstrates how to use Transmog to transform data from one format to another, apply transformations,
+and handle various data scenarios.
 
 ## Basic Transformation
 
@@ -30,11 +31,11 @@ def transform_data(record):
     # Convert names to uppercase
     if "name" in record:
         record["name"] = record["name"].upper()
-    
+
     # Calculate a new field
     if "price" in record and "quantity" in record:
         record["total"] = record["price"] * record["quantity"]
-    
+
     return record
 
 # Initialize processor
@@ -101,12 +102,12 @@ def validate_and_clean(record):
     # Data validation
     if "email" in record and not "@" in record["email"]:
         record["email"] = None  # Invalid email
-    
+
     # Data cleaning
     if "phone" in record and record["phone"]:
         # Remove non-numeric characters
         record["phone"] = ''.join(c for c in record["phone"] if c.isdigit())
-    
+
     return record
 
 processor = Processor()
@@ -141,11 +142,11 @@ def fill_nulls(record):
     # Fill missing age with a default value
     if "age" in record and record["age"] is None:
         record["age"] = 0
-    
+
     # Fill missing names with "Unknown"
     if "name" in record and record["name"] is None:
         record["name"] = "Unknown"
-    
+
     return record
 
 result_filled = processor.process_csv(
@@ -245,14 +246,14 @@ def type_transform(record):
             except ValueError:
                 # Handle invalid date format
                 record["created_at"] = None
-    
+
     # Convert string values to numeric
     if "rating" in record and isinstance(record["rating"], str):
         try:
             record["rating"] = float(record["rating"])
         except ValueError:
             record["rating"] = None
-    
+
     return record
 
 # Process with type handling
@@ -267,11 +268,12 @@ result_with_types.write_json("typed_data.json")
 
 ## Conclusion
 
-This tutorial has demonstrated various data transformation capabilities in Transmog, including format conversion, data cleaning, validation, and handling different data scenarios.
+This tutorial has demonstrated various data transformation capabilities in Transmog, including format
+conversion, data cleaning, validation, and handling different data scenarios.
 
 For more information, refer to:
 
 - [Processor API Reference](../api/processor.md)
 - [CSV Processing Guide](../user/csv-processing.md)
 - [JSON Processing Guide](../user/json-processing.md)
-- [Result Object Reference](../api/result.md) 
+- [Result Object Reference](../api/processing-result.md)

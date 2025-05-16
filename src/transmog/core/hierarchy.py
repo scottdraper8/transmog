@@ -1,27 +1,36 @@
-"""
-Hierarchy processing module for nested JSON structures.
+"""Hierarchy processing module for nested JSON structures.
 
 Provides functions to process complete JSON structures with
 parent-child relationship preservation.
 """
 
-from typing import Any, Dict, List, Optional, Set, Tuple, Callable
+import logging
+from collections.abc import Generator
+from datetime import datetime
+from typing import (
+    Any,
+    Callable,
+    Optional,
+    Union,
+)
 
-from transmog.core.extractor import extract_arrays
+from transmog.core.extractor import extract_arrays, stream_extract_arrays
 from transmog.core.flattener import flatten_json
 from transmog.core.metadata import (
     annotate_with_metadata,
-    create_batch_metadata,
     generate_deterministic_id,
 )
-from transmog.config.settings import settings
 
 # Type aliases
-JsonDict = Dict[str, Any]
-FlatDict = Dict[str, Any]
-ArrayDict = Dict[str, List[Dict[str, Any]]]
-ProcessResult = Tuple[FlatDict, ArrayDict]
-VisitedPath = Set[int]
+JsonDict = dict[str, Any]
+FlatDict = dict[str, Any]
+ArrayDict = dict[str, list[dict[str, Any]]]
+ProcessResult = tuple[FlatDict, ArrayDict]
+StreamingChildTables = Generator[tuple[str, list[FlatDict]], None, None]
+ArrayResult = Union[ArrayDict, StreamingChildTables]
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 
 def process_structure(
@@ -34,20 +43,24 @@ def process_structure(
     include_empty: bool = False,
     skip_null: bool = True,
     extract_time: Optional[Any] = None,
-    visited: Optional[VisitedPath] = None,
     root_entity: Optional[str] = None,
-    shared_flatten_cache: Optional[Dict[int, FlatDict]] = None,
     abbreviate_table_names: bool = True,
     abbreviate_field_names: bool = True,
-    max_table_component_length: int = None,
-    max_field_component_length: int = None,
+    max_table_component_length: Optional[int] = None,
+    max_field_component_length: Optional[int] = None,
     preserve_leaf_component: bool = True,
-    custom_abbreviations: Optional[Dict[str, str]] = None,
-    deterministic_id_fields: Optional[Dict[str, str]] = None,
-    id_generation_strategy: Optional[Callable[[Dict[str, Any]], str]] = None,
-) -> ProcessResult:
-    """
-    Process JSON structure with parent-child relationship preservation.
+    custom_abbreviations: Optional[dict[str, str]] = None,
+    default_id_field: Optional[Union[str, dict[str, str]]] = None,
+    id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
+    id_field: str = "__extract_id",
+    parent_field: str = "__parent_extract_id",
+    time_field: str = "__extract_datetime",
+    visit_arrays: bool = True,
+    streaming: bool = False,
+    recovery_strategy: Optional[Any] = None,
+    max_depth: int = 100,
+) -> tuple[FlatDict, ArrayResult]:
+    """Process JSON structure with parent-child relationship preservation.
 
     This is the main entry point for processing a complete JSON structure,
     handling both the main record and all nested arrays.
@@ -62,195 +75,247 @@ def process_structure(
         include_empty: Whether to include empty values
         skip_null: Whether to skip null values
         extract_time: Extraction timestamp
-        visited: Object IDs for circular detection
         root_entity: Top-level entity name
-        shared_flatten_cache: Cache of flattened objects
         abbreviate_table_names: Whether to abbreviate table names
         abbreviate_field_names: Whether to abbreviate field names
         max_table_component_length: Maximum length for table name components
         max_field_component_length: Maximum length for field name components
         preserve_leaf_component: Whether to preserve leaf components
         custom_abbreviations: Custom abbreviation dictionary
-        deterministic_id_fields: Dict mapping paths to field names for deterministic IDs
+        default_id_field: Field name or dict mapping paths to field names for
+            deterministic IDs
         id_generation_strategy: Custom function for ID generation
+        id_field: ID field name
+        parent_field: Parent ID field name
+        time_field: Timestamp field name
+        visit_arrays: Whether to visit and process arrays
+        streaming: Whether to return a generator for child tables
+        recovery_strategy: Strategy for handling errors
+        max_depth: Maximum recursion depth for nested structures
 
     Returns:
-        Tuple of (flattened main object, array tables dictionary)
+        Tuple of (flattened main object, array tables dictionary or generator)
     """
-    if visited is None:
-        visited = set()
-
-    if shared_flatten_cache is None:
-        shared_flatten_cache = {}
-
     # Initialize root_entity if at top level
     if root_entity is None:
         root_entity = entity_name
 
-    # Prevent circular references
-    obj_id = id(data)
-    if obj_id in visited:
-        return {}, {}
+    # Check for empty data cases
+    if data is None:
+        empty_result = {
+            id_field: generate_deterministic_id(str(entity_name) + "_empty"),
+            time_field: extract_time or datetime.now(),
+            "__original_entity": entity_name,
+        }
+        if parent_id:
+            empty_result[parent_field] = parent_id
 
-    visited.add(obj_id)
+        # Return empty result based on streaming mode
+        if streaming:
 
-    # Check if we already flattened this object
-    if obj_id in shared_flatten_cache:
-        flattened_obj = shared_flatten_cache[obj_id]
-    else:
-        # Process this object - flatten it first
-        flattened_obj = flatten_json(
-            data,
-            parent_path=parent_path,
-            separator=separator,
-            cast_to_string=cast_to_string,
-            include_empty=include_empty,
-            skip_arrays=True,
-            skip_null=skip_null,
-            abbreviate_field_names=abbreviate_field_names,
-            max_field_component_length=max_field_component_length,
-            preserve_leaf_component=preserve_leaf_component,
-            custom_abbreviations=custom_abbreviations,
-        )
-        # Cache the result
-        shared_flatten_cache[obj_id] = flattened_obj
+            def empty_generator() -> Generator[
+                tuple[str, list[dict[str, Any]]], None, None
+            ]:
+                if False:
+                    yield "", []
+
+            return empty_result, empty_generator()
+        else:
+            return empty_result, {}
+
+    # Process this object - flatten it
+    flattened_obj = flatten_json(
+        data,
+        parent_path=parent_path,
+        separator=separator,
+        cast_to_string=cast_to_string,
+        include_empty=include_empty,
+        skip_arrays=True,
+        skip_null=skip_null,
+        abbreviate_field_names=abbreviate_field_names,
+        max_field_component_length=max_field_component_length,
+        preserve_leaf_component=preserve_leaf_component,
+        custom_abbreviations=custom_abbreviations,
+        mode="streaming",
+        recovery_strategy=recovery_strategy,
+        max_depth=max_depth,
+    )
 
     # Determine source field for deterministic ID generation
     source_field = None
-    if deterministic_id_fields:
-        # Normalize path for comparison
-        normalized_path = parent_path.strip(separator) if parent_path else ""
-
-        # Exact path match first
-        if normalized_path in deterministic_id_fields:
-            source_field = deterministic_id_fields[normalized_path]
-        # Then try wildcard matches if exact match not found
-        elif "*" in deterministic_id_fields:
-            source_field = deterministic_id_fields["*"]
-        # Try any path prefix matches (most specific to least)
+    if default_id_field:
+        if isinstance(default_id_field, str):
+            # Simple case - use the same field for all paths
+            source_field = default_id_field
         else:
-            path_components = (
-                normalized_path.split(separator) if normalized_path else []
-            )
-            for i in range(len(path_components), 0, -1):
-                prefix = separator.join(path_components[:i])
-                prefix_wildcard = f"{prefix}{separator}*"
-                if prefix_wildcard in deterministic_id_fields:
-                    source_field = deterministic_id_fields[prefix_wildcard]
-                    break
+            # Dict case - map paths to field names
+            # Normalize path for comparison
+            normalized_path = parent_path.strip(separator) if parent_path else ""
+
+            # Exact path match first
+            if normalized_path in default_id_field:
+                source_field = default_id_field[normalized_path]
+            # Then try wildcard matches if exact match not found
+            elif "*" in default_id_field:
+                source_field = default_id_field["*"]
+            # Try any path prefix matches (most specific to least)
+            else:
+                path_components = (
+                    normalized_path.split(separator) if normalized_path else []
+                )
+                for i in range(len(path_components), 0, -1):
+                    prefix = separator.join(path_components[:i])
+                    prefix_wildcard = f"{prefix}{separator}*"
+                    if prefix_wildcard in default_id_field:
+                        source_field = default_id_field[prefix_wildcard]
+                        break
 
     # Add metadata - use in_place for better performance
+    flattened_obj_dict = flattened_obj if flattened_obj is not None else {}
     annotated_obj = annotate_with_metadata(
-        flattened_obj,
+        flattened_obj_dict,
         parent_id=parent_id,
         extract_time=extract_time,
+        id_field=id_field,
+        parent_field=parent_field,
+        time_field=time_field,
         in_place=True,
         source_field=source_field,
         id_generation_strategy=id_generation_strategy,
     )
 
-    # Extract all nested arrays - reuse the visited set and flatten cache
-    arrays = extract_arrays(
-        data,
-        parent_id=annotated_obj.get("__extract_id"),
-        parent_path=parent_path,
-        entity_name=entity_name,
-        separator=separator,
-        cast_to_string=cast_to_string,
-        include_empty=include_empty,
-        skip_null=skip_null,
-        extract_time=extract_time,
-        visited=visited,
-        shared_flatten_cache=shared_flatten_cache,
-        abbreviate_enabled=abbreviate_table_names,
-        max_component_length=max_table_component_length,
-        preserve_leaf=preserve_leaf_component,
-        custom_abbreviations=custom_abbreviations,
-        deterministic_id_fields=deterministic_id_fields,
-        id_generation_strategy=id_generation_strategy,
-    )
+    # Skip array processing if visit_arrays is False
+    if not visit_arrays:
+        if streaming:
 
-    return annotated_obj, arrays
+            def empty_generator() -> Generator[
+                tuple[str, list[dict[str, Any]]], None, None
+            ]:
+                if False:
+                    yield "", []
+
+            return annotated_obj, empty_generator()
+        else:
+            return annotated_obj, {}
+
+    # Handle array extraction based on streaming mode
+    extract_id = annotated_obj.get(id_field)
+
+    if streaming:
+        # Define a generator function to yield child tables
+        def generate_child_records() -> Generator[
+            tuple[str, list[dict[str, Any]]], None, None
+        ]:
+            # Collect all records by table name to ensure complete tables are yielded
+            collected_tables: dict[str, list[dict[str, Any]]] = {}
+
+            # First, collect all records from the stream
+            generator = stream_extract_arrays(
+                data,
+                parent_id=extract_id,
+                parent_path=parent_path,
+                entity_name=entity_name,
+                separator=separator,
+                cast_to_string=cast_to_string,
+                include_empty=include_empty,
+                skip_null=skip_null,
+                extract_time=extract_time,
+                id_field=id_field,
+                parent_field=parent_field,
+                time_field=time_field,
+                abbreviate_enabled=abbreviate_table_names,
+                max_component_length=max_table_component_length,
+                preserve_leaf=preserve_leaf_component,
+                custom_abbreviations=custom_abbreviations,
+                default_id_field=default_id_field,
+                id_generation_strategy=id_generation_strategy,
+                recovery_strategy=recovery_strategy,
+                max_depth=max_depth - 1,
+            )
+
+            # Group by table name
+            for table, record in generator:
+                if table not in collected_tables:
+                    collected_tables[table] = []
+                collected_tables[table].append(record)
+
+            # Then yield all records for each table
+            for table_name, records in collected_tables.items():
+                if records:  # Only yield if there are records
+                    yield table_name, records
+
+        return annotated_obj, generate_child_records()
+    else:
+        # Extract all nested arrays
+        arrays = extract_arrays(
+            data,
+            parent_id=extract_id,
+            parent_path=parent_path,
+            entity_name=entity_name,
+            separator=separator,
+            cast_to_string=cast_to_string,
+            include_empty=include_empty,
+            skip_null=skip_null,
+            extract_time=extract_time,
+            id_field=id_field,
+            parent_field=parent_field,
+            time_field=time_field,
+            abbreviate_enabled=abbreviate_table_names,
+            max_component_length=max_table_component_length,
+            preserve_leaf=preserve_leaf_component,
+            custom_abbreviations=custom_abbreviations,
+            default_id_field=default_id_field,
+            id_generation_strategy=id_generation_strategy,
+            streaming=False,
+            recovery_strategy=recovery_strategy,
+            max_depth=max_depth,
+        )
+
+        return annotated_obj, arrays
 
 
 def process_record_batch(
-    records: List[JsonDict], entity_name: str, batch_size: int = 100, **kwargs
-) -> Tuple[List[FlatDict], ArrayDict]:
-    """
-    Process a batch of records, returning flattened main records and array tables.
-
-    This is a convenience function for batch processing that can be used
-    with parallel execution frameworks.
+    records: list[JsonDict], entity_name: str, batch_size: int = 100, **kwargs: Any
+) -> tuple[list[FlatDict], ArrayDict]:
+    """Process a batch of records efficiently.
 
     Args:
-        records: List of JSON records to process
+        records: List of JSON records
         entity_name: Entity name
-        batch_size: Size of batches to process at once
+        batch_size: Batch size for processing
         **kwargs: Additional arguments to pass to process_structure
 
     Returns:
-        Tuple of (list of flattened records, combined array tables dictionary)
+        Tuple of (flattened records, array tables dictionary)
     """
-    main_records = []
-    all_arrays: Dict[str, List[Dict[str, Any]]] = {}
+    # Initialize result containers
+    flat_records = []
+    combined_arrays: dict[str, list[dict[str, Any]]] = {}
 
-    # Create a shared flatten cache for better performance
-    shared_flatten_cache = {}
-
-    # Filter out parameters that process_structure doesn't accept
-    # Only allow parameters that are explicitly in process_structure's signature
-    allowed_params = {
-        "separator",
-        "cast_to_string",
-        "include_empty",
-        "skip_null",
-        "extract_time",
-        "root_entity",
-        "shared_flatten_cache",
-        "visited",
-        "abbreviate_table_names",
-        "abbreviate_field_names",
-        "max_table_component_length",
-        "max_field_component_length",
-        "preserve_leaf_component",
-        "custom_abbreviations",
-        "deterministic_id_fields",
-        "id_generation_strategy",
-    }
-    filtered_kwargs = {k: v for k, v in kwargs.items() if k in allowed_params}
-
-    # Process in batches for better memory usage
+    # Process records in batches
     for i in range(0, len(records), batch_size):
         batch = records[i : i + batch_size]
 
-        # Shared visited set for circular reference detection
-        visited = set()
-
         # Process each record in the batch
         for record in batch:
-            # Process main record
-            main_record, arrays = process_structure(
-                record,
-                entity_name,
-                shared_flatten_cache=shared_flatten_cache,
-                visited=visited,  # Pass visited set to prevent circular references
-                **filtered_kwargs,
+            flat_obj, arrays = process_structure(
+                record, entity_name=entity_name, **kwargs
             )
-            main_records.append(main_record)
+            flat_records.append(flat_obj)
 
-            # Combine arrays efficiently
-            for array_name, array_items in arrays.items():
-                if array_items:
-                    all_arrays.setdefault(array_name, []).extend(array_items)
+            # Merge arrays from this record
+            if isinstance(arrays, dict):
+                for table_name, table_data in arrays.items():
+                    if table_name in combined_arrays:
+                        combined_arrays[table_name].extend(table_data)
+                    else:
+                        combined_arrays[table_name] = table_data
 
-        # Clear the shared cache after each batch to avoid memory buildup
-        shared_flatten_cache.clear()
-
-    return main_records, all_arrays
+    return flat_records, combined_arrays
 
 
 def process_records_in_single_pass(
-    records: List[JsonDict],
+    records: list[JsonDict],
     entity_name: str,
     extract_time: Optional[Any] = None,
     separator: str = "_",
@@ -260,156 +325,240 @@ def process_records_in_single_pass(
     id_field: str = "__extract_id",
     parent_field: str = "__parent_extract_id",
     time_field: str = "__extract_datetime",
-    visit_arrays: bool = False,
+    visit_arrays: bool = True,
     abbreviate_table_names: bool = True,
     abbreviate_field_names: bool = True,
-    max_table_component_length: int = None,
-    max_field_component_length: int = None,
+    max_table_component_length: Optional[int] = None,
+    max_field_component_length: Optional[int] = None,
     preserve_leaf_component: bool = True,
-    custom_abbreviations: Optional[Dict[str, str]] = None,
-    deterministic_id_fields: Optional[Dict[str, str]] = None,
-    id_generation_strategy: Optional[Callable[[Dict[str, Any]], str]] = None,
-    **kwargs,
-) -> Tuple[List[FlatDict], ArrayDict]:
-    """
-    Process a list of records in a single pass, optimized for consistency and performance.
+    custom_abbreviations: Optional[dict[str, str]] = None,
+    default_id_field: Optional[Union[str, dict[str, str]]] = None,
+    id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
+    recovery_strategy: Optional[Any] = None,
+    max_depth: int = 100,
+    **kwargs: Any,
+) -> tuple[list[FlatDict], ArrayDict]:
+    """Process all records in a single pass, building main/child tables simultaneously.
 
-    This function processes all records in a single pass, which is more efficient
-    when all records can fit in memory and have similar structure.
+    This is the standard processing approach for most datasets where memory
+    is not a constraint. All tables are built fully in memory.
 
     Args:
         records: List of JSON records to process
-        entity_name: Name of the entity for table naming
-        extract_time: Timestamp for all records
-        separator: Separator for flattened field names
-        cast_to_string: Whether to cast values to strings
+        entity_name: Name of the entity being processed
+        extract_time: Extraction timestamp
+        separator: Separator for path components
+        cast_to_string: Whether to cast all values to strings
         include_empty: Whether to include empty values
         skip_null: Whether to skip null values
-        id_field: Field name for record ID
-        parent_field: Field name for parent ID
-        time_field: Field name for timestamp
-        visit_arrays: Whether to treat arrays as simple values
+        id_field: ID field name
+        parent_field: Parent ID field name
+        time_field: Timestamp field name
+        visit_arrays: Whether to visit and process arrays
         abbreviate_table_names: Whether to abbreviate table names
         abbreviate_field_names: Whether to abbreviate field names
         max_table_component_length: Maximum length for table name components
         max_field_component_length: Maximum length for field name components
         preserve_leaf_component: Whether to preserve leaf components
         custom_abbreviations: Custom abbreviation dictionary
-        deterministic_id_fields: Dict mapping paths to field names for deterministic IDs
+        default_id_field: Field name or dict mapping paths to field names for
+            deterministic IDs
         id_generation_strategy: Custom function for ID generation
-        **kwargs: Additional options
+        recovery_strategy: Strategy for handling errors
+        max_depth: Maximum recursion depth for nested structures
+        **kwargs: Additional keyword arguments passed to process_structure
 
     Returns:
-        Tuple of (flattened records, child tables)
+        Tuple of (main table as list of dicts, child tables as dict of lists)
     """
-    if not records:
-        return [], {}
+    # Set extract_time to the current timestamp if not specified
+    if extract_time is None:
+        extract_time = datetime.now()
 
-    # Set defaults from settings if needed
-    if max_table_component_length is None:
-        max_table_component_length = settings.get_option("max_table_component_length")
+    # Initialize results
+    main_records = []
+    child_tables: dict[str, list[dict[str, Any]]] = {}
 
-    if max_field_component_length is None:
-        max_field_component_length = settings.get_option("max_field_component_length")
-
-    # Prepare shared processing context
-    shared_flatten_cache = {}
-    all_arrays: Dict[str, List[Dict[str, Any]]] = {}
-
-    # Flatten all records first (more efficient cache usage)
-    flattened_records = []
+    # Process each record
     for record in records:
-        obj_id = id(record)
-        if obj_id not in shared_flatten_cache:
-            flattened = flatten_json(
-                record,
-                parent_path="",
-                separator=separator,
-                cast_to_string=cast_to_string,
-                include_empty=include_empty,
-                skip_arrays=True,
-                skip_null=skip_null,
-                abbreviate_field_names=abbreviate_field_names,
-                max_field_component_length=max_field_component_length,
-                preserve_leaf_component=preserve_leaf_component,
-                custom_abbreviations=custom_abbreviations,
-            )
-            shared_flatten_cache[obj_id] = flattened
-        else:
-            flattened = shared_flatten_cache[obj_id]
-
-        flattened_records.append(flattened)
-
-    # Determine source field for root-level deterministic ID generation
-    source_field = None
-    if deterministic_id_fields:
-        # Look for root path
-        if "" in deterministic_id_fields:
-            source_field = deterministic_id_fields[""]
-        # Try wildcard match
-        elif "*" in deterministic_id_fields:
-            source_field = deterministic_id_fields["*"]
-
-    # Add metadata to all records at once (more efficient)
-    annotated_records = []
-    for i, record in enumerate(records):
-        original_record = records[i]  # Original record for field value lookup
-        flattened_record = flattened_records[i]  # Flattened record to annotate
-
-        # For deterministic IDs, we need to check if the source field exists in the original record
-        deterministic_source_value = None
-        if source_field and source_field in original_record:
-            deterministic_source_value = original_record.get(source_field)
-
-        # Generate extract ID deterministically if needed
-        extract_id = None
-        if deterministic_source_value and source_field:
-            extract_id = generate_deterministic_id(deterministic_source_value)
-        elif id_generation_strategy:
-            try:
-                extract_id = id_generation_strategy(original_record)
-            except Exception:
-                extract_id = None  # Will fall back to random UUID
-
-        # Annotate the flattened record with metadata
-        annotated = annotate_with_metadata(
-            flattened_record,
-            extract_time=extract_time,
-            in_place=True,
-            id_field=id_field,
-            parent_field=parent_field,
-            time_field=time_field,
-            extract_id=extract_id,  # Use pre-generated ID if available
-        )
-        annotated_records.append(annotated)
-
-    # Extract arrays from all records
-    visited = set()
-    for i, record in enumerate(records):
-        parent_id = annotated_records[i].get(id_field)
-
-        arrays = extract_arrays(
-            record,
-            parent_id=parent_id,
+        # Process a single record with all nested arrays
+        main_record, child_records = process_structure(
+            data=record,  # Process record even if None
             entity_name=entity_name,
-            extract_time=extract_time,
-            visited=visited,
-            shared_flatten_cache=shared_flatten_cache,
+            parent_id=None,  # Root records have no parent
+            parent_path="",
             separator=separator,
             cast_to_string=cast_to_string,
             include_empty=include_empty,
             skip_null=skip_null,
-            abbreviate_enabled=abbreviate_table_names,
-            max_component_length=max_table_component_length,
-            preserve_leaf=preserve_leaf_component,
+            extract_time=extract_time,
+            root_entity=entity_name,
+            abbreviate_table_names=abbreviate_table_names,
+            abbreviate_field_names=abbreviate_field_names,
+            max_table_component_length=max_table_component_length,
+            max_field_component_length=max_field_component_length,
+            preserve_leaf_component=preserve_leaf_component,
             custom_abbreviations=custom_abbreviations,
-            deterministic_id_fields=deterministic_id_fields,
+            default_id_field=default_id_field,
             id_generation_strategy=id_generation_strategy,
+            id_field=id_field,
+            parent_field=parent_field,
+            time_field=time_field,
+            visit_arrays=visit_arrays,
+            streaming=False,  # Must be False for single-pass
+            recovery_strategy=recovery_strategy,
+            max_depth=max_depth,
         )
 
-        # Combine arrays efficiently
-        for array_name, array_items in arrays.items():
-            if array_items:
-                all_arrays.setdefault(array_name, []).extend(array_items)
+        # Add to main table
+        main_records.append(main_record)
 
-    return annotated_records, all_arrays
+        # Add to child tables
+        if isinstance(child_records, dict):
+            for table_name, table_records in child_records.items():
+                if table_name not in child_tables:
+                    child_tables[table_name] = []
+                child_tables[table_name].extend(table_records)
+        elif hasattr(child_records, "__next__"):
+            for table_name, table_records in child_records:
+                if table_name not in child_tables:
+                    child_tables[table_name] = []
+                child_tables[table_name].extend(table_records)
+
+    return main_records, child_tables
+
+
+def stream_process_records(
+    records: list[JsonDict],
+    entity_name: str,
+    extract_time: Optional[Any] = None,
+    separator: str = "_",
+    cast_to_string: bool = True,
+    include_empty: bool = False,
+    skip_null: bool = True,
+    id_field: str = "__extract_id",
+    parent_field: str = "__parent_extract_id",
+    time_field: str = "__extract_datetime",
+    visit_arrays: bool = True,
+    abbreviate_table_names: bool = True,
+    abbreviate_field_names: bool = True,
+    max_table_component_length: Optional[int] = None,
+    max_field_component_length: Optional[int] = None,
+    preserve_leaf_component: bool = True,
+    custom_abbreviations: Optional[dict[str, str]] = None,
+    default_id_field: Optional[Union[str, dict[str, str]]] = None,
+    id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
+    max_depth: int = 100,
+    **kwargs: Any,
+) -> tuple[list[FlatDict], StreamingChildTables]:
+    """Stream process records for memory-efficient processing.
+
+    This function processes records in a streaming fashion, returning
+    a generator for child tables instead of building them all in memory.
+
+    Args:
+        records: List of JSON records to process
+        entity_name: Name of the entity being processed
+        extract_time: Extraction timestamp
+        separator: Separator for path components
+        cast_to_string: Whether to cast all values to strings
+        include_empty: Whether to include empty values
+        skip_null: Whether to skip null values
+        id_field: ID field name
+        parent_field: Parent ID field name
+        time_field: Timestamp field name
+        visit_arrays: Whether to visit and process arrays
+        abbreviate_table_names: Whether to abbreviate table names
+        abbreviate_field_names: Whether to abbreviate field names
+        max_table_component_length: Maximum length for table name components
+        max_field_component_length: Maximum length for field name components
+        preserve_leaf_component: Whether to preserve leaf components
+        custom_abbreviations: Custom abbreviation dictionary
+        default_id_field: Field name or dict mapping paths to field names for
+            deterministic IDs
+        id_generation_strategy: Custom function for ID generation
+        max_depth: Maximum recursion depth for nested structures
+        **kwargs: Additional keyword arguments passed to process_structure
+
+    Returns:
+        Tuple of (main table as list of dicts, generator for child tables)
+    """
+    # Set extract_time to current time if not provided
+    if extract_time is None:
+        extract_time = datetime.now()
+
+    # Initialize results
+    main_records = []
+    generators_list: list[Generator[tuple[str, list[dict[str, Any]]], None, None]] = []
+
+    # Process each record's main table
+    for record in records:
+        # Process a single record, but only retrieve the main record
+        # and a generator for child records that we'll store for later
+        main_record, child_result = process_structure(
+            data=record,  # Process record even if None
+            entity_name=entity_name,
+            parent_id=None,  # Root records have no parent
+            parent_path="",
+            separator=separator,
+            cast_to_string=cast_to_string,
+            include_empty=include_empty,
+            skip_null=skip_null,
+            extract_time=extract_time,
+            root_entity=entity_name,
+            abbreviate_table_names=abbreviate_table_names,
+            abbreviate_field_names=abbreviate_field_names,
+            max_table_component_length=max_table_component_length,
+            max_field_component_length=max_field_component_length,
+            preserve_leaf_component=preserve_leaf_component,
+            custom_abbreviations=custom_abbreviations,
+            default_id_field=default_id_field,
+            id_generation_strategy=id_generation_strategy,
+            id_field=id_field,
+            parent_field=parent_field,
+            time_field=time_field,
+            visit_arrays=visit_arrays,
+            streaming=True,  # Enable streaming for child tables
+            max_depth=max_depth,
+        )
+
+        # Add to main table
+        main_records.append(main_record)
+
+        # Determine the type of child_result and handle appropriately
+        if isinstance(child_result, dict):
+            # Convert the dictionary to a generator
+            def dict_to_generator(
+                d: dict[str, list[dict[str, Any]]],
+            ) -> Generator[tuple[str, list[dict[str, Any]]], None, None]:
+                items_gen: Generator[tuple[str, list[dict[str, Any]]], None, None] = (
+                    (table_name, records) for table_name, records in d.items()
+                )
+                yield from items_gen
+
+            generators_list.append(dict_to_generator(child_result))
+        else:
+            # It's already a generator
+            generators_list.append(child_result)
+
+    # Define a generator function that will yield child tables
+    def child_tables_generator() -> Generator[
+        tuple[str, list[dict[str, Any]]], None, None
+    ]:
+        # Dictionary to collect records for each table
+        table_records: dict[str, list[dict[str, Any]]] = {}
+
+        # Process child records for each record
+        for generator in generators_list:
+            for table_name, records in generator:
+                # Add records to the corresponding table
+                if table_name not in table_records:
+                    table_records[table_name] = []
+                table_records[table_name].extend(records)
+
+        # Yield each table's records
+        for table_name, records in table_records.items():
+            if records:  # Skip empty tables
+                yield table_name, records
+
+    return main_records, child_tables_generator()
