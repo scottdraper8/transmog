@@ -84,7 +84,7 @@ optional-dependencies.test = [
   "pytest-cov>=3",
 ]
 urls."Bug Tracker" = "https://github.com/scottdraper8/transmog/issues"
-urls."Documentation" = "https://transmog.readthedocs.io"
+urls."Documentation" = "https://scottdraper8.github.io/transmog/"
 urls."Homepage" = "https://github.com/scottdraper8/transmog"
 
 [tool.setuptools]

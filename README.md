@@ -41,7 +41,7 @@ For development installation:
 pip install transmog[dev]
 ```
 
-See the [installation guide](docs/installation.md) for more details.
+See the [installation guide](https://scottdraper8.github.io/transmog/installation.html) for more details.
 
 ## Quick Example
 
@@ -129,7 +129,7 @@ config = (
 processor = tm.Processor(config=config)
 ```
 
-See the [configuration guide](docs/user/configuration.md) for more details.
+See the [configuration guide](https://scottdraper8.github.io/transmog/configuration.html) for more details.
 
 ## Error Recovery Strategies
 
@@ -155,7 +155,7 @@ The partial recovery strategy is particularly valuable when working with:
 - Processing API responses with inconsistent structures
 - Recovering data from malformed files
 
-See the [error handling guide](docs/user/error-handling.md) for more information.
+See the [error handling guide](https://scottdraper8.github.io/transmog/error-handling.html) for more information.
 
 ## Cache Configuration
 
@@ -187,7 +187,7 @@ processor.clear_cache()
 ```
 
 The cache system improves performance when processing datasets with repeated values while providing memory
-usage control. See the [cache configuration guide](docs/user/caching.md) for more details.
+usage control. See the [cache configuration guide](https://scottdraper8.github.io/transmog/caching.html) for more details.
 
 ## Processing Large Datasets
 
@@ -227,7 +227,7 @@ The benchmarking tools help evaluate:
 - Memory usage characteristics
 - Component-level performance metrics
 
-For more details, see the [Benchmarking Guide](docs/dev/benchmarking.md).
+For more details, see the [Benchmarking Guide](https://scottdraper8.github.io/transmog/benchmarking.html).
 
 ## Deterministic ID Generation
 
@@ -251,7 +251,7 @@ processor = tm.Processor(config=config)
 result = processor.process(data)
 ```
 
-See the [deterministic IDs guide](docs/user/deterministic-ids.md) for more information.
+See the [deterministic IDs guide](https://scottdraper8.github.io/transmog/deterministic-ids.html) for more information.
 
 ## Output Format Options
 
@@ -308,13 +308,13 @@ Transmog provides three main categories of output formats:
 
 ## Documentation
 
-- [Installation Guide](docs/installation.md)
-- [Getting Started](docs/getting_started.md)
-- [Configuration Guide](docs/user/configuration.md)
-- [Output Formats](docs/user/output-formats.md)
-- [In-Memory Processing](docs/user/in-memory-processing.md)
-- [Deterministic IDs](docs/user/deterministic-ids.md)
-- [API Reference](docs/api/index.md)
+- [Installation Guide](https://scottdraper8.github.io/transmog/installation.html)
+- [Getting Started](https://scottdraper8.github.io/transmog/getting-started.html)
+- [Configuration Guide](https://scottdraper8.github.io/transmog/configuration.html)
+- [Output Formats](https://scottdraper8.github.io/transmog/output-formats.html)
+- [In-Memory Processing](https://scottdraper8.github.io/transmog/in-memory-processing.html)
+- [Deterministic IDs](https://scottdraper8.github.io/transmog/deterministic-ids.html)
+- [API Reference](https://scottdraper8.github.io/transmog/api/index.html)
 - [Examples](examples/README.md)
 
 ## Use Cases
