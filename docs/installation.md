@@ -43,6 +43,7 @@ python scripts/setup_dev.py
 ```
 
 This script automates the development setup process by:
+
 1. Creating and activating a virtual environment
 2. Checking Python version compatibility
 3. Installing development dependencies

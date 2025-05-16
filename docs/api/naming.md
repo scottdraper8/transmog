@@ -10,7 +10,6 @@ This document describes the naming functionality in Transmog.
 from transmog.naming.abbreviator import (
     abbreviate_field_name,
     abbreviate_table_name,
-    get_common_abbreviations,
     merge_abbreviation_dicts
 )
 ```
@@ -36,13 +35,19 @@ short_table = abbreviate_table_name(
 ### Abbreviation Dictionaries
 
 ```python
-# Get common abbreviations
-abbrevs = get_common_abbreviations()
-# Returns a dictionary of common abbreviations
+# Create and use custom abbreviations
+custom_abbrevs = {"customer": "cust", "information": "info"}
+
+# Use custom abbreviations
+short_name = abbreviate_field_name(
+    "customer_billing_information_payment_methods",
+    max_component_length=5,
+    abbreviation_dict=custom_abbrevs
+)
 
 # Merge abbreviation dictionaries
-custom_abbrevs = {"customer": "cust", "information": "info"}
-merged = merge_abbreviation_dicts(get_common_abbreviations(), custom_abbrevs)
+additional_abbrevs = {"payment": "pmt", "methods": "mthd"}
+merged = merge_abbreviation_dicts(custom_abbrevs, additional_abbrevs)
 ```
 
 ## Naming Conventions

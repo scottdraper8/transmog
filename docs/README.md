@@ -31,6 +31,7 @@ python scripts/setup_dev.py
 ```
 
 This script:
+
 1. Creates and activates a virtual environment
 2. Installs development dependencies
 3. Sets up pre-commit hooks
@@ -46,26 +47,26 @@ To build the documentation:
 
 1. Install the required dependencies:
 
-```bash
-pip install -r docs/requirements.txt
-```
+    ```bash
+    pip install -r docs/requirements.txt
+    ```
 
 2. Build the documentation:
 
-```bash
-cd docs
-make html
-```
+    ```bash
+    cd docs
+    make html
+    ```
 
 3. View the built documentation:
 
-```bash
-open _build/html/index.html
-```
+    ```bash
+    open _build/html/index.html
+    ```
 
 ## Contributing to Documentation
 
-Please see the [CONTRIBUTING.md](https://github.com/scottdraper8/transmog/blob/main/CONTRIBUTING.md) file 
+Please see the [CONTRIBUTING.md](https://github.com/scottdraper8/transmog/blob/main/CONTRIBUTING.md) file
 for guidelines on contributing to the documentation.
 
 ## Documentation Map
