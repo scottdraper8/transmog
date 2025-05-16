@@ -8,7 +8,6 @@ from transmog.naming.abbreviator import (
     abbreviate_component,
     abbreviate_field_name,
     abbreviate_table_name,
-    get_common_abbreviations,
     merge_abbreviation_dicts,
 )
 from transmog.naming.conventions import (
@@ -28,6 +27,5 @@ __all__ = [
     "abbreviate_component",
     "abbreviate_table_name",
     "abbreviate_field_name",
-    "get_common_abbreviations",
     "merge_abbreviation_dicts",
 ]

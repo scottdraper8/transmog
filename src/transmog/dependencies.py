@@ -19,10 +19,10 @@ class DependencyManager:
     utility functions for handling missing dependencies.
     """
 
-    # Track which optional dependencies are available
+    # Optional dependencies availability tracking
     _optional_deps: dict[str, bool] = {}
 
-    # Group dependencies by feature
+    # Dependencies grouped by feature
     _feature_deps: dict[str, set[str]] = {
         "parquet": {"pyarrow"},
         "fast_json": {"orjson"},
@@ -52,7 +52,7 @@ class DependencyManager:
         """Manually register a dependency availability.
 
         This method is primarily used for testing or for cases
-        where you want to manually control dependency availability
+        where dependency availability needs to be manually controlled
         without actually importing the package.
 
         Args:

@@ -14,7 +14,7 @@ class Features:
     optional features based on installed packages.
     """
 
-    # Initialize feature flags
+    # Feature flags
     HAS_PYARROW = False
     HAS_ORJSON = False
 

@@ -18,7 +18,7 @@ from typing import (
 
 from ..config import ProcessingMode, TransmogConfig
 
-# Import the clear_caches and refresh_cache_config functions from flattener module
+# Cache management functions
 from ..core.flattener import clear_caches, refresh_cache_config
 from ..core.metadata import (
     get_current_timestamp,
@@ -37,7 +37,7 @@ from ..error import (
     with_recovery,
 )
 
-# Import data iterators
+# Data iteration utilities
 from .data_iterators import (
     get_csv_file_iterator,
     get_data_iterator,
@@ -47,7 +47,7 @@ from .data_iterators import (
     get_jsonl_file_iterator,
 )
 
-# Import file handling functions
+# File processing utilities
 from .file_handling import (
     detect_input_format,
     process_chunked,
@@ -56,10 +56,10 @@ from .file_handling import (
     process_file_to_format,
 )
 
-# Import processing result handling
+# Processing result handling
 from .result import ConversionMode, ProcessingResult
 
-# Import processing strategies
+# Processing strategies
 from .strategy import (
     BatchStrategy,
     ChunkedStrategy,
@@ -69,7 +69,7 @@ from .strategy import (
     ProcessingStrategy,
 )
 
-# Import streaming functions
+# Streaming processing utilities
 from .streaming import (
     stream_process,
     stream_process_csv,
@@ -77,7 +77,7 @@ from .streaming import (
     stream_process_file_with_format,
 )
 
-# Import utilities
+# General utilities
 from .utils import get_batch_size, get_common_config_params, handle_file_error
 
 # Type for data records
@@ -162,8 +162,8 @@ class Processor:
             TransmogConfig.default()
             .with_error_handling(recovery_strategy=LENIENT, allow_malformed_data=True)
             .with_processing(
-                cast_to_string=True  # Enable string casting to handle numeric type
-                # issues
+                # Enable string casting to handle numeric type issues
+                cast_to_string=True
             )
         )
 

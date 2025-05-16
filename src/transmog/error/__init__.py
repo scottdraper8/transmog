@@ -15,7 +15,7 @@ from .exceptions import (
     ValidationError,
 )
 
-# Import logger for convenience
+# Error handling utilities
 from .handling import (
     check_dependency,
     error_context,

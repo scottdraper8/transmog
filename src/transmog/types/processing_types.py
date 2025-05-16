@@ -4,10 +4,13 @@ This module defines interfaces for processing strategies to break circular depen
 """
 
 from collections.abc import Iterator
-from typing import Any, Protocol, Union
+from typing import Any, Literal, Protocol, Union
 
 from .base import JsonDict
 from .result_types import ResultInterface
+
+# Type for flatten mode
+FlattenMode = Literal["standard", "streaming"]
 
 
 class ProcessingStrategyProtocol(Protocol):

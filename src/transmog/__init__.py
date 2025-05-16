@@ -6,7 +6,6 @@ with parent-child relationship preservation and metadata annotation.
 
 __version__ = "0.1.2.5"
 
-# Import dependencies and features early to enable detection
 # Configuration functionality
 from transmog.config import (
     ErrorHandlingConfig,
@@ -82,7 +81,6 @@ from transmog.io.writers.parquet import ParquetStreamingWriter
 from transmog.naming.abbreviator import (
     abbreviate_field_name,
     abbreviate_table_name,
-    get_common_abbreviations,
     merge_abbreviation_dicts,
 )
 
@@ -105,8 +103,7 @@ from transmog.process import (
     Processor,
 )
 
-# For backwards compatibility, alias the DependencyManager
-# This ensures existing imports that use IoDependencyManager continue to work
+# Alias the DependencyManager for backwards compatibility
 from .dependencies import DependencyManager, DependencyManager as IoDependencyManager
 from .features import Features
 
@@ -191,7 +188,6 @@ __all__ = [
     # Naming utilities
     "abbreviate_field_name",
     "abbreviate_table_name",
-    "get_common_abbreviations",
     "merge_abbreviation_dicts",
     "get_standard_field_name",
     "get_table_name",

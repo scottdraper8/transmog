@@ -16,8 +16,9 @@ from typing import (
 from ..config import settings
 from ..error import error_context, logger
 from ..error.exceptions import ProcessingError
-from ..naming.abbreviator import abbreviate_field_name, get_common_abbreviations
+from ..naming.abbreviator import abbreviate_field_name
 from ..naming.conventions import sanitize_name
+from ..types import FlattenMode
 
 
 def _process_value(
@@ -250,9 +251,7 @@ def _flatten_json_core(
         # Prepare abbreviation dictionary
         abbreviation_dict = None
         if abbreviate_field_names and custom_abbreviations:
-            common_abbrevs = get_common_abbreviations()
-            abbreviation_dict = common_abbrevs.copy()
-            abbreviation_dict.update(custom_abbreviations)
+            abbreviation_dict = custom_abbreviations.copy()
 
         # Track complex objects that need to be removed for in-place processing
         complex_keys_to_remove = []
@@ -534,10 +533,6 @@ def _flatten_json_core(
                 logger.warning(f"Recovery failed: {re}")
                 raise e from None
         raise
-
-
-# Type for flatten mode
-FlattenMode = Literal["standard", "streaming"]
 
 
 @error_context("Failed to flatten JSON", wrap_as=lambda e: ProcessingError(str(e)))

@@ -86,17 +86,17 @@ class ProcessingStrategy(ABC):
         Returns:
             Dictionary of common configuration parameters
         """
-        # Use current timestamp if not provided
+        # Default to current timestamp if not provided
         if extract_time is None:
             extract_time = get_current_timestamp()
 
-        # Get configuration parameters
+        # Get configuration sections
         naming_config = self.config.naming
         processing_config = self.config.processing
         metadata_config = self.config.metadata
         error_config = self.config.error_handling
 
-        # Create parameters dictionary
+        # Combine parameters
         params = {
             # Naming parameters
             "separator": naming_config.separator,
@@ -121,7 +121,7 @@ class ProcessingStrategy(ABC):
             "id_generation_strategy": metadata_config.id_generation_strategy,
         }
 
-        # Add recovery strategy if configured
+        # Apply recovery strategy if configured
         if error_config.recovery_strategy:
             from ..error.recovery import (
                 DEFAULT,
@@ -132,7 +132,7 @@ class ProcessingStrategy(ABC):
                 StrictRecovery,
             )
 
-            # Create the recovery strategy instance
+            # Select appropriate recovery strategy
             strategy_name = error_config.recovery_strategy
             recovery_strategy: Optional[
                 Union[StrictRecovery, SkipAndLogRecovery, PartialProcessingRecovery]
@@ -150,7 +150,7 @@ class ProcessingStrategy(ABC):
             ):
                 recovery_strategy = strategy_name
 
-            # Add to params if we have a valid strategy
+            # Add valid strategy to params
             if recovery_strategy:
                 params["recovery_strategy"] = recovery_strategy
 
@@ -180,7 +180,7 @@ class ProcessingStrategy(ABC):
         Returns:
             Dictionary of parameters for processing
         """
-        # Get config objects
+        # Get config sections
         naming_config = self.config.naming
         processing_config = self.config.processing
         metadata_config = self.config.metadata

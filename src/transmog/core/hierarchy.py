@@ -29,7 +29,7 @@ ProcessResult = tuple[FlatDict, ArrayDict]
 StreamingChildTables = Generator[tuple[str, list[FlatDict]], None, None]
 ArrayResult = Union[ArrayDict, StreamingChildTables]
 
-# Setup logger
+# Logger initialization
 logger = logging.getLogger(__name__)
 
 
@@ -100,7 +100,7 @@ def process_structure(
     if root_entity is None:
         root_entity = entity_name
 
-    # Check for empty data cases
+    # Handle empty data case
     if data is None:
         empty_result = {
             id_field: generate_deterministic_id(str(entity_name) + "_empty"),
@@ -110,7 +110,7 @@ def process_structure(
         if parent_id:
             empty_result[parent_field] = parent_id
 
-        # Return empty result based on streaming mode
+        # Return appropriate empty result based on mode
         if streaming:
 
             def empty_generator() -> Generator[
@@ -123,7 +123,7 @@ def process_structure(
         else:
             return empty_result, {}
 
-    # Process this object - flatten it
+    # Flatten the object
     flattened_obj = flatten_json(
         data,
         parent_path=parent_path,
@@ -141,24 +141,23 @@ def process_structure(
         max_depth=max_depth,
     )
 
-    # Determine source field for deterministic ID generation
+    # Resolve source field for deterministic ID generation
     source_field = None
     if default_id_field:
         if isinstance(default_id_field, str):
-            # Simple case - use the same field for all paths
+            # Use same field for all paths
             source_field = default_id_field
         else:
-            # Dict case - map paths to field names
-            # Normalize path for comparison
+            # Map paths to field names
             normalized_path = parent_path.strip(separator) if parent_path else ""
 
-            # Exact path match first
+            # Check for exact path match first
             if normalized_path in default_id_field:
                 source_field = default_id_field[normalized_path]
-            # Then try wildcard matches if exact match not found
+            # Try wildcard match
             elif "*" in default_id_field:
                 source_field = default_id_field["*"]
-            # Try any path prefix matches (most specific to least)
+            # Try path prefix matches (most specific first)
             else:
                 path_components = (
                     normalized_path.split(separator) if normalized_path else []
@@ -170,7 +169,7 @@ def process_structure(
                         source_field = default_id_field[prefix_wildcard]
                         break
 
-    # Add metadata - use in_place for better performance
+    # Add metadata with in-place optimization
     flattened_obj_dict = flattened_obj if flattened_obj is not None else {}
     annotated_obj = annotate_with_metadata(
         flattened_obj_dict,
@@ -184,7 +183,7 @@ def process_structure(
         id_generation_strategy=id_generation_strategy,
     )
 
-    # Skip array processing if visit_arrays is False
+    # Skip array processing if not needed
     if not visit_arrays:
         if streaming:
 

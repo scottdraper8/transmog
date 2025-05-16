@@ -300,18 +300,6 @@ def abbreviate_field_name(
     return separator.join(abbreviated_parts)
 
 
-def get_common_abbreviations() -> dict[str, str]:
-    """Get dictionary of common terminology abbreviations.
-
-    This function now returns an empty dictionary by default,
-    using simple truncation instead of predefined abbreviations.
-
-    Returns:
-        Empty dictionary
-    """
-    return {}
-
-
 def merge_abbreviation_dicts(*dicts: dict[str, str]) -> dict[str, str]:
     """Merge multiple abbreviation dictionaries.
 
