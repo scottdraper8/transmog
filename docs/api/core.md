@@ -1,7 +1,8 @@
 # Core API Reference
 
-This section covers the core low-level functions in Transmog. These functions are used internally by
-the high-level API (`Processor` class) but can also be used directly for more control over the transformation process.
+> **User Guide**: For a user-friendly introduction, see the [Data Transformation Guide](../user/processing/data-transformation.md).
+
+This document provides technical reference for Transmog's core components and classes.
 
 ## Flattening Module
 
@@ -139,8 +140,15 @@ process_structure(
     max_field_component_length: int = None,
     preserve_leaf_component: bool = True,
     custom_abbreviations: Optional[Dict[str, str]] = None,
-    deterministic_id_fields: Optional[Dict[str, str]] = None,
+    default_id_field: Optional[Union[str, Dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[Dict[str, Any]], str]] = None,
+    id_field: str = "__extract_id",
+    parent_field: str = "__parent_extract_id",
+    time_field: str = "__extract_datetime",
+    visit_arrays: bool = True,
+    streaming: bool = False,
+    recovery_strategy: Optional[Any] = None,
+    max_depth: int = 100,
 ) -> Tuple[Dict[str, Any], Dict[str, List[Dict[str, Any]]]]
 ```
 

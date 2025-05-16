@@ -217,6 +217,6 @@ When contributing performance improvements to Transmog:
 ## Related Documentation
 
 - [Testing Guide](testing.md): Learn about the testing framework
-- [Strategies](../user/strategies.md): Learn about processing strategies
-- [In-Memory Processing](../user/in-memory-processing.md): Learn about memory optimization
-- [Streaming](../user/streaming.md): Learn about streaming processing
+- [Processing Guide](../user/processing/processing-overview.md): Learn about processing strategies
+- [Performance Optimization](../user/advanced/performance-optimization.md): Learn about memory optimization
+- [Streaming](../user/advanced/streaming.md): Learn about streaming processing

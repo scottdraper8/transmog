@@ -1,5 +1,7 @@
 # Configuration API Reference
 
+> **User Guide**: For usage guidance and examples, see the [Configuration Guide](../user/essentials/configuration.md).
+
 This document provides a reference for the configuration classes in Transmog.
 
 ## TransmogConfig

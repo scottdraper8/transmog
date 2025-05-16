@@ -1,5 +1,9 @@
 # ProcessingResult API Reference
 
+> **User Guide**: For usage guidance and examples, see the [Output Formats Guide](../user/output/output-formats.md).
+
+This document describes the `ProcessingResult` class in Transmog.
+
 The `ProcessingResult` class encapsulates the result of processing data with Transmog. It provides access
 to the processed data in various formats.
 

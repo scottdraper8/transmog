@@ -1,40 +1,74 @@
 # Transmog Examples
 
-This directory contains examples and sample code for using the Transmog library.
+This directory contains examples demonstrating how to use Transmog for data transformation.
 
 ## Directory Structure
 
-- **Basic Usage**
-  - `simple_flatten.py` - How to flatten nested JSON structures
-  - `config_example.py` - Configuring Transmog with the TransmogConfig API
-  - `native_output_formats.py` - Working with different output formats
-  - `conversion_modes_example.py` - Memory management with different conversion modes
+- **essentials/** - Core functionality examples
+  - Flattening basics
+  - Configuration options
+  - Processing modes
 
-- **Advanced Features**
-  - `advanced_usage.py` - Complex transformation examples
-  - `streaming_example.py` - Memory-efficient streaming processing
-  - `partial_recovery_example.py` - Recovering data from problematic sources
-  - `error_recovery_example.py` - Error handling strategies
-  - `recovery_strategy_comparison.py` - Comparing different recovery strategies
-  - `deterministic_id_examples.py` - Working with deterministic IDs
-  - `parallel_processing.py` - Processing data in parallel
-  - `performance_comparison.py` - Performance benchmarks and optimizations
+- **processing/** - Data processing examples
+  - JSON processing
+  - CSV processing
+  - File handling
 
-- **Customization**
-  - `abbreviation_example.py` - Field name abbreviation strategies
-  - `custom_naming_strategies.py` - Custom field naming approaches
+- **advanced/** - Advanced functionality
+  - Streaming processing
+  - Performance optimization
+  - Error handling
+  - Deterministic IDs
 
-- **output/** - Directory for example outputs (ignored by git)
+- **output/** - Output format examples
+  - Different output formats
+  - Formatting options
+  - File writing options
 
-## Running the Examples
+- **data/** - Data files and example outputs
+  - Input data files for examples
+  - Output directory for example results
+
+## Example Format
+
+Each example follows a standard format:
+
+```python
+"""
+Example Name: [Name]
+
+Demonstrates: [Specific functionality demonstrated]
+
+Related Documentation:
+- [Link to related documentation section]
+
+Learning Objectives:
+- [What the user will learn from this example]
+"""
+
+# Standard imports
+import transmog as tm
+
+# Example code with clear, factual comments
+
+def main():
+    # Example implementation with clear output
+
+if __name__ == "__main__":
+    main()
+```
+
+## Running Examples
 
 Most examples can be run directly:
 
 ```bash
-python examples/simple_flatten.py
+python examples/essentials/flattening_basics.py
 ```
 
-Some examples may require additional dependencies to be installed:
+When examples generate output files, they are saved in the `examples/data/output` directory.
+
+Optional features may require additional dependencies:
 
 ```bash
 pip install transmog[all]  # Install all optional dependencies
@@ -42,31 +76,27 @@ pip install transmog[all]  # Install all optional dependencies
 
 ## Example Categories
 
-### Configuration and Setup
+### Essentials
 
-- `config_example.py` - Demonstrates the TransmogConfig system with its fluent API
-- `deterministic_id_examples.py` - Shows how to configure deterministic ID generation
+- **Flattening Basics**: Core functionality for flattening nested structures
+- **Configuration**: Options for configuring the processor
+- **Processing Modes**: Different modes for processing data
 
-### Processing Data
+### Processing
 
-- `simple_flatten.py` - Basic flattening of nested JSON structures
-- `advanced_usage.py` - More complex flattening scenarios
-- `streaming_example.py` - Processing large datasets with streaming
+- **JSON Processing**: Working with JSON data
+- **CSV Processing**: Working with CSV data
+- **File Handling**: Reading from and writing to files
 
-### Output Formats
+### Advanced
 
-- `native_output_formats.py` - Working with different output formats
-- `conversion_modes_example.py` - Memory-efficient output handling
+- **Streaming Processing**: Memory-efficient streaming data processing
+- **Error Handling**: Handling errors and recovery strategies
+- **Performance Optimization**: Optimizing for different performance goals
+- **Deterministic IDs**: Consistent ID generation across processing runs
 
-### Error Handling
+### Output
 
-- `partial_recovery_example.py` - Recovering data from problematic sources
-- `error_recovery_example.py` - Different error handling strategies
-- `recovery_strategy_comparison.py` - Comparing strategy performance
-
-### Performance
-
-- `parallel_processing.py` - Processing data in parallel
-- `performance_comparison.py` - Performance benchmarks and optimizations
+- **Output Formats**: Different output format options
 
 For detailed explanation of each example, see the inline comments in each example file.

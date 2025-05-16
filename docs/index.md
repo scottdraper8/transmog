@@ -31,56 +31,78 @@ Transmog features:
 - Processing large datasets
 - Configuring memory usage
 
+## Documentation Structure
+
+For an overview of how the documentation is organized, see the [Documentation Map](documentation_map.md).
+
 ## Getting Started
 
 - [Installation Guide](installation.md)
-- [Quick Start Guide](user/getting-started.md)
+- [Getting Started Guide](user/essentials/getting-started.md)
+- [Basic Concepts](user/essentials/basic-concepts.md)
+- [Data Structures](user/essentials/data-structures.md)
 
-## Core Concepts
+## Quick Start Tutorials
 
-### Flattening and Transformation
+- [Transform Nested JSON](tutorials/basic/transform-nested-json.md)
+- [Flatten and Normalize](tutorials/basic/flatten-and-normalize.md)
 
-- [Flattening Nested Data](user/flattening.md)
-- [Working with Arrays](user/arrays.md)
-- [Metadata Management](user/metadata.md)
-- [Deterministic ID Generation](user/deterministic-ids.md)
-- [Error Handling](user/error-handling.md)
+## Core User Guides
 
-### Processing Strategies
+### Essentials
 
-- [Processing Strategies](user/strategies.md) - Different processing strategies
-- [Streaming Processing](user/streaming.md) - Process data streams
+- [Configuration](user/essentials/configuration.md)
+- [Dependencies and Features](user/essentials/dependencies-and-features.md)
 
-### Output Formats
+### Processing
 
-- [Output Format Options](user/output-formats.md) - Available output formats
-- [In-Memory Processing](user/in-memory-processing.md) - In-memory processing
+- [Processing Overview](user/processing/processing-overview.md)
+- [Data Transformation](user/processing/data-transformation.md)
+- [JSON Handling](user/processing/json-handling.md)
+- [CSV Processing](user/processing/csv-processing.md)
+- [File Processing](user/processing/file-processing.md)
+- [Metadata](user/processing/metadata.md)
+- [Naming](user/processing/naming.md)
+- [Transforms](user/processing/transforms.md)
+- [IO Operations](user/processing/io.md)
 
-### Configuration System
+### Advanced
 
-- [Configuration Guide](user/configuration.md) - Configuration options
-- [Error Recovery Strategies](user/error-handling.md) - Error handling during processing
+- [Streaming](user/advanced/streaming.md)
+- [Performance Optimization](user/advanced/performance-optimization.md)
+- [Error Handling](user/advanced/error-handling.md)
+- [Deterministic ID Generation](user/advanced/deterministic-ids.md)
+
+### Output
+
+- [Output Formats](user/output/output-formats.md)
 
 ## API Reference
 
 - [Processor API](api/processor.md)
 - [ProcessingResult API](api/processing-result.md)
-- [Configuration API](api/config.md) - Configuration classes and options
-- [CSV Reader API](api/csv-reader.md) - CSV file processing
+- [Process API](api/process.md)
+- [Configuration API](api/config.md)
+- [CSV Reader API](api/csv-reader.md)
+- [Error Handling API](api/error.md)
+- [IO API](api/io.md)
+- [Naming API](api/naming.md)
+- [Types API](api/types.md)
 
-## Examples
+## Advanced Tutorials
 
-- Streaming Processing
-- Error Recovery
-- [Partial Recovery](../examples/partial_recovery_example.py)
+- [Streaming Large Datasets](tutorials/intermediate/streaming-large-datasets.md)
+- [Customizing ID Generation](tutorials/intermediate/customizing-id-generation.md)
+- [Error Recovery Strategies](tutorials/advanced/error-recovery-strategies.md)
+- [Optimizing Memory Usage](tutorials/advanced/optimizing-memory-usage.md)
 
 ## For Developers
 
-- Contributing
-- Development Guide
+- [Architecture](dev/architecture.md)
+- [Extending Transmog](dev/extending.md)
 - [Testing Guide](dev/testing.md)
 - [Benchmarking Guide](dev/benchmarking.md)
-- [Architecture](dev/architecture.md) - Internal design
+- [Code Style Guide](dev/code-style.md)
 
 ## Roadmap
 
@@ -164,8 +186,11 @@ See our [ROADMAP.md](https://github.com/scottdraper8/transmog/blob/main/ROADMAP.
 :hidden:
 :caption: Getting Started
 
-user/getting-started
+user/essentials/getting-started
+user/essentials/basic-concepts
+user/essentials/data-structures
 installation
+documentation_map
 README
 ```
 
@@ -174,27 +199,35 @@ README
 :hidden:
 :caption: User Guide
 
-user/configuration
-user/flattening
-user/arrays
-user/metadata
-user/deterministic-ids
-user/streaming
-user/strategies
-user/output-formats
-user/in-memory-processing
-user/error-handling
-user/json-processing
-user/json-transform
-user/csv-processing
-user/streaming-parquet
-user/schema
-user/naming
-user/transforms
-user/caching
-user/data-flow
-user/hierarchy
-user/concurrency
+user/essentials/configuration
+user/essentials/dependencies-and-features
+user/processing/processing-overview
+user/processing/data-transformation
+user/processing/json-handling
+user/processing/csv-processing
+user/processing/file-processing
+user/processing/metadata
+user/processing/naming
+user/processing/transforms
+user/processing/io
+user/advanced/streaming
+user/advanced/performance-optimization
+user/advanced/error-handling
+user/advanced/deterministic-ids
+user/output/output-formats
+```
+
+```{toctree}
+:maxdepth: 1
+:hidden:
+:caption: Tutorials
+
+tutorials/basic/transform-nested-json
+tutorials/basic/flatten-and-normalize
+tutorials/intermediate/streaming-large-datasets
+tutorials/intermediate/customizing-id-generation
+tutorials/advanced/error-recovery-strategies
+tutorials/advanced/optimizing-memory-usage
 ```
 
 ```{toctree}
@@ -204,9 +237,14 @@ user/concurrency
 
 api/processor
 api/processing-result
+api/process
 api/config
 api/csv-reader
 api/core
+api/error
+api/io
+api/naming
+api/types
 ```
 
 ```{toctree}
@@ -221,16 +259,6 @@ dev/benchmarking
 dev/code-style
 ```
 
-```{toctree}
-:maxdepth: 1
-:hidden:
-:caption: Tutorials
-
-tutorials/data-transformation
-```
-
 ## Indices and Tables
 
-- {ref}`genindex`
-- {ref}`modindex`
-- {ref}`search`
+- {ref}`

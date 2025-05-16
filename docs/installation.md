@@ -143,4 +143,4 @@ pip install --no-cache-dir transmog
 
 ## Next Steps
 
-After installation, see the [Getting Started Guide](user/getting-started.md).
+After installation, see the [Getting Started Guide](user/essentials/getting-started.md).

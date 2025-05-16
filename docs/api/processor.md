@@ -1,6 +1,15 @@
 # Processor API Reference
 
-The `Processor` class is the main entry point for processing JSON data in Transmog.
+> **User Guide**: For usage guidance and examples, see:
+>
+> - [Processing Overview](../user/processing/processing-overview.md) - General processing concepts and methods
+> - [Streaming Guide](../user/advanced/streaming.md) - Streaming processing techniques
+> - [File Processing Guide](../user/processing/file-processing.md) - Processing data from various file formats
+>
+> For details on the underlying processing components, see the [Process API](process.md).
+
+The `Processor` class is the main entry point for processing JSON data in Transmog. It provides a high-level
+interface for transforming nested JSON structures into flat, relational tables.
 
 ## Import
 
@@ -19,37 +28,6 @@ Processor(config: Optional[TransmogConfig] = None)
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | config | TransmogConfig | None | Configuration object. If None, uses default configuration. |
-
-## Configuration
-
-The Processor class uses the `TransmogConfig` class for configuration:
-
-```python
-from transmog import Processor, TransmogConfig
-
-# Create with custom configuration
-config = (
-    TransmogConfig.default()
-    .with_naming(
-        separator=".",
-        abbreviate_table_names=False
-    )
-    .with_processing(
-        cast_to_string=True,
-        batch_size=5000
-    )
-    .with_metadata(
-        id_field="custom_id"
-    )
-    .with_error_handling(
-        recovery_strategy="skip"
-    )
-)
-
-processor = Processor(config=config)
-```
-
-See the [Configuration API Reference](config.md) for all configuration options.
 
 ## Factory Methods
 
@@ -80,7 +58,7 @@ processor = Processor.with_custom_id_generation(custom_id_strategy)
 processor = Processor.with_partial_recovery()
 ```
 
-### Configuration Methods
+## Configuration Methods
 
 Create a processor with updated configuration:
 
@@ -107,41 +85,7 @@ new_processor = processor.with_caching(enabled=True, maxsize=50000)
 new_processor = processor.with_config(custom_config)
 ```
 
-### Partial Recovery Processor
-
-The `with_partial_recovery()` method creates a processor configured to:
-
-1. Use the partial recovery strategy (LENIENT)
-2. Enable malformed data processing
-3. Cast values to strings to handle numeric type issues
-
-Uses include:
-
-- Data migration from legacy systems
-- Processing API responses with inconsistent structures
-- Recovering data from malformed files
-
-```python
-from transmog import Processor
-
-# Create a processor that will attempt to recover partial data from problematic records
-processor = Processor.with_partial_recovery()
-
-# Process data that may contain errors
-try:
-    result = processor.process(problematic_data, entity_name="records")
-
-    # The output will contain markers for errors but still preserve valid parts
-    for record in result.get_main_table():
-        if "_error" in record:
-            print(f"Record with ID {record.get('id')} had errors: {record['_error']}")
-        else:
-            print(f"Record with ID {record.get('id')} processed successfully")
-except Exception as e:
-    print(f"Processing failed despite recovery attempts: {e}")
-```
-
-## Processing Methods
+## Core Processing Methods
 
 ### process
 
@@ -180,6 +124,35 @@ main_table = result.get_main_table()
 child_tables = result.get_table_names()
 ```
 
+### process_file
+
+Process a file containing JSON data.
+
+```python
+process_file(
+    file_path: str,
+    entity_name: str,
+    extract_time: Optional[Any] = None,
+    input_format: str = "auto"
+) -> ProcessingResult
+```
+
+#### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| file_path | str | Required | Path to the file to process |
+| entity_name | str | Required | Name of the entity (used for table naming) |
+| extract_time | Any | None | Extraction timestamp (current time if None) |
+| input_format | str | "auto" | Format of the input file ("json", "jsonl", "auto") |
+
+#### Example
+
+```python
+# Process a JSON file
+result = processor.process_file("data.json", entity_name="customers")
+```
+
 ### process_batch
 
 Process a batch of records.
@@ -196,34 +169,29 @@ process_batch(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| batch_data | List[Dict[str, Any]] | Required | Batch of records to process |
+| batch_data | List[Dict[str, Any]] | Required | List of records to process |
 | entity_name | str | Required | Name of the entity (used for table naming) |
 | extract_time | Any | None | Extraction timestamp (current time if None) |
-
-#### Returns
-
-A `ProcessingResult` object containing the processed data.
 
 #### Example
 
 ```python
-batch = [
-    {"id": 1, "name": "Record 1"},
-    {"id": 2, "name": "Record 2"},
-    {"id": 3, "name": "Record 3"}
-]
-result = processor.process_batch(batch, entity_name="records")
+# Process a batch of records
+batch = [{"id": 1, "name": "John"}, {"id": 2, "name": "Jane"}]
+result = processor.process_batch(batch, entity_name="customers")
 ```
 
-### process_file
+### process_chunked
 
-Process data from a file.
+Process data in chunks to manage memory usage.
 
 ```python
-process_file(
-    file_path: str,
+process_chunked(
+    data: Union[List[Dict[str, Any]], str, Iterator[Dict[str, Any]]],
     entity_name: str,
+    chunk_size: int = 1000,
     extract_time: Optional[Any] = None,
+    input_format: str = "auto"
 ) -> ProcessingResult
 ```
 
@@ -231,80 +199,36 @@ process_file(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| file_path | str | Required | Path to the file to process |
+| data | List[Dict], str, Iterator[Dict] | Required | Data to process in chunks |
 | entity_name | str | Required | Name of the entity (used for table naming) |
+| chunk_size | int | 1000 | Number of records to process in each chunk |
 | extract_time | Any | None | Extraction timestamp (current time if None) |
-
-#### Returns
-
-A `ProcessingResult` object containing the processed data.
+| input_format | str | "auto" | Format of the input ("json", "jsonl", "auto") |
 
 #### Example
 
 ```python
-result = processor.process_file("data.json", entity_name="records")
-```
-
-### process_file_to_format
-
-Process a file and convert the result to a specific format.
-
-```python
-process_file_to_format(
-    file_path: str,
-    entity_name: str,
-    output_format: str,
-    output_path: Optional[str] = None,
-    extract_time: Optional[Any] = None,
-    **format_options,
-) -> ProcessingResult
-```
-
-#### Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| file_path | str | Required | Path to the file to process |
-| entity_name | str | Required | Name of the entity (used for table naming) |
-| output_format | str | Required | Output format (e.g., "json", "csv", "parquet") |
-| output_path | str | None | Output path for the files (if None, no files are written) |
-| extract_time | Any | None | Extraction timestamp (current time if None) |
-| **format_options | dict | {} | Format-specific options (e.g., compression, indent) |
-
-#### Returns
-
-A `ProcessingResult` object containing the processed data.
-
-#### Example
-
-```python
-result = processor.process_file_to_format(
-    "data.json",
-    entity_name="records",
-    output_format="parquet",
-    output_path="output_dir",
-    compression="snappy"
-)
+# Process a large dataset in chunks
+result = processor.process_chunked(large_data, entity_name="logs", chunk_size=500)
 ```
 
 ### process_csv
 
-Process data from a CSV file.
+Process a CSV file.
 
 ```python
 process_csv(
     file_path: str,
     entity_name: str,
-    extract_time: Optional[Any] = None,
-    delimiter: Optional[str] = None,
+    delimiter: str = ",",
     has_header: bool = True,
-    null_values: Optional[List[str]] = None,
-    sanitize_column_names: bool = True,
-    infer_types: bool = True,
     skip_rows: int = 0,
-    quote_char: Optional[str] = None,
+    quote_char: str = '"',
+    null_values: Optional[List[str]] = None,
     encoding: str = "utf-8",
-    chunk_size: Optional[int] = None,
+    infer_types: bool = True,
+    sanitize_column_names: bool = True,
+    extract_time: Optional[Any] = None
 ) -> ProcessingResult
 ```
 
@@ -314,86 +238,42 @@ process_csv(
 |-----------|------|---------|-------------|
 | file_path | str | Required | Path to the CSV file |
 | entity_name | str | Required | Name of the entity (used for table naming) |
-| extract_time | Any | None | Extraction timestamp (current time if None) |
-| delimiter | str | None | CSV delimiter (default auto-detection) |
-| has_header | bool | True | Whether the CSV has a header |
-| null_values | List[str] | None | Values to treat as NULL |
-| sanitize_column_names | bool | True | Whether to sanitize column names |
-| infer_types | bool | True | Whether to infer types from data |
+| delimiter | str | "," | Field delimiter |
+| has_header | bool | True | Whether the file has a header row |
 | skip_rows | int | 0 | Number of rows to skip at the beginning |
-| quote_char | str | None | Character for quoting fields |
+| quote_char | str | '"' | Character for quoting fields |
+| null_values | List[str] | None | Values to interpret as NULL |
 | encoding | str | "utf-8" | File encoding |
-| chunk_size | int | None | Process in chunks of this size |
-
-#### Returns
-
-A `ProcessingResult` object containing the processed data.
+| infer_types | bool | True | Whether to infer data types |
+| sanitize_column_names | bool | True | Whether to clean up column names |
+| extract_time | Any | None | Extraction timestamp (current time if None) |
 
 #### Example
 
 ```python
+# Process a CSV file
 result = processor.process_csv(
     "data.csv",
-    entity_name="records",
+    entity_name="products",
     delimiter=",",
-    has_header=True,
-    infer_types=True
+    has_header=True
 )
 ```
 
-### process_chunked
-
-Process data in chunks for memory efficiency.
-
-```python
-process_chunked(
-    data: Union[Dict[str, Any], List[Dict[str, Any]], str, bytes],
-    entity_name: str,
-    extract_time: Optional[Any] = None,
-    chunk_size: Optional[int] = None,
-    input_format: str = "auto",
-    **format_options,
-) -> ProcessingResult
-```
-
-#### Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| data | Dict, List[Dict], str, bytes | Required | Data to process |
-| entity_name | str | Required | Name of the entity |
-| extract_time | Any | None | Extraction timestamp |
-| chunk_size | int | None | Size of chunks to process |
-| input_format | str | "auto" | Format of the input data ("auto", "json", "jsonl", "csv") |
-| **format_options | dict | {} | Format-specific options |
-
-#### Returns
-
-A `ProcessingResult` object containing the processed data.
-
-#### Example
-
-```python
-result = processor.process_chunked(
-    "large_data.jsonl",
-    entity_name="records",
-    chunk_size=1000,
-    input_format="jsonl"
-)
-```
+## Streaming Processing Methods
 
 ### stream_process
 
-Process data and stream it directly to output.
+Stream process data to an output format without keeping all results in memory.
 
 ```python
 stream_process(
-    data: Union[Dict[str, Any], List[Dict[str, Any]], str, bytes],
+    data: Union[Dict[str, Any], List[Dict[str, Any]], str, bytes, Iterator[Dict[str, Any]]],
     entity_name: str,
     output_format: str,
-    output_destination: Union[str, BinaryIO, StringIO],
+    output_destination: Union[str, IO[Any]],
     extract_time: Optional[Any] = None,
-    **format_options,
+    **format_options
 ) -> None
 ```
 
@@ -401,139 +281,135 @@ stream_process(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| data | Dict, List[Dict], str, bytes | Required | Data to process |
-| entity_name | str | Required | Name of the entity |
-| output_format | str | Required | Output format |
-| output_destination | str, BinaryIO, StringIO | Required | Output destination (path or file-like object) |
-| extract_time | Any | None | Extraction timestamp |
-| **format_options | dict | {} | Format-specific options |
-
-#### Returns
-
-None. Data is written directly to the output destination.
+| data | Dict, List[Dict], str, bytes, Iterator[Dict] | Required | Data to process |
+| entity_name | str | Required | Name of the entity (used for table naming) |
+| output_format | str | Required | Output format ("json", "csv", "parquet") |
+| output_destination | str, IO | Required | Output path or file-like object |
+| extract_time | Any | None | Extraction timestamp (current time if None) |
+| **format_options | Any | {} | Format-specific options |
 
 #### Example
 
 ```python
+# Stream process to Parquet
 processor.stream_process(
-    "large_data.jsonl",
-    entity_name="records",
+    data,
+    entity_name="customers",
     output_format="parquet",
-    output_destination="output_dir",
+    output_destination="output/customers",
     compression="snappy"
 )
 ```
 
 ### stream_process_file
 
-Stream-process a file directly to output.
+Stream process a file to an output format.
 
 ```python
 stream_process_file(
     file_path: str,
     entity_name: str,
     output_format: str,
-    output_destination: Union[str, BinaryIO, StringIO],
+    output_destination: Union[str, IO[Any]],
     extract_time: Optional[Any] = None,
-    **format_options,
+    input_format: str = "auto",
+    **format_options
 ) -> None
 ```
-
-#### Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| file_path | str | Required | Path to the file |
-| entity_name | str | Required | Name of the entity |
-| output_format | str | Required | Output format |
-| output_destination | str, BinaryIO, StringIO | Required | Output destination |
-| extract_time | Any | None | Extraction timestamp |
-| **format_options | dict | {} | Format-specific options |
-
-#### Returns
-
-None. Data is written directly to the output destination.
 
 #### Example
 
 ```python
+# Stream process a JSON file to CSV
 processor.stream_process_file(
     "data.json",
     entity_name="records",
-    output_format="parquet",
-    output_destination="output_dir",
-    compression="snappy"
+    output_format="csv",
+    output_destination="output/records",
+    include_header=True
 )
 ```
 
 ### stream_process_csv
 
-Stream-process a CSV file directly to output.
+Stream process a CSV file to an output format.
 
 ```python
 stream_process_csv(
     file_path: str,
     entity_name: str,
     output_format: str,
-    output_destination: Union[str, BinaryIO, StringIO],
-    extract_time: Optional[Any] = None,
-    delimiter: Optional[str] = None,
+    output_destination: Union[str, IO[Any]],
+    delimiter: str = ",",
     has_header: bool = True,
-    null_values: Optional[List[str]] = None,
-    sanitize_column_names: bool = True,
-    infer_types: bool = True,
     skip_rows: int = 0,
-    quote_char: Optional[str] = None,
+    quote_char: str = '"',
+    null_values: Optional[List[str]] = None,
     encoding: str = "utf-8",
-    **format_options,
+    infer_types: bool = True,
+    sanitize_column_names: bool = True,
+    extract_time: Optional[Any] = None,
+    **format_options
 ) -> None
+```
+
+#### Example
+
+```python
+# Stream process a CSV file to Parquet
+processor.stream_process_csv(
+    "data.csv",
+    entity_name="products",
+    output_format="parquet",
+    output_destination="output/products",
+    delimiter=",",
+    has_header=True,
+    compression="snappy"
+)
+```
+
+## Error Handling Methods
+
+### with_error_handling
+
+Create a new processor with updated error handling settings.
+
+```python
+with_error_handling(
+    recovery_strategy: str = "strict",
+    log_errors: bool = True,
+    max_errors: Optional[int] = None
+) -> Processor
 ```
 
 #### Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| file_path | str | Required | Path to the CSV file |
-| entity_name | str | Required | Name of the entity |
-| output_format | str | Required | Output format |
-| output_destination | str, BinaryIO, StringIO | Required | Output destination |
-| extract_time | Any | None | Extraction timestamp |
-| delimiter | str | None | CSV delimiter |
-| has_header | bool | True | Whether the CSV has a header |
-| null_values | List[str] | None | Values to treat as NULL |
-| sanitize_column_names | bool | True | Whether to sanitize column names |
-| infer_types | bool | True | Whether to infer types |
-| skip_rows | int | 0 | Number of rows to skip |
-| quote_char | str | None | Character for quoting fields |
-| encoding | str | "utf-8" | File encoding |
-| **format_options | dict | {} | Format-specific options |
-
-#### Returns
-
-None. Data is written directly to the output destination.
-
-### clear_cache
-
-Clear the internal caches used for value processing.
-
-```python
-clear_cache() -> None
-```
+| recovery_strategy | str | "strict" | Recovery strategy ("strict", "skip", "partial") |
+| log_errors | bool | True | Whether to log errors |
+| max_errors | int | None | Maximum number of errors before failing |
 
 #### Example
 
 ```python
-processor.clear_cache()
+# Create a processor that skips records with errors
+processor = processor.with_error_handling(recovery_strategy="skip", max_errors=100)
+
+# Process data that may contain errors
+result = processor.process(data_with_errors, entity_name="records")
 ```
 
-## Processing Strategies
+## Related Resources
 
-The `Processor` class selects the appropriate processing strategy based on the input data:
+For more detailed information about specific components and use cases, refer to:
 
-- `InMemoryStrategy` - For in-memory dictionaries or lists
-- `FileStrategy` - For processing file paths
-- `ChunkedStrategy` - For processing data in chunks
-- `CSVStrategy` - For CSV files
-- `BatchStrategy` - For batch processing
+- [Process API](process.md) - Details about the underlying processing components
+- [ProcessingResult API](processing-result.md) - Working with processing results
+- [Configuration API](config.md) - Advanced configuration options
 
-The `process` method handles strategy selection automatically.
+For usage guidance and examples, see the user guides:
+
+- [Processing Overview](../user/processing/processing-overview.md) - General processing concepts and methods
+- [Streaming Guide](../user/advanced/streaming.md) - Streaming processing techniques
+- [File Processing Guide](../user/processing/file-processing.md) - Processing data from various file formats
