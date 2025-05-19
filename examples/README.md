@@ -100,3 +100,45 @@ pip install transmog[all]  # Install all optional dependencies
 - **Output Formats**: Different output format options
 
 For detailed explanation of each example, see the inline comments in each example file.
+
+## Array Processing
+
+### Primitive Arrays
+
+Transmog now processes arrays of primitive values (strings, numbers, booleans) as child tables, similar to how it processes arrays of objects. Each primitive value in an array becomes a record in a child table with a `value` field containing the primitive value.
+
+Key points about primitive array handling:
+
+- Arrays of primitive values are extracted to their own child tables
+- By default, null values in arrays are skipped (controlled by the `skip_null` parameter)
+- To include null values, set `skip_null=False` when processing
+- Each primitive value is stored in a `value` field in the resulting record
+- Parent-child relationships are maintained with appropriate metadata
+
+Example:
+
+```python
+import transmog as tm
+
+# Create data with primitive arrays
+data = {
+    "id": 123,
+    "name": "Example",
+    "tags": ["red", "green", "blue"],
+    "scores": [95, 87, 92]
+}
+
+# Process the data
+processor = tm.Processor()
+result = processor.process(data, entity_name="example")
+
+# Access the primitive array tables
+tags_table = result.get_child_table("example_tags")
+scores_table = result.get_child_table("example_scores")
+
+# Each tag is now a record with a "value" field
+for tag in tags_table:
+    print(f"Tag: {tag['value']}")
+```
+
+See the [primitive_arrays_example.py](basic/primitive_arrays_example.py) for a complete working example.

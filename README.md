@@ -11,6 +11,10 @@ parent-child relationships.
 
 - **Multiple Input Formats**: Process JSON, JSONL (line-delimited JSON), and CSV files
 - **Flattening**: Flatten deeply nested structures with customizable delimiter options
+- **Array Handling**:
+  - Extract arrays of objects as child tables with parent-child relationships
+  - Process arrays of primitive values (strings, numbers, booleans) as child tables
+  - Customizable null value handling
 - **Output Flexibility**:
   - Native formats: Python dictionaries, JSON objects, PyArrow Tables
   - Bytes output: Serialize directly to Parquet, CSV, or JSON bytes

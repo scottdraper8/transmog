@@ -168,8 +168,7 @@ class TestExtractor(AbstractExtractorTest):
         assert "test_items" in arrays
         assert len(arrays["test_items"]) == 2
 
-        # With our new table naming, subitems will be under tables with indices
-        # e.g., test_items_0_subitems and test_items_1_subitems
+        # Find subitems tables by naming pattern
         subitems_tables = [
             name for name in arrays.keys() if "items" in name and "sub" in name
         ]
@@ -212,3 +211,46 @@ class TestExtractor(AbstractExtractorTest):
         # Count total subitems across all subitems tables
         total_subitems = sum(len(tables[table]) for table in subitems_tables)
         assert total_subitems == 3, f"Expected 3 total subitems, got {total_subitems}"
+
+    def test_primitive_array_extraction(self):
+        """Test extraction of primitive arrays (arrays of non-dict values)."""
+        # Create a test structure with primitive arrays
+        data = {
+            "id": 123,
+            "name": "Test Entity",
+            "tags": ["tag1", "tag2", "tag3"],
+            "scores": [10, 20, 30, 40],
+            "mixed": [100, "string", True, None],
+            "nested": {"flags": [True, False, True]},
+        }
+
+        # Extract arrays
+        arrays = extract_arrays(data, entity_name="test", skip_null=False)
+
+        # Print table names for debugging
+        print(f"Extracted tables: {list(arrays.keys())}")
+
+        # Check that primitive arrays were extracted as child tables
+        assert "test_tags" in arrays, "Tags array was not extracted"
+        assert "test_scores" in arrays, "Scores array was not extracted"
+        assert "test_mixed" in arrays, "Mixed array was not extracted"
+        assert "test_nested_flags" in arrays, "Nested flags array was not extracted"
+
+        # Check that the correct number of items were extracted
+        assert len(arrays["test_tags"]) == 3, "Wrong number of tags extracted"
+        assert len(arrays["test_scores"]) == 4, "Wrong number of scores extracted"
+        assert len(arrays["test_mixed"]) == 4, "Wrong number of mixed items extracted"
+
+        # Check that the primitive values are stored in the 'value' field
+        for i, expected in enumerate(["tag1", "tag2", "tag3"]):
+            assert arrays["test_tags"][i]["value"] == expected
+
+        for i, expected in enumerate([10, 20, 30, 40]):
+            assert arrays["test_scores"][i]["value"] == expected
+
+        # Check that metadata fields are included
+        for record in arrays["test_tags"]:
+            assert "__extract_id" in record
+            assert "__extract_datetime" in record
+            assert "__array_field" in record
+            assert "__array_index" in record

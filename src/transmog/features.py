@@ -17,9 +17,11 @@ class Features:
     # Feature flags
     HAS_PYARROW = False
     HAS_ORJSON = False
+    HAS_TYPING_EXTENSIONS = False
 
     HAS_PARQUET_SUPPORT = False
     HAS_FAST_JSON = False
+    HAS_ENHANCED_TYPING = False
 
     @classmethod
     def detect_features(cls) -> None:
@@ -31,10 +33,14 @@ class Features:
         # Check individual packages
         cls.HAS_PYARROW = DependencyManager.has_dependency("pyarrow")
         cls.HAS_ORJSON = DependencyManager.has_dependency("orjson")
+        cls.HAS_TYPING_EXTENSIONS = DependencyManager.has_dependency(
+            "typing_extensions"
+        )
 
         # Check complete features
         cls.HAS_PARQUET_SUPPORT = DependencyManager.has_feature("parquet")
         cls.HAS_FAST_JSON = DependencyManager.has_feature("fast_json")
+        cls.HAS_ENHANCED_TYPING = DependencyManager.has_feature("typing")
 
 
 # Run detection at import time

@@ -26,6 +26,7 @@ class DependencyManager:
     _feature_deps: dict[str, set[str]] = {
         "parquet": {"pyarrow"},
         "fast_json": {"orjson"},
+        "typing": {"typing-extensions"},  # Enhanced typing support
     }
 
     @classmethod

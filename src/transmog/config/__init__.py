@@ -114,6 +114,7 @@ class TransmogConfig:
                 processing_mode=ProcessingMode.LOW_MEMORY,
                 batch_size=100,
                 path_parts_optimization=True,
+                visit_arrays=True,
             ),
             cache_config=CacheConfig(
                 enabled=True,
@@ -130,6 +131,7 @@ class TransmogConfig:
                 processing_mode=ProcessingMode.HIGH_PERFORMANCE,
                 batch_size=10000,
                 path_parts_optimization=True,
+                visit_arrays=True,
             ),
             cache_config=CacheConfig(
                 enabled=True,

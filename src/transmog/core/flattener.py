@@ -192,7 +192,7 @@ def _flatten_json_core(
         cast_to_string: Whether to cast all values to strings
         include_empty: Whether to include empty values
         skip_null: Whether to skip null values
-        skip_arrays: Whether to skip arrays
+        skip_arrays: Arrays are not skipped by default
         visit_arrays: Whether to visit arrays
         parent_path: Current path from root
         path_parts: Components of the path for optimization
@@ -521,7 +521,7 @@ def flatten_json(
     cast_to_string: Optional[bool] = None,
     include_empty: Optional[bool] = None,
     skip_null: Optional[bool] = None,
-    skip_arrays: bool = True,
+    skip_arrays: bool = False,
     visit_arrays: Optional[bool] = None,
     parent_path: str = "",
     path_parts: Optional[list[str]] = None,
@@ -548,7 +548,7 @@ def flatten_json(
         cast_to_string: Whether to cast all values to strings
         include_empty: Whether to include empty values
         skip_null: Whether to skip null values
-        skip_arrays: Whether to skip arrays
+        skip_arrays: Arrays are not skipped by default
         visit_arrays: Whether to visit arrays
         parent_path: Current path from root
         path_parts: Components of the path for optimization
@@ -581,7 +581,7 @@ def flatten_json(
         skip_null = settings.get("skip_null", True)
 
     if visit_arrays is None:
-        visit_arrays = settings.get("visit_arrays", False)
+        visit_arrays = settings.get("visit_arrays", True)
 
     if abbreviate_field_names is None:
         abbreviate_field_names = settings.get("abbreviate_field_names", True)

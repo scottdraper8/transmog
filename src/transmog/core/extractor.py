@@ -172,15 +172,10 @@ def _extract_arrays_impl(
 
             # Process each item in the array
             for i, item in enumerate(value):
-                # Skip null array items
-                if item is None:
+                # Skip null array items if configured to skip nulls
+                if item is None and skip_null:
                     continue
 
-                # Only process dictionary items
-                if not isinstance(item, dict):
-                    continue
-
-                # Process dictionary item
                 try:
                     # Create path for this specific array item
                     item_path = f"{current_path}{separator}{i}"
@@ -200,21 +195,28 @@ def _extract_arrays_impl(
                             elif table_name in default_id_field:
                                 source_field = default_id_field[table_name]
 
-                    # Flatten the JSON structure
-                    flattened = flatten_json(
-                        item,
-                        separator=separator,
-                        cast_to_string=cast_to_string,
-                        include_empty=include_empty,
-                        skip_null=skip_null,
-                        parent_path="",
-                        in_place=False,
-                        mode="streaming" if streaming_mode else "standard",
-                        recovery_strategy=recovery_strategy,
-                    )
+                    if isinstance(item, dict):
+                        # Process dictionary item
+                        # Flatten the JSON structure
+                        flattened = flatten_json(
+                            item,
+                            separator=separator,
+                            cast_to_string=cast_to_string,
+                            include_empty=include_empty,
+                            skip_null=skip_null,
+                            parent_path="",
+                            in_place=False,
+                            mode="streaming" if streaming_mode else "standard",
+                            recovery_strategy=recovery_strategy,
+                        )
 
-                    # Add metadata fields to the record
-                    metadata_dict = flattened if flattened is not None else {}
+                        # Add metadata fields to the record
+                        metadata_dict = flattened if flattened is not None else {}
+                    else:
+                        # Primitive array value storage
+                        metadata_dict = {"value": item}
+
+                    # Add metadata to the dictionary
                     annotated = annotate_with_metadata(
                         metadata_dict,
                         parent_id=parent_id,
@@ -234,33 +236,34 @@ def _extract_arrays_impl(
                     # Output the processed record
                     yield table_name, annotated
 
-                    # Process any nested arrays recursively
-                    nested_generator = _extract_arrays_impl(
-                        item,
-                        parent_id=annotated.get(id_field),
-                        parent_path=item_path,
-                        entity_name=entity_name,
-                        separator=separator,
-                        cast_to_string=cast_to_string,
-                        include_empty=include_empty,
-                        skip_null=skip_null,
-                        extract_time=extract_time,
-                        id_field=id_field,
-                        parent_field=parent_field,
-                        time_field=time_field,
-                        abbreviate_enabled=abbreviate_enabled,
-                        max_component_length=max_component_length,
-                        preserve_leaf=preserve_leaf,
-                        custom_abbreviations=custom_abbreviations,
-                        default_id_field=default_id_field,
-                        id_generation_strategy=id_generation_strategy,
-                        recovery_strategy=recovery_strategy,
-                        max_depth=max_depth,
-                        current_depth=current_depth + 1,
-                        streaming_mode=streaming_mode,
-                    )
+                    # Process any nested arrays recursively, but only for dictionary items
+                    if isinstance(item, dict):
+                        nested_generator = _extract_arrays_impl(
+                            item,
+                            parent_id=annotated.get(id_field),
+                            parent_path=item_path,
+                            entity_name=entity_name,
+                            separator=separator,
+                            cast_to_string=cast_to_string,
+                            include_empty=include_empty,
+                            skip_null=skip_null,
+                            extract_time=extract_time,
+                            id_field=id_field,
+                            parent_field=parent_field,
+                            time_field=time_field,
+                            abbreviate_enabled=abbreviate_enabled,
+                            max_component_length=max_component_length,
+                            preserve_leaf=preserve_leaf,
+                            custom_abbreviations=custom_abbreviations,
+                            default_id_field=default_id_field,
+                            id_generation_strategy=id_generation_strategy,
+                            recovery_strategy=recovery_strategy,
+                            max_depth=max_depth,
+                            current_depth=current_depth + 1,
+                            streaming_mode=streaming_mode,
+                        )
 
-                    yield from nested_generator
+                        yield from nested_generator
 
                 except Exception as e:
                     # Apply recovery strategy if available
