@@ -13,55 +13,38 @@ def get_table_name(
     path: str,
     parent_entity: str,
     separator: str = "_",
+    parent_path: str = "",
     abbreviate_middle: bool = True,
-    abbreviation_length: int = 2,
+    abbreviation_length: Optional[int] = None,
 ) -> str:
     """Generate standardized table name for nested arrays.
 
     Naming conventions:
-    - First level: parent_arrayname
-    - Deeper: parent_abbr1_abbr2_arrayname
+    - First level: <entity>_<arrayname>
+    - Nested arrays: <entity>_<path>_<arrayname>
 
     This function is cached to avoid recalculating table names repeatedly.
 
     Args:
-        path: Array path with potential nesting
+        path: Array path or name
         parent_entity: Top-level entity name
         separator: Separator character for path components
+        parent_path: Path to the parent object containing this array
         abbreviate_middle: Whether to abbreviate middle segments
+            (deprecated, handled by extractor)
         abbreviation_length: Length of abbreviations
+            (deprecated, handled by extractor)
 
     Returns:
         Formatted table name
     """
-    parts = path.split(separator)
-
-    # Direct child of entity
-    if len(parts) <= 1:
+    # For first-level arrays (direct children of the entity)
+    if not parent_path:
         return f"{parent_entity}{separator}{path}"
 
-    array_name = parts[-1]
-
-    # Skip abbreviation for simplified naming
-    if not abbreviate_middle:
-        return f"{parent_entity}{separator}{array_name}"
-
-    # Abbreviate middle segments for complex paths
-    middle_segments = parts[:-1]
-    abbreviated_path = []
-
-    for segment in middle_segments:
-        if len(segment) <= abbreviation_length:
-            abbrev = segment
-        else:
-            abbrev = segment[:abbreviation_length]
-
-        abbreviated_path.append(abbrev)
-
-    path_str = separator.join(abbreviated_path)
-    result = f"{parent_entity}{separator}{path_str}{separator}{array_name}"
-
-    return result
+    # For nested arrays
+    full_path = f"{parent_path}{separator}{path}"
+    return f"{parent_entity}{separator}{full_path.replace('/', separator)}"
 
 
 @functools.lru_cache(maxsize=1024)

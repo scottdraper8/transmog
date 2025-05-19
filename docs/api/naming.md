@@ -22,14 +22,38 @@ short_name = abbreviate_field_name(
     "customer_billing_information_payment_methods",
     max_component_length=5
 )
-# Returns "customer_bill_info_paym_metho"
+# Returns "customer_bill_info_paym_methods"
 
 # Abbreviate a table name
 short_table = abbreviate_table_name(
     "customer_billing_information_payment_methods",
-    max_component_length=5
+    parent_entity="customer",
+    max_component_length=4
 )
-# Returns "cus_bil_inf_pay_met"
+# Returns "customer_bill_info_payment_methods"
+```
+
+### Table Naming Convention
+
+Transmog uses a consistent table naming convention:
+
+- First level arrays: `<table>_<arrayname>`
+- Nested arrays: `<table>_<arra>_<arrayname>` (intermediate nodes abbreviated to 4 chars by default)
+
+Examples:
+
+```python
+# Get table name for a first level array
+table_name = get_table_name("orders", "customer")
+# Returns "customer_orders"
+
+# Get table name for a nested array (second level)
+table_name = get_table_name("customer_orders_items", "data")
+# Returns "data_cust_items" (intermediate node abbreviated)
+
+# Get table name for a deeply nested array
+table_name = get_table_name("customer_orders_shipments_packages", "data")
+# Returns "data_cust_orde_ship_packages" (intermediate nodes abbreviated)
 ```
 
 ### Abbreviation Dictionaries

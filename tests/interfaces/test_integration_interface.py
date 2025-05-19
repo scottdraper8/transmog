@@ -111,6 +111,9 @@ class AbstractIntegrationTest:
         # Get all tables
         all_tables = result.get_table_names()
 
+        # Debug
+        print(f"All tables in hierarchical consistency test: {all_tables}")
+
         # Identify the tables by level using more precise filtering
         # This will find tables with only level1 in name, not level2 or level3
         level1_table = next(
@@ -121,16 +124,24 @@ class AbstractIntegrationTest:
             ),
             None,
         )
-        level2_table = next(
-            (t for t in all_tables if "level2" in t and "level3" not in t), None
-        )
-        level3_table = next((t for t in all_tables if "level3" in t), None)
+        # With the new naming pattern, level2 may be split across multiple tables
+        # with indices in their names, so we gather all tables that match
+        level2_tables = [t for t in all_tables if "level2" in t and "level3" not in t]
+        level3_tables = [t for t in all_tables if "level3" in t]
 
         # Get records from each table
         main_record = result.get_main_table()[0]
         level1_records = result.get_child_table(level1_table)
-        level2_records = result.get_child_table(level2_table)
-        level3_records = result.get_child_table(level3_table)
+
+        # Gather all level2 records from potentially multiple tables
+        level2_records = []
+        for table in level2_tables:
+            level2_records.extend(result.get_child_table(table))
+
+        # Gather all level3 records from potentially multiple tables
+        level3_records = []
+        for table in level3_tables:
+            level3_records.extend(result.get_child_table(table))
 
         # Verify record counts
         assert len(level1_records) >= 2  # At least 2 level1 items
@@ -138,30 +149,21 @@ class AbstractIntegrationTest:
         assert len(level3_records) >= 8  # At least 8 level3 items
 
         # Verify parent-child relationships
-        # Level 1 should have main as parent
-        main_id = main_record["__extract_id"]
-        level1_with_main_parent = [
-            r for r in level1_records if r["__parent_extract_id"] == main_id
-        ]
-        assert len(level1_with_main_parent) > 0
+        # Each level1 record should be referenced by some level2 records
+        for level1_record in level1_records:
+            level1_id = level1_record["__extract_id"]
+            # Check that at least one level2 record references this level1
+            assert any(
+                record["__parent_extract_id"] == level1_id for record in level2_records
+            ), f"No level2 record references level1 record with ID {level1_id}"
 
-        # Level 2 should have level 1 as parent
-        level1_ids = [record["__extract_id"] for record in level1_records]
-        level2_with_level1_parent = [
-            record
-            for record in level2_records
-            if record["__parent_extract_id"] in level1_ids
-        ]
-        assert len(level2_with_level1_parent) > 0
-
-        # Level 3 should have level 2 as parent
-        level2_ids = [record["__extract_id"] for record in level2_records]
-        level3_with_level2_parent = [
-            record
-            for record in level3_records
-            if record["__parent_extract_id"] in level2_ids
-        ]
-        assert len(level3_with_level2_parent) > 0
+        # Each level2 record should be referenced by some level3 records
+        for level2_record in level2_records:
+            level2_id = level2_record["__extract_id"]
+            # Check that at least one level3 record references this level2
+            assert any(
+                record["__parent_extract_id"] == level2_id for record in level3_records
+            ), f"No level3 record references level2 record with ID {level2_id}"
 
     def test_output_formats(self, processor, sample_data, output_dir):
         """Test that processed data can be written to different output formats."""

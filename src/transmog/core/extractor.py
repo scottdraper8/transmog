@@ -11,8 +11,7 @@ from typing import Any, Callable, Optional, Union
 from transmog.core.flattener import flatten_json
 from transmog.core.metadata import annotate_with_metadata, generate_deterministic_id
 from transmog.error import logger
-from transmog.naming.abbreviator import abbreviate_table_name
-from transmog.naming.conventions import get_table_name, sanitize_name
+from transmog.naming.conventions import sanitize_name
 
 # Type aliases for improved code readability
 JsonDict = dict[str, Any]
@@ -105,20 +104,67 @@ def _extract_arrays_impl(
             # Generate table name with proper sanitization
             sanitized_key = sanitize_name(key, separator)
             sanitized_entity = sanitize_name(entity_name) if entity_name else ""
-            raw_table_name = get_table_name(sanitized_key, sanitized_entity, separator)
 
-            # Apply table name abbreviation if enabled
-            if abbreviate_enabled:
-                table_name = abbreviate_table_name(
-                    raw_table_name,
-                    parent_entity=sanitized_entity,
-                    separator=separator,
-                    max_component_length=max_component_length,
-                    preserve_leaf=preserve_leaf,
-                    abbreviation_dict=custom_abbreviations,
-                )
+            # Generate table name directly based on path depth
+            if not parent_path:
+                # First level array: <entity>_<arrayname>
+                table_name = f"{sanitized_entity}{separator}{sanitized_key}"
             else:
-                table_name = raw_table_name
+                # Determine the array path for nesting
+                path_parts = current_path.split(separator)
+
+                # For deeply nested arrays, only consider the relevant parts of the path
+                # excluding the final array name (key)
+                if len(path_parts) > 1:
+                    # Extract intermediate nodes for abbreviation
+                    intermediate_parts = path_parts[
+                        :-1
+                    ]  # exclude the array name itself
+
+                    # Apply abbreviation to intermediate nodes
+                    if abbreviate_enabled:
+                        abbreviated_intermediates = []
+                        for part in intermediate_parts:
+                            # Skip entity name if it appears in the path
+                            if part == sanitized_entity:
+                                continue
+
+                            # Abbreviate intermediate nodes
+                            if (
+                                max_component_length
+                                and len(part) > max_component_length
+                            ):
+                                abbreviated_part = part[:max_component_length]
+                            else:
+                                abbreviated_part = part
+
+                            abbreviated_intermediates.append(abbreviated_part)
+
+                        # Build the table name with abbreviated intermediates
+                        if abbreviated_intermediates:
+                            path_str = separator.join(abbreviated_intermediates)
+                            table_name = (
+                                f"{sanitized_entity}{separator}{path_str}"
+                                f"{separator}{sanitized_key}"
+                            )
+                        else:
+                            # No intermediates - use first level format
+                            table_name = f"{sanitized_entity}{separator}{sanitized_key}"
+                    else:
+                        # No abbreviation, just join without entity duplication
+                        path_str = separator.join(
+                            [p for p in intermediate_parts if p != sanitized_entity]
+                        )
+                        if path_str:
+                            table_name = (
+                                f"{sanitized_entity}{separator}{path_str}"
+                                f"{separator}{sanitized_key}"
+                            )
+                        else:
+                            table_name = f"{sanitized_entity}{separator}{sanitized_key}"
+                else:
+                    # Only key level (shouldn't happen in nested case but as fallback)
+                    table_name = f"{sanitized_entity}{separator}{sanitized_key}"
 
             # Skip if array is empty
             if not value:

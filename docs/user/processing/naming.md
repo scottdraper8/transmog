@@ -2,8 +2,128 @@
 
 > **API Reference**: For detailed API documentation, see the [Naming API Reference](../../api/naming.md).
 
-Transmog includes a flexible naming and abbreviation system that helps manage field and table names when
-converting nested structures to flattened formats.
+Transmog includes a comprehensive naming system that handles field and table naming conventions,
+with intelligent abbreviation to manage lengthy path names.
+
+## Table Naming Convention
+
+When processing nested arrays, Transmog uses a consistent table naming convention:
+
+- **First level arrays**: `<entity>_<arrayname>`
+- **Nested arrays**: `<entity>_<intermediate_path>_<arrayname>`
+
+For nested arrays, intermediate path components are abbreviated to 4 characters by default when their
+length exceeds this limit.
+
+### Examples
+
+For a data structure like:
+
+```json
+{
+  "customers": [
+    {
+      "orders": [
+        {
+          "items": [...]
+        }
+      ]
+    }
+  ]
+}
+```
+
+The generated tables would be:
+
+- `root_customers`
+- `root_customers_orders`
+- `root_customers_orders_items`
+
+With default abbreviation settings (max 4 chars), deep nestings become:
+
+```json
+{
+  "customers": [
+    {
+      "orders": [
+        {
+          "line_items": [
+            {
+              "product_details": [...]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+Would generate:
+
+- `root_customers`
+- `root_customers_orders`
+- `root_customers_orders_line_items` (or `root_customers_orders_line` if abbreviated)
+- `root_customers_orders_line_prod_details` (abbreviated intermediate components)
+
+## Field Naming
+
+Fields follow a similar pattern but typically include the full path:
+
+```json
+{
+  "customer": {
+    "billing_address": {
+      "street": "123 Main St"
+    }
+  }
+}
+```
+
+Would be flattened to:
+
+```text
+"customer_billing_address_street": "123 Main St"
+```
+
+With field abbreviation, this might become:
+
+```text
+"customer_bill_addr_street": "123 Main St"
+```
+
+## Customizing Naming Behavior
+
+You can customize the naming behavior through the `TransmogConfig`:
+
+```python
+from transmog import TransmogConfig, Processor
+
+# Custom naming configuration
+config = TransmogConfig.default().with_naming(
+    separator="_",                     # Character to separate path components
+    abbreviate_table_names=True,       # Enable table name abbreviation
+    abbreviate_field_names=True,       # Enable field name abbreviation
+    max_table_component_length=4,      # Max length for table path components
+    max_field_component_length=5,      # Max length for field path components
+    preserve_root_component=True,      # Don't abbreviate root components
+    preserve_leaf_component=True,      # Don't abbreviate leaf components
+    custom_abbreviations={             # Custom abbreviation dictionary
+        "information": "info",
+        "configuration": "config"
+    }
+)
+
+processor = Processor(config=config)
+```
+
+The naming system balances readability with practical length constraints, allowing you to
+control how verbose or compact your output data structure will be.
+
+## Abbreviation System
+
+The abbreviation system handles lengthy field and table names by intelligently truncating
+path components while preserving the most important parts.
 
 ## How Field Names are Generated
 
@@ -20,30 +140,6 @@ When transforming nested JSON structures to flat tables, Transmog constructs fie
 ```
 
 This becomes a flat field: `customer_address_street` (using the default `_` separator).
-
-## Abbreviation System
-
-To handle long nested paths that could result in unwieldy field names, Transmog provides an abbreviation system that:
-
-1. Preserves root components by default
-2. Preserves leaf components by default
-3. Abbreviates intermediate components by truncating them
-
-### Examples
-
-For a deeply nested path like `customer_shipping_information_address_street`:
-
-- **Default behavior** (preserve root and leaf):
-  `customer_ship_addr_street`
-
-- **Root-only preservation**:
-  `customer_ship_addr_stre`
-
-- **Leaf-only preservation**:
-  `cust_ship_addr_street`
-
-- **No preservation**:
-  `cust_ship_addr_stre`
 
 ## Configuration Options
 

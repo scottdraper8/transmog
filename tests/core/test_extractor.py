@@ -155,3 +155,60 @@ class TestExtractor(AbstractExtractorTest):
             extract_arrays(deeply_nested_data, entity_name="test", max_depth=3)
             # Should log a warning about max depth
             mock_logger.warning.assert_called_with(ANY)
+
+    def test_nested_array_extraction(self, complex_nested_data):
+        """Test extraction of nested arrays."""
+        # Extract arrays with default settings
+        arrays = extract_arrays(complex_nested_data, entity_name="test")
+
+        # Print table names for debugging
+        print(f"Extracted tables: {list(arrays.keys())}")
+
+        # Check that the items array was extracted
+        assert "test_items" in arrays
+        assert len(arrays["test_items"]) == 2
+
+        # With our new table naming, subitems will be under tables with indices
+        # e.g., test_items_0_subitems and test_items_1_subitems
+        subitems_tables = [
+            name for name in arrays.keys() if "items" in name and "sub" in name
+        ]
+        assert len(subitems_tables) > 0, "No subitems tables found"
+
+        # Count total subitems across all subitems tables
+        total_subitems = sum(len(arrays[table]) for table in subitems_tables)
+        assert total_subitems == 3, f"Expected 3 total subitems, got {total_subitems}"
+
+    def test_streaming_extraction(self, complex_nested_data):
+        """Test streaming array extraction."""
+        # Use streaming extraction
+        records = list(stream_extract_arrays(complex_nested_data, entity_name="test"))
+
+        # Verify results structure
+        tables = {}
+        for table_name, record in records:
+            if table_name not in tables:
+                tables[table_name] = []
+            tables[table_name].append(record)
+
+        # Print table names for debugging
+        print(f"Streaming extracted tables: {list(tables.keys())}")
+
+        # Check that arrays are extracted
+        assert len(tables) > 0
+
+        # There should be one table for items
+        items_tables = [
+            name for name in tables.keys() if "items" in name and "subitems" not in name
+        ]
+        assert len(items_tables) == 1
+        items_table = items_tables[0]
+        assert len(tables[items_table]) == 2
+
+        # Check subitems tables (may have indices in names)
+        subitems_tables = [name for name in tables.keys() if "subitems" in name]
+        assert len(subitems_tables) > 0, "No subitems tables found"
+
+        # Count total subitems across all subitems tables
+        total_subitems = sum(len(tables[table]) for table in subitems_tables)
+        assert total_subitems == 3, f"Expected 3 total subitems, got {total_subitems}"

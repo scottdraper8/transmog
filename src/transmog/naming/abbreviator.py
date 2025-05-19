@@ -56,10 +56,18 @@ def _abbreviate_table_name_cached(
     preserve_root: bool = True,
     preserve_leaf: bool = True,
 ) -> str:
-    """Cached version of abbreviate_table_name without the dictionary parameter."""
+    """Cached version of abbreviate_table_name without the dictionary parameter.
+
+    Table naming convention follows the pattern:
+    - First level arrays: <entity>_<arrayname>
+    - Nested arrays: <entity>_<path>_<arrayname>
+
+    For nested arrays, intermediate path components are abbreviated to the specified
+    max_component_length (default 4) when they exceed this length.
+    """
     # Use default from settings if max_component_length is None
     if max_component_length is None:
-        max_component_length = settings.DEFAULT_MAX_TABLE_COMPONENT_LENGTH
+        max_component_length = settings.DEFAULT_MAX_TABLE_COMPONENT_LENGTH or 4
 
     # Convert to string for type safety
     path = str(path)
@@ -114,12 +122,19 @@ def abbreviate_table_name(
 ) -> str:
     """Generate abbreviated table name from path.
 
+    Table naming convention follows the pattern:
+    - First level arrays: <entity>_<arrayname>
+    - Nested arrays: <entity>_<path>_<arrayname>
+
+    For nested arrays, intermediate path components are abbreviated to the specified
+    max_component_length (default 4) when they exceed this length.
+
     Args:
         path: Array path (e.g., "orders_items_details")
         parent_entity: Root entity name
         separator: Separator character for path components
         abbreviate_enabled: Whether abbreviation is enabled
-        max_component_length: Maximum length for each path component
+        max_component_length: Maximum length for each path component (default 4)
         preserve_root: Whether to preserve the root component
         preserve_leaf: Whether to preserve the leaf component
         abbreviation_dict: Dictionary of custom abbreviations
@@ -129,7 +144,7 @@ def abbreviate_table_name(
     """
     # Use default from settings if max_component_length is None
     if max_component_length is None:
-        max_component_length = settings.DEFAULT_MAX_TABLE_COMPONENT_LENGTH
+        max_component_length = settings.DEFAULT_MAX_TABLE_COMPONENT_LENGTH or 4
 
     # Convert to string for type safety
     path = str(path)

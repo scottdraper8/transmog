@@ -501,60 +501,64 @@ class TestProcessor(AbstractProcessorTest):
         """Test table naming conventions."""
         # Configure custom naming
         config = TransmogConfig.default().with_naming(
-            separator=".",
+            separator="_",
             abbreviate_table_names=True,
             max_table_component_length=4,
         )
         processor = Processor(config=config)
 
-        # Process data
-        result = processor.process(complex_data, entity_name="naming")
+        # Create a test data structure with clear nesting levels
+        test_data = {
+            "id": "test123",
+            "name": "Test Data",
+            # First level array
+            "items": [
+                {"id": "i1", "name": "Item 1"},
+                {"id": "i2", "name": "Item 2"},
+            ],
+            # Nested arrays with multiple levels
+            "orders": [
+                {
+                    "id": "o1",
+                    "items": [{"id": "oi1", "name": "Order Item 1"}],
+                    "shipments": [
+                        {
+                            "id": "s1",
+                            "tracking": "123456",
+                            "packages": [{"id": "p1", "weight": 1.5}],
+                        }
+                    ],
+                }
+            ],
+        }
 
-        # Get table names
+        # Process the test data
+        result = processor.process(test_data, entity_name="test")
+
+        # Get all table names
         table_names = result.get_table_names()
+        print(f"Generated table names: {table_names}")  # Debug print
 
-        # Look for any table that might contain items data
-        item_related_table = None
-        for name in table_names:
-            # Check for abbreviated or full table names with items
-            if (
-                "item" in name.lower()
-                or "itm" in name.lower()
-                or "itms" in name.lower()
-            ):
-                item_related_table = name
-                break
+        # Verify first level arrays follow <entity>_<arrayname> pattern
+        assert "test_items" in table_names, (
+            f"First level items table not found, got: {table_names}"
+        )
+        assert "test_orders" in table_names, (
+            f"First level orders table not found, got: {table_names}"
+        )
 
-        # Try fuzzy matching if exact match fails
-        if not item_related_table:
-            # Try to identify by content rather than name
-            for name in table_names:
-                if name == "main":
-                    continue
+        # Verify nested arrays - match the actual pattern with abbreviation and indices
+        assert "test_orde_0_items" in table_names, (
+            f"Orders items table not found, got: {table_names}"
+        )
+        assert "test_orde_0_shipments" in table_names, (
+            f"Orders shipments table not found, got: {table_names}"
+        )
 
-                child_table = result.get_child_table(name)
-                if child_table and len(child_table) > 0:
-                    record = child_table[0]
-                    # Look for fields that suggest this is an items table
-                    if any(field in record for field in ["id", "name", "value"]):
-                        item_related_table = name
-                        break
-
-        # Skip if we still can't find an items table
-        if not item_related_table and len(table_names) <= 1:
-            pytest.skip("No item-related tables found for naming convention test")
-        else:
-            # Assert we found some child table (may not be items specifically)
-            assert len(table_names) > 1 or item_related_table is not None, (
-                f"No child tables found: {table_names}"
-            )
-
-            # If we found an items table, verify it has some content
-            if item_related_table:
-                child_table = result.get_child_table(item_related_table)
-                assert len(child_table) > 0, (
-                    f"Table {item_related_table} has no records"
-                )
+        # Verify deeply nested arrays
+        assert "test_orde_0_ship_0_packages" in table_names, (
+            f"Packages table not found in: {table_names}"
+        )
 
     def test_error_handling(self):
         """Test error handling in the processor."""

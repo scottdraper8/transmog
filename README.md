@@ -187,7 +187,8 @@ processor.clear_cache()
 ```
 
 The cache system improves performance when processing datasets with repeated values while providing memory
-usage control. See the [cache configuration guide](https://scottdraper8.github.io/transmog/caching.html) for more details.
+usage control. See the [cache configuration guide](https://scottdraper8.github.io/transmog/caching.html)
+for more details.
 
 ## Processing Large Datasets
 
