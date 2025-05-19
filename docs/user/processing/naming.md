@@ -25,7 +25,7 @@ For a data structure like:
     {
       "orders": [
         {
-          "items": [...]
+          "items": []
         }
       ]
     }
@@ -49,7 +49,7 @@ With default abbreviation settings (max 4 chars), deep nestings become:
         {
           "line_items": [
             {
-              "product_details": [...]
+              "product_details": []
             }
           ]
         }
