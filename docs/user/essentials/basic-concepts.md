@@ -37,7 +37,7 @@ The processor orchestrates the transformation process through:
 The naming system controls identifier creation through:
 
 - Managing table names derived from the JSON structure
-- Supporting abbreviation options for long table names
+- Special handling for deeply nested structures
 - Implementing different naming conventions (snake_case, camelCase)
 
 ### Output Formats

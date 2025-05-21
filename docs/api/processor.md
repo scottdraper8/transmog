@@ -67,7 +67,7 @@ Create a processor with updated configuration:
 processor = Processor()
 
 # Create a new processor with updated naming settings
-new_processor = processor.with_naming(separator=".", abbreviate_table_names=False)
+new_processor = processor.with_naming(separator=".", deep_nesting_threshold=4)
 
 # Create a new processor with updated processing settings
 new_processor = processor.with_processing(cast_to_string=False, batch_size=5000)

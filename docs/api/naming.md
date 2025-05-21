@@ -1,44 +1,34 @@
 # Naming API
 
-> **User Guide**: For usage guidance and examples, see the [Naming and Abbreviation System User Guide](../user/processing/naming.md).
+> **User Guide**: For usage guidance and examples, see the [Naming System User Guide](../user/processing/naming.md).
 
 This document describes the naming functionality in Transmog.
 
-## Abbreviator
-
-```python
-from transmog.naming.abbreviator import (
-    abbreviate_field_name,
-    abbreviate_table_name,
-    merge_abbreviation_dicts
-)
-```
-
-### Field and Table Name Abbreviation
-
-```python
-# Abbreviate a field name
-short_name = abbreviate_field_name(
-    "customer_billing_information_payment_methods",
-    max_component_length=5
-)
-# Returns "customer_bill_info_paym_methods"
-
-# Abbreviate a table name
-short_table = abbreviate_table_name(
-    "customer_billing_information_payment_methods",
-    parent_entity="customer",
-    max_component_length=4
-)
-# Returns "customer_bill_info_payment_methods"
-```
-
-### Table Naming Convention
+## Table Naming Convention
 
 Transmog uses a consistent table naming convention:
 
-- First level arrays: `<table>_<arrayname>`
-- Nested arrays: `<table>_<arra>_<arrayname>` (intermediate nodes abbreviated to 4 chars by default)
+```python
+from transmog.naming.conventions import (
+    get_standard_field_name,
+    get_table_name,
+    handle_deeply_nested_path,
+    sanitize_name
+)
+```
+
+### Field and Table Names
+
+Transmog uses a simplified naming approach that combines field names with separators.
+Special handling is only provided for deeply nested structures (>4 layers by default).
+
+### Table Naming Convention
+
+The naming convention simply combines field names with separators:
+
+- First level arrays: `<entity>_<arrayname>`
+- Nested arrays: `<entity>_<path_to_array>_<arrayname>`
+- Deeply nested arrays: `<entity>_<first_component>_nested_<last_component>`
 
 Examples:
 
@@ -48,41 +38,15 @@ table_name = get_table_name("orders", "customer")
 # Returns "customer_orders"
 
 # Get table name for a nested array (second level)
-table_name = get_table_name("customer_orders_items", "data")
-# Returns "data_cust_items" (intermediate node abbreviated)
+table_name = get_table_name("orders_items", "customer", parent_path="orders")
+# Returns "customer_orders_items"
 
 # Get table name for a deeply nested array
-table_name = get_table_name("customer_orders_shipments_packages", "data")
-# Returns "data_cust_orde_ship_packages" (intermediate nodes abbreviated)
-```
-
-### Abbreviation Dictionaries
-
-```python
-# Create and use custom abbreviations
-custom_abbrevs = {"customer": "cust", "information": "info"}
-
-# Use custom abbreviations
-short_name = abbreviate_field_name(
-    "customer_billing_information_payment_methods",
-    max_component_length=5,
-    abbreviation_dict=custom_abbrevs
-)
-
-# Merge abbreviation dictionaries
-additional_abbrevs = {"payment": "pmt", "methods": "mthd"}
-merged = merge_abbreviation_dicts(custom_abbrevs, additional_abbrevs)
+table_name = get_table_name("packages", "customer", parent_path="orders_shipments", deeply_nested_threshold=4)
+# Returns "customer_orders_nested_packages" (deeply nested path handling)
 ```
 
 ## Naming Conventions
-
-```python
-from transmog.naming.conventions import (
-    get_standard_field_name,
-    get_table_name,
-    sanitize_name
-)
-```
 
 ### Standard Field Names
 
@@ -100,17 +64,29 @@ field_name = get_standard_field_name("user.address.street", separator=".")
 
 ```python
 # Get table name for a path
-table_name = get_table_name("user_orders", separator="_")
-# Returns "user_orders"
+table_name = get_table_name("orders", "customer", separator="_")
+# Returns "customer_orders"
 
-# Get table name with abbreviation
+# Get table name with nested path
 table_name = get_table_name(
-    "customer_billing_information",
-    separator="_",
-    abbreviate=True,
-    max_component_length=5
+    "shipping_address",
+    "customer",
+    parent_path="orders",
+    separator="_"
 )
-# Returns "cus_bil_inf"
+# Returns "customer_orders_shipping_address"
+```
+
+### Handling Deeply Nested Paths
+
+```python
+# Handle a deeply nested path
+simplified_path = handle_deeply_nested_path(
+    "level1_level2_level3_level4_level5",
+    separator="_",
+    deeply_nested_threshold=4
+)
+# Returns "level1_nested_level5"
 ```
 
 ### Name Sanitization

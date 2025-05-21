@@ -1,39 +1,31 @@
 """Table naming conventions module.
 
 Provides functions to generate standardized table names
-for nested arrays based on their hierarchy.
+based on field combinations with separators.
 """
 
 import functools
 from typing import Optional
 
 
-@functools.lru_cache(maxsize=256)
 def get_table_name(
     path: str,
     parent_entity: str,
     separator: str = "_",
     parent_path: str = "",
-    abbreviate_middle: bool = True,
-    abbreviation_length: Optional[int] = None,
+    deeply_nested_threshold: int = 4,
 ) -> str:
     """Generate standardized table name for nested arrays.
 
-    Naming conventions:
-    - First level: <entity>_<arrayname>
-    - Nested arrays: <entity>_<path>_<arrayname>
-
-    This function is cached to avoid recalculating table names repeatedly.
+    Naming convention is simplified to directly combine field names with separators.
+    Special handling is only provided for deeply nested structures (>4 layers).
 
     Args:
         path: Array path or name
         parent_entity: Top-level entity name
         separator: Separator character for path components
         parent_path: Path to the parent object containing this array
-        abbreviate_middle: Whether to abbreviate middle segments
-            (deprecated, handled by extractor)
-        abbreviation_length: Length of abbreviations
-            (deprecated, handled by extractor)
+        deeply_nested_threshold: Threshold for when to consider a path deeply nested
 
     Returns:
         Formatted table name
@@ -44,6 +36,24 @@ def get_table_name(
 
     # For nested arrays
     full_path = f"{parent_path}{separator}{path}"
+    path_parts = full_path.split(separator)
+
+    # Check if we have a deeply nested structure
+    # Including the entity name, a path with deeply_nested_threshold components
+    # already counts as deeply nested
+    if len(path_parts) >= deeply_nested_threshold:
+        # For deeply nested structures, use first component, nested indicator, and the
+        # last component
+        simplified_path = separator.join(
+            [
+                path_parts[0],  # First component
+                "nested",  # Indicator of nesting
+                path_parts[-1],  # Last component
+            ]
+        )
+        return f"{parent_entity}{separator}{simplified_path}"
+
+    # For regular nesting, simply combine all fields
     return f"{parent_entity}{separator}{full_path.replace('/', separator)}"
 
 
@@ -189,3 +199,31 @@ def join_path(parts: tuple[str, ...], separator: str = "_") -> str:
         Joined path string
     """
     return separator.join(parts)
+
+
+def handle_deeply_nested_path(
+    path: str, separator: str = "_", deeply_nested_threshold: int = 4
+) -> str:
+    """Handle deeply nested paths by simplifying them.
+
+    For paths with more than the threshold number of components,
+    only keep the first and last components.
+
+    Args:
+        path: The path to potentially simplify
+        separator: Separator character for path components
+        deeply_nested_threshold: Threshold for when to consider a path deeply nested
+
+    Returns:
+        Simplified path for deeply nested structures, original path otherwise
+    """
+    components = path.split(separator)
+
+    # Including the entity name, a path with deeply_nested_threshold components
+    # already counts as deeply nested
+    if len(components) >= deeply_nested_threshold:
+        # For deeply nested structures, include first and last components
+        # with a "nested" indicator in between
+        return separator.join([components[0], "nested", components[-1]])
+
+    return path

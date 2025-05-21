@@ -15,6 +15,34 @@ from transmog.config.settings import (
     load_config,
     load_profile,
 )
+from transmog.config.validation import (
+    validate_batch_size,
+    validate_cache_size,
+    validate_component_length,
+    validate_field_name,
+    validate_id_field_mapping,
+    validate_max_depth,
+    validate_recovery_strategy,
+    validate_separator,
+)
+from transmog.error import ConfigurationError
+
+__all__ = [
+    "settings",
+    "extensions",
+    "load_profile",
+    "load_config",
+    "configure",
+    "TransmogSettings",
+    "ExtensionRegistry",
+    "ProcessingMode",
+    "NamingConfig",
+    "ProcessingConfig",
+    "MetadataConfig",
+    "ErrorHandlingConfig",
+    "TransmogConfig",
+    "validate_component_length",
+]
 
 # Global instances
 settings = TransmogSettings()
@@ -31,16 +59,10 @@ class ProcessingMode(Enum):
 
 @dataclass
 class NamingConfig:
-    """Configuration for naming conventions and abbreviations."""
+    """Configuration for naming conventions."""
 
     separator: str = "_"
-    abbreviate_table_names: bool = True
-    abbreviate_field_names: bool = True
-    max_table_component_length: Optional[int] = None
-    max_field_component_length: Optional[int] = None
-    preserve_root_component: bool = True
-    preserve_leaf_component: bool = True
-    custom_abbreviations: dict[str, str] = field(default_factory=dict)
+    deeply_nested_threshold: int = 4
 
 
 @dataclass
@@ -101,6 +123,8 @@ class TransmogConfig:
     error_handling: ErrorHandlingConfig = field(default_factory=ErrorHandlingConfig)
     cache_config: CacheConfig = field(default_factory=CacheConfig)
 
+    # Basic factories
+
     @classmethod
     def default(cls) -> "TransmogConfig":
         """Create a default configuration."""
@@ -140,12 +164,17 @@ class TransmogConfig:
             ),
         )
 
+    # ID Generation factories
+
     @classmethod
-    def with_deterministic_ids(cls, source_field: str) -> "TransmogConfig":
+    def with_deterministic_ids(
+        cls, source_field: Union[str, dict[str, str]]
+    ) -> "TransmogConfig":
         """Create a configuration with deterministic ID generation.
 
         Args:
-            source_field: Field name to use for deterministic ID generation
+            source_field: Field name to use for deterministic ID generation, or
+                          a dictionary mapping table names to field names
 
         Returns:
             TransmogConfig with deterministic ID generation
@@ -159,48 +188,125 @@ class TransmogConfig:
         """Create a configuration with custom ID generation."""
         return cls(metadata=MetadataConfig(id_generation_strategy=strategy))
 
+    # Predefined configurations for common use cases
+
+    @classmethod
+    def simple_mode(cls) -> "TransmogConfig":
+        """Create a simple configuration for basic usage with minimal metadata.
+
+        This configuration focuses on producing clean output with simplified field names
+        and minimal metadata fields, suitable for users who want readable output.
+        """
+        return cls(
+            metadata=MetadataConfig(
+                id_field="id",
+                parent_field="parent_id",
+                time_field="extract_time",
+            ),
+            processing=ProcessingConfig(
+                cast_to_string=False,
+            ),
+        )
+
+    @classmethod
+    def streaming_optimized(cls) -> "TransmogConfig":
+        """Create a configuration optimized for streaming processing.
+
+        This configuration balances memory usage and performance
+        for streaming large datasets directly to output files.
+        """
+        return (
+            cls.memory_optimized()
+            .with_processing(
+                batch_size=500,
+                cast_to_string=True,
+            )
+            .with_caching(
+                maxsize=5000,
+                clear_after_batch=True,
+            )
+        )
+
+    @classmethod
+    def error_tolerant(cls) -> "TransmogConfig":
+        """Create a configuration that's tolerant of data errors.
+
+        This configuration is useful for processing potentially problematic data
+        by skipping errors rather than failing completely.
+        """
+        return cls(
+            error_handling=ErrorHandlingConfig(
+                recovery_strategy="skip",
+                allow_malformed_data=True,
+                max_retries=5,
+            ),
+            processing=ProcessingConfig(
+                cast_to_string=True,
+                skip_null=True,
+            ),
+        )
+
+    @classmethod
+    def csv_optimized(cls) -> "TransmogConfig":
+        """Create a configuration optimized for CSV output.
+
+        This configuration ensures all values are strings and
+        field names are compatible with CSV requirements.
+        """
+        return cls(
+            processing=ProcessingConfig(
+                cast_to_string=True,
+                include_empty=True,
+                skip_null=False,
+            ),
+            naming=NamingConfig(
+                separator="_",
+            ),
+        )
+
+    # Component-specific configuration methods
+
     def with_naming(
         self,
         separator: Optional[str] = None,
-        abbreviate_table_names: Optional[bool] = None,
-        abbreviate_field_names: Optional[bool] = None,
-        max_table_component_length: Optional[int] = None,
-        max_field_component_length: Optional[int] = None,
-        preserve_root_component: Optional[bool] = None,
-        preserve_leaf_component: Optional[bool] = None,
-        custom_abbreviations: Optional[dict[str, str]] = None,
+        deeply_nested_threshold: Optional[int] = None,
     ) -> "TransmogConfig":
-        """Update naming configuration."""
+        """Update naming configuration.
+
+        Args:
+            separator: Separator character for path components
+            deeply_nested_threshold: Threshold for when to consider a path deeply nested
+
+        Returns:
+            Updated configuration
+        """
         naming = dataclasses.replace(self.naming)
 
         if separator is not None:
+            validate_separator(separator)
             naming.separator = separator
 
-        if abbreviate_table_names is not None:
-            naming.abbreviate_table_names = abbreviate_table_names
-
-        if abbreviate_field_names is not None:
-            naming.abbreviate_field_names = abbreviate_field_names
-
-        if max_table_component_length is not None:
-            naming.max_table_component_length = max_table_component_length
-
-        if max_field_component_length is not None:
-            naming.max_field_component_length = max_field_component_length
-
-        if preserve_root_component is not None:
-            naming.preserve_root_component = preserve_root_component
-
-        if preserve_leaf_component is not None:
-            naming.preserve_leaf_component = preserve_leaf_component
-
-        if custom_abbreviations is not None:
-            naming.custom_abbreviations = custom_abbreviations
+        if deeply_nested_threshold is not None:
+            naming.deeply_nested_threshold = deeply_nested_threshold
 
         return dataclasses.replace(self, naming=naming)
 
     def with_processing(self, **kwargs: Any) -> "TransmogConfig":
-        """Create a new configuration with updated processing settings."""
+        """Create a new configuration with updated processing settings.
+
+        Args:
+            **kwargs: Processing options to update
+
+        Returns:
+            Updated configuration
+        """
+        # Validate parameters
+        if "batch_size" in kwargs:
+            validate_batch_size(kwargs["batch_size"])
+
+        if "max_depth" in kwargs:
+            validate_max_depth(kwargs["max_depth"])
+
         return TransmogConfig(
             naming=self.naming,
             processing=ProcessingConfig(**{**self.processing.__dict__, **kwargs}),
@@ -210,7 +316,42 @@ class TransmogConfig:
         )
 
     def with_metadata(self, **kwargs: Any) -> "TransmogConfig":
-        """Create a new configuration with updated metadata settings."""
+        """Create a new configuration with updated metadata settings.
+
+        Args:
+            **kwargs: Metadata options to update
+
+        Returns:
+            Updated configuration
+        """
+        # Validate parameters
+        if "id_field" in kwargs:
+            validate_field_name(kwargs["id_field"])
+
+        if "parent_field" in kwargs:
+            validate_field_name(kwargs["parent_field"])
+
+        if "time_field" in kwargs:
+            validate_field_name(kwargs["time_field"])
+
+        if "default_id_field" in kwargs:
+            validate_id_field_mapping(kwargs["default_id_field"])
+
+        # Check for duplicate field names
+        id_field = kwargs.get("id_field", self.metadata.id_field)
+        parent_field = kwargs.get("parent_field", self.metadata.parent_field)
+        time_field = kwargs.get("time_field", self.metadata.time_field)
+
+        if (
+            id_field == parent_field
+            or id_field == time_field
+            or parent_field == time_field
+        ):
+            raise ConfigurationError(
+                f"Metadata field names must be unique. Got: "
+                f"id={id_field}, parent={parent_field}, time={time_field}"
+            )
+
         return TransmogConfig(
             naming=self.naming,
             processing=self.processing,
@@ -220,7 +361,18 @@ class TransmogConfig:
         )
 
     def with_error_handling(self, **kwargs: Any) -> "TransmogConfig":
-        """Create a new configuration with updated error handling settings."""
+        """Create a new configuration with updated error handling settings.
+
+        Args:
+            **kwargs: Error handling options to update
+
+        Returns:
+            Updated configuration
+        """
+        # Validate parameters
+        if "recovery_strategy" in kwargs:
+            validate_recovery_strategy(kwargs["recovery_strategy"])
+
         return TransmogConfig(
             naming=self.naming,
             processing=self.processing,
@@ -253,12 +405,15 @@ class TransmogConfig:
             cache_config.enabled = enabled
 
         if maxsize is not None:
+            validate_cache_size(maxsize)
             cache_config.maxsize = maxsize
 
         if clear_after_batch is not None:
             cache_config.clear_after_batch = clear_after_batch
 
         return dataclasses.replace(self, cache_config=cache_config)
+
+    # Convenience methods for common scenarios
 
     def with_extraction(self, **kwargs: Any) -> "TransmogConfig":
         """Update extraction settings.
@@ -314,19 +469,33 @@ class TransmogConfig:
         # Apply changes through processing method
         return self.with_processing(**processing_kwargs)
 
+    def use_dot_notation(self) -> "TransmogConfig":
+        """Configure to use dot notation for nested fields.
 
-__all__ = [
-    "settings",
-    "extensions",
-    "load_profile",
-    "load_config",
-    "configure",
-    "TransmogSettings",
-    "ExtensionRegistry",
-    "ProcessingMode",
-    "NamingConfig",
-    "ProcessingConfig",
-    "MetadataConfig",
-    "ErrorHandlingConfig",
-    "TransmogConfig",
-]
+        This is a common requirement for many database systems and query languages.
+
+        Returns:
+            Updated TransmogConfig using dot notation
+        """
+        return self.with_naming(separator=".")
+
+    def disable_arrays(self) -> "TransmogConfig":
+        """Configure to skip array processing and keep arrays as JSON strings.
+
+        This is useful when you want to keep arrays as single fields rather
+        than creating child tables.
+
+        Returns:
+            Updated TransmogConfig with array processing disabled
+        """
+        return self.with_processing(visit_arrays=False)
+
+    def use_string_format(self) -> "TransmogConfig":
+        """Configure all fields to be cast to strings.
+
+        This is useful for formats that require string values, like CSV.
+
+        Returns:
+            Updated TransmogConfig with string casting enabled
+        """
+        return self.with_processing(cast_to_string=True)

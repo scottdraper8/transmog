@@ -226,7 +226,7 @@ class AbstractIntegrationTest:
             }
 
             # Instead of checking for exact field names, check for semantic equivalence
-            # Field names might be abbreviated differently after refactoring
+            # Field names may differ slightly when deeply nested paths are simplified
             # Check essential fields are present
             assert "id" in first_read, "Missing 'id' field"
             assert "name" in first_read, "Missing 'name' field"

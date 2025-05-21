@@ -7,6 +7,8 @@ throughout all components of the Transmog system.
 
 import os
 
+import pytest
+
 from transmog import Processor
 from transmog.config import TransmogConfig
 from transmog.core.extractor import extract_arrays
@@ -117,38 +119,6 @@ class TestConfigPropagation:
             "nullfield" not in keys_no_underscore and "null_field" not in main_table[0]
         )
 
-    def test_abbreviation_propagation(self):
-        """Test that abbreviation settings are properly propagated."""
-        # Create processor with abbreviation settings
-        config = TransmogConfig.default().with_naming(
-            abbreviate_field_names=True,
-            max_field_component_length=3,
-            custom_abbreviations={"information": "inf"},
-        )
-        processor = Processor(config=config)
-
-        # Test data with long field names
-        test_data = {"information": "test data", "very_long_field_name": "test value"}
-
-        # Process the data
-        result = processor.process(test_data, entity_name="test")
-
-        # Verify abbreviations were applied
-        main_table = result.get_main_table()
-
-        # Check that the long field name was abbreviated
-        assert "very_long_field_name" not in main_table[0]
-
-        # Look for abbreviated version of the long field name - several patterns possible based on implementation
-        long_field_abbreviated = any(
-            key
-            for key in main_table[0].keys()
-            if ("ver" in key.lower() and "lon" in key.lower() and "fie" in key.lower())
-            or ("v" in key.lower() and "l" in key.lower() and "f" in key.lower())
-            or len(key) < len("very_long_field_name")
-        )
-        assert long_field_abbreviated, "Long field name was not abbreviated properly"
-
     def test_config_propagation_to_io(self, tmpdir):
         """Test that configuration options reach the IO layer."""
         # Set up configuration with specific options
@@ -162,11 +132,11 @@ class TestConfigPropagation:
         result = processor.process(test_data, entity_name="test")
 
         # Test JSON output with indentation setting
-        os.path.join(tmpdir, "output.json")
-        result.write_all_json(base_path=tmpdir, indent=4)
+        output_path = os.path.join(tmpdir, "output")
+        result.write_all_json(base_path=output_path, indent=4)
 
         # Read the file back and verify formatting
-        json_file_path = os.path.join(tmpdir, "test.json")
+        json_file_path = os.path.join(output_path, "main.json")
         assert os.path.exists(json_file_path)
 
         with open(json_file_path) as f:
@@ -207,3 +177,25 @@ class TestConfigPropagation:
         assert len(arrays) > 0
         array_keys = list(arrays.keys())
         assert len(arrays[array_keys[0]]) == 2  # Should have 2 items
+
+    def test_deeply_nested_path_handling(self):
+        """Test that deeply nested path handling settings are properly propagated."""
+        # Create processor with custom deeply nested threshold
+        config = TransmogConfig.default().with_naming(deeply_nested_threshold=3)
+        processor = Processor(config=config)
+
+        # Test data with deeply nested structure
+        test_data = {
+            "level1": {"level2": {"level3": {"level4": {"level5": "deep value"}}}}
+        }
+
+        # Process the data
+        result = processor.process(test_data, entity_name="test")
+
+        # Verify deeply nested path handling was applied
+        main_table = result.get_main_table()
+        assert len(main_table) == 1
+
+        # Look for a simplified field name with 'nested' in it
+        nested_field_present = any("nested" in key for key in main_table[0].keys())
+        assert nested_field_present, "No simplified deeply nested field found"

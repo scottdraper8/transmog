@@ -147,7 +147,7 @@ config = (
     )
     .with_naming(
         separator=".",            # Use dots as separators
-        abbreviate_field_names=True,  # Abbreviate field names
+        deep_nesting_threshold=4,     # Handle deep nesting
         max_field_component_length=5  # Limit component length
     )
 )
@@ -193,13 +193,8 @@ processor = tm.Processor(
     config=tm.TransmogConfig.default()
     .with_naming(
         separator="/",                   # Use slash as separator
-        abbreviate_field_names=True,     # Abbreviate field names
         max_field_component_length=10,   # Limit component length
-        custom_abbreviations={           # Custom abbreviations
-            "information": "info",
-            "customer": "cust",
-            "address": "addr"
-        }
+        deep_nesting_threshold=4         # Threshold for deep nesting
     )
 )
 

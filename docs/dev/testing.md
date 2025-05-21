@@ -194,7 +194,7 @@ class TestFlattener(AbstractFlattenerTest):
         # Create processor with explicit configuration
         proc_config = (
             TransmogConfig.default()
-            .with_naming(separator="_", abbreviate_field_names=False)
+            .with_naming(separator="_", deep_nesting_threshold=4)
             .with_processing(cast_to_string=False)
         )
 
@@ -203,7 +203,7 @@ class TestFlattener(AbstractFlattenerTest):
             simple_data,
             separator=proc_config.naming.separator,
             cast_to_string=proc_config.processing.cast_to_string,
-            abbreviate_field_names=proc_config.naming.abbreviate_field_names,
+            deep_nesting_threshold=proc_config.naming.deep_nesting_threshold,
         )
 
         # Check basic fields are preserved
@@ -237,7 +237,7 @@ class AbstractProcessorTest:
         config = (
             TransmogConfig.default()
             .with_processing(cast_to_string=True)
-            .with_naming(separator="_", abbreviate_field_names=False)
+            .with_naming(separator="_", deep_nesting_threshold=4)
         )
         return Processor(config=config)
 

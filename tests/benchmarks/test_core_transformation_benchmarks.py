@@ -226,15 +226,17 @@ class TestExtractorBenchmarks:
         # Verify the result
         assert isinstance(result, dict)
 
-    @pytest.mark.parametrize("abbreviate_enabled", [True, False])
-    def test_extract_with_abbreviation(self, abbreviate_enabled, benchmark):
-        """Benchmark the impact of table name abbreviation on extraction performance."""
+    @pytest.mark.parametrize("deeply_nested_threshold", [2, 4, 10])
+    def test_extract_with_deeply_nested_threshold(
+        self, deeply_nested_threshold, benchmark
+    ):
+        """Benchmark the impact of deeply nested path handling on extraction performance."""
         # Generate test data
         data = generate_array_heavy_data(array_count=3, array_size=10)
 
-        # Benchmark array extraction with different abbreviation settings
-        benchmark.group = "Extractor-Abbreviation"
-        benchmark.extra_info = {"abbreviate_enabled": abbreviate_enabled}
+        # Benchmark array extraction with different deeply nested threshold settings
+        benchmark.group = "Extractor-DeeplyNested"
+        benchmark.extra_info = {"deeply_nested_threshold": deeply_nested_threshold}
         result = benchmark(
             extract_arrays,
             data,
@@ -242,7 +244,7 @@ class TestExtractorBenchmarks:
             entity_name="benchmark",
             separator="_",
             cast_to_string=True,
-            abbreviate_enabled=abbreviate_enabled,
+            deeply_nested_threshold=deeply_nested_threshold,
         )
 
         # Verify the result
@@ -270,7 +272,7 @@ class TestHierarchyBenchmarks:
             separator="_",
             cast_to_string=True,
             extract_time=get_current_timestamp(),
-            abbreviate_table_names=True,
+            deeply_nested_threshold=4,
             visit_arrays=True,
         )
 
@@ -294,7 +296,7 @@ class TestHierarchyBenchmarks:
             separator="_",
             cast_to_string=True,
             extract_time=get_current_timestamp(),
-            abbreviate_table_names=True,
+            deeply_nested_threshold=4,
             visit_arrays=visit_arrays,
         )
 

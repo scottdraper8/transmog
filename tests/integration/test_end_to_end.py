@@ -50,7 +50,7 @@ class TestEndToEnd(AbstractIntegrationTest):
         config = (
             TransmogConfig.default()
             .with_processing(cast_to_string=True, include_empty=True)
-            .with_naming(separator=".", abbreviate_field_names=False)
+            .with_naming(separator=".")
         )
         processor = Processor(config=config)
 

@@ -27,7 +27,7 @@ result.get_table_names() -> List[str]
 # Get a specific child table by name
 result.get_child_table(table_name: str) -> List[Dict[str, Any]]
 
-# Get a formatted table name (with abbreviations applied)
+# Get a formatted table name
 result.get_formatted_table_name(table_name: str) -> str
 ```
 

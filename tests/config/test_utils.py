@@ -13,13 +13,7 @@ def test_get_common_config_params():
         TransmogConfig.default()
         .with_naming(
             separator="|",
-            abbreviate_field_names=False,
-            abbreviate_table_names=False,
-            max_field_component_length=10,
-            max_table_component_length=10,
-            preserve_root_component=False,
-            preserve_leaf_component=False,
-            custom_abbreviations={"test": "t"},
+            deeply_nested_threshold=5,
         )
         .with_processing(
             cast_to_string=False,
@@ -35,13 +29,7 @@ def test_get_common_config_params():
 
     # Verify all expected parameters are present
     assert params["separator"] == "|"
-    assert params["abbreviate_field_names"] is False
-    assert params["abbreviate_table_names"] is False
-    assert params["max_field_component_length"] == 10
-    assert params["max_table_component_length"] == 10
-    assert params["preserve_root_component"] is False
-    assert params["preserve_leaf_component"] is False
-    assert params["custom_abbreviations"] == {"test": "t"}
+    assert params["deeply_nested_threshold"] == 5
     assert params["cast_to_string"] is False
     assert params["include_empty"] is True
     assert params["skip_null"] is False
@@ -59,13 +47,7 @@ def test_get_common_config_params_default():
 
     # Verify default values are present
     assert params["separator"] == "_"
-    assert params["abbreviate_field_names"] is True
-    assert params["abbreviate_table_names"] is True
-    assert params["max_field_component_length"] is None  # Default is None in the class
-    assert params["max_table_component_length"] is None  # Default is None in the class
-    assert params["preserve_root_component"] is True
-    assert params["preserve_leaf_component"] is True
-    assert params["custom_abbreviations"] == {}
+    assert params["deeply_nested_threshold"] == 4
     assert params["cast_to_string"] is True
     assert params["include_empty"] is False
     assert params["skip_null"] is True

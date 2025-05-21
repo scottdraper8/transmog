@@ -199,7 +199,7 @@ def main():
             # preservation
         )
         .with_naming(
-            abbreviate_table_names=True,  # Shorter table names reduce memory
+            deep_nesting_threshold=3,  # Better handling of deep nesting
             max_table_component_length=8,  # Limit name length
         )
     )
@@ -311,9 +311,7 @@ def main():
     print("- batch_size: Controls memory vs. performance tradeoff")
     print("- skip_null and include_empty: Affects processing speed and output size")
     print("- cast_to_string: Type conversion affects processing speed")
-    print(
-        "- abbreviate_table_names: Affects memory usage for complex nested structures"
-    )
+    print("- deep_nesting_threshold: Affects how deeply nested structures are handled")
 
 
 if __name__ == "__main__":

@@ -141,7 +141,7 @@ jobs:
         print("Testing configuration system...")
         custom_config = (
             TransmogConfig.default()
-            .with_naming(separator='.', abbreviate_table_names=False)
+            .with_naming(separator='.')
             .with_processing(cast_to_string=True, skip_null=False)
             .with_metadata(id_field='record_id', parent_field='parent_id')
             .with_error_handling(recovery_strategy='strict')

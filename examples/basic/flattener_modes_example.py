@@ -130,21 +130,21 @@ def main():
     for key in list(result2.keys())[:5]:
         print(f"  {key}: {result2[key]}")
 
-    print("\n=== Example 3: Field Name Abbreviation ===")
+    print("\n=== Example 3: Deep Nesting Handling ===")
     # Using the mode parameter with additional options
     result3 = flatten_json(
         data,
         separator=".",
         cast_to_string=True,
         skip_arrays=True,
-        abbreviate_field_names=True,
+        deep_nesting_threshold=3,
         max_field_component_length=5,
         preserve_leaf_component=True,
         mode="streaming",
     )
 
-    print(f"Result keys with abbreviation: {len(result3)} fields")
-    print("Sample fields (abbreviated):")
+    print(f"Result keys with deep nesting threshold (3): {len(result3)} fields")
+    print("Sample fields (deep nesting handling):")
     for key in list(result3.keys())[:5]:
         print(f"  {key}: {result3[key]}")
 

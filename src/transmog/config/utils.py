@@ -29,11 +29,5 @@ def get_common_config_params(config: TransmogConfig) -> dict[str, Any]:
         "max_depth": config.processing.max_nesting_depth,
         # Naming parameters
         "separator": config.naming.separator,
-        "abbreviate_field_names": config.naming.abbreviate_field_names,
-        "abbreviate_table_names": config.naming.abbreviate_table_names,
-        "max_field_component_length": config.naming.max_field_component_length,
-        "max_table_component_length": config.naming.max_table_component_length,
-        "preserve_root_component": config.naming.preserve_root_component,
-        "preserve_leaf_component": config.naming.preserve_leaf_component,
-        "custom_abbreviations": config.naming.custom_abbreviations,
+        "deeply_nested_threshold": config.naming.deeply_nested_threshold,
     }

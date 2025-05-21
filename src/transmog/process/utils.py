@@ -32,16 +32,7 @@ def get_common_config_params(
     return {
         # Naming config
         "separator": processor.config.naming.separator,
-        "abbreviate_table_names": processor.config.naming.abbreviate_table_names,
-        "abbreviate_field_names": processor.config.naming.abbreviate_field_names,
-        "max_table_component_length": (
-            processor.config.naming.max_table_component_length
-        ),
-        "max_field_component_length": (
-            processor.config.naming.max_field_component_length
-        ),
-        "preserve_leaf_component": processor.config.naming.preserve_leaf_component,
-        "custom_abbreviations": processor.config.naming.custom_abbreviations,
+        "deeply_nested_threshold": processor.config.naming.deeply_nested_threshold,
         # Processing config
         "cast_to_string": processor.config.processing.cast_to_string,
         "include_empty": processor.config.processing.include_empty,

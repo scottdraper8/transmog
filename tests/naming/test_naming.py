@@ -1,13 +1,14 @@
-"""Tests for naming conventions and abbreviation system.
+"""Tests for naming conventions.
 
-This module contains tests for the naming conventions and abbreviation system
-in Transmog, ensuring that table and field names are generated correctly.
+This module contains tests for the naming conventions in Transmog,
+ensuring that table and field names are generated correctly.
 """
 
-import pytest
-
-from transmog.naming.abbreviator import abbreviate_component, abbreviate_table_name
-from transmog.naming.conventions import get_table_name, sanitize_name
+from transmog.naming.conventions import (
+    get_table_name,
+    handle_deeply_nested_path,
+    sanitize_name,
+)
 
 
 class TestNamingConventions:
@@ -29,36 +30,52 @@ class TestNamingConventions:
         result = get_table_name("details", "customer", parent_path="orders/items")
         assert result == "customer_orders_items_details"
 
-    def test_abbreviate_table_name(self):
-        """Test abbreviate_table_name function."""
-        # First level array
-        result = abbreviate_table_name("items", "customer")
-        assert result == "customer_items"
-
-        # Second level with abbreviation directly using the underscore notation
-        result = abbreviate_table_name(
-            "orders_shipments", "customer", max_component_length=4
+    def test_deeply_nested_path_handling(self):
+        """Test handling of deeply nested paths."""
+        # Path with depth less than threshold should remain unchanged
+        result = get_table_name(
+            "details", "customer", parent_path="orders_items", deeply_nested_threshold=4
         )
-        # With our new implementation in the extractor, abbreviation is done directly
-        # This test is for backwards compatibility with existing code
-        assert result == "customer_orders_shipments"
+        assert result == "customer_orders_items_details"
 
-    def test_abbreviate_component(self):
-        """Test component abbreviation."""
-        # Default abbreviation (4 chars)
-        result = abbreviate_component("information", max_length=4)
-        assert result == "info"
-
-        # Custom abbreviation length
-        result = abbreviate_component("information", max_length=5)
-        assert result == "infor"
-
-        # Custom abbreviation dictionary
-        custom_abbrevs = {"information": "INFO"}
-        result = abbreviate_component(
-            "information", max_length=4, abbreviation_dict=custom_abbrevs
+        # Path with depth greater than threshold should be simplified
+        result = get_table_name(
+            "values",
+            "customer",
+            parent_path="orders_items_details_specifications",
+            deeply_nested_threshold=4,
         )
-        assert result == "INFO"
+        assert "nested" in result
+        assert result == "customer_orders_nested_values"
+
+        # Test with custom deeply nested threshold
+        result = get_table_name(
+            "data",
+            "customer",
+            parent_path="orders_items_details",
+            deeply_nested_threshold=3,
+        )
+        assert "nested" in result
+        assert result == "customer_orders_nested_data"
+
+    def test_handle_deeply_nested_path(self):
+        """Test the deeply nested path utility directly."""
+        # Path with fewer components than threshold should be unchanged
+        path = "level1_level2_level3"
+        result = handle_deeply_nested_path(path, deeply_nested_threshold=4)
+        assert result == path
+
+        # Path with more components than threshold should be simplified
+        path = "level1_level2_level3_level4_level5"
+        result = handle_deeply_nested_path(path, deeply_nested_threshold=4)
+        assert result == "level1_nested_level5"
+
+        # Test with custom separator
+        path = "level1.level2.level3.level4.level5"
+        result = handle_deeply_nested_path(
+            path, separator=".", deeply_nested_threshold=4
+        )
+        assert result == "level1.nested.level5"
 
     def test_sanitize_name(self):
         """Test name sanitization."""
@@ -73,3 +90,11 @@ class TestNamingConventions:
         # Test with SQL special character handling
         result = sanitize_name("user$name")
         assert result == "user_name"
+
+        # Test with numeric prefix
+        result = sanitize_name("123_column")
+        assert result == "col_123_column"
+
+        # Test preservation of separators
+        result = sanitize_name("user_email_com", preserve_separator=True)
+        assert result == "user_email_com"

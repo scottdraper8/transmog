@@ -258,7 +258,7 @@ def main():
         tm.TransmogConfig.default()
         .with_naming(
             separator=".",  # Use dot notation for nested fields
-            abbreviate_table_names=True,  # Abbreviate table names
+            deep_nesting_threshold=3,  # Handle deeply nested fields
             max_table_component_length=5,  # Limit component length in table names
         )
         .with_processing(
@@ -293,7 +293,7 @@ def main():
             f"(delta: {memory_after - memory_before:.2f} MB)"
         )
 
-    # Count output files with abbreviated names
+    # Count output files with formatted names
     custom_files = [
         f
         for f in os.listdir(os.path.join(output_dir, "custom_streaming"))

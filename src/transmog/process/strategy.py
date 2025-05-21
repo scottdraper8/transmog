@@ -78,7 +78,7 @@ class ProcessingStrategy(ABC):
     def _get_common_config_params(
         self, extract_time: Optional[Any] = None
     ) -> dict[str, Any]:
-        """Get common configuration parameters for processing.
+        """Get common configuration parameters.
 
         Args:
             extract_time: Optional extraction timestamp
@@ -100,13 +100,7 @@ class ProcessingStrategy(ABC):
         params = {
             # Naming parameters
             "separator": naming_config.separator,
-            "abbreviate_table_names": naming_config.abbreviate_table_names,
-            "abbreviate_field_names": naming_config.abbreviate_field_names,
-            "max_table_component_length": naming_config.max_table_component_length,
-            "max_field_component_length": naming_config.max_field_component_length,
-            "preserve_root_component": naming_config.preserve_root_component,
-            "preserve_leaf_component": naming_config.preserve_leaf_component,
-            "custom_abbreviations": naming_config.custom_abbreviations,
+            "deeply_nested_threshold": naming_config.deeply_nested_threshold,
             # Processing parameters
             "cast_to_string": processing_config.cast_to_string,
             "include_empty": processing_config.include_empty,
@@ -189,26 +183,8 @@ class ProcessingStrategy(ABC):
         params = {
             # Naming parameters
             "separator": kwargs.get("separator", naming_config.separator),
-            "abbreviate_table_names": kwargs.get(
-                "abbreviate_table_names", naming_config.abbreviate_table_names
-            ),
-            "abbreviate_field_names": kwargs.get(
-                "abbreviate_field_names", naming_config.abbreviate_field_names
-            ),
-            "max_table_component_length": kwargs.get(
-                "max_table_component_length", naming_config.max_table_component_length
-            ),
-            "max_field_component_length": kwargs.get(
-                "max_field_component_length", naming_config.max_field_component_length
-            ),
-            "preserve_root_component": kwargs.get(
-                "preserve_root_component", naming_config.preserve_root_component
-            ),
-            "preserve_leaf_component": kwargs.get(
-                "preserve_leaf_component", naming_config.preserve_leaf_component
-            ),
-            "custom_abbreviations": kwargs.get(
-                "custom_abbreviations", naming_config.custom_abbreviations
+            "deeply_nested_threshold": kwargs.get(
+                "deeply_nested_threshold", naming_config.deeply_nested_threshold
             ),
             # Processing parameters
             "cast_to_string": kwargs.get(
@@ -734,6 +710,13 @@ class FileStrategy(ProcessingStrategy):
         params: dict[str, Any],
     ) -> None:
         """Process arrays for a batch of records efficiently."""
+        # Get processing parameters
+        visit_arrays = params.get("visit_arrays", True)
+
+        # Only process arrays if enabled
+        if not visit_arrays:
+            return
+
         # Process arrays for each record in batch
         for i, record in enumerate(batch):
             if i >= len(main_ids):
@@ -750,10 +733,9 @@ class FileStrategy(ProcessingStrategy):
                 include_empty=params["include_empty"],
                 skip_null=params["skip_null"],
                 extract_time=extract_time,
-                abbreviate_enabled=params["abbreviate_table_names"],
-                max_component_length=params["max_table_component_length"],
-                preserve_leaf=params["preserve_leaf_component"],
-                custom_abbreviations=params["custom_abbreviations"],
+                deeply_nested_threshold=params.get("deeply_nested_threshold", 4),
+                default_id_field=default_id_field,
+                id_generation_strategy=id_generation_strategy,
                 recovery_strategy=params.get("recovery_strategy"),
             )
 
@@ -953,6 +935,13 @@ class BatchStrategy(ProcessingStrategy):
         params: dict[str, Any],
     ) -> None:
         """Process arrays for a batch of records efficiently."""
+        # Get processing parameters
+        visit_arrays = params.get("visit_arrays", True)
+
+        # Only process arrays if enabled
+        if not visit_arrays:
+            return
+
         # Process arrays for each record in batch
         for i, record in enumerate(batch):
             if i >= len(main_ids):
@@ -969,10 +958,9 @@ class BatchStrategy(ProcessingStrategy):
                 include_empty=params["include_empty"],
                 skip_null=params["skip_null"],
                 extract_time=extract_time,
-                abbreviate_enabled=params["abbreviate_table_names"],
-                max_component_length=params["max_table_component_length"],
-                preserve_leaf=params["preserve_leaf_component"],
-                custom_abbreviations=params["custom_abbreviations"],
+                deeply_nested_threshold=params.get("deeply_nested_threshold", 4),
+                default_id_field=default_id_field,
+                id_generation_strategy=id_generation_strategy,
                 recovery_strategy=params.get("recovery_strategy"),
             )
 
@@ -1197,11 +1185,8 @@ class ChunkedStrategy(ProcessingStrategy):
                     include_empty=params.get("include_empty", False),
                     skip_null=params.get("skip_null", True),
                     skip_arrays=True,
-                    abbreviate_field_names=params.get("abbreviate_field_names", False),
-                    max_field_component_length=params.get("max_field_component_length"),
-                    preserve_root_component=params.get("preserve_root_component", True),
-                    preserve_leaf_component=params.get("preserve_leaf_component", True),
-                    custom_abbreviations=params.get("custom_abbreviations"),
+                    deeply_nested_threshold=params.get("deeply_nested_threshold", 4),
+                    max_depth=params.get("max_depth", 100),
                     recovery_strategy=params.get("recovery_strategy"),
                 )
 
@@ -1265,8 +1250,6 @@ class ChunkedStrategy(ProcessingStrategy):
 
         # Get processing parameters
         visit_arrays = params.get("visit_arrays", True)
-        parent_field = params.get("parent_field", "__parent_extract_id")
-        time_field = params.get("time_field", "__extract_datetime")
 
         # Only process arrays if enabled
         if not visit_arrays:
@@ -1288,20 +1271,10 @@ class ChunkedStrategy(ProcessingStrategy):
                 include_empty=params.get("include_empty", False),
                 skip_null=params.get("skip_null", True),
                 extract_time=extract_time,
-                abbreviate_table_names=params.get("abbreviate_table_names", True),
-                abbreviate_field_names=params.get("abbreviate_field_names", False),
-                max_table_component_length=params.get("max_table_component_length"),
-                max_field_component_length=params.get("max_field_component_length"),
-                preserve_leaf_component=params.get("preserve_leaf_component", True),
-                custom_abbreviations=params.get("custom_abbreviations"),
+                deeply_nested_threshold=params.get("deeply_nested_threshold", 4),
                 default_id_field=default_id_field,
                 id_generation_strategy=id_generation_strategy,
-                id_field=id_field,
-                parent_field=parent_field,
-                time_field=time_field,
-                visit_arrays=visit_arrays,
                 recovery_strategy=params.get("recovery_strategy"),
-                streaming=False,
             )
 
             # Add arrays to result for this record - ensure arrays is a dict

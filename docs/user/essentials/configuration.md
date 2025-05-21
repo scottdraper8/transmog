@@ -56,8 +56,8 @@ config = (
     tm.TransmogConfig.default()
     .with_naming(
         separator=".",
-        abbreviate_table_names=False,
-        max_table_component_length=30
+        max_table_component_length=30,
+        deep_nesting_threshold=4
     )
     .with_processing(
         batch_size=5000,
@@ -96,7 +96,7 @@ processor = tm.Processor()
 # Create a new processor with updated naming settings
 updated_processor = processor.with_naming(
     separator=".",
-    abbreviate_table_names=False
+    deep_nesting_threshold=5
 )
 
 # Create a new processor with updated processing settings
@@ -138,17 +138,11 @@ Controls table and field naming through the following parameters:
 ```python
 naming_config = tm.NamingConfig(
     separator="_",                # Field name separator
-    abbreviate_table_names=True,  # Use abbreviations for table names
-    abbreviate_field_names=True,  # Use abbreviations for field names
     max_table_component_length=30,# Maximum length for table name components
     max_field_component_length=30,# Maximum length for field name components
     preserve_leaf_component=True, # Keep the leaf component in full
     preserve_root_component=True, # Keep the root component in full
-    custom_abbreviations={        # Custom abbreviations
-        "user": "usr",
-        "transaction": "txn",
-        "information": "info"
-    }
+    deep_nesting_threshold=4      # Threshold for special handling of deep nesting
 )
 
 # Use this configuration component
@@ -314,4 +308,63 @@ tm.settings.default_batch_size = 1000
   - `partial`: For extracting data from inconsistent sources
 - **Naming Consistency**: Configure naming conventions consistently
   - Use the same separator throughout
-  - Consider table name abbreviation for database compatibility
+  - Configure deep nesting threshold appropriately for your data structure
+
+## Simplified Configuration API
+
+Transmog now provides several shortcut methods for common configuration scenarios:
+
+```python
+import transmog as tm
+
+# Optimized for CSV output
+config = tm.TransmogConfig.csv_optimized()
+
+# Error tolerant configuration
+config = tm.TransmogConfig.error_tolerant()
+
+# Simple mode with minimal metadata
+config = tm.TransmogConfig.simple_mode()
+
+# Optimized for streaming
+config = tm.TransmogConfig.streaming_optimized()
+
+# Common modifications
+config = (
+    tm.TransmogConfig.default()
+    .use_dot_notation()           # Use dots as separators
+    .disable_arrays()             # Skip array processing
+    .use_string_format()          # Cast all values to strings
+)
+```
+
+## Configuration Validation
+
+The configuration system now includes built-in validation to catch potential issues early:
+
+```python
+import transmog as tm
+from transmog.error import ConfigurationError
+
+try:
+    # Invalid separator would be caught immediately
+    config = tm.TransmogConfig.default().with_naming(separator="")
+except ConfigurationError as e:
+    print(f"Configuration error: {e}")
+
+try:
+    # Invalid metadata field names would be caught
+    config = tm.TransmogConfig.default().with_metadata(
+        id_field="__id",
+        parent_field="__id"  # Same as id_field - not allowed
+    )
+except ConfigurationError as e:
+    print(f"Configuration error: {e}")
+```
+
+Validation helps prevent common mistakes like:
+
+- Invalid separators (empty or invalid characters)
+- Duplicate metadata field names
+- Invalid batch sizes or cache configuration
+- Invalid recovery strategy names

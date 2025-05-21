@@ -9,14 +9,14 @@ from datetime import datetime
 from typing import Any, Callable, Optional, Union
 
 from transmog.core.flattener import flatten_json
-from transmog.core.metadata import annotate_with_metadata, generate_deterministic_id
+from transmog.core.metadata import annotate_with_metadata
 from transmog.error import logger
 from transmog.naming.conventions import sanitize_name
+from transmog.naming.utils import get_table_name_for_array
+from transmog.types.base import JsonDict
 
 # Type aliases for improved code readability
-JsonDict = dict[str, Any]
 JsonList = list[dict[str, Any]]
-ArrayDict = dict[str, JsonList]
 ExtractResult = dict[str, list[dict[str, Any]]]
 
 
@@ -33,10 +33,7 @@ def _extract_arrays_impl(
     id_field: str = "__extract_id",
     parent_field: str = "__parent_extract_id",
     time_field: str = "__extract_datetime",
-    abbreviate_enabled: bool = True,
-    max_component_length: Optional[int] = None,
-    preserve_leaf: bool = True,
-    custom_abbreviations: Optional[dict[str, str]] = None,
+    deeply_nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     recovery_strategy: Optional[Any] = None,
@@ -64,10 +61,7 @@ def _extract_arrays_impl(
         id_field: ID field name
         parent_field: Parent ID field name
         time_field: Timestamp field name
-        abbreviate_enabled: Whether to abbreviate table names
-        max_component_length: Maximum length for table name components
-        preserve_leaf: Whether to preserve leaf components
-        custom_abbreviations: Custom abbreviation dictionary
+        deeply_nested_threshold: Threshold for deep nesting (default 4)
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
         id_generation_strategy: Custom function for ID generation
@@ -105,66 +99,14 @@ def _extract_arrays_impl(
             sanitized_key = sanitize_name(key, separator)
             sanitized_entity = sanitize_name(entity_name) if entity_name else ""
 
-            # Generate table name directly based on path depth
-            if not parent_path:
-                # First level array: <entity>_<arrayname>
-                table_name = f"{sanitized_entity}{separator}{sanitized_key}"
-            else:
-                # Determine the array path for nesting
-                path_parts = current_path.split(separator)
-
-                # For deeply nested arrays, only consider the relevant parts of the path
-                # excluding the final array name (key)
-                if len(path_parts) > 1:
-                    # Extract intermediate nodes for abbreviation
-                    intermediate_parts = path_parts[
-                        :-1
-                    ]  # exclude the array name itself
-
-                    # Apply abbreviation to intermediate nodes
-                    if abbreviate_enabled:
-                        abbreviated_intermediates = []
-                        for part in intermediate_parts:
-                            # Skip entity name if it appears in the path
-                            if part == sanitized_entity:
-                                continue
-
-                            # Abbreviate intermediate nodes
-                            if (
-                                max_component_length
-                                and len(part) > max_component_length
-                            ):
-                                abbreviated_part = part[:max_component_length]
-                            else:
-                                abbreviated_part = part
-
-                            abbreviated_intermediates.append(abbreviated_part)
-
-                        # Build the table name with abbreviated intermediates
-                        if abbreviated_intermediates:
-                            path_str = separator.join(abbreviated_intermediates)
-                            table_name = (
-                                f"{sanitized_entity}{separator}{path_str}"
-                                f"{separator}{sanitized_key}"
-                            )
-                        else:
-                            # No intermediates - use first level format
-                            table_name = f"{sanitized_entity}{separator}{sanitized_key}"
-                    else:
-                        # No abbreviation, just join without entity duplication
-                        path_str = separator.join(
-                            [p for p in intermediate_parts if p != sanitized_entity]
-                        )
-                        if path_str:
-                            table_name = (
-                                f"{sanitized_entity}{separator}{path_str}"
-                                f"{separator}{sanitized_key}"
-                            )
-                        else:
-                            table_name = f"{sanitized_entity}{separator}{sanitized_key}"
-                else:
-                    # Only key level (shouldn't happen in nested case but as fallback)
-                    table_name = f"{sanitized_entity}{separator}{sanitized_key}"
+            # Generate table name using utility function
+            table_name = get_table_name_for_array(
+                entity_name=sanitized_entity,
+                array_name=sanitized_key,
+                parent_path=parent_path,
+                separator=separator,
+                deeply_nested_threshold=deeply_nested_threshold,
+            )
 
             # Skip if array is empty
             if not value:
@@ -177,8 +119,8 @@ def _extract_arrays_impl(
                     continue
 
                 try:
-                    # Create path for this specific array item
-                    item_path = f"{current_path}{separator}{i}"
+                    # Create path for this specific array item without index
+                    item_path = current_path
 
                     # Determine ID source field based on configuration
                     source_field = None
@@ -188,6 +130,8 @@ def _extract_arrays_impl(
                             source_field = default_id_field
                         else:
                             # Path-specific field mapping
+                            # Try with current_path first since it doesn't have
+                            # the index
                             if current_path in default_id_field:
                                 source_field = default_id_field[current_path]
                             elif "*" in default_id_field:
@@ -206,6 +150,7 @@ def _extract_arrays_impl(
                             skip_null=skip_null,
                             parent_path="",
                             in_place=False,
+                            deeply_nested_threshold=deeply_nested_threshold,
                             mode="streaming" if streaming_mode else "standard",
                             recovery_strategy=recovery_strategy,
                         )
@@ -236,7 +181,7 @@ def _extract_arrays_impl(
                     # Output the processed record
                     yield table_name, annotated
 
-                    # Process any nested arrays recursively, but only for dictionary items
+                    # Process any nested arrays recursively, but only for dict items
                     if isinstance(item, dict):
                         nested_generator = _extract_arrays_impl(
                             item,
@@ -251,10 +196,7 @@ def _extract_arrays_impl(
                             id_field=id_field,
                             parent_field=parent_field,
                             time_field=time_field,
-                            abbreviate_enabled=abbreviate_enabled,
-                            max_component_length=max_component_length,
-                            preserve_leaf=preserve_leaf,
-                            custom_abbreviations=custom_abbreviations,
+                            deeply_nested_threshold=deeply_nested_threshold,
                             default_id_field=default_id_field,
                             id_generation_strategy=id_generation_strategy,
                             recovery_strategy=recovery_strategy,
@@ -262,88 +204,62 @@ def _extract_arrays_impl(
                             current_depth=current_depth + 1,
                             streaming_mode=streaming_mode,
                         )
-
+                        # Process nested arrays one by one
                         yield from nested_generator
-
                 except Exception as e:
                     # Apply recovery strategy if available
-                    if recovery_strategy and hasattr(recovery_strategy, "recover"):
-                        try:
-                            recovery_result = recovery_strategy.recover(
-                                e,
-                                entity_name=entity_name,
-                                path=current_path.split(separator),
-                            )
-                            # Create placeholder record if recovery succeeded
-                            if recovery_result is not None and isinstance(
-                                recovery_result, dict
-                            ):
-                                simple_record = {
-                                    id_field: generate_deterministic_id(
-                                        str(current_path) + str(i)
-                                    ),
-                                    parent_field: parent_id,
-                                    time_field: extract_time or datetime.now(),
-                                    "__array_field": sanitized_key,
-                                    "__array_index": i,
-                                    "__extract_status": "error_recovered",
-                                    "__error_message": str(e),
-                                }
-                                yield table_name, simple_record
-                                continue
-                        except Exception as re:
-                            # Log recovery failures
-                            logger.warning(f"Recovery failed: {re}")
-                    # Re-raise original exception if recovery failed or unavailable
-                    raise
-
-        # Process nested objects
-        elif isinstance(value, dict):
-            try:
-                # Recursively process nested dictionary
-                nested_generator = _extract_arrays_impl(
-                    value,
-                    parent_id=parent_id,
-                    parent_path=current_path,
-                    entity_name=entity_name,
-                    separator=separator,
-                    cast_to_string=cast_to_string,
-                    include_empty=include_empty,
-                    skip_null=skip_null,
-                    extract_time=extract_time,
-                    id_field=id_field,
-                    parent_field=parent_field,
-                    time_field=time_field,
-                    abbreviate_enabled=abbreviate_enabled,
-                    max_component_length=max_component_length,
-                    preserve_leaf=preserve_leaf,
-                    custom_abbreviations=custom_abbreviations,
-                    default_id_field=default_id_field,
-                    id_generation_strategy=id_generation_strategy,
-                    recovery_strategy=recovery_strategy,
-                    max_depth=max_depth,
-                    current_depth=current_depth + 1,
-                    streaming_mode=streaming_mode,
-                )
-
-                yield from nested_generator
-
-            except Exception as e:
-                # Apply recovery strategy if available
-                if recovery_strategy and hasattr(recovery_strategy, "recover"):
-                    try:
-                        recovery_result = recovery_strategy.recover(
-                            e,
-                            entity_name=entity_name,
-                            path=current_path.split(separator),
+                    if recovery_strategy == "skip":
+                        # Skip this array item
+                        continue
+                    elif recovery_strategy == "partial":
+                        # Create error record
+                        error_record = {
+                            "__error": str(e),
+                            "__array_field": sanitized_key,
+                            "__array_index": i,
+                        }
+                        # Add metadata
+                        annotated = annotate_with_metadata(
+                            error_record,
+                            parent_id=parent_id,
+                            extract_time=extract_time,
+                            id_field=id_field,
+                            parent_field=parent_field,
+                            time_field=time_field,
+                            in_place=True,
                         )
-                        # Continue to next field if recovery succeeded
-                        if recovery_result is not None:
-                            continue
-                    except Exception as re:
-                        logger.warning(f"Recovery failed: {re}")
-                # Re-raise original exception if recovery failed or unavailable
-                raise
+                        # Output the error record
+                        yield f"{table_name}{separator}errors", annotated
+                    else:
+                        # Raise the exception (default behavior)
+                        raise
+
+        # Nested object processing (non-array)
+        elif isinstance(value, dict):
+            # Recursively process nested objects for arrays inside them
+            nested_generator = _extract_arrays_impl(
+                value,
+                parent_id=parent_id,
+                parent_path=current_path,
+                entity_name=entity_name,
+                separator=separator,
+                cast_to_string=cast_to_string,
+                include_empty=include_empty,
+                skip_null=skip_null,
+                extract_time=extract_time,
+                id_field=id_field,
+                parent_field=parent_field,
+                time_field=time_field,
+                deeply_nested_threshold=deeply_nested_threshold,
+                default_id_field=default_id_field,
+                id_generation_strategy=id_generation_strategy,
+                recovery_strategy=recovery_strategy,
+                max_depth=max_depth,
+                current_depth=current_depth + 1,
+                streaming_mode=streaming_mode,
+            )
+            # Process nested arrays one by one
+            yield from nested_generator
 
 
 def extract_arrays(
@@ -359,10 +275,7 @@ def extract_arrays(
     id_field: str = "__extract_id",
     parent_field: str = "__parent_extract_id",
     time_field: str = "__extract_datetime",
-    abbreviate_enabled: bool = True,
-    max_component_length: Optional[int] = None,
-    preserve_leaf: bool = True,
-    custom_abbreviations: Optional[dict[str, str]] = None,
+    deeply_nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     streaming: bool = False,
@@ -370,10 +283,7 @@ def extract_arrays(
     max_depth: int = 100,
     current_depth: int = 0,
 ) -> ExtractResult:
-    """Extract all nested arrays from a data structure.
-
-    This function identifies arrays within the given JSON structure and
-    extracts them into separate tables, preserving parent-child relationships.
+    """Extract nested arrays into flattened tables.
 
     Args:
         data: JSON data to process
@@ -388,25 +298,24 @@ def extract_arrays(
         id_field: ID field name
         parent_field: Parent ID field name
         time_field: Timestamp field name
-        abbreviate_enabled: Whether to abbreviate table names
-        max_component_length: Maximum length for table name components
-        preserve_leaf: Whether to preserve leaf components
-        custom_abbreviations: Custom abbreviation dictionary
+        deeply_nested_threshold: Threshold for deep nesting (default 4)
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
         id_generation_strategy: Custom function for ID generation
-        streaming: Whether to stream results
+        streaming: Whether to use streaming mode (returns generator)
         recovery_strategy: Strategy for error recovery
         max_depth: Maximum recursion depth allowed
         current_depth: Current depth in the recursion
 
     Returns:
-        Dictionary of array tables with their records
+        Dictionary mapping table names to lists of records
     """
-    # Initialize result dictionary
-    result: ExtractResult = {}
+    # Initialize extraction timestamp if not provided
+    if extract_time is None:
+        extract_time = datetime.now()
 
-    # Process data using implementation helper
+    # Collect records in streaming mode
+    result: ExtractResult = {}
     for table_name, record in _extract_arrays_impl(
         data,
         parent_id=parent_id,
@@ -420,22 +329,17 @@ def extract_arrays(
         id_field=id_field,
         parent_field=parent_field,
         time_field=time_field,
-        abbreviate_enabled=abbreviate_enabled,
-        max_component_length=max_component_length,
-        preserve_leaf=preserve_leaf,
-        custom_abbreviations=custom_abbreviations,
+        deeply_nested_threshold=deeply_nested_threshold,
         default_id_field=default_id_field,
         id_generation_strategy=id_generation_strategy,
         recovery_strategy=recovery_strategy,
         max_depth=max_depth,
         current_depth=current_depth,
-        streaming_mode=streaming,
+        streaming_mode=False,
     ):
-        # Create table if not exists
+        # Accumulate records by table
         if table_name not in result:
             result[table_name] = []
-
-        # Add record to appropriate table
         result[table_name].append(record)
 
     return result
@@ -454,20 +358,17 @@ def stream_extract_arrays(
     id_field: str = "__extract_id",
     parent_field: str = "__parent_extract_id",
     time_field: str = "__extract_datetime",
-    abbreviate_enabled: bool = True,
-    max_component_length: Optional[int] = None,
-    preserve_leaf: bool = True,
-    custom_abbreviations: Optional[dict[str, str]] = None,
+    deeply_nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     recovery_strategy: Optional[Any] = None,
     max_depth: int = 100,
     current_depth: int = 0,
-) -> Generator[tuple[str, JsonDict], None, None]:
-    """Stream extract arrays for memory-efficient processing.
+) -> Generator[tuple[str, list[JsonDict]], None, None]:
+    """Extract arrays from JSON in streaming mode.
 
-    Similar to extract_arrays but yields records one at a time
-    rather than building the entire result in memory.
+    This is a memory-efficient version that yields records as they are processed
+    rather than building complete tables in memory.
 
     Args:
         data: JSON data to process
@@ -482,10 +383,7 @@ def stream_extract_arrays(
         id_field: ID field name
         parent_field: Parent ID field name
         time_field: Timestamp field name
-        abbreviate_enabled: Whether to abbreviate table names
-        max_component_length: Maximum length for table name components
-        preserve_leaf: Whether to preserve leaf components
-        custom_abbreviations: Custom abbreviation dictionary
+        deeply_nested_threshold: Threshold for deep nesting (default 4)
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
         id_generation_strategy: Custom function for ID generation
@@ -493,11 +391,14 @@ def stream_extract_arrays(
         max_depth: Maximum recursion depth allowed
         current_depth: Current depth in the recursion
 
-    Returns:
-        Generator yielding tuples of (table_name, record)
+    Yields:
+        Tuples of (table_name, list of records) for each table
     """
-    # Delegate to implementation with streaming mode enabled
-    yield from _extract_arrays_impl(
+    # Collect records by table name for grouping
+    records_by_table: dict[str, list[JsonDict]] = {}
+
+    # Process all records from the implementation
+    for table_name, record in _extract_arrays_impl(
         data,
         parent_id=parent_id,
         parent_path=parent_path,
@@ -510,14 +411,19 @@ def stream_extract_arrays(
         id_field=id_field,
         parent_field=parent_field,
         time_field=time_field,
-        abbreviate_enabled=abbreviate_enabled,
-        max_component_length=max_component_length,
-        preserve_leaf=preserve_leaf,
-        custom_abbreviations=custom_abbreviations,
+        deeply_nested_threshold=deeply_nested_threshold,
         default_id_field=default_id_field,
         id_generation_strategy=id_generation_strategy,
         recovery_strategy=recovery_strategy,
         max_depth=max_depth,
         current_depth=current_depth,
         streaming_mode=True,
-    )
+    ):
+        # Group records by table
+        if table_name not in records_by_table:
+            records_by_table[table_name] = []
+        records_by_table[table_name].append(record)
+
+    # Yield each table with its records
+    for table_name, records in records_by_table.items():
+        yield table_name, records

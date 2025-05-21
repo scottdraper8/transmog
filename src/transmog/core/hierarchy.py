@@ -20,11 +20,9 @@ from transmog.core.metadata import (
     annotate_with_metadata,
     generate_deterministic_id,
 )
+from transmog.types.base import ArrayDict, FlatDict, JsonDict
 
 # Type aliases
-JsonDict = dict[str, Any]
-FlatDict = dict[str, Any]
-ArrayDict = dict[str, list[dict[str, Any]]]
 ProcessResult = tuple[FlatDict, ArrayDict]
 StreamingChildTables = Generator[tuple[str, list[FlatDict]], None, None]
 ArrayResult = Union[ArrayDict, StreamingChildTables]
@@ -44,12 +42,7 @@ def process_structure(
     skip_null: bool = True,
     extract_time: Optional[Any] = None,
     root_entity: Optional[str] = None,
-    abbreviate_table_names: bool = True,
-    abbreviate_field_names: bool = True,
-    max_table_component_length: Optional[int] = None,
-    max_field_component_length: Optional[int] = None,
-    preserve_leaf_component: bool = True,
-    custom_abbreviations: Optional[dict[str, str]] = None,
+    deeply_nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     id_field: str = "__extract_id",
@@ -76,12 +69,8 @@ def process_structure(
         skip_null: Whether to skip null values
         extract_time: Extraction timestamp
         root_entity: Top-level entity name
-        abbreviate_table_names: Whether to abbreviate table names
-        abbreviate_field_names: Whether to abbreviate field names
-        max_table_component_length: Maximum length for table name components
-        max_field_component_length: Maximum length for field name components
-        preserve_leaf_component: Whether to preserve leaf components
-        custom_abbreviations: Custom abbreviation dictionary
+        deeply_nested_threshold: Threshold for when to consider a path deeply nested
+            (default 4)
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
         id_generation_strategy: Custom function for ID generation
@@ -132,10 +121,7 @@ def process_structure(
         include_empty=include_empty,
         skip_arrays=True,
         skip_null=skip_null,
-        abbreviate_field_names=abbreviate_field_names,
-        max_field_component_length=max_field_component_length,
-        preserve_leaf_component=preserve_leaf_component,
-        custom_abbreviations=custom_abbreviations,
+        deeply_nested_threshold=deeply_nested_threshold,
         mode="streaming",
         recovery_strategy=recovery_strategy,
         max_depth=max_depth,
@@ -149,21 +135,19 @@ def process_structure(
         else:
             normalized_path = parent_path.strip(separator) if parent_path else ""
 
-            # Path resolution priority: exact match, wildcard, prefix matches
+            # Path resolution with simplified naming scheme
             if normalized_path in default_id_field:
                 source_field = default_id_field[normalized_path]
             elif "*" in default_id_field:
                 source_field = default_id_field["*"]
             else:
-                path_components = (
-                    normalized_path.split(separator) if normalized_path else []
-                )
-                for i in range(len(path_components), 0, -1):
-                    prefix = separator.join(path_components[:i])
-                    prefix_wildcard = f"{prefix}{separator}*"
-                    if prefix_wildcard in default_id_field:
-                        source_field = default_id_field[prefix_wildcard]
-                        break
+                # Try matching based on path components without level numbers
+                for path_key in default_id_field:
+                    if path_key.endswith("*"):
+                        prefix = path_key[:-1]
+                        if normalized_path.startswith(prefix):
+                            source_field = default_id_field[path_key]
+                            break
 
     # Add metadata with in-place optimization
     flattened_obj_dict = flattened_obj if flattened_obj is not None else {}
@@ -197,51 +181,8 @@ def process_structure(
     extract_id = annotated_obj.get(id_field)
 
     if streaming:
-
-        def generate_child_records() -> Generator[
-            tuple[str, list[dict[str, Any]]], None, None
-        ]:
-            # Collect records by table name for complete table yields
-            collected_tables: dict[str, list[dict[str, Any]]] = {}
-
-            generator = stream_extract_arrays(
-                data,
-                parent_id=extract_id,
-                parent_path=parent_path,
-                entity_name=entity_name,
-                separator=separator,
-                cast_to_string=cast_to_string,
-                include_empty=include_empty,
-                skip_null=skip_null,
-                extract_time=extract_time,
-                id_field=id_field,
-                parent_field=parent_field,
-                time_field=time_field,
-                abbreviate_enabled=abbreviate_table_names,
-                max_component_length=max_table_component_length,
-                preserve_leaf=preserve_leaf_component,
-                custom_abbreviations=custom_abbreviations,
-                default_id_field=default_id_field,
-                id_generation_strategy=id_generation_strategy,
-                recovery_strategy=recovery_strategy,
-                max_depth=max_depth - 1,
-            )
-
-            # Group by table name
-            for table, record in generator:
-                if table not in collected_tables:
-                    collected_tables[table] = []
-                collected_tables[table].append(record)
-
-            # Yield complete tables with records
-            for table_name, records in collected_tables.items():
-                if records:
-                    yield table_name, records
-
-        return annotated_obj, generate_child_records()
-    else:
-        # Extract all nested arrays
-        arrays = extract_arrays(
+        # Stream extraction version
+        return annotated_obj, stream_extract_arrays(
             data,
             parent_id=extract_id,
             parent_path=parent_path,
@@ -254,58 +195,54 @@ def process_structure(
             id_field=id_field,
             parent_field=parent_field,
             time_field=time_field,
-            abbreviate_enabled=abbreviate_table_names,
-            max_component_length=max_table_component_length,
-            preserve_leaf=preserve_leaf_component,
-            custom_abbreviations=custom_abbreviations,
+            deeply_nested_threshold=deeply_nested_threshold,
             default_id_field=default_id_field,
             id_generation_strategy=id_generation_strategy,
-            streaming=False,
             recovery_strategy=recovery_strategy,
             max_depth=max_depth,
         )
-
-        return annotated_obj, arrays
+    else:
+        # Batch extraction version
+        return annotated_obj, extract_arrays(
+            data,
+            parent_id=extract_id,
+            parent_path=parent_path,
+            entity_name=entity_name,
+            separator=separator,
+            cast_to_string=cast_to_string,
+            include_empty=include_empty,
+            skip_null=skip_null,
+            extract_time=extract_time,
+            id_field=id_field,
+            parent_field=parent_field,
+            time_field=time_field,
+            deeply_nested_threshold=deeply_nested_threshold,
+            default_id_field=default_id_field,
+            id_generation_strategy=id_generation_strategy,
+            recovery_strategy=recovery_strategy,
+            max_depth=max_depth,
+        )
 
 
 def process_record_batch(
     records: list[JsonDict], entity_name: str, batch_size: int = 100, **kwargs: Any
 ) -> tuple[list[FlatDict], ArrayDict]:
-    """Process a batch of records efficiently.
+    """Process a batch of records separately and combine the results.
+
+    This is a convenience function to process multiple top-level
+    records with a single function call.
 
     Args:
-        records: List of JSON records
-        entity_name: Entity name
-        batch_size: Batch size for processing
-        **kwargs: Additional arguments to pass to process_structure
+        records: List of top-level records to process
+        entity_name: Entity name for all records
+        batch_size: Number of records to process in a single batch
+        **kwargs: Additional keyword args to pass to process_structure
 
     Returns:
-        Tuple of (flattened records, array tables dictionary)
+        Tuple of (flattened main objects, combined array tables)
     """
-    # Initialize result containers
-    flat_records = []
-    combined_arrays: dict[str, list[dict[str, Any]]] = {}
-
-    # Process records in batches
-    for i in range(0, len(records), batch_size):
-        batch = records[i : i + batch_size]
-
-        # Process each record in the batch
-        for record in batch:
-            flat_obj, arrays = process_structure(
-                record, entity_name=entity_name, **kwargs
-            )
-            flat_records.append(flat_obj)
-
-            # Merge arrays from this record
-            if isinstance(arrays, dict):
-                for table_name, table_data in arrays.items():
-                    if table_name in combined_arrays:
-                        combined_arrays[table_name].extend(table_data)
-                    else:
-                        combined_arrays[table_name] = table_data
-
-    return flat_records, combined_arrays
+    # Process records in smaller batches for better memory usage
+    return process_records_in_single_pass(records, entity_name=entity_name, **kwargs)
 
 
 def process_records_in_single_pass(
@@ -320,26 +257,21 @@ def process_records_in_single_pass(
     parent_field: str = "__parent_extract_id",
     time_field: str = "__extract_datetime",
     visit_arrays: bool = True,
-    abbreviate_table_names: bool = True,
-    abbreviate_field_names: bool = True,
-    max_table_component_length: Optional[int] = None,
-    max_field_component_length: Optional[int] = None,
-    preserve_leaf_component: bool = True,
-    custom_abbreviations: Optional[dict[str, str]] = None,
+    deeply_nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     recovery_strategy: Optional[Any] = None,
     max_depth: int = 100,
     **kwargs: Any,
 ) -> tuple[list[FlatDict], ArrayDict]:
-    """Process all records in a single pass, building main/child tables simultaneously.
+    r"""Process multiple records and combine the results.
 
-    This is the standard processing approach for most datasets where memory
-    is not a constraint. All tables are built fully in memory.
+    This function processes all records in a single pass, optimizing for throughput
+    over memory usage.
 
     Args:
-        records: List of JSON records to process
-        entity_name: Name of the entity being processed
+        records: List of records to process
+        entity_name: Entity name for all records
         extract_time: Extraction timestamp
         separator: Separator for path components
         cast_to_string: Whether to cast all values to strings
@@ -349,76 +281,94 @@ def process_records_in_single_pass(
         parent_field: Parent ID field name
         time_field: Timestamp field name
         visit_arrays: Whether to visit and process arrays
-        abbreviate_table_names: Whether to abbreviate table names
-        abbreviate_field_names: Whether to abbreviate field names
-        max_table_component_length: Maximum length for table name components
-        max_field_component_length: Maximum length for field name components
-        preserve_leaf_component: Whether to preserve leaf components
-        custom_abbreviations: Custom abbreviation dictionary
+        deeply_nested_threshold: Threshold for when to consider a path deeply
+            nested (default 4)
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
         id_generation_strategy: Custom function for ID generation
-        recovery_strategy: Strategy for handling errors
+        recovery_strategy: Strategy for error recovery
         max_depth: Maximum recursion depth for nested structures
-        **kwargs: Additional keyword arguments passed to process_structure
+        **kwargs: Additional keyword args
 
     Returns:
-        Tuple of (main table as list of dicts, child tables as dict of lists)
+        Tuple of (flattened main objects, array tables)
     """
-    # Set default extraction timestamp if not specified
+    # Timestamp for all records in batch if not provided
     if extract_time is None:
         extract_time = datetime.now()
 
     # Initialize results
-    main_records = []
-    child_tables: dict[str, list[dict[str, Any]]] = {}
+    main_records: list[FlatDict] = []
+    arrays: ArrayDict = {}
 
     # Process each record
-    for record in records:
-        main_record, child_records = process_structure(
-            data=record,
-            entity_name=entity_name,
-            parent_id=None,
-            parent_path="",
-            separator=separator,
-            cast_to_string=cast_to_string,
-            include_empty=include_empty,
-            skip_null=skip_null,
-            extract_time=extract_time,
-            root_entity=entity_name,
-            abbreviate_table_names=abbreviate_table_names,
-            abbreviate_field_names=abbreviate_field_names,
-            max_table_component_length=max_table_component_length,
-            max_field_component_length=max_field_component_length,
-            preserve_leaf_component=preserve_leaf_component,
-            custom_abbreviations=custom_abbreviations,
-            default_id_field=default_id_field,
-            id_generation_strategy=id_generation_strategy,
-            id_field=id_field,
-            parent_field=parent_field,
-            time_field=time_field,
-            visit_arrays=visit_arrays,
-            streaming=False,
-            recovery_strategy=recovery_strategy,
-            max_depth=max_depth,
-        )
+    for i, record in enumerate(records):
+        try:
+            # Process a single record - Don't pass batch_size to process_structure
+            process_kwargs = {
+                k: v
+                for k, v in kwargs.items()
+                if k != "batch_size" and k != "use_deterministic_ids"
+            }
+            main_record, child_tables = process_structure(
+                record,
+                entity_name=entity_name,
+                extract_time=extract_time,
+                separator=separator,
+                cast_to_string=cast_to_string,
+                include_empty=include_empty,
+                skip_null=skip_null,
+                id_field=id_field,
+                parent_field=parent_field,
+                time_field=time_field,
+                visit_arrays=visit_arrays,
+                deeply_nested_threshold=deeply_nested_threshold,
+                default_id_field=default_id_field,
+                id_generation_strategy=id_generation_strategy,
+                recovery_strategy=recovery_strategy,
+                max_depth=max_depth,
+                **process_kwargs,
+            )
 
-        # Add to main table
-        main_records.append(main_record)
+            # Add main record to results
+            main_records.append(main_record)
 
-        # Add to child tables
-        if isinstance(child_records, dict):
-            for table_name, table_records in child_records.items():
-                if table_name not in child_tables:
-                    child_tables[table_name] = []
-                child_tables[table_name].extend(table_records)
-        elif hasattr(child_records, "__next__"):
-            for table_name, table_records in child_records:
-                if table_name not in child_tables:
-                    child_tables[table_name] = []
-                child_tables[table_name].extend(table_records)
+            # Merge child tables
+            if isinstance(child_tables, dict):
+                for table_name, records in child_tables.items():
+                    if table_name not in arrays:
+                        arrays[table_name] = []
+                    arrays[table_name].extend(records)
 
-    return main_records, child_tables
+        except Exception as e:
+            # Apply recovery strategy if available
+            if recovery_strategy and hasattr(recovery_strategy, "recover"):
+                try:
+                    recovery_result = recovery_strategy.recover(
+                        e, entity_name=entity_name, path=[], record_index=i
+                    )
+                    if recovery_result is not None:
+                        logger.info(
+                            f"Recovery successful for record {i} in batch processing"
+                        )
+                        if (
+                            isinstance(recovery_result, tuple)
+                            and len(recovery_result) == 2
+                        ):
+                            rec, child_tabs = recovery_result
+                            main_records.append(rec)
+                            for table_name, records in child_tabs.items():
+                                if table_name not in arrays:
+                                    arrays[table_name] = []
+                                arrays[table_name].extend(records)
+                        continue
+                except Exception as re:
+                    logger.warning(f"Recovery failed during batch processing: {re}")
+            # Re-raise original exception if recovery failed
+            logger.error(f"Error processing record {i} in batch: {e}")
+            raise
+
+    return main_records, arrays
 
 
 def stream_process_records(
@@ -433,25 +383,20 @@ def stream_process_records(
     parent_field: str = "__parent_extract_id",
     time_field: str = "__extract_datetime",
     visit_arrays: bool = True,
-    abbreviate_table_names: bool = True,
-    abbreviate_field_names: bool = True,
-    max_table_component_length: Optional[int] = None,
-    max_field_component_length: Optional[int] = None,
-    preserve_leaf_component: bool = True,
-    custom_abbreviations: Optional[dict[str, str]] = None,
+    deeply_nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     max_depth: int = 100,
     **kwargs: Any,
 ) -> tuple[list[FlatDict], StreamingChildTables]:
-    """Stream process records for memory-efficient processing.
+    r"""Process records in streaming mode.
 
-    This function processes records in a streaming fashion, returning
-    a generator for child tables instead of building them all in memory.
+    This function is memory-efficient, yielding results from child tables
+    as they are processed instead of accumulating them in memory.
 
     Args:
-        records: List of JSON records to process
-        entity_name: Name of the entity being processed
+        records: List of records to process
+        entity_name: Entity name for all records
         extract_time: Extraction timestamp
         separator: Separator for path components
         cast_to_string: Whether to cast all values to strings
@@ -461,93 +406,91 @@ def stream_process_records(
         parent_field: Parent ID field name
         time_field: Timestamp field name
         visit_arrays: Whether to visit and process arrays
-        abbreviate_table_names: Whether to abbreviate table names
-        abbreviate_field_names: Whether to abbreviate field names
-        max_table_component_length: Maximum length for table name components
-        max_field_component_length: Maximum length for field name components
-        preserve_leaf_component: Whether to preserve leaf components
-        custom_abbreviations: Custom abbreviation dictionary
+        deeply_nested_threshold: Threshold for when to consider a path deeply
+            nested (default 4)
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
         id_generation_strategy: Custom function for ID generation
         max_depth: Maximum recursion depth for nested structures
-        **kwargs: Additional keyword arguments passed to process_structure
+        **kwargs: Additional keyword args
 
     Returns:
-        Tuple of (main table as list of dicts, generator for child tables)
+        Tuple of (flattened main objects, generator for array tables)
     """
-    # Set default extraction timestamp
+    # Timestamp for all records in batch if not provided
     if extract_time is None:
         extract_time = datetime.now()
 
-    # Initialize results
-    main_records = []
-    generators_list: list[Generator[tuple[str, list[dict[str, Any]]], None, None]] = []
+    # Process each record with streaming enabled
+    main_records: list[FlatDict] = []
+    all_generators: list[Generator[tuple[str, list[dict[str, Any]]], None, None]] = []
 
-    # Process each record
     for record in records:
-        main_record, child_result = process_structure(
-            data=record,
+        # Don't pass batch_size to process_structure
+        process_kwargs = {
+            k: v
+            for k, v in kwargs.items()
+            if k != "batch_size" and k != "use_deterministic_ids"
+        }
+        main_record, child_generator = process_structure(
+            record,
             entity_name=entity_name,
-            parent_id=None,
-            parent_path="",
+            extract_time=extract_time,
             separator=separator,
             cast_to_string=cast_to_string,
             include_empty=include_empty,
             skip_null=skip_null,
-            extract_time=extract_time,
-            root_entity=entity_name,
-            abbreviate_table_names=abbreviate_table_names,
-            abbreviate_field_names=abbreviate_field_names,
-            max_table_component_length=max_table_component_length,
-            max_field_component_length=max_field_component_length,
-            preserve_leaf_component=preserve_leaf_component,
-            custom_abbreviations=custom_abbreviations,
-            default_id_field=default_id_field,
-            id_generation_strategy=id_generation_strategy,
             id_field=id_field,
             parent_field=parent_field,
             time_field=time_field,
             visit_arrays=visit_arrays,
-            streaming=True,
+            deeply_nested_threshold=deeply_nested_threshold,
+            default_id_field=default_id_field,
+            id_generation_strategy=id_generation_strategy,
+            streaming=True,  # Enable streaming mode
             max_depth=max_depth,
+            **process_kwargs,
         )
 
-        # Add to main table
+        # Add main record to results
         main_records.append(main_record)
 
-        # Handle child results by type
-        if isinstance(child_result, dict):
-            # Convert dictionary to generator
-            def dict_to_generator(
-                d: dict[str, list[dict[str, Any]]],
-            ) -> Generator[tuple[str, list[dict[str, Any]]], None, None]:
-                items_gen: Generator[tuple[str, list[dict[str, Any]]], None, None] = (
-                    (table_name, records) for table_name, records in d.items()
-                )
-                yield from items_gen
+        # Store generator for later use
+        if isinstance(child_generator, Generator):
+            all_generators.append(child_generator)
 
-            generators_list.append(dict_to_generator(child_result))
-        else:
-            generators_list.append(child_result)
+    # Convert list of generators to single generator that merges all results
+    def dict_to_generator(
+        d: dict[str, list[dict[str, Any]]],
+    ) -> Generator[tuple[str, list[dict[str, Any]]], None, None]:
+        """Convert a dictionary to a generator of (key, value) pairs."""
+        for key, value in d.items():
+            if value:  # Only yield non-empty lists
+                yield key, value
 
-    # Generator to yield child tables
+    # Define a generator function that combines results from all generators
     def child_tables_generator() -> Generator[
         tuple[str, list[dict[str, Any]]], None, None
     ]:
         # Collect records for each table
-        table_records: dict[str, list[dict[str, Any]]] = {}
+        all_tables: dict[str, list[dict[str, Any]]] = {}
 
         # Process each generator
-        for generator in generators_list:
-            for table_name, records in generator:
-                if table_name not in table_records:
-                    table_records[table_name] = []
-                table_records[table_name].extend(records)
+        for gen in all_generators:
+            try:
+                for table_name, records in gen:
+                    if table_name not in all_tables:
+                        all_tables[table_name] = []
 
-        # Yield non-empty tables
-        for table_name, records in table_records.items():
-            if records:
-                yield table_name, records
+                    # Ensure records is a list of dictionaries (array records)
+                    if isinstance(records, list):
+                        all_tables[table_name].extend(records)
+                    elif isinstance(records, dict):
+                        all_tables[table_name].append(records)
+            except StopIteration:
+                continue
+
+        # Yield all collected records
+        yield from dict_to_generator(all_tables)
 
     return main_records, child_tables_generator()

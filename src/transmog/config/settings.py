@@ -20,13 +20,8 @@ DEFAULT_OPTIONS = {
     "include_empty": False,
     "skip_null": True,
     "visit_arrays": True,
-    "abbreviate_table_names": True,
-    "abbreviate_field_names": True,
-    "max_table_component_length": 4,
-    "max_field_component_length": 4,
-    "preserve_root_component": True,
+    "deeply_nested_threshold": 4,
     "preserve_leaf_component": True,
-    "custom_abbreviations": {},
     "path_parts_optimization": True,
     "max_nesting_depth": 100,
     "indent": 2,
@@ -66,15 +61,7 @@ class TransmogSettings:
     DEFAULT_ALLOW_MALFORMED_DATA = False
     DEFAULT_DEFAULT_ID_FIELD = None
     DEFAULT_ID_GENERATION_STRATEGY = None
-
-    # Abbreviation settings
-    DEFAULT_ABBREVIATE_TABLE_NAMES = True
-    DEFAULT_ABBREVIATE_FIELD_NAMES = True
-    DEFAULT_MAX_TABLE_COMPONENT_LENGTH = 4
-    DEFAULT_MAX_FIELD_COMPONENT_LENGTH = 4
-    DEFAULT_PRESERVE_ROOT_COMPONENT = True
-    DEFAULT_PRESERVE_LEAF_COMPONENT = True
-    DEFAULT_CUSTOM_ABBREVIATIONS: dict[str, str] = {}
+    DEFAULT_DEEPLY_NESTED_THRESHOLD = 4
 
     # CSV settings
     DEFAULT_CSV_DELIMITER = ","
@@ -133,23 +120,11 @@ class TransmogSettings:
             "include_empty": True,
             "skip_null": False,
         },
-        "no_abbreviation": {
-            "abbreviate_table_names": False,
-            "abbreviate_field_names": False,
+        "simple_naming": {
+            "deeply_nested_threshold": 6,
         },
-        "full_abbreviation": {
-            "abbreviate_table_names": True,
-            "abbreviate_field_names": True,
-            "max_table_component_length": 4,
-            "max_field_component_length": 4,
-            "preserve_leaf_component": False,
-        },
-        "short_abbreviation": {
-            "abbreviate_table_names": True,
-            "abbreviate_field_names": True,
-            "max_table_component_length": 4,
-            "max_field_component_length": 4,
-            "preserve_leaf_component": True,
+        "compact_naming": {
+            "deeply_nested_threshold": 3,
         },
         "csv_strict": {
             "csv_delimiter": ",",

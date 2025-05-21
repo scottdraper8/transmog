@@ -219,8 +219,8 @@ def processor():
         TransmogConfig.default()
         .with_processing(cast_to_string=True)
         .with_naming(
-            abbreviate_field_names=False,
             separator="_",  # Ensure consistency in tests
+            deeply_nested_threshold=4,  # Use standard deeply nested threshold
         )
     )
     return Processor(config=config)

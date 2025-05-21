@@ -73,7 +73,7 @@ class TestStreamingProcessFunctions:
         params = _get_streaming_params(processor)
         assert "cast_to_string" in params
         assert "separator" in params
-        assert "abbreviate_field_names" in params
+        assert "deeply_nested_threshold" in params
 
         # Test with extract_time
         extract_time = "2023-01-01"

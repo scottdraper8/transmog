@@ -204,31 +204,27 @@ def with_error_handling(self, **kwargs) -> "TransmogConfig":
 
 ## NamingConfig
 
-Configuration for naming conventions and abbreviations.
+Configuration for naming conventions.
 
 ```python
 @dataclass
 class NamingConfig:
-    """Configuration for naming conventions and abbreviations."""
+    """Configuration for naming conventions."""
 
     separator: str = "_"
-    abbreviate_table_names: bool = True
-    abbreviate_field_names: bool = True
     max_table_component_length: Optional[int] = None
     max_field_component_length: Optional[int] = None
     preserve_leaf_component: bool = True
-    custom_abbreviations: Dict[str, str] = field(default_factory=dict)
+    deep_nesting_threshold: int = 4
 ```
 
 ### Parameters
 
 - **separator** (`str`, default: `"_"`): The separator to use between path components.
-- **abbreviate_table_names** (`bool`, default: `True`): Whether to abbreviate table names.
-- **abbreviate_field_names** (`bool`, default: `True`): Whether to abbreviate field names.
 - **max_table_component_length** (`Optional[int]`, default: `None`): Maximum length for table name components.
 - **max_field_component_length** (`Optional[int]`, default: `None`): Maximum length for field name components.
 - **preserve_leaf_component** (`bool`, default: `True`): Whether to preserve the leaf component in full.
-- **custom_abbreviations** (`Dict[str, str]`, default: `{}`): Dictionary of custom abbreviations.
+- **deep_nesting_threshold** (`int`, default: `4`): Depth threshold for special handling of deeply nested structures.
 
 ## ProcessingConfig
 
@@ -365,8 +361,8 @@ config = (
     TransmogConfig.default()
     .with_naming(
         separator=".",
-        abbreviate_table_names=False,
-        max_table_component_length=30
+        max_table_component_length=30,
+        deep_nesting_threshold=4
     )
     .with_processing(
         cast_to_string=False,

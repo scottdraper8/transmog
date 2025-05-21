@@ -1,131 +1,9 @@
-# Naming and Abbreviation System
+# Naming System
 
-> **API Reference**: For detailed API documentation, see the [Naming API Reference](../../api/naming.md).
+Transmog provides a simplified naming system that maintains a consistent structure for field and table names
+when processing nested JSON data.
 
-Transmog includes a comprehensive naming system that handles field and table naming conventions,
-with intelligent abbreviation to manage lengthy path names.
-
-## Table Naming Convention
-
-When processing nested arrays, Transmog uses a consistent table naming convention:
-
-- **First level arrays**: `<entity>_<arrayname>`
-- **Nested arrays**: `<entity>_<intermediate_path>_<arrayname>`
-
-For nested arrays, intermediate path components are abbreviated to 4 characters by default when their
-length exceeds this limit.
-
-### Examples
-
-For a data structure like:
-
-```json
-{
-  "customers": [
-    {
-      "orders": [
-        {
-          "items": []
-        }
-      ]
-    }
-  ]
-}
-```
-
-The generated tables would be:
-
-- `root_customers`
-- `root_customers_orders`
-- `root_customers_orders_items`
-
-With default abbreviation settings (max 4 chars), deep nestings become:
-
-```json
-{
-  "customers": [
-    {
-      "orders": [
-        {
-          "line_items": [
-            {
-              "product_details": []
-            }
-          ]
-        }
-      ]
-    }
-  ]
-}
-```
-
-Would generate:
-
-- `root_customers`
-- `root_customers_orders`
-- `root_customers_orders_line_items` (or `root_customers_orders_line` if abbreviated)
-- `root_customers_orders_line_prod_details` (abbreviated intermediate components)
-
-## Field Naming
-
-Fields follow a similar pattern but typically include the full path:
-
-```json
-{
-  "customer": {
-    "billing_address": {
-      "street": "123 Main St"
-    }
-  }
-}
-```
-
-Would be flattened to:
-
-```text
-"customer_billing_address_street": "123 Main St"
-```
-
-With field abbreviation, this might become:
-
-```text
-"customer_bill_addr_street": "123 Main St"
-```
-
-## Customizing Naming Behavior
-
-You can customize the naming behavior through the `TransmogConfig`:
-
-```python
-from transmog import TransmogConfig, Processor
-
-# Custom naming configuration
-config = TransmogConfig.default().with_naming(
-    separator="_",                     # Character to separate path components
-    abbreviate_table_names=True,       # Enable table name abbreviation
-    abbreviate_field_names=True,       # Enable field name abbreviation
-    max_table_component_length=4,      # Max length for table path components
-    max_field_component_length=5,      # Max length for field path components
-    preserve_root_component=True,      # Don't abbreviate root components
-    preserve_leaf_component=True,      # Don't abbreviate leaf components
-    custom_abbreviations={             # Custom abbreviation dictionary
-        "information": "info",
-        "configuration": "config"
-    }
-)
-
-processor = Processor(config=config)
-```
-
-The naming system balances readability with practical length constraints, allowing you to
-control how verbose or compact your output data structure will be.
-
-## Abbreviation System
-
-The abbreviation system handles lengthy field and table names by intelligently truncating
-path components while preserving the most important parts.
-
-## How Field Names are Generated
+## Overview
 
 When transforming nested JSON structures to flat tables, Transmog constructs field names by combining path components:
 
@@ -141,65 +19,103 @@ When transforming nested JSON structures to flat tables, Transmog constructs fie
 
 This becomes a flat field: `customer_address_street` (using the default `_` separator).
 
+## Table Naming Convention
+
+Transmog uses a consistent naming convention for tables:
+
+1. **Main table**: Named after the entity (e.g., `customer`)
+2. **First level arrays**: `<entity>_<arrayname>` (e.g., `customer_orders`)
+3. **Nested arrays**: `<entity>_<path_to_array>_<arrayname>` (e.g., `customer_orders_items`)
+4. **Deeply nested arrays**: For paths with more than 4 components (configurable), a simplified convention is used:
+   `<entity>_<first_component>_nested_<last_component>` (e.g., `customer_orders_nested_packages`)
+
+The deeply nested threshold is configurable (default is 4).
+
+### Examples
+
+Given this hierarchical structure:
+
+```json
+{
+  "customers": [
+    {
+      "name": "Customer 1",
+      "orders": [
+        {
+          "id": "order1",
+          "line_items": [
+            { "product": "A", "quantity": 2 },
+            { "product": "B", "quantity": 1 }
+          ],
+          "shipping": {
+            "address": "123 Main St",
+            "details": {
+              "provider": "Express",
+              "tracking": {
+                "number": "TR123456",
+                "status": "Shipped"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+The resulting tables would be:
+
+- `root` (main table)
+- `root_customers` (first level array)
+- `root_customers_orders` (second level array)
+- `root_customers_orders_line_items` (third level array)
+- `root_customers_orders_shipping_nested_tracking` (deeply nested structure)
+
+## Field Naming
+
+Field names are constructed by combining path components with a separator:
+
+- Default separator is underscore (`_`)
+- Path components are lowercased for consistency
+- Special characters are handled for SQL compatibility
+
 ## Configuration Options
 
-The abbreviation system can be controlled through the configuration API:
+The naming system can be controlled through the configuration API:
 
 ```python
 config = (
     TransmogConfig.default()
     .with_naming(
-        abbreviate_field_names=True,       # Enable/disable abbreviation
-        abbreviate_table_names=True,       # Enable/disable for table names
-        max_field_component_length=4,      # Max length for components
-        max_table_component_length=4,      # Max length for table name components
-        preserve_root_component=True,      # Preserve root component
-        preserve_leaf_component=True,      # Preserve leaf component
-        custom_abbreviations={             # Custom abbreviation dictionary
-            "information": "info",
-            "address": "addr"
-        }
+        separator="_",                     # Character to separate path components
+        deeply_nested_threshold=4,         # Threshold for when to treat paths as deeply nested
     )
 )
 ```
 
-## Custom Abbreviations
-
-You can provide a dictionary of custom abbreviations to be used instead of simple truncation:
-
-```python
-custom_abbrevs = {
-    "information": "info",
-    "customer": "cust",
-    "address": "addr"
-}
-```
-
-When a component matches a key in this dictionary, the custom abbreviation will be used.
-
-## Performance Considerations
-
-The abbreviation system includes optimizations like LRU caching for frequently used paths to minimize
-performance impact.
-
 ## SQL Compatibility
 
-Field names are sanitized to ensure SQL compatibility, with spaces and special characters replaced by underscores.
+Field names are sanitized to ensure SQL compatibility:
 
-## When to Use Abbreviation
+- Spaces and special characters are replaced by underscores
+- Names starting with numbers are prefixed with "col_"
+- Multiple consecutive special characters are collapsed
 
-Abbreviation is particularly helpful when:
+## When to Use Deeply Nested Handling
 
-1. Working with data sources that have deeply nested structures
+Special handling for deeply nested structures is particularly helpful when:
+
+1. Working with data sources that have deeply nested structures (like complex APIs)
 2. Generating field names that need to fit within database column name length limits
-3. Improving readability of flattened data by focusing on the most important parts (roots and leaves)
+3. Ensuring that nested paths remain manageable and readable
 
-## Disabling Abbreviation
+## Disabling Deeply Nested Handling
 
-If you prefer to maintain the original field names, you can disable abbreviation:
+If you prefer to maintain the complete path for all structures, you can increase the threshold:
 
 ```python
-config = TransmogConfig.default().with_naming(abbreviate_field_names=False)
+config = TransmogConfig.default().with_naming(deeply_nested_threshold=100)
 ```
 
-This will preserve the full path components in field names.
+This will preserve the full path components even for deeply nested structures.

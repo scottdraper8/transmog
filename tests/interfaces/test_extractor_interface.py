@@ -186,12 +186,11 @@ class AbstractExtractorTest:
             if "id" in item:
                 assert isinstance(item["id"], str)
 
-        # Test with abbreviate_enabled=True
+        # Test with deeply_nested_threshold
         arrays3 = extract_arrays(
             simple_nested_data,
             entity_name="test",
-            abbreviate_enabled=True,
-            max_component_length=5,
+            deeply_nested_threshold=2,  # Lower threshold
         )
 
         # Just verify it doesn't crash with these options

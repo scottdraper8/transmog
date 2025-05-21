@@ -232,7 +232,7 @@ def main():
     # Create processor with custom naming configuration
     naming_config = tm.TransmogConfig.default().with_naming(
         separator=".",  # Use dots in field names
-        abbreviate_table_names=True,  # Abbreviate table names
+        deep_nesting_threshold=3,  # Lower threshold for handling nested paths
         max_table_component_length=10,  # Limit name component length
         separator_replacement="_",  # Replace separators in input keys
     )
@@ -241,7 +241,7 @@ def main():
     naming_result = naming_processor.process(data=data, entity_name="company")
 
     # Show the table names that will be used for files
-    print("\nAbbreviated table names:")
+    print("\nFormatted table names:")
     for original_name in naming_result.get_table_names():
         formatted_name = naming_result.get_formatted_table_name(original_name)
         print(f"Original: {original_name}")

@@ -161,9 +161,9 @@ class TestPartialRecoveryIntegration:
                 for i, record in enumerate(table):
                     print(f"  Record {i}: {record}")
 
-                if "children" in table_name.lower():
+                if table_name == "parent_record_children":
                     children_table_exists = True
-                    # In this table, we should have all three children
+                    # In the children table, we should have all three children
                     assert len(table) == 3, (
                         f"Expected 3 child records in {table_name}, got {len(table)}"
                     )
@@ -180,6 +180,41 @@ class TestPartialRecoveryIntegration:
                             found_child2 = True
                         if "child3" in r_str:
                             found_child3 = True
+
+                if table_name == "parent_record_children_scores":
+                    # The scores table will have 9 primitive values (3 scores for each of 3 children)
+                    # With the updated table naming scheme without indices
+                    assert len(table) == 9, (
+                        f"Expected 9 score values in {table_name}, got {len(table)}"
+                    )
+
+                    # Check that all scores are represented
+                    child1_scores = [10, 20, 30]
+                    child2_scores = [40, float("inf"), 60]
+                    child3_scores = [70, 80, 90]
+
+                    # Group records by parent ID to verify correct grouping
+                    scores_by_parent = {}
+                    for record in table:
+                        _parent_id = record.get("__parent_extract_id")
+                        if _parent_id not in scores_by_parent:
+                            scores_by_parent[_parent_id] = []
+                        # Some values might be stored as strings due to cast_to_string=True
+                        value = record.get("value")
+                        if isinstance(value, str) and value.isdigit():
+                            value = int(value)
+                        scores_by_parent[_parent_id].append(value)
+
+                    # Verify we have 3 parents (children) with scores
+                    assert len(scores_by_parent) == 3, (
+                        f"Expected scores from 3 parent records, got {len(scores_by_parent)}"
+                    )
+
+                    # Verify each parent has the expected number of scores
+                    for _parent_id, scores in scores_by_parent.items():
+                        assert len(scores) == 3, (
+                            f"Expected 3 scores per parent, got {len(scores)}"
+                        )
 
             # Assert that we found all child records, either in main table or child tables
             assert found_child1, "Missing child1 record"

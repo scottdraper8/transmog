@@ -428,6 +428,36 @@ register_hook("pre_transform", my_pre_transform_hook)
 register_hook("post_transform", my_post_transform_hook)
 ```
 
+## Naming Utilities
+
+The `naming.utils` module provides common utility functions for handling field and table name formatting across the codebase:
+
+```python
+from transmog.naming.utils import format_field_name, get_table_name_for_array
+
+# Format a field name with deep nesting handling
+formatted_field = format_field_name(
+    field_path="user_address_street",
+    separator="_",
+    max_component_length=4,
+    preserve_leaf_component=True,
+    deep_nesting_threshold=4
+)
+
+# Generate a table name for arrays
+table_name = get_table_name_for_array(
+    entity_name="user",
+    array_name="addresses",
+    parent_path="contacts_0",
+    separator="_",
+    max_component_length=5,
+    deep_nesting_threshold=4
+)
+```
+
+These utilities help maintain consistency in naming conventions across different modules,
+and reduce code duplication between the flattener and extractor modules.
+
 ## Best Practices
 
 When extending Transmog, follow these best practices:

@@ -115,7 +115,7 @@ config = (
     tm.TransmogConfig.default()
     .with_naming(
         separator=".",
-        abbreviate_table_names=False
+        deeply_nested_threshold=4  # Configure when to simplify deeply nested paths
     )
     .with_processing(
         batch_size=5000,
@@ -134,6 +134,25 @@ processor = tm.Processor(config=config)
 ```
 
 See the [configuration guide](https://scottdraper8.github.io/transmog/configuration.html) for more details.
+
+## Naming Convention
+
+Transmog uses a simplified naming approach that combines field names with separators:
+
+```python
+# For table names (arrays)
+# First level array: entity_arrayname
+customer_orders
+
+# Nested array: entity_parent_arrayname
+customer_orders_items
+
+# Deeply nested array: entity_first_nested_last
+customer_orders_nested_details
+```
+
+Special handling for deeply nested paths prevents excessively long names while maintaining clarity.
+The threshold for when paths are considered "deeply nested" is configurable (default is 4).
 
 ## Error Recovery Strategies
 

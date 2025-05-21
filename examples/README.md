@@ -105,7 +105,9 @@ For detailed explanation of each example, see the inline comments in each exampl
 
 ### Primitive Arrays
 
-Transmog now processes arrays of primitive values (strings, numbers, booleans) as child tables, similar to how it processes arrays of objects. Each primitive value in an array becomes a record in a child table with a `value` field containing the primitive value.
+Transmog now processes arrays of primitive values (strings, numbers, booleans) as child tables,
+similar to how it processes arrays of objects. Each primitive value in an array becomes a record
+in a child table with a `value` field containing the primitive value.
 
 Key points about primitive array handling:
 

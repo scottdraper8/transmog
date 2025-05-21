@@ -163,8 +163,6 @@ def test_default_settings():
     """Test that default settings are properly set."""
     # Test a few key settings
     assert settings.separator == "_"
-    assert settings.abbreviate_field_names is True
-    assert settings.abbreviate_table_names is True
     assert settings.cast_to_string is True
     assert settings.include_empty is False
     assert settings.skip_null is True
@@ -174,20 +172,20 @@ def test_settings_update():
     """Test that settings can be updated."""
     # Save original values
     original_separator = settings.separator
-    original_abbrev = settings.abbreviate_field_names
+    original_cast_to_string = settings.cast_to_string
 
     try:
         # Update settings
         settings.separator = "."
-        settings.abbreviate_field_names = False
+        settings.cast_to_string = False
 
         # Verify updates
         assert settings.separator == "."
-        assert settings.abbreviate_field_names is False
+        assert settings.cast_to_string is False
     finally:
         # Restore original values
         settings.separator = original_separator
-        settings.abbreviate_field_names = original_abbrev
+        settings.cast_to_string = original_cast_to_string
 
 
 def test_settings_reload():
@@ -247,8 +245,6 @@ def test_settings_attributes():
     # Test a sample of required attributes
     required_attributes = [
         "separator",
-        "abbreviate_field_names",
-        "abbreviate_table_names",
         "cast_to_string",
         "include_empty",
         "skip_null",
@@ -256,6 +252,7 @@ def test_settings_attributes():
         "id_field",
         "parent_field",
         "time_field",
+        "deeply_nested_threshold",
     ]
 
     for attr in required_attributes:
@@ -340,13 +337,7 @@ class TestConfigUtils:
             )
             .with_naming(
                 separator=".",
-                abbreviate_field_names=False,
-                abbreviate_table_names=False,
-                max_field_component_length=15,
-                max_table_component_length=30,
-                preserve_root_component=False,
-                preserve_leaf_component=False,
-                custom_abbreviations={"test": "t", "example": "ex"},
+                deeply_nested_threshold=5,
             )
         )
 
@@ -356,16 +347,6 @@ class TestConfigUtils:
         assert config.processing.skip_null is False
         assert config.processing.visit_arrays is True
         assert config.processing.max_nesting_depth == 20
-
-        # Verify naming parameters are correctly set
-        assert config.naming.separator == "."
-        assert config.naming.abbreviate_field_names is False
-        assert config.naming.abbreviate_table_names is False
-        assert config.naming.max_field_component_length == 15
-        assert config.naming.max_table_component_length == 30
-        assert config.naming.preserve_root_component is False
-        assert config.naming.preserve_leaf_component is False
-        assert config.naming.custom_abbreviations == {"test": "t", "example": "ex"}
 
     def test_get_common_config_params_default(self):
         """Test accessing parameters from default config."""
@@ -384,9 +365,7 @@ class TestConfigUtils:
 
         # Verify naming parameters match defaults
         assert config.naming.separator == "_"
-        assert config.naming.abbreviate_field_names is True
-        assert config.naming.abbreviate_table_names is True
-        assert hasattr(config.naming, "custom_abbreviations")
+        assert config.naming.deeply_nested_threshold == 4
 
     def test_get_common_config_params_memory_optimized(self):
         """Test accessing parameters from memory-optimized config."""

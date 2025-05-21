@@ -173,7 +173,7 @@ During the core processing stage, Transmog:
 - Flattens nested structures
 - Extracts arrays to separate tables
 - Generates IDs and establishes relationships
-- Handles path abbreviation and formatting
+- Handles special formatting for deeply nested paths
 
 ```python
 # Process with specific options
@@ -181,8 +181,8 @@ processor = tm.Processor(
     config=tm.TransmogConfig.default()
     .with_naming(
         separator=".",                  # Use dots in path names
-        abbreviate_field_names=True,    # Abbreviate field names
-        max_field_component_length=5    # Limit component length
+        max_field_component_length=5,   # Limit component length
+        deep_nesting_threshold=4        # Threshold for deep nesting
     )
 )
 
@@ -385,7 +385,7 @@ for record in result.get_main_table():
    ```python
    # Create configurations for different data types
    customer_config = tm.TransmogConfig.default().with_naming(
-       separator="/", abbreviate_field_names=True
+       separator="/", deep_nesting_threshold=4
    )
 
    order_config = tm.TransmogConfig.default().with_processing(

@@ -158,7 +158,7 @@ def main():
         tm.TransmogConfig.default()
         .with_naming(
             separator=".",  # Use dot notation for nested fields
-            abbreviate_table_names=False,  # Don't abbreviate table names
+            deep_nesting_threshold=4,  # Handle deeply nested structures
         )
         .with_processing(
             cast_to_string=False,  # Keep original data types

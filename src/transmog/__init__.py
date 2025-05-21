@@ -78,16 +78,12 @@ from transmog.io import (
 
 # Specific writer implementations
 from transmog.io.writers.parquet import ParquetStreamingWriter
-from transmog.naming.abbreviator import (
-    abbreviate_field_name,
-    abbreviate_table_name,
-    merge_abbreviation_dicts,
-)
 
 # Naming utilities
 from transmog.naming.conventions import (
     get_standard_field_name,
     get_table_name,
+    handle_deeply_nested_path,
     sanitize_name,
 )
 
@@ -186,10 +182,8 @@ __all__ = [
     "generate_extract_id",
     "get_current_timestamp",
     # Naming utilities
-    "abbreviate_field_name",
-    "abbreviate_table_name",
-    "merge_abbreviation_dicts",
     "get_standard_field_name",
     "get_table_name",
     "sanitize_name",
+    "handle_deeply_nested_path",
 ]

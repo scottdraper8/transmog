@@ -21,10 +21,9 @@ flatten_json(
     path_parts: Optional[List[str]] = None,
     path_parts_optimization: bool = None,
     max_depth: Optional[int] = None,
-    abbreviate_field_names: Optional[bool] = None,
     max_field_component_length: Optional[int] = None,
     preserve_leaf_component: Optional[bool] = None,
-    custom_abbreviations: Optional[Dict[str, str]] = None,
+    deep_nesting_threshold: Optional[int] = None,
     current_depth: int = 0,
     in_place: bool = False,
     mode: Literal["standard", "streaming"] = "standard",
@@ -48,10 +47,9 @@ Flattens a nested JSON object into a single-level dictionary.
 | path_parts | List[str] | None | List of path components (for optimization) |
 | path_parts_optimization | bool | None | Whether to use path parts optimization |
 | max_depth | int | None | Maximum recursion depth |
-| abbreviate_field_names | bool | None | Whether to abbreviate field names |
 | max_field_component_length | int | None | Maximum length for each component |
 | preserve_leaf_component | bool | None | Whether to preserve the leaf component |
-| custom_abbreviations | Dict[str, str] | None | Custom abbreviation dictionary |
+| deep_nesting_threshold | int | None | Threshold for special handling of deeply nested structures |
 | current_depth | int | 0 | Current recursion depth |
 | in_place | bool | False | Whether to modify the original object in place |
 | mode | str | "standard" | Processing mode ("standard" for regular processing, "streaming" for memory-efficient) |
@@ -107,10 +105,9 @@ extract_arrays(
     skip_null: bool = None,
     extract_time: Optional[Any] = None,
     parent_path_parts: Optional[List[str]] = None,
-    abbreviate_enabled: Optional[bool] = None,
     max_component_length: Optional[int] = None,
     preserve_leaf: Optional[bool] = None,
-    custom_abbreviations: Optional[Dict[str, str]] = None,
+    deep_nesting_threshold: Optional[int] = None,
     deterministic_id_fields: Optional[Dict[str, str]] = None,
     id_generation_strategy: Optional[Callable[[Dict[str, Any]], str]] = None,
 ) -> Dict[str, List[Dict[str, Any]]]
@@ -134,12 +131,10 @@ process_structure(
     skip_null: bool = True,
     extract_time: Optional[Any] = None,
     root_entity: Optional[str] = None,
-    abbreviate_table_names: bool = True,
-    abbreviate_field_names: bool = True,
     max_table_component_length: int = None,
     max_field_component_length: int = None,
     preserve_leaf_component: bool = True,
-    custom_abbreviations: Optional[Dict[str, str]] = None,
+    deep_nesting_threshold: int = 4,
     default_id_field: Optional[Union[str, Dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[Dict[str, Any]], str]] = None,
     id_field: str = "__extract_id",

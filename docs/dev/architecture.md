@@ -188,7 +188,7 @@ Transmog provides several extension points for customization:
    # Create custom configuration
    config = (
        TransmogConfig.default()
-       .with_naming(separator=".", abbreviate_table_names=False)
+       .with_naming(separator=".", deep_nesting_threshold=4)
        .with_processing(cast_to_string=True, skip_null=True)
        .with_metadata(id_field="custom_id")
    )

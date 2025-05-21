@@ -232,7 +232,7 @@ class TestProcessor(AbstractProcessorTest):
         config = (
             TransmogConfig.default()
             .with_processing(cast_to_string=True, visit_arrays=True)
-            .with_naming(separator="_", abbreviate_field_names=False)
+            .with_naming(separator="_")
         )
         processor = Processor(config=config)
 
@@ -284,9 +284,7 @@ class TestProcessor(AbstractProcessorTest):
     def test_processor_config_options(self, simple_data):
         """Test processor with different configuration options."""
         # Test separator configuration
-        config_separator = TransmogConfig.default().with_naming(
-            separator=".", abbreviate_field_names=False
-        )
+        config_separator = TransmogConfig.default().with_naming(separator=".")
         processor_separator = Processor(config=config_separator)
         result_separator = processor_separator.process(simple_data, entity_name="test")
 
@@ -307,41 +305,6 @@ class TestProcessor(AbstractProcessorTest):
                 break
 
         assert addr_fields_found, f"No address fields found in {dot_separated_fields}"
-
-        # Test abbreviation configuration
-        config_abbrev = TransmogConfig.default().with_naming(
-            separator="_",
-            abbreviate_field_names=True,
-            max_field_component_length=3,
-        )
-        processor_abbrev = Processor(config=config_abbrev)
-        result_abbrev = processor_abbrev.process(simple_data, entity_name="test")
-
-        # Check abbreviated field names - more flexible pattern matching
-        main_record = result_abbrev.get_main_table()[0]
-
-        # Look for fields that appear to be address fields with any abbreviation pattern
-        addr_field_patterns = ["addr_", "add_", "adr_", "ad_", "a_"]
-
-        # Get all fields that might be address fields
-        potential_addr_fields = []
-        for pattern in addr_field_patterns:
-            for key in main_record.keys():
-                if key.lower().startswith(pattern.lower()):
-                    potential_addr_fields.append(key)
-
-        # Also look for any fields that have address parts regardless of prefix
-        address_parts = ["street", "city", "zip", "str", "cty", "zp"]
-        for key in main_record.keys():
-            if any(part in key.lower() for part in address_parts):
-                potential_addr_fields.append(key)
-
-        # Remove duplicates
-        potential_addr_fields = list(set(potential_addr_fields))
-
-        assert len(potential_addr_fields) > 0, (
-            f"No potential address fields found in {list(main_record.keys())}"
-        )
 
     def test_processing_modes(self, batch_data):
         """Test different processing modes."""
@@ -499,11 +462,10 @@ class TestProcessor(AbstractProcessorTest):
 
     def test_table_naming_conventions(self, complex_data):
         """Test table naming conventions."""
-        # Configure custom naming
+        # Configure custom naming with a lower threshold to trigger deep nesting in our test
         config = TransmogConfig.default().with_naming(
             separator="_",
-            abbreviate_table_names=True,
-            max_table_component_length=4,
+            deeply_nested_threshold=3,  # Lower threshold to match our test data depth
         )
         processor = Processor(config=config)
 
@@ -547,17 +509,29 @@ class TestProcessor(AbstractProcessorTest):
             f"First level orders table not found, got: {table_names}"
         )
 
-        # Verify nested arrays - match the actual pattern with abbreviation and indices
-        assert "test_orde_0_items" in table_names, (
+        # Verify nested arrays - directly combined with separators (no indices)
+        assert "test_orders_items" in table_names, (
             f"Orders items table not found, got: {table_names}"
         )
-        assert "test_orde_0_shipments" in table_names, (
+        assert "test_orders_shipments" in table_names, (
             f"Orders shipments table not found, got: {table_names}"
         )
 
-        # Verify deeply nested arrays
-        assert "test_orde_0_ship_0_packages" in table_names, (
-            f"Packages table not found in: {table_names}"
+        # Verify deeply nested arrays - should use the simplified deep nesting format
+        deep_table = [name for name in table_names if "packages" in name]
+        assert deep_table, (
+            f"No deeply nested table found with 'packages' in name: {table_names}"
+        )
+
+        # Debug information about the deep nested path
+        print(f"Deep nested table name: {deep_table[0]}")
+        print(f"Deep nested table parts: {deep_table[0].split('_')}")
+        print(f"Deep nested table parts count: {len(deep_table[0].split('_'))}")
+        print(f"Deeply nested threshold: {3}")
+
+        # For deeply nested tables, the format should be simplified
+        assert "nested" in deep_table[0], (
+            f"Deeply nested table {deep_table[0]} should contain 'nested' indicator"
         )
 
     def test_error_handling(self):

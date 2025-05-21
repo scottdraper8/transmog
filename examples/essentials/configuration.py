@@ -1,16 +1,15 @@
-"""Example Name: Configuration.
+"""Example Name: Configuration Options.
 
-Demonstrates: Configuration options for the Transmog processor
+Demonstrates: Different ways to configure the Transmog processor
 
 Related Documentation:
 - https://transmog.readthedocs.io/en/latest/user/essentials/configuration.html
-- https://transmog.readthedocs.io/en/latest/api/config.html
 
 Learning Objectives:
-- How to configure Transmog with TransmogConfig
-- How to use the fluent API for configuration
-- How to create and apply custom configurations
-- How to use predefined configurations
+- How to use different configuration options
+- How to create custom configurations
+- How to use the new configuration shortcuts
+- How to handle configuration validation
 """
 
 import os
@@ -18,156 +17,155 @@ from pprint import pprint
 
 # Import from transmog package
 import transmog as tm
+from transmog.error import ConfigurationError
 
 
 def main():
-    """Run the configuration examples."""
-    # Create sample data
-    data = {
-        "id": 101,
-        "name": "Example Organization",
-        "status": "active",
-        "founded": 1995,
-        "details": {
-            "description": "A sample organization for examples",
-            "industry": "Technology",
-            "employees": 500,
-            "public": True,
-            "valuation": None,
-        },
-        "locations": [
-            {
-                "id": 1,
-                "name": "Headquarters",
-                "address": {
-                    "street": "123 Main St",
-                    "city": "San Francisco",
-                    "state": "CA",
-                    "postal_code": "94105",
-                },
-            },
-            {
-                "id": 2,
-                "name": "Branch Office",
-                "address": {
-                    "street": "456 Market St",
-                    "city": "New York",
-                    "state": "NY",
-                    "postal_code": "10001",
-                },
-            },
-        ],
-    }
-
+    """Run the configuration example."""
     # Create output directory
     output_dir = os.path.join(os.path.dirname(__file__), "..", "data", "output")
     os.makedirs(output_dir, exist_ok=True)
 
+    # Sample data for testing configurations
+    data = {
+        "id": 123,
+        "name": "Example Entity",
+        "details": {
+            "category": "Test",
+            "active": True,
+            "score": 92.5,
+            "tags": ["tag1", "tag2", "tag3"],
+        },
+        "items": [
+            {"id": "i1", "name": "Item 1", "price": 10.99},
+            {"id": "i2", "name": "Item 2", "price": 20.99},
+        ],
+    }
+
     # Example 1: Default configuration
     print("\n=== Default Configuration ===")
-
     processor = tm.Processor()
-    result = processor.process(data=data, entity_name="org")
+    result = processor.process(data=data, entity_name="entity")
+    print_result_overview(result)
 
-    print("Default Configuration Settings:")
-    print("- Separator: '_'")
-    print("- Cast to string: True")
-    print("- Skip null: True")
-    print("- Processing mode: STANDARD")
-
-    print("\nResult with Default Configuration:")
-    if result.get_main_table():
-        pprint(result.get_main_table()[0])
-
-    # Example 2: Using Predefined Configurations
+    # Example 2: Predefined Configurations (NEW)
     print("\n=== Predefined Configurations ===")
 
-    # Memory-optimized configuration
-    # Create processor but don't use it - just for demonstration
-    _ = tm.Processor.memory_optimized()
-    print("\nMemory-Optimized Configuration Settings:")
-    print("- Processing mode: MEMORY_OPTIMIZED")
-    print("- Batch size: Smaller")
+    # Simple mode with minimal metadata
+    print("\n-- Simple Mode --")
+    simple_processor = tm.Processor(tm.TransmogConfig.simple_mode())
+    simple_result = simple_processor.process(data=data, entity_name="entity")
+    print_result_overview(simple_result)
 
-    # Performance-optimized configuration
-    # Create processor but don't use it - just for demonstration
-    _ = tm.Processor.performance_optimized()
-    print("\nPerformance-Optimized Configuration Settings:")
-    print("- Processing mode: PERFORMANCE_OPTIMIZED")
-    print("- Batch size: Larger")
+    # CSV-optimized configuration
+    print("\n-- CSV Optimized --")
+    csv_processor = tm.Processor(tm.TransmogConfig.csv_optimized())
+    csv_result = csv_processor.process(data=data, entity_name="entity")
+    print_result_overview(csv_result)
 
-    # Example 3: Custom Configuration with Fluent API
-    print("\n=== Custom Configuration with Fluent API ===")
+    # Error-tolerant configuration
+    print("\n-- Error Tolerant --")
+    tolerant_processor = tm.Processor(tm.TransmogConfig.error_tolerant())
+    tolerant_result = tolerant_processor.process(data=data, entity_name="entity")
+    print_result_overview(tolerant_result)
 
-    # Create custom configuration using fluent API
-    custom_config = (
-        tm.TransmogConfig.default()
-        .with_naming(
-            separator=".",  # Use dot as separator
-            abbreviate_table_names=True,  # Abbreviate table names
-            separator_replacement="_",  # Replace separators in input keys
-            # with underscore
-        )
-        .with_processing(
-            cast_to_string=False,  # Keep original types
-            skip_null=False,  # Include null values
-            arrays_to_string=False,  # Don't convert arrays to strings
-            batch_size=500,  # Process in batches of 500
-        )
-        .with_metadata(
-            id_field="record_id",  # Custom ID field name
-            parent_field="parent_id",  # Custom parent field name
-            datetime_field="processed_at",  # Custom datetime field name
-        )
+    # Example 3: Custom configurations - Component-specific updates
+    print("\n=== Custom Component Configurations ===")
+
+    # Update naming configuration
+    print("\n-- Custom Naming Configuration --")
+    naming_config = tm.TransmogConfig.default().with_naming(
+        separator=".",
+        deep_nesting_threshold=3,
+        max_field_component_length=4,
     )
+    naming_processor = tm.Processor(naming_config)
+    naming_result = naming_processor.process(data=data, entity_name="entity")
+    print("First record field names:")
+    pprint(list(naming_result.get_main_table()[0].keys())[:10])
 
-    # Use the custom configuration
-    custom_processor = tm.Processor(config=custom_config)
-    custom_result = custom_processor.process(data=data, entity_name="org")
-
-    print("Custom Configuration Settings:")
-    print("- Separator: '.'")
-    print("- Cast to string: False")
-    print("- Skip null: False")
-    print("- ID field: 'record_id'")
-
-    print("\nResult with Custom Configuration:")
-    if custom_result.get_main_table():
-        record = custom_result.get_main_table()[0]
-        # Print a subset of fields to demonstrate changes
-        for field in ["record_id", "id", "name", "details.industry"]:
-            if field in record:
-                print(f"{field}: {record[field]}")
-
-    # Example 4: Specific Configurations for Different Uses
-    print("\n=== Specific Configurations for Different Uses ===")
-
-    # Configuration for CSV output
-    csv_config = tm.TransmogConfig.default().with_processing(
-        cast_to_string=True,  # Ensure all values are strings for CSV
-        arrays_to_string=True,  # Convert arrays to string representation
+    # Update processing configuration
+    print("\n-- Custom Processing Configuration --")
+    processing_config = tm.TransmogConfig.default().with_processing(
+        cast_to_string=False,
+        include_empty=True,
+        skip_null=False,
     )
+    processing_processor = tm.Processor(processing_config)
+    processing_result = processing_processor.process(data=data, entity_name="entity")
+    print("Data with original types:")
+    main_record = processing_result.get_main_table()[0]
+    print(f"Score type: {type(main_record.get('details_score'))}")
+    print(f"Active type: {type(main_record.get('details_active'))}")
 
-    csv_processor = tm.Processor(config=csv_config)
-    # Process data but not used - just for demonstration
-    _ = csv_processor.process(data=data, entity_name="org")
+    # Example 4: Configuration shortcuts (NEW)
+    print("\n=== Configuration Shortcuts ===")
 
-    # Configuration for type preservation (for Parquet/SQL)
-    typed_config = tm.TransmogConfig.default().with_processing(
-        cast_to_string=False,  # Preserve original types
-        cast_from_string=False,  # Don't attempt to cast strings to other types
-        skip_null=False,  # Include nulls for proper schema inference
-    )
+    # Use dot notation
+    print("\n-- Using Dot Notation --")
+    dot_config = tm.TransmogConfig.default().use_dot_notation()
+    dot_processor = tm.Processor(dot_config)
+    dot_result = dot_processor.process(data=data, entity_name="entity")
+    print("Field names with dot notation:")
+    pprint(list(dot_result.get_main_table()[0].keys())[:5])
 
-    typed_processor = tm.Processor(config=typed_config)
-    # Process data but not used - just for demonstration
-    _ = typed_processor.process(data=data, entity_name="org")
+    # Disable arrays
+    print("\n-- Disable Arrays --")
+    no_arrays_config = tm.TransmogConfig.default().disable_arrays()
+    no_arrays_processor = tm.Processor(no_arrays_config)
+    no_arrays_result = no_arrays_processor.process(data=data, entity_name="entity")
+    print(f"Child tables: {no_arrays_result.get_table_names()}")
 
-    print("Configuration Approaches Available:")
-    print("- CSV-optimized: All fields cast to strings, arrays converted to strings")
-    print("- Type-preserving: Original types preserved, nulls included")
-    print("- Memory-optimized: Reduced memory footprint for large datasets")
-    print("- Performance-optimized: Faster processing with more memory usage")
+    # String formatting
+    print("\n-- String Formatting --")
+    string_config = tm.TransmogConfig.default().use_string_format()
+    string_processor = tm.Processor(string_config)
+    string_result = string_processor.process(data=data, entity_name="entity")
+    main_record = string_result.get_main_table()[0]
+    print(f"Score type: {type(main_record.get('details_score'))}")
+    print(f"Active value: {main_record.get('details_active')}")
+
+    # Example 5: Configuration validation
+    print("\n=== Configuration Validation ===")
+
+    # Invalid separator
+    try:
+        # This will raise a validation error before assignment
+        tm.TransmogConfig.default().with_naming(separator="")
+        print("This shouldn't happen - validation should catch empty separator")
+    except ConfigurationError as e:
+        print(f"Caught separator validation error: {e}")
+
+    # Duplicate field names
+    try:
+        # This will raise a validation error before assignment
+        tm.TransmogConfig.default().with_metadata(
+            id_field="record_id",
+            parent_field="record_id",  # Same as id_field
+        )
+        print("This shouldn't happen - validation should catch duplicate fields")
+    except ConfigurationError as e:
+        print(f"Caught field validation error: {e}")
+
+    # Invalid batch size
+    try:
+        # This will raise a validation error before assignment
+        tm.TransmogConfig.default().with_processing(batch_size=-1)
+        print("This shouldn't happen - validation should catch negative batch size")
+    except ConfigurationError as e:
+        print(f"Caught batch size validation error: {e}")
+
+
+def print_result_overview(result):
+    """Print a quick overview of a result."""
+    main_table = result.get_main_table()
+    tables = result.get_table_names()
+
+    print(f"Main table has {len(main_table)} records")
+    print(f"Created {len(tables)} child tables: {', '.join(tables)}")
+    if tables:
+        child_table = result.get_child_table(tables[0])
+        print(f"First child table '{tables[0]}' has {len(child_table)} records")
 
 
 if __name__ == "__main__":

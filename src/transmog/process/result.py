@@ -165,6 +165,7 @@ class ProcessingResult(ResultInterface):
         Returns:
             Formatted table name
         """
+        # Simplified formatting for table names - just replace problematic characters
         return table_name.replace(".", "_").replace("/", "_")
 
     def add_main_record(self, record: JsonDict) -> None:
@@ -858,7 +859,7 @@ class ProcessingResult(ResultInterface):
     def write(
         self, format_name: str, base_path: str, **format_options: Any
     ) -> dict[str, str]:
-        """Write all tables to files in the specified format.
+        """Write all tables to files of the specified format.
 
         Args:
             format_name: Format to write (e.g., 'csv', 'json', 'parquet')
@@ -866,131 +867,41 @@ class ProcessingResult(ResultInterface):
             **format_options: Format-specific options
 
         Returns:
-            Dictionary of table names to file paths
+            Dictionary mapping table names to output file paths
 
         Raises:
-            OutputError: If writing fails
+            OutputError: If the output format is not supported
         """
-        # Create the base directory if it doesn't exist
+        # Ensure the output directory exists
         os.makedirs(base_path, exist_ok=True)
 
-        # Use the appropriate writer method based on format
-        if format_name.lower() == "csv":
-            return self.write_all_csv(base_path, **format_options)
-        elif format_name.lower() == "json":
-            return self.write_all_json(base_path, **format_options)
-        elif format_name.lower() == "parquet":
-            return self.write_all_parquet(base_path, **format_options)
-        else:
-            # Try to use a registered writer
-            if is_format_available(format_name):
-                return self.write_to_file(format_name, base_path, **format_options)
-            else:
-                raise OutputError(
-                    f"Unsupported format: {format_name}",
-                    output_format=format_name,
-                    path=base_path,
-                )
+        # Check if format is supported
+        if not is_format_available(format_name):
+            raise OutputError(f"Output format {format_name} is not available")
 
-    def write_all_json(
-        self, base_path: str, indent: Optional[int] = 2, **kwargs: Any
-    ) -> dict[str, str]:
-        """Write all tables to JSON files.
+        # Get writer for this format
+        writer = create_writer(format_name)
 
-        Args:
-            base_path: Base path for output files
-            indent: Indentation level for JSON formatting
-            **kwargs: Additional JSON formatting options
+        # Write each table to a file
+        output_files = {}
 
-        Returns:
-            Dictionary of table names to file paths
+        # Write main table
+        main_table_name = self.entity_name
+        main_filename = os.path.join(base_path, f"{main_table_name}.{format_name}")
+        writer.write(self.main_table, main_filename, **format_options)
+        output_files[main_table_name] = main_filename
 
-        Raises:
-            OutputError: If writing fails
-        """
-        # Create the base directory if it doesn't exist
-        os.makedirs(base_path, exist_ok=True)
+        # Write child tables
+        for table_name, data in self.child_tables.items():
+            # Get a safe filename for the table
+            safe_table_name = self.get_formatted_table_name(table_name)
+            output_filename = os.path.join(
+                base_path, f"{safe_table_name}.{format_name}"
+            )
+            writer.write(data, output_filename, **format_options)
+            output_files[table_name] = output_filename
 
-        # Convert to bytes first
-        json_data = self.to_json_bytes(indent=indent, **kwargs)
-
-        # Map of table names to file paths
-        file_paths: dict[str, str] = {}
-
-        try:
-            # Write main table
-            main_path = os.path.join(base_path, f"{self.entity_name}.json")
-            with open(main_path, "wb") as f:
-                f.write(json_data["main"])
-            file_paths["main"] = main_path
-
-            # Write child tables
-            for table_name, data in json_data.items():
-                if table_name == "main":
-                    continue
-                formatted_name = self.get_formatted_table_name(table_name)
-                file_path = os.path.join(base_path, f"{formatted_name}.json")
-                with open(file_path, "wb") as f:
-                    f.write(data)
-                file_paths[table_name] = file_path
-
-            return file_paths
-        except Exception as e:
-            raise OutputError(
-                f"Failed to write JSON files: {e}",
-                output_format="json",
-                path=base_path,
-            ) from e
-
-    def write_all_csv(
-        self, base_path: str, include_header: bool = True, **kwargs: Any
-    ) -> dict[str, str]:
-        """Write all tables to CSV files.
-
-        Args:
-            base_path: Base path for output files
-            include_header: Whether to include header row
-            **kwargs: Additional CSV formatting options
-
-        Returns:
-            Dictionary of table names to file paths
-
-        Raises:
-            OutputError: If writing fails
-        """
-        # Create the base directory if it doesn't exist
-        os.makedirs(base_path, exist_ok=True)
-
-        # Convert to CSV bytes first
-        csv_data = self.to_csv_bytes(include_header=include_header, **kwargs)
-
-        # Map of table names to file paths
-        file_paths: dict[str, str] = {}
-
-        try:
-            # Write main table
-            main_path = os.path.join(base_path, f"{self.entity_name}.csv")
-            with open(main_path, "wb") as f:
-                f.write(csv_data["main"])
-            file_paths["main"] = main_path
-
-            # Write child tables
-            for table_name, data in csv_data.items():
-                if table_name == "main":
-                    continue
-                formatted_name = self.get_formatted_table_name(table_name)
-                file_path = os.path.join(base_path, f"{formatted_name}.csv")
-                with open(file_path, "wb") as f:
-                    f.write(data)
-                file_paths[table_name] = file_path
-
-            return file_paths
-        except Exception as e:
-            raise OutputError(
-                f"Failed to write CSV files: {e}",
-                output_format="csv",
-                path=base_path,
-            ) from e
+        return output_files
 
     @classmethod
     def combine_results(
@@ -1137,7 +1048,7 @@ class ProcessingResult(ResultInterface):
             **options: Writer-specific options
 
         Returns:
-            Dictionary mapping table names to file paths
+            Dictionary mapping table names to output file paths
 
         Raises:
             OutputError: If the writer is not available or writing fails
@@ -1252,3 +1163,105 @@ class ProcessingResult(ResultInterface):
             True if orjson is available, False otherwise
         """
         return _check_orjson_available()
+
+    def write_all_json(
+        self, base_path: str, indent: Optional[int] = 2, **kwargs: Any
+    ) -> dict[str, str]:
+        """Write all tables to JSON files.
+
+        Args:
+            base_path: Base path for output files
+            indent: Indentation level for JSON formatting
+            **kwargs: Additional JSON writer options
+
+        Returns:
+            Dictionary of table names to file paths
+
+        Raises:
+            OutputError: If writing fails
+        """
+        # Create the base directory if it doesn't exist
+        os.makedirs(base_path, exist_ok=True)
+
+        # Convert to dictionary structure with tables
+        tables = self.to_json_objects()
+
+        # Keep track of the paths
+        file_paths: dict[str, str] = {}
+
+        try:
+            # Process each table
+            for table_name, records in tables.items():
+                # Skip empty tables
+                if not records:
+                    continue
+
+                # Create the formatted table name
+                formatted_name = self.get_formatted_table_name(table_name)
+                file_path = os.path.join(base_path, f"{formatted_name}.json")
+
+                # Write to JSON file
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(records, f, indent=indent, **kwargs)
+
+                # Record the file path
+                file_paths[table_name] = file_path
+
+            return file_paths
+        except Exception as e:
+            raise OutputError(
+                f"Failed to write JSON files: {e}",
+                output_format="json",
+                path=base_path,
+            ) from e
+
+    def write_all_csv(
+        self, base_path: str, include_header: bool = True, **kwargs: Any
+    ) -> dict[str, str]:
+        """Write all tables to CSV files.
+
+        Args:
+            base_path: Base path for output files
+            include_header: Whether to include headers in CSV files
+            **kwargs: Additional CSV writer options
+
+        Returns:
+            Dictionary of table names to file paths
+
+        Raises:
+            OutputError: If writing fails
+        """
+        # Create the base directory if it doesn't exist
+        os.makedirs(base_path, exist_ok=True)
+
+        # Get CSV bytes for each table
+        csv_bytes = self.to_csv_bytes(include_header=include_header, **kwargs)
+
+        # Keep track of the paths
+        file_paths: dict[str, str] = {}
+
+        try:
+            # Process each table
+            for table_name, data in csv_bytes.items():
+                # Skip empty tables
+                if not data:
+                    continue
+
+                # Create the formatted table name
+                formatted_name = self.get_formatted_table_name(table_name)
+                file_path = os.path.join(base_path, f"{formatted_name}.csv")
+
+                # Write to CSV file
+                with open(file_path, "wb") as f:
+                    f.write(data)
+
+                # Record the file path
+                file_paths[table_name] = file_path
+
+            return file_paths
+        except Exception as e:
+            raise OutputError(
+                f"Failed to write CSV files: {e}",
+                output_format="csv",
+                path=base_path,
+            ) from e

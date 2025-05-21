@@ -135,7 +135,7 @@ The transformation can be customized using `TransmogConfig`:
 config = (
     TransmogConfig.default()
     .performance_optimized()
-    .with_naming(abbreviate=True)
+    .with_naming(deep_nesting_threshold=4)
 )
 
 # Create a processor with custom configuration

@@ -58,7 +58,7 @@ class AbstractProcessorTest:
         config = (
             TransmogConfig.default()
             .with_processing(cast_to_string=True)
-            .with_naming(separator="_", abbreviate_field_names=False)
+            .with_naming(separator="_")
         )
         return Processor(config=config)
 
