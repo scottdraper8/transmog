@@ -1,10 +1,9 @@
-"""Transmog: JSON to tabular normalization and flattening utility.
+"""Transmog - Flatten, transform, and organize complex data.
 
-A library for transforming nested JSON structures into flattened formats
-with parent-child relationship preservation and metadata annotation.
+Provides tools to transform deeply nested JSON structures into flattened tables.
 """
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 # Configuration functionality
 from transmog.config import (
