@@ -18,6 +18,7 @@ from transmog.types.base import JsonDict
 # Type aliases for improved code readability
 JsonList = list[dict[str, Any]]
 ExtractResult = dict[str, list[dict[str, Any]]]
+StreamExtractResult = Generator[tuple[str, dict[str, Any]], None, None]
 
 
 def _extract_arrays_impl(
@@ -285,6 +286,9 @@ def extract_arrays(
 ) -> ExtractResult:
     """Extract nested arrays into flattened tables.
 
+    Processes nested JSON data and extracts arrays into separate tables.
+    Parent-child relationships are maintained with ID references.
+
     Args:
         data: JSON data to process
         parent_id: UUID of parent record
@@ -364,7 +368,7 @@ def stream_extract_arrays(
     recovery_strategy: Optional[Any] = None,
     max_depth: int = 100,
     current_depth: int = 0,
-) -> Generator[tuple[str, list[JsonDict]], None, None]:
+) -> StreamExtractResult:
     """Extract arrays from JSON in streaming mode.
 
     This is a memory-efficient version that yields records as they are processed
@@ -392,12 +396,13 @@ def stream_extract_arrays(
         current_depth: Current depth in the recursion
 
     Yields:
-        Tuples of (table_name, list of records) for each table
+        Tuples of (table_name, record) for each extracted record
     """
-    # Collect records by table name for grouping
-    records_by_table: dict[str, list[JsonDict]] = {}
+    # Initialize extraction timestamp if not provided
+    if extract_time is None:
+        extract_time = datetime.now()
 
-    # Process all records from the implementation
+    # Process all records from the implementation and yield each record individually
     for table_name, record in _extract_arrays_impl(
         data,
         parent_id=parent_id,
@@ -419,11 +424,5 @@ def stream_extract_arrays(
         current_depth=current_depth,
         streaming_mode=True,
     ):
-        # Group records by table
-        if table_name not in records_by_table:
-            records_by_table[table_name] = []
-        records_by_table[table_name].append(record)
-
-    # Yield each table with its records
-    for table_name, records in records_by_table.items():
-        yield table_name, records
+        # Yield the record directly
+        yield table_name, record

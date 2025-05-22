@@ -36,6 +36,11 @@ class TestExtractor(AbstractExtractorTest):
         # Extract using non-streaming method
         batch_arrays = extract_arrays(complex_nested_data, entity_name="test")
 
+        # Print batch tables for debugging
+        print("\nBatch tables:")
+        for table_name, records in batch_arrays.items():
+            print(f"  {table_name}: {len(records)} records")
+
         # Extract using streaming method
         stream_records = list(
             stream_extract_arrays(complex_nested_data, entity_name="test")
@@ -47,6 +52,11 @@ class TestExtractor(AbstractExtractorTest):
             if table_name not in stream_arrays:
                 stream_arrays[table_name] = []
             stream_arrays[table_name].append(record)
+
+        # Print streaming tables for debugging
+        print("\nStreaming tables:")
+        for table_name, records in stream_arrays.items():
+            print(f"  {table_name}: {len(records)} records")
 
         # Verify that we extracted tables for the same entities
         batch_entity_types = {name.split("_")[-1] for name in batch_arrays.keys()}
@@ -64,6 +74,10 @@ class TestExtractor(AbstractExtractorTest):
 
             batch_count = sum(len(batch_arrays[table]) for table in batch_tables)
             stream_count = sum(len(stream_arrays[table]) for table in stream_tables)
+
+            print(f"\nComparing entity type: {entity_type}")
+            print(f"  Batch tables: {batch_tables} - Total {batch_count} records")
+            print(f"  Stream tables: {stream_tables} - Total {stream_count} records")
 
             assert batch_count == stream_count
 
