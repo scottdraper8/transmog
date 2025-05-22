@@ -165,7 +165,7 @@ class Processor:
         """
         return cls(
             TransmogConfig.default()
-            .with_error_handling(recovery_strategy=LENIENT, allow_malformed_data=True)
+            .with_error_handling(recovery_strategy="partial", allow_malformed_data=True)
             .with_processing(
                 # Enable string casting to handle numeric type issues
                 cast_to_string=True
