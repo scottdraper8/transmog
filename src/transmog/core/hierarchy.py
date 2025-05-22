@@ -24,7 +24,7 @@ from transmog.types.base import ArrayDict, FlatDict, JsonDict
 
 # Type aliases
 ProcessResult = tuple[FlatDict, ArrayDict]
-StreamingChildTables = Generator[tuple[str, list[FlatDict]], None, None]
+StreamingChildTables = Generator[tuple[str, dict[str, Any]], None, None]
 ArrayResult = Union[ArrayDict, StreamingChildTables]
 
 # Logger setup
@@ -102,11 +102,9 @@ def process_structure(
         # Return empty result based on mode
         if streaming:
 
-            def empty_generator() -> Generator[
-                tuple[str, list[dict[str, Any]]], None, None
-            ]:
+            def empty_generator() -> Generator[tuple[str, dict[str, Any]], None, None]:
                 if False:
-                    yield "", []
+                    yield "", {}
 
             return empty_result, empty_generator()
         else:
@@ -167,11 +165,9 @@ def process_structure(
     if not visit_arrays:
         if streaming:
 
-            def empty_generator() -> Generator[
-                tuple[str, list[dict[str, Any]]], None, None
-            ]:
+            def empty_generator() -> Generator[tuple[str, dict[str, Any]], None, None]:
                 if False:
-                    yield "", []
+                    yield "", {}
 
             return annotated_obj, empty_generator()
         else:
@@ -423,7 +419,7 @@ def stream_process_records(
 
     # Process each record with streaming enabled
     main_records: list[FlatDict] = []
-    all_generators: list[Generator[tuple[str, list[dict[str, Any]]], None, None]] = []
+    all_generators: list[Generator[tuple[str, dict[str, Any]], None, None]] = []
 
     for record in records:
         # Don't pass batch_size to process_structure
@@ -459,38 +455,14 @@ def stream_process_records(
         if isinstance(child_generator, Generator):
             all_generators.append(child_generator)
 
-    # Convert list of generators to single generator that merges all results
-    def dict_to_generator(
-        d: dict[str, list[dict[str, Any]]],
-    ) -> Generator[tuple[str, list[dict[str, Any]]], None, None]:
-        """Convert a dictionary to a generator of (key, value) pairs."""
-        for key, value in d.items():
-            if value:  # Only yield non-empty lists
-                yield key, value
-
     # Define a generator function that combines results from all generators
-    def child_tables_generator() -> Generator[
-        tuple[str, list[dict[str, Any]]], None, None
-    ]:
-        # Collect records for each table
-        all_tables: dict[str, list[dict[str, Any]]] = {}
-
+    def child_tables_generator() -> Generator[tuple[str, dict[str, Any]], None, None]:
         # Process each generator
         for gen in all_generators:
             try:
-                for table_name, records in gen:
-                    if table_name not in all_tables:
-                        all_tables[table_name] = []
-
-                    # Ensure records is a list of dictionaries (array records)
-                    if isinstance(records, list):
-                        all_tables[table_name].extend(records)
-                    elif isinstance(records, dict):
-                        all_tables[table_name].append(records)
+                # Just yield each record directly from each generator
+                yield from gen
             except StopIteration:
                 continue
-
-        # Yield all collected records
-        yield from dict_to_generator(all_tables)
 
     return main_records, child_tables_generator()

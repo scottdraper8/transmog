@@ -403,7 +403,7 @@ def stream_extract_arrays(
         extract_time = datetime.now()
 
     # Process all records from the implementation and yield each record individually
-    for table_name, record in _extract_arrays_impl(
+    yield from _extract_arrays_impl(
         data,
         parent_id=parent_id,
         parent_path=parent_path,
@@ -423,6 +423,4 @@ def stream_extract_arrays(
         max_depth=max_depth,
         current_depth=current_depth,
         streaming_mode=True,
-    ):
-        # Yield the record directly
-        yield table_name, record
+    )

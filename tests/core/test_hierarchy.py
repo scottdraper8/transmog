@@ -514,11 +514,10 @@ class TestDirectHierarchyFunctions:
 
         # Collect tables from the generator
         collected_tables = {}
-        for table_name, records in child_tables_gen:
-            if table_name in collected_tables:
-                collected_tables[table_name].extend(records)
-            else:
-                collected_tables[table_name] = records
+        for table_name, record in child_tables_gen:
+            if table_name not in collected_tables:
+                collected_tables[table_name] = []
+            collected_tables[table_name].append(record)
 
         # Print table names and content for debugging
         print(f"Collected tables: {list(collected_tables.keys())}")
@@ -536,22 +535,14 @@ class TestDirectHierarchyFunctions:
         # Verify we got the expected child tables with correct naming convention
         assert children_table in collected_tables
 
-        # Check if we have a list of records or a single flattened record
-        if (
-            isinstance(collected_tables[children_table], list)
-            and len(collected_tables[children_table]) > 0
-        ):
-            first_item = collected_tables[children_table][0]
-            if isinstance(first_item, dict) and "__parent_extract_id" in first_item:
-                # We have properly structured records with one record per child
-                assert (
-                    len(collected_tables[children_table]) == 4
-                )  # 2 records × 2 children
-            else:
-                # We might have a flattened structure with keys as fields
-                # In this case, just check some basic fields we expect in the children
-                assert "id" in collected_tables[children_table]
-                assert "name" in collected_tables[children_table]
+        # Check that we have records with parent IDs
+        assert len(collected_tables[children_table]) > 0
+        for record in collected_tables[children_table]:
+            assert "__parent_extract_id" in record
+
+        # Since we processed 2 identical records, each with 2 children,
+        # we should have 4 children records total
+        assert len(collected_tables[children_table]) == 4  # 2 records × 2 children
 
     def test_process_structure_with_deterministic_ids(self, nested_record):
         """Test processing with deterministic IDs based on field values."""

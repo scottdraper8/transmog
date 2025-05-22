@@ -319,11 +319,11 @@ When using the high-level `Processor` API, the appropriate strategy is selected 
 
 | Input Type | Strategy Selected |
 |------------|------------------|
-| Dict, List[Dict] | InMemoryStrategy |
+| Dict, list[Dict] | InMemoryStrategy |
 | File path (str) | FileStrategy |
 | CSV file path with process_csv | CSVStrategy |
 | Any data with process_chunked | ChunkedStrategy |
-| List[Dict] with process_batch | BatchStrategy |
+| list[Dict] with process_batch | BatchStrategy |
 
 ### Strategy Composition
 

@@ -10,7 +10,7 @@ This document provides technical reference for Transmog's core components and cl
 
 ```python
 flatten_json(
-    data: Dict[str, Any],
+    data: dict[str, Any],
     separator: str = None,
     cast_to_string: bool = None,
     include_empty: bool = None,
@@ -18,7 +18,7 @@ flatten_json(
     skip_arrays: bool = True,
     visit_arrays: bool = None,
     parent_path: str = "",
-    path_parts: Optional[List[str]] = None,
+    path_parts: Optional[list[str]] = None,
     path_parts_optimization: bool = None,
     max_depth: Optional[int] = None,
     max_field_component_length: Optional[int] = None,
@@ -27,7 +27,7 @@ flatten_json(
     current_depth: int = 0,
     in_place: bool = False,
     mode: Literal["standard", "streaming"] = "standard",
-) -> Dict[str, Any]
+) -> dict[str, Any]
 ```
 
 Flattens a nested JSON object into a single-level dictionary.
@@ -36,7 +36,7 @@ Flattens a nested JSON object into a single-level dictionary.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| data | Dict[str, Any] | Required | Dictionary to flatten |
+| data | dict[str, Any] | Required | Dictionary to flatten |
 | separator | str | None | Separator to use between path segments |
 | cast_to_string | bool | None | Whether to cast all values to strings |
 | include_empty | bool | None | Whether to include empty strings |
@@ -44,7 +44,7 @@ Flattens a nested JSON object into a single-level dictionary.
 | skip_arrays | bool | True | Whether to skip array flattening |
 | visit_arrays | bool | None | Whether to visit array elements |
 | parent_path | str | "" | Path prefix from parent object |
-| path_parts | List[str] | None | List of path components (for optimization) |
+| path_parts | list[str] | None | List of path components (for optimization) |
 | path_parts_optimization | bool | None | Whether to use path parts optimization |
 | max_depth | int | None | Maximum recursion depth |
 | max_field_component_length | int | None | Maximum length for each component |
@@ -95,7 +95,7 @@ result = flatten_json(data, separator="_", cast_to_string=True, mode="streaming"
 
 ```python
 extract_arrays(
-    obj: Dict[str, Any],
+    obj: dict[str, Any],
     parent_id: Optional[str] = None,
     parent_path: str = "",
     entity_name: str = "root",
@@ -104,13 +104,13 @@ extract_arrays(
     include_empty: bool = None,
     skip_null: bool = None,
     extract_time: Optional[Any] = None,
-    parent_path_parts: Optional[List[str]] = None,
+    parent_path_parts: Optional[list[str]] = None,
     max_component_length: Optional[int] = None,
     preserve_leaf: Optional[bool] = None,
     deep_nesting_threshold: Optional[int] = None,
-    deterministic_id_fields: Optional[Dict[str, str]] = None,
-    id_generation_strategy: Optional[Callable[[Dict[str, Any]], str]] = None,
-) -> Dict[str, List[Dict[str, Any]]]
+    deterministic_id_fields: Optional[dict[str, str]] = None,
+    id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
+) -> dict[str, list[dict[str, Any]]]
 ```
 
 Extracts nested arrays from JSON structure with parent-child relationships.
@@ -121,7 +121,7 @@ Extracts nested arrays from JSON structure with parent-child relationships.
 
 ```python
 process_structure(
-    data: Dict[str, Any],
+    data: dict[str, Any],
     entity_name: str,
     parent_id: Optional[str] = None,
     parent_path: str = "",
@@ -135,8 +135,8 @@ process_structure(
     max_field_component_length: int = None,
     preserve_leaf_component: bool = True,
     deep_nesting_threshold: int = 4,
-    default_id_field: Optional[Union[str, Dict[str, str]]] = None,
-    id_generation_strategy: Optional[Callable[[Dict[str, Any]], str]] = None,
+    default_id_field: Optional[Union[str, dict[str, str]]] = None,
+    id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     id_field: str = "__extract_id",
     parent_field: str = "__parent_extract_id",
     time_field: str = "__extract_datetime",
@@ -144,7 +144,7 @@ process_structure(
     streaming: bool = False,
     recovery_strategy: Optional[Any] = None,
     max_depth: int = 100,
-) -> Tuple[Dict[str, Any], Dict[str, List[Dict[str, Any]]]]
+) -> tuple[dict[str, Any], dict[str, list[dict[str, Any]]]]
 ```
 
 Processes JSON structure with parent-child relationship preservation. This is the main entry point for
@@ -156,18 +156,18 @@ processing a complete JSON structure, handling both the main record and all nest
 
 ```python
 annotate_with_metadata(
-    record: Dict[str, Any],
+    record: dict[str, Any],
     parent_id: Optional[str] = None,
     extract_id: Optional[str] = None,
     extract_time: Optional[Any] = None,
     id_field: str = "__extract_id",
     parent_field: str = "__parent_extract_id",
     time_field: str = "__extract_datetime",
-    extra_fields: Optional[Dict[str, Any]] = None,
+    extra_fields: Optional[dict[str, Any]] = None,
     in_place: bool = False,
     source_field: Optional[str] = None,
-    id_generation_strategy: Optional[Callable[[Dict[str, Any]], str]] = None,
-) -> Dict[str, Any]
+    id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
+) -> dict[str, Any]
 ```
 
 Annotates a record with metadata fields like extract ID, parent ID, and timestamp.
@@ -176,9 +176,9 @@ Annotates a record with metadata fields like extract ID, parent ID, and timestam
 
 ```python
 generate_extract_id(
-    record: Optional[Dict[str, Any]] = None,
+    record: Optional[dict[str, Any]] = None,
     source_field: Optional[str] = None,
-    id_generation_strategy: Optional[Callable[[Dict[str, Any]], str]] = None,
+    id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
 ) -> str
 ```
 

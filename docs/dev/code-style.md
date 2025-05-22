@@ -186,7 +186,7 @@ from transmog.io import csv_writer
 Use type hints for function parameters and return values:
 
 ```python
-def process_items(items: List[Dict]) -> Dict[str, int]:
+def process_items(items: list[Dict]) -> dict[str, int]:
     """Process a list of items and return count summary."""
     # Implementation
 ```

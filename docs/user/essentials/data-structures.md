@@ -31,14 +31,14 @@ import transmog as tm
 from typing import Dict, List, Any
 
 # Dictionary input
-data: Dict[str, Any] = {
+data: dict[str, Any] = {
     "id": 123,
     "name": "Example",
     "items": [{"id": 1}, {"id": 2}]
 }
 
 # Python list input
-records: List[Dict[str, Any]] = [
+records: list[dict[str, Any]] = [
     {"id": 1, "name": "First"},
     {"id": 2, "name": "Second"}
 ]
@@ -54,13 +54,13 @@ Processing results are returned as structured data:
 
 ```python
 # Main table as list of dictionaries
-main_table: List[Dict[str, Any]] = result.get_main_table()
+main_table: list[dict[str, Any]] = result.get_main_table()
 
 # Child tables as dictionary of table names to lists of dictionaries
-child_tables: Dict[str, List[Dict[str, Any]]] = result.get_child_tables()
+child_tables: dict[str, list[dict[str, Any]]] = result.get_child_tables()
 
 # Specific child table
-items_table: List[Dict[str, Any]] = result.get_child_table("record_items")
+items_table: list[dict[str, Any]] = result.get_child_table("record_items")
 ```
 
 ### PyArrow Table Types
@@ -71,7 +71,7 @@ When using PyArrow integration, you'll work with PyArrow Tables:
 import pyarrow as pa
 
 # Get results as PyArrow Tables
-pa_tables: Dict[str, pa.Table] = result.to_pyarrow_tables()
+pa_tables: dict[str, pa.Table] = result.to_pyarrow_tables()
 
 # Get a specific table
 main_pa_table: pa.Table = pa_tables["main"]

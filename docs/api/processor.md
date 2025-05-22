@@ -93,7 +93,7 @@ Process data with the current configuration.
 
 ```python
 process(
-    data: Union[Dict[str, Any], List[Dict[str, Any]], str, bytes],
+    data: Union[dict[str, Any], list[dict[str, Any]], str, bytes],
     entity_name: str,
     extract_time: Optional[Any] = None,
 ) -> ProcessingResult
@@ -103,7 +103,7 @@ process(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| data | Dict, List[Dict], str, bytes | Required | JSON data to process (dict, list, JSON string, file path, or bytes) |
+| data | Dict, list[Dict], str, bytes | Required | JSON data to process (dict, list, JSON string, file path, or bytes) |
 | entity_name | str | Required | Name of the entity (used for table naming) |
 | extract_time | Any | None | Extraction timestamp (current time if None) |
 
@@ -159,7 +159,7 @@ Process a batch of records.
 
 ```python
 process_batch(
-    batch_data: List[Dict[str, Any]],
+    batch_data: list[dict[str, Any]],
     entity_name: str,
     extract_time: Optional[Any] = None,
 ) -> ProcessingResult
@@ -169,7 +169,7 @@ process_batch(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| batch_data | List[Dict[str, Any]] | Required | List of records to process |
+| batch_data | list[dict[str, Any]] | Required | List of records to process |
 | entity_name | str | Required | Name of the entity (used for table naming) |
 | extract_time | Any | None | Extraction timestamp (current time if None) |
 
@@ -187,7 +187,7 @@ Process data in chunks to manage memory usage.
 
 ```python
 process_chunked(
-    data: Union[List[Dict[str, Any]], str, Iterator[Dict[str, Any]]],
+    data: Union[list[dict[str, Any]], str, Iterator[dict[str, Any]]],
     entity_name: str,
     chunk_size: int = 1000,
     extract_time: Optional[Any] = None,
@@ -199,7 +199,7 @@ process_chunked(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| data | List[Dict], str, Iterator[Dict] | Required | Data to process in chunks |
+| data | list[Dict], str, Iterator[Dict] | Required | Data to process in chunks |
 | entity_name | str | Required | Name of the entity (used for table naming) |
 | chunk_size | int | 1000 | Number of records to process in each chunk |
 | extract_time | Any | None | Extraction timestamp (current time if None) |
@@ -224,7 +224,7 @@ process_csv(
     has_header: bool = True,
     skip_rows: int = 0,
     quote_char: str = '"',
-    null_values: Optional[List[str]] = None,
+    null_values: Optional[list[str]] = None,
     encoding: str = "utf-8",
     infer_types: bool = True,
     sanitize_column_names: bool = True,
@@ -242,7 +242,7 @@ process_csv(
 | has_header | bool | True | Whether the file has a header row |
 | skip_rows | int | 0 | Number of rows to skip at the beginning |
 | quote_char | str | '"' | Character for quoting fields |
-| null_values | List[str] | None | Values to interpret as NULL |
+| null_values | list[str] | None | Values to interpret as NULL |
 | encoding | str | "utf-8" | File encoding |
 | infer_types | bool | True | Whether to infer data types |
 | sanitize_column_names | bool | True | Whether to clean up column names |
@@ -268,7 +268,7 @@ Stream process data to an output format without keeping all results in memory.
 
 ```python
 stream_process(
-    data: Union[Dict[str, Any], List[Dict[str, Any]], str, bytes, Iterator[Dict[str, Any]]],
+    data: Union[dict[str, Any], list[dict[str, Any]], str, bytes, Iterator[dict[str, Any]]],
     entity_name: str,
     output_format: str,
     output_destination: Union[str, IO[Any]],
@@ -281,7 +281,7 @@ stream_process(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| data | Dict, List[Dict], str, bytes, Iterator[Dict] | Required | Data to process |
+| data | Dict, list[Dict], str, bytes, Iterator[Dict] | Required | Data to process |
 | entity_name | str | Required | Name of the entity (used for table naming) |
 | output_format | str | Required | Output format ("json", "csv", "parquet") |
 | output_destination | str, IO | Required | Output path or file-like object |
@@ -344,7 +344,7 @@ stream_process_csv(
     has_header: bool = True,
     skip_rows: int = 0,
     quote_char: str = '"',
-    null_values: Optional[List[str]] = None,
+    null_values: Optional[list[str]] = None,
     encoding: str = "utf-8",
     infer_types: bool = True,
     sanitize_column_names: bool = True,

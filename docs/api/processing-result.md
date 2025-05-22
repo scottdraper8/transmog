@@ -19,13 +19,13 @@ from transmog import ProcessingResult, ConversionMode
 
 ```python
 # Get the main table (root level records)
-result.get_main_table() -> List[Dict[str, Any]]
+result.get_main_table() -> list[dict[str, Any]]
 
 # Get names of all available tables
-result.get_table_names() -> List[str]
+result.get_table_names() -> list[str]
 
 # Get a specific child table by name
-result.get_child_table(table_name: str) -> List[Dict[str, Any]]
+result.get_child_table(table_name: str) -> list[dict[str, Any]]
 
 # Get a formatted table name
 result.get_formatted_table_name(table_name: str) -> str
@@ -35,10 +35,10 @@ result.get_formatted_table_name(table_name: str) -> str
 
 ```python
 # Get all tables as dictionaries
-result.to_dict() -> Dict[str, List[Dict[str, Any]]]
+result.to_dict() -> dict[str, list[dict[str, Any]]]
 
 # Get all tables as JSON-serializable dictionaries
-result.to_json_objects() -> Dict[str, List[Dict[str, Any]]]
+result.to_json_objects() -> dict[str, list[dict[str, Any]]]
 ```
 
 ### PyArrow Output
@@ -47,7 +47,7 @@ result.to_json_objects() -> Dict[str, List[Dict[str, Any]]]
 # Get all tables as PyArrow tables
 result.to_pyarrow_tables(
     conversion_mode: ConversionMode = ConversionMode.EAGER
-) -> Dict[str, pyarrow.Table]
+) -> dict[str, pyarrow.Table]
 ```
 
 ### Bytes Output
@@ -58,9 +58,9 @@ result.to_json_bytes(
     indent: Optional[int] = None,
     ensure_ascii: bool = True,
     sort_keys: bool = False,
-    separators: Optional[Tuple[str, str]] = None,
+    separators: Optional[tuple[str, str]] = None,
     conversion_mode: ConversionMode = ConversionMode.EAGER
-) -> Dict[str, bytes]
+) -> dict[str, bytes]
 
 # Get all tables as CSV bytes
 result.to_csv_bytes(
@@ -68,14 +68,14 @@ result.to_csv_bytes(
     delimiter: Optional[str] = None,
     include_header: bool = True,
     conversion_mode: ConversionMode = ConversionMode.EAGER
-) -> Dict[str, bytes]
+) -> dict[str, bytes]
 
 # Get all tables as Parquet bytes
 result.to_parquet_bytes(
     compression: str = "snappy",
     row_group_size: Optional[int] = None,
     conversion_mode: ConversionMode = ConversionMode.EAGER
-) -> Dict[str, bytes]
+) -> dict[str, bytes]
 ```
 
 ### File Output
@@ -87,9 +87,9 @@ result.write_all_json(
     indent: Optional[int] = None,
     ensure_ascii: bool = True,
     sort_keys: bool = False,
-    separators: Optional[Tuple[str, str]] = None,
+    separators: Optional[tuple[str, str]] = None,
     conversion_mode: ConversionMode = ConversionMode.EAGER
-) -> Dict[str, str]
+) -> dict[str, str]
 
 # Write all tables to CSV files
 result.write_all_csv(
@@ -100,7 +100,7 @@ result.write_all_csv(
     line_terminator: Optional[str] = None,
     quote_strategy: str = "minimal",
     conversion_mode: ConversionMode = ConversionMode.EAGER
-) -> Dict[str, str]
+) -> dict[str, str]
 
 # Write all tables to Parquet files
 result.write_all_parquet(
@@ -108,9 +108,9 @@ result.write_all_parquet(
     compression: str = "snappy",
     row_group_size: Optional[int] = None,
     data_page_size: Optional[int] = None,
-    partition_cols: Optional[List[str]] = None,
+    partition_cols: Optional[list[str]] = None,
     conversion_mode: ConversionMode = ConversionMode.EAGER
-) -> Dict[str, str]
+) -> dict[str, str]
 ```
 
 ### Conversion Mode
@@ -126,7 +126,7 @@ result.with_conversion_mode(mode: ConversionMode) -> ProcessingResult
 # Combine multiple ProcessingResult objects
 @staticmethod
 def combine_results(
-    results: List[ProcessingResult]
+    results: list[ProcessingResult]
 ) -> ProcessingResult
 ```
 

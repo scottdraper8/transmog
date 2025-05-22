@@ -1,7 +1,6 @@
-"""Streaming processing functionality for Transmog.
+"""Streaming process module for Transmog.
 
-This module provides functions to process data in a streaming fashion,
-writing directly to output formats without keeping entire datasets in memory.
+Provides functions for streaming processing of data directly to output.
 """
 
 import os
@@ -13,7 +12,6 @@ from typing import (
     Union,
 )
 
-from ..core.hierarchy import stream_process_records
 from ..core.metadata import get_current_timestamp
 from ..error import (
     FileError,
@@ -47,7 +45,7 @@ def _get_streaming_params(
         Dictionary of parameters for streaming processing
     """
     # Get base parameters
-    params = get_common_config_params(processor, extract_time)
+    params: dict[str, Any] = get_common_config_params(processor, extract_time)
 
     # Add streaming-specific params
     if use_deterministic_ids is not None:
@@ -65,27 +63,39 @@ def _stream_process_batch(
     extract_time: Optional[Any] = None,
     use_deterministic_ids: bool = False,
 ) -> None:
-    """Stream process a batch of records and write directly to output.
+    """Process a batch of records and write to output directly.
 
     Args:
         processor: Processor instance
         batch_data: Batch of records to process
         entity_name: Name of the entity being processed
-        writer: StreamingWriter to write output
+        writer: StreamingWriter instance
         child_tables_registry: Registry of discovered child tables
         extract_time: Optional extraction timestamp
         use_deterministic_ids: Whether to use deterministic ID generation
     """
-    # Get streaming parameters
-    params = _get_streaming_params(processor, extract_time, use_deterministic_ids)
-
-    # Process the batch of records with streaming
-    main_records, child_tables_gen = stream_process_records(
-        records=batch_data, entity_name=entity_name, **params
+    # Get processing parameters
+    params = _get_streaming_params(
+        processor=processor,
+        extract_time=extract_time,
+        use_deterministic_ids=use_deterministic_ids,
     )
 
-    # Write main records to output
+    # Import here to avoid circular imports
+    from transmog.core.hierarchy import stream_process_records
+
+    # Process batch with streaming
+    main_records, child_tables_gen = stream_process_records(
+        records=batch_data,
+        entity_name=entity_name,
+        **params,
+    )
+
+    # Write main records
     writer.write_main_records(main_records)
+
+    # Buffer child records by table to handle both individual records and batches
+    child_tables_buffer: dict[str, list[dict[str, Any]]] = {}
 
     # Process child tables
     for table_name, records in child_tables_gen:
@@ -94,8 +104,22 @@ def _stream_process_batch(
             writer.initialize_child_table(table_name)
             child_tables_registry[table_name] = True
 
-        # Write child records
-        writer.write_child_records(table_name, records)
+        # Handle both individual records and batches of records
+        if isinstance(records, dict):
+            # Single record case
+            if table_name not in child_tables_buffer:
+                child_tables_buffer[table_name] = []
+            child_tables_buffer[table_name].append(records)
+        elif isinstance(records, list):
+            # Batch case (for backward compatibility)
+            writer.write_child_records(table_name, records)
+        else:
+            raise TypeError(f"Unexpected record type: {type(records)}")
+
+    # Write buffered child records
+    for table_name, table_records in child_tables_buffer.items():
+        if table_records:
+            writer.write_child_records(table_name, table_records)
 
 
 def _stream_process_in_batches(
@@ -104,7 +128,7 @@ def _stream_process_in_batches(
     entity_name: str,
     writer: StreamingWriterProtocol,
     extract_time: Optional[Any] = None,
-    batch_size: int = 1000,
+    batch_size: Optional[int] = 1000,
     use_deterministic_ids: bool = False,
 ) -> None:
     """Stream process data in batches and write directly to output.
@@ -126,7 +150,7 @@ def _stream_process_in_batches(
         record_buffer.append(record)
 
         # Process a batch when buffer is full
-        if len(record_buffer) >= batch_size:
+        if len(record_buffer) >= (batch_size or 1000):
             _stream_process_batch(
                 processor=processor,
                 batch_data=record_buffer,
@@ -237,7 +261,7 @@ def stream_process_file_with_format(
         handle_file_error(file_path, e, format_type)
 
 
-@error_context("Failed to stream process file", log_exceptions=True)
+@error_context("Failed to stream process file", log_exceptions=True)  # type: ignore
 def stream_process_file(
     processor: Any,
     file_path: str,
@@ -283,7 +307,7 @@ def stream_process_file(
     )
 
 
-@error_context("Failed to stream process CSV file", log_exceptions=True)
+@error_context("Failed to stream process CSV file", log_exceptions=True)  # type: ignore
 def stream_process_csv(
     processor: Any,
     file_path: str,
@@ -352,7 +376,7 @@ def stream_process_csv(
     )
 
 
-@error_context("Failed to stream process data", log_exceptions=True)
+@error_context("Failed to stream process data", log_exceptions=True)  # type: ignore
 def stream_process(
     processor: Any,
     data: Union[
@@ -412,7 +436,7 @@ def stream_process(
             data_iterator=data_iterator,
             entity_name=entity_name,
             extract_time=extract_time,
-            batch_size=batch_size,
+            batch_size=batch_size if batch_size is not None else 1000,
             writer=writer,
             use_deterministic_ids=use_deterministic_ids,
         )

@@ -430,7 +430,7 @@ from transmog import Processor
 from transmog.config import TransmogConfig
 
 
-def generate_test_data(num_records: int = 100) -> List[Dict[str, Any]]:
+def generate_test_data(num_records: int = 100) -> list[dict[str, Any]]:
     """Generate synthetic test data for benchmarks."""
     data = []
     for i in range(num_records):

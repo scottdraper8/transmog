@@ -72,7 +72,7 @@ Create a configuration with deterministic ID generation.
 
 ```python
 @classmethod
-def with_deterministic_ids(cls, id_fields: Union[str, Dict[str, str]]) -> "TransmogConfig":
+def with_deterministic_ids(cls, id_fields: Union[str, dict[str, str]]) -> "TransmogConfig":
     """
     Create a config with deterministic ID generation enabled.
 
@@ -92,7 +92,7 @@ Create a configuration with custom ID generation.
 ```python
 @classmethod
 def with_custom_id_generation(
-    cls, strategy: Callable[[Dict[str, Any]], str]
+    cls, strategy: Callable[[dict[str, Any]], str]
 ) -> "TransmogConfig":
     """
     Create a configuration with custom ID generation.
@@ -273,22 +273,22 @@ class MetadataConfig:
     """
 
     # Generation options
-    default_id_field: Optional[Union[str, Dict[str, str]]] = None
+    default_id_field: Optional[Union[str, dict[str, str]]] = None
     parent_field: str = "__parent_extract_id"
     time_field: str = "__extract_datetime"
-    deterministic_id_fields: Dict[str, str] = field(default_factory=dict)
-    id_generation_strategy: Optional[Callable[[Dict[str, Any]], str]] = None
+    deterministic_id_fields: dict[str, str] = field(default_factory=dict)
+    id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None
 ```
 
 ### Parameters
 
-- **default_id_field** (`Optional[Union[str, Dict[str, str]]]`, default: `None`): Field name or dictionary mapping
+- **default_id_field** (`Optional[Union[str, dict[str, str]]]`, default: `None`): Field name or dictionary mapping
   paths to field names used for deterministic ID generation.
 - **parent_field** (`str`, default: `"__parent_extract_id"`): Field name for parent IDs.
 - **time_field** (`str`, default: `"__extract_datetime"`): Field name for timestamps.
-- **deterministic_id_fields** (`Dict[str, str]`, default: `{}`): Dictionary mapping table paths to field names for
+- **deterministic_id_fields** (`dict[str, str]`, default: `{}`): Dictionary mapping table paths to field names for
   deterministic ID generation.
-- **id_generation_strategy** (`Optional[Callable[[Dict[str, Any]], str]]`, default: `None`): Custom function for ID generation.
+- **id_generation_strategy** (`Optional[Callable[[dict[str, Any]], str]]`, default: `None`): Custom function for ID generation.
 
 ## ErrorHandlingConfig
 

@@ -22,7 +22,7 @@ Processor.process_csv(
     extract_time: Optional[Any] = None,
     delimiter: Optional[str] = None,
     has_header: bool = True,
-    null_values: Optional[List[str]] = None,
+    null_values: Optional[list[str]] = None,
     sanitize_column_names: bool = True,
     infer_types: bool = True,
     skip_rows: int = 0,
@@ -41,7 +41,7 @@ Processor.process_csv(
 | extract_time | Any | None | Extraction timestamp (current time if None) |
 | delimiter | str | None | Delimiter character (auto-detect or comma if None) |
 | has_header | bool | True | Whether the file has a header row |
-| null_values | List[str] | None | List of strings to interpret as null values |
+| null_values | list[str] | None | List of strings to interpret as null values |
 | sanitize_column_names | bool | True | Whether to sanitize column names |
 | infer_types | bool | True | Whether to infer data types from string values |
 | skip_rows | int | 0 | Number of rows to skip at the beginning |
