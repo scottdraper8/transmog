@@ -248,10 +248,12 @@ def _flatten_json_core(
                 current_path, separator, deeply_nested_threshold
             )
 
-        # Remove the original key if not modifying in place
-        if not in_place:
-            if key in data:
-                result.pop(key, None)
+        # Skip empty dictionaries and arrays
+        if (isinstance(value, dict) and not value) or (
+            isinstance(value, list) and not value
+        ):
+            # Skip empty objects and arrays
+            continue
 
         # Process value based on its type
         if isinstance(value, dict):
@@ -289,6 +291,10 @@ def _flatten_json_core(
                         # Regular field, apply path prefix
                         result[flattened_key] = flattened_value
 
+                # Remove the original key to avoid duplication, but only if not in_place
+                if key in result and not in_place:
+                    result.pop(key, None)
+
             except Exception as e:
                 if recovery_strategy == "skip":
                     # Skip the problematic nested object
@@ -318,6 +324,9 @@ def _flatten_json_core(
                 )
                 if processed_value is not None:
                     result[current_path] = processed_value
+                    # Remove original array field, but only if not in_place
+                    if key in result and not in_place:
+                        result.pop(key, None)
             else:
                 # Array contains complex objects, stringify it
                 processed_value = _process_value_wrapper(
@@ -329,20 +338,19 @@ def _flatten_json_core(
                 )
                 if processed_value is not None:
                     result[current_path] = processed_value
+                    # Remove original array field, but only if not in_place
+                    if key in result and not in_place:
+                        result.pop(key, None)
         else:
-            # Process scalar value
+            # For scalar values, process and add to the result
             processed_value = _process_value_wrapper(
-                value,
-                cast_to_string,
-                include_empty,
-                skip_null,
-                context=context,
+                value, cast_to_string, include_empty, skip_null, context=context
             )
             if processed_value is not None:
                 result[current_path] = processed_value
 
-    # In-place modification should return the modified data
-    return result if in_place else result
+    # Return the flattened result
+    return result
 
 
 @error_context("Failed to flatten JSON", wrap_as=lambda e: ProcessingError(str(e)))  # type: ignore
@@ -388,6 +396,11 @@ def flatten_json(
 
     Returns:
         Flattened JSON data
+
+    Notes:
+        - Empty objects ({}) and empty arrays ([]) are skipped
+        - Original nested structures are removed after being flattened
+        - Deeply nested paths are simplified when they exceed the threshold
     """
     # Use default settings if parameters are not provided
     if separator is None:

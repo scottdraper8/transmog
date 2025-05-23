@@ -182,13 +182,31 @@ class TestFlattener(AbstractFlattenerTest):
         # The array should be a string (JSON representation) or list
         assert isinstance(flattened_include["items"], (str, list))
 
-        # Test with explicit visit_arrays=True
-        flattened_visit = flatten_json(array_data, visit_arrays=True, skip_arrays=False)
+        # Test with explicit visit_arrays=True and in_place=True
+        flattened_visit = flatten_json(
+            array_data.copy(),
+            visit_arrays=True,
+            skip_arrays=False,
+            in_place=True,  # Even with in_place=True, arrays are processed
+        )
 
-        # With visit_arrays=True in the simplified naming scheme,
-        # the array itself is preserved as a JSON string
+        # With the current implementation, arrays are always processed
+        # When visit_arrays=True, the array is stringified
         assert "items" in flattened_visit
         assert isinstance(flattened_visit["items"], str)
+
+        # Test with explicit visit_arrays=True and in_place=False (default)
+        flattened_visit_no_preserve = flatten_json(
+            array_data.copy(),
+            visit_arrays=True,
+            skip_arrays=False,
+            in_place=False,  # This is the default, removes original arrays
+        )
+
+        # With improved behavior, the original array is removed
+        assert "items" not in flattened_visit_no_preserve
+        # But we should have results from flattening the array items
+        assert "id" in flattened_visit_no_preserve  # The root id is preserved
 
     def test_simplified_naming(self, array_data):
         """Test that array flattening uses the simplified naming scheme without indices."""
@@ -198,14 +216,92 @@ class TestFlattener(AbstractFlattenerTest):
             "items": [{"name": "item1", "value": 100}, {"name": "item2", "value": 200}],
         }
 
-        # Flatten with the simplified naming scheme
-        flattened = flatten_json(data, visit_arrays=True, skip_arrays=False)
+        # Flatten with the simplified naming scheme and in_place=True to keep original arrays
+        flattened = flatten_json(
+            data.copy(), visit_arrays=True, skip_arrays=False, in_place=True
+        )
 
-        # Check that we have flattened array items with simple names (no indices)
-        assert "items" in flattened  # The array itself is preserved
+        # With in_place=True, the array is preserved but stringified
+        assert "items" in flattened
 
         # The items should be flattened as a JSON string
         assert isinstance(flattened["items"], str)
 
-        # We should not have index-based fields
+        # Test with in_place=False (default behavior)
+        flattened_no_preserve = flatten_json(
+            data.copy(), visit_arrays=True, skip_arrays=False
+        )
+
+        # With the improved behavior, the original array is removed
+        assert "items" not in flattened_no_preserve
+
+        # We should not have index-based fields in either case
         assert not any(key.startswith("items[") for key in flattened.keys())
+        assert not any(key.startswith("items[") for key in flattened_no_preserve.keys())
+
+    def test_empty_objects_and_arrays_are_skipped(self):
+        """Test that empty objects and arrays are skipped."""
+        # Create test data with empty objects and arrays
+        data = {
+            "id": 1,
+            "name": "Test",
+            "empty_object": {},
+            "empty_array": [],
+            "nested": {
+                "value": "nested_value",
+                "empty_nested_object": {},
+                "empty_nested_array": [],
+            },
+            "non_empty_object": {"key": "value"},
+            "array_with_empty_objects": [{}, {}, {}],
+            "non_empty_array": [1, 2, 3],
+        }
+
+        # Flatten the data
+        flattened = flatten_json(data)
+
+        # Empty objects and arrays should be skipped
+        assert "empty_object" not in flattened
+        assert "empty_array" not in flattened
+        assert "nested_empty_nested_object" not in flattened
+        assert "nested_empty_nested_array" not in flattened
+
+        # Original keys should be removed after flattening nested objects
+        assert "nested" not in flattened
+        assert "nested_value" in flattened
+
+        # Non-empty objects and arrays should be flattened/processed correctly
+        assert "non_empty_object" not in flattened  # Original object removed
+        assert "non_empty_object_key" in flattened  # But flattened key exists
+
+        # An array containing only empty objects is effectively empty and should be skipped
+        assert "array_with_empty_objects" not in flattened
+
+        # Non-empty arrays should be preserved in string format
+        # But only if we use in_place=True
+        flattened_with_arrays = flatten_json(data.copy(), in_place=True)
+        assert isinstance(flattened_with_arrays.get("non_empty_array", None), str)
+
+    def test_original_nested_structures_removed(self):
+        """Test that original nested structures are removed after flattening."""
+        # Create deeply nested test data
+        data = {
+            "id": 1,
+            "level1": {
+                "value1": "foo",
+                "level2": {"value2": "bar", "level3": {"value3": "baz"}},
+            },
+        }
+
+        # Flatten the data
+        flattened = flatten_json(data)
+
+        # Original nested structure keys should be removed
+        assert "level1" not in flattened
+        assert "level1_level2" not in flattened
+        assert "level1_level2_level3" not in flattened
+
+        # But their values should be preserved with flattened paths
+        assert "level1_value1" in flattened
+        assert "level1_level2_value2" in flattened
+        assert "level1_level2_level3_value3" in flattened

@@ -94,6 +94,12 @@ def _extract_arrays_impl(
         # Build the current path for this field
         current_path = f"{parent_path}{separator}{key}" if parent_path else key
 
+        # Skip empty arrays and dictionaries
+        if (isinstance(value, list) and not value) or (
+            isinstance(value, dict) and not value
+        ):
+            continue
+
         # Array processing
         if isinstance(value, list) and value:
             # Generate table name with proper sanitization
@@ -109,14 +115,14 @@ def _extract_arrays_impl(
                 deeply_nested_threshold=deeply_nested_threshold,
             )
 
-            # Skip if array is empty
-            if not value:
-                continue
-
             # Process each item in the array
             for i, item in enumerate(value):
                 # Skip null array items if configured to skip nulls
                 if item is None and skip_null:
+                    continue
+
+                # Skip empty dictionary items
+                if isinstance(item, dict) and not item:
                     continue
 
                 try:
@@ -237,6 +243,10 @@ def _extract_arrays_impl(
 
         # Nested object processing (non-array)
         elif isinstance(value, dict):
+            # Skip empty dictionaries
+            if not value:
+                continue
+
             # Recursively process nested objects for arrays inside them
             nested_generator = _extract_arrays_impl(
                 value,
@@ -313,6 +323,11 @@ def extract_arrays(
 
     Returns:
         Dictionary mapping table names to lists of records
+
+    Notes:
+        - Empty objects ({}) and empty arrays ([]) are skipped
+        - Dictionary items that are empty are also skipped
+        - Null values in arrays are skipped when skip_null is True
     """
     # Initialize extraction timestamp if not provided
     if extract_time is None:
@@ -369,10 +384,11 @@ def stream_extract_arrays(
     max_depth: int = 100,
     current_depth: int = 0,
 ) -> StreamExtractResult:
-    """Extract arrays from JSON in streaming mode.
+    """Extract nested arrays into a stream of records for memory-efficient processing.
 
-    This is a memory-efficient version that yields records as they are processed
-    rather than building complete tables in memory.
+    Similar to extract_arrays, but yields records individually instead of
+    collecting them into tables. This is useful for streaming large datasets
+    directly to output.
 
     Args:
         data: JSON data to process
@@ -397,6 +413,11 @@ def stream_extract_arrays(
 
     Yields:
         Tuples of (table_name, record) for each extracted record
+
+    Notes:
+        - Empty objects ({}) and empty arrays ([]) are skipped
+        - Dictionary items that are empty are also skipped
+        - Null values in arrays are skipped when skip_null is True
     """
     # Initialize extraction timestamp if not provided
     if extract_time is None:

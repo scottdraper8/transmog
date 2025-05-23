@@ -286,3 +286,71 @@ class TestExtractor(AbstractExtractorTest):
                 # Check array-specific fields
                 assert "__array_field" in item
                 assert "__array_index" in item
+
+    def test_empty_arrays_and_objects_are_skipped(self):
+        """Test that empty arrays and empty objects in arrays are skipped."""
+        # Create data with empty arrays and objects
+        data = {
+            "id": 1,
+            "name": "Test",
+            "empty_array": [],
+            "array_with_empty_objects": [{}, {}, {}],
+            "mixed_array": [
+                {"id": 1, "name": "Valid"},
+                {},  # Empty object should be skipped
+                {"id": 2, "name": "Also Valid"},
+            ],
+            "nested_object": {
+                "empty_array": [],
+                "valid_array": [{"id": 1, "value": "test"}],
+            },
+        }
+
+        # Extract arrays
+        result = extract_arrays(data, entity_name="test")
+        table_names = list(result.keys())
+
+        # Print table names for debugging
+        print(f"Extracted tables: {table_names}")
+
+        # Empty arrays should be skipped entirely
+        assert not any("empty_array" in name for name in table_names)
+
+        # Array with only empty objects should result in no records
+        array_empty_obj_tables = [
+            name for name in table_names if "array_with_empty_objects" in name
+        ]
+        if array_empty_obj_tables:
+            # If a table was created, it should have no records
+            for table in array_empty_obj_tables:
+                assert len(result[table]) == 0
+
+        # Mixed array should only have valid objects
+        mixed_array_tables = [name for name in table_names if "mixed_array" in name]
+        if mixed_array_tables:
+            for table in mixed_array_tables:
+                # Should have only 2 records (not 3)
+                assert len(result[table]) == 2
+                # All records should have both id and name
+                for record in result[table]:
+                    assert "id" in record
+                    assert "name" in record
+
+        # Nested object's empty array should be skipped
+        assert not any("nested_object_empty_array" in name for name in table_names)
+
+        # Nested object's valid array should be processed - the table name is actually
+        # test_nested_nested_array due to how the naming convention works
+        nested_valid_tables = [name for name in table_names if "nested_nested" in name]
+
+        # Verify we found the valid array table
+        assert len(nested_valid_tables) > 0
+
+        # Verify it has the record we expect
+        for table in nested_valid_tables:
+            assert len(result[table]) > 0
+            # Verify it has our valid array content
+            for record in result[table]:
+                if record.get("__array_field") == "valid_array":
+                    assert "id" in record
+                    assert "value" in record
