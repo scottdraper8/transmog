@@ -270,7 +270,7 @@ Transmog provides several options for controlling how arrays are processed:
    )
    ```
 
-For a complete guide to array handling options, see [Array Handling](../examples/array_handling.md).
+For a complete guide to array handling options, see [Array Handling](array-handling.md).
 
 ## Part 3: Understanding Parent-Child Relationships
 

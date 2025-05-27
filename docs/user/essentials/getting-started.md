@@ -206,5 +206,5 @@ processor = tm.Processor(
 For detailed configuration options, see:
 
 - [Configuration Guide](configuration.md) - Complete configuration system documentation
-- [Array Handling Options](../examples/array_handling.md) - Detailed array processing options
+- [Array Handling Options](../processing/array-handling.md) - Detailed array processing options
 - [Configuration API Reference](../../api/config.md) - Technical API details
