@@ -9,6 +9,7 @@ import os
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Generator, Iterator
+from datetime import datetime, timezone
 from typing import (
     Any,
     Callable,
@@ -44,13 +45,13 @@ T = TypeVar("T")
 
 
 class ProcessingStrategy(ABC):
-    """Base abstract class for processing strategies."""
+    """Abstract base class for processing strategies."""
 
     def __init__(self, config: TransmogConfig):
-        """Initialize the strategy with configuration.
+        """Initialize with configuration.
 
         Args:
-            config: Configuration for processing
+            config: Processing configuration
         """
         self.config = config
 
@@ -62,16 +63,16 @@ class ProcessingStrategy(ABC):
         extract_time: Optional[Any] = None,
         **kwargs: Any,
     ) -> ProcessingResult:
-        """Process data according to the strategy.
+        """Process the data.
 
         Args:
-            data: Input data in a format appropriate for the strategy
+            data: Data to process
             entity_name: Name of the entity being processed
             extract_time: Optional extraction timestamp
-            **kwargs: Additional strategy-specific parameters
+            **kwargs: Additional parameters
 
         Returns:
-            ProcessingResult object containing processed data
+            ProcessingResult containing processed data
         """
         pass
 
@@ -84,74 +85,84 @@ class ProcessingStrategy(ABC):
             extract_time: Optional extraction timestamp
 
         Returns:
-            Dictionary of common configuration parameters
+            Dictionary of common parameters
         """
-        # Default to current timestamp if not provided
+        # Extract extraction time
         if extract_time is None:
-            extract_time = get_current_timestamp()
+            extract_time = datetime.now(timezone.utc)
 
-        # Get configuration sections
-        naming_config = self.config.naming
-        processing_config = self.config.processing
-        metadata_config = self.config.metadata
-        error_config = self.config.error_handling
+        # Get naming parameters
+        naming_config = getattr(self.config, "naming", None)
+        if naming_config:
+            separator = naming_config.separator
+            deeply_nested_threshold = naming_config.deeply_nested_threshold
+        else:
+            separator = "_"
+            deeply_nested_threshold = 4
 
-        # Combine parameters
-        params = {
-            # Naming parameters
-            "separator": naming_config.separator,
-            "deeply_nested_threshold": naming_config.deeply_nested_threshold,
-            # Processing parameters
-            "cast_to_string": processing_config.cast_to_string,
-            "include_empty": processing_config.include_empty,
-            "skip_null": processing_config.skip_null,
-            "visit_arrays": processing_config.visit_arrays,
-            # Metadata parameters
-            "id_field": metadata_config.id_field,
-            "parent_field": metadata_config.parent_field,
-            "time_field": metadata_config.time_field,
+        # Get processing parameters
+        processing_config = getattr(self.config, "processing", None)
+        if processing_config:
+            cast_to_string = processing_config.cast_to_string
+            include_empty = processing_config.include_empty
+            skip_null = processing_config.skip_null
+            path_parts_optimization = processing_config.path_parts_optimization
+            visit_arrays = processing_config.visit_arrays
+            keep_arrays = processing_config.keep_arrays
+            max_depth = processing_config.max_depth
+        else:
+            cast_to_string = True
+            include_empty = False
+            skip_null = True
+            path_parts_optimization = True
+            visit_arrays = True
+            keep_arrays = False
+            max_depth = 100
+
+        # Get metadata parameters
+        metadata_config = getattr(self.config, "metadata", None)
+        if metadata_config:
+            id_field = metadata_config.id_field
+            parent_field = metadata_config.parent_field
+            time_field = metadata_config.time_field
+            default_id_field = metadata_config.default_id_field
+            id_generation_strategy = metadata_config.id_generation_strategy
+        else:
+            id_field = "__extract_id"
+            parent_field = "__parent_extract_id"
+            time_field = "__extract_datetime"
+            default_id_field = None
+            id_generation_strategy = None
+
+        # Get error handling parameters
+        error_config = getattr(self.config, "error_handling", None)
+        if error_config:
+            recovery_strategy = error_config.recovery_strategy
+        else:
+            recovery_strategy = "strict"
+
+        # Return consolidated parameters
+        return {
+            "separator": separator,
+            "deeply_nested_threshold": deeply_nested_threshold,
+            "cast_to_string": cast_to_string,
+            "include_empty": include_empty,
+            "skip_null": skip_null,
+            "path_parts_optimization": path_parts_optimization,
+            "visit_arrays": visit_arrays,
+            "keep_arrays": keep_arrays,
+            "id_field": id_field,
+            "parent_field": parent_field,
+            "time_field": time_field,
+            "default_id_field": default_id_field,
+            "id_generation_strategy": id_generation_strategy,
             "extract_time": extract_time,
-            "default_id_field": metadata_config.default_id_field,
-            "id_generation_strategy": metadata_config.id_generation_strategy,
+            "recovery_strategy": recovery_strategy,
+            "max_depth": max_depth,
         }
 
-        # Apply recovery strategy if configured
-        if error_config.recovery_strategy:
-            from ..error.recovery import (
-                DEFAULT,
-                LENIENT,
-                STRICT,
-                PartialProcessingRecovery,
-                SkipAndLogRecovery,
-                StrictRecovery,
-            )
-
-            # Select appropriate recovery strategy
-            strategy_name = error_config.recovery_strategy
-            recovery_strategy: Optional[
-                Union[StrictRecovery, SkipAndLogRecovery, PartialProcessingRecovery]
-            ] = None
-
-            if strategy_name == "strict":
-                recovery_strategy = STRICT
-            elif strategy_name == "skip":
-                recovery_strategy = DEFAULT
-            elif strategy_name == "partial":
-                recovery_strategy = LENIENT
-            elif isinstance(
-                strategy_name,
-                (StrictRecovery, SkipAndLogRecovery, PartialProcessingRecovery),
-            ):
-                recovery_strategy = strategy_name
-
-            # Add valid strategy to params
-            if recovery_strategy:
-                params["recovery_strategy"] = recovery_strategy
-
-        return params
-
     def _get_batch_size(self, chunk_size: Optional[int] = None) -> int:
-        """Determine batch size for processing.
+        """Get batch size for processing.
 
         Args:
             chunk_size: Optional override for batch size
@@ -159,62 +170,64 @@ class ProcessingStrategy(ABC):
         Returns:
             Batch size to use
         """
-        if chunk_size is not None and chunk_size > 0:
-            return chunk_size
-        return self.config.processing.batch_size
+        # Use provided chunk size if specified
+        if chunk_size is not None:
+            return int(chunk_size)
+
+        # Otherwise use config batch size
+        processing_config = getattr(self.config, "processing", None)
+        if processing_config and hasattr(processing_config, "batch_size"):
+            return processing_config.batch_size
+        return 1000  # Default batch size
 
     def _get_common_parameters(self, **kwargs: Any) -> dict[str, Any]:
-        """Extract common parameters from kwargs or config.
-
-        This method combines user-provided parameters with defaults from config.
+        """Get common parameters for processing.
 
         Args:
-            **kwargs: User-provided parameters that override defaults
+            **kwargs: Override parameters
 
         Returns:
-            Dictionary of parameters for processing
+            Dictionary of parameters
         """
-        # Get config sections
-        naming_config = self.config.naming
-        processing_config = self.config.processing
-        metadata_config = self.config.metadata
+        # Get parameters from config
+        params = self._get_common_config_params(
+            extract_time=kwargs.get("extract_time", None)
+        )
 
-        # Combine parameters from config and kwargs
-        params = {
-            # Naming parameters
-            "separator": kwargs.get("separator", naming_config.separator),
-            "deeply_nested_threshold": kwargs.get(
-                "deeply_nested_threshold", naming_config.deeply_nested_threshold
-            ),
-            # Processing parameters
-            "cast_to_string": kwargs.get(
-                "cast_to_string", processing_config.cast_to_string
-            ),
-            "include_empty": kwargs.get(
-                "include_empty", processing_config.include_empty
-            ),
-            "skip_null": kwargs.get("skip_null", processing_config.skip_null),
-            "max_depth": kwargs.get("max_depth", processing_config.max_nesting_depth),
-            "visit_arrays": kwargs.get("visit_arrays", processing_config.visit_arrays),
-            # Metadata parameters
-            "id_field": kwargs.get("id_field", metadata_config.id_field),
-            "parent_field": kwargs.get("parent_field", metadata_config.parent_field),
-            "time_field": kwargs.get("time_field", metadata_config.time_field),
-            "default_id_field": kwargs.get(
-                "default_id_field", metadata_config.default_id_field
-            ),
-            "id_generation_strategy": kwargs.get(
-                "id_generation_strategy", metadata_config.id_generation_strategy
-            ),
-        }
+        # Override with any provided parameters
+        for key, value in kwargs.items():
+            if key in params:
+                params[key] = value
 
         return params
+
+    def _remove_array_fields_from_record(self, record: dict[str, Any]) -> None:
+        """Remove array and object fields from a record.
+
+        Args:
+            record: The record to remove array fields from
+        """
+        # Identify keys to remove (complex types that would be extracted to
+        # child tables)
+        keys_to_remove = []
+        for key, value in record.items():
+            # Skip metadata fields which start with __
+            if key.startswith("__"):
+                continue
+
+            # Remove lists and dictionaries that would be extracted to child tables
+            if isinstance(value, (list, dict)):
+                keys_to_remove.append(key)
+
+        # Remove the identified keys
+        for key in keys_to_remove:
+            del record[key]
 
 
 class InMemoryStrategy(ProcessingStrategy):
     """Strategy for processing in-memory data structures."""
 
-    @error_context("Failed to process data", log_exceptions=True)
+    @error_context("Failed to process data", log_exceptions=True)  # type: ignore
     def process(
         self,
         data: Any,
@@ -281,18 +294,42 @@ class InMemoryStrategy(ProcessingStrategy):
         """
         # Extract recovery strategy if present
         recovery_strategy = params.get("recovery_strategy")
+        keep_arrays = params.get("keep_arrays", False)
 
-        # Remove from params to avoid duplicate argument
-        params_copy = params.copy()
-        if "recovery_strategy" in params_copy:
-            del params_copy["recovery_strategy"]
+        # Get common parameters
+        extract_time = params.get("extract_time")
+        separator = params.get("separator", "_")
+        cast_to_string = params.get("cast_to_string", True)
+        include_empty = params.get("include_empty", False)
+        skip_null = params.get("skip_null", True)
+        id_field = params.get("id_field", "__extract_id")
+        parent_field = params.get("parent_field", "__parent_extract_id")
+        time_field = params.get("time_field", "__extract_datetime")
+        visit_arrays = params.get("visit_arrays", True)
+        deeply_nested_threshold = params.get("deeply_nested_threshold", 4)
+        default_id_field = params.get("default_id_field")
+        id_generation_strategy = params.get("id_generation_strategy")
+        max_depth = params.get("max_depth", 100)
 
         # Process all records in a single pass
         main_records, child_tables = process_records_in_single_pass(
             records=data_list,
             entity_name=entity_name,
+            extract_time=extract_time,
+            separator=separator,
+            cast_to_string=cast_to_string,
+            include_empty=include_empty,
+            skip_null=skip_null,
+            id_field=id_field,
+            parent_field=parent_field,
+            time_field=time_field,
+            visit_arrays=visit_arrays,
+            deeply_nested_threshold=deeply_nested_threshold,
+            default_id_field=default_id_field,
+            id_generation_strategy=id_generation_strategy,
             recovery_strategy=recovery_strategy,
-            **params_copy,
+            max_depth=max_depth,
+            keep_arrays=keep_arrays,
         )
 
         # Update result
@@ -712,6 +749,7 @@ class FileStrategy(ProcessingStrategy):
         """Process arrays for a batch of records efficiently."""
         # Get processing parameters
         visit_arrays = params.get("visit_arrays", True)
+        keep_arrays = params.get("keep_arrays", False)
 
         # Only process arrays if enabled
         if not visit_arrays:
@@ -744,6 +782,18 @@ class FileStrategy(ProcessingStrategy):
                 for table_name, records in arrays.items():
                     for child in records:
                         result.add_child_record(table_name, child)
+
+                # Only remove array fields if keep_arrays is False
+                if not keep_arrays:
+                    # Remove array fields from the original record after they've been
+                    # processed
+                    # This ensures arrays don't exist in both the main table
+                    # and child tables
+                    self._remove_array_fields_from_record(record)
+
+                    # Also update the main record in the result if it exists
+                    if i < len(result.main_table):
+                        self._remove_array_fields_from_record(result.main_table[i])
 
 
 class BatchStrategy(ProcessingStrategy):
@@ -937,6 +987,7 @@ class BatchStrategy(ProcessingStrategy):
         """Process arrays for a batch of records efficiently."""
         # Get processing parameters
         visit_arrays = params.get("visit_arrays", True)
+        keep_arrays = params.get("keep_arrays", False)
 
         # Only process arrays if enabled
         if not visit_arrays:
@@ -969,6 +1020,18 @@ class BatchStrategy(ProcessingStrategy):
                 for table_name, records in arrays.items():
                     for child in records:
                         result.add_child_record(table_name, child)
+
+                # Only remove array fields if keep_arrays is False
+                if not keep_arrays:
+                    # Remove array fields from the original record after they've been
+                    # processed
+                    # This ensures arrays don't exist in both the main table
+                    # and child tables
+                    self._remove_array_fields_from_record(record)
+
+                    # Also update the main record in the result if it exists
+                    if i < len(result.main_table):
+                        self._remove_array_fields_from_record(result.main_table[i])
 
 
 class ChunkedStrategy(ProcessingStrategy):
@@ -1250,13 +1313,14 @@ class ChunkedStrategy(ProcessingStrategy):
 
         # Get processing parameters
         visit_arrays = params.get("visit_arrays", True)
+        keep_arrays = params.get("keep_arrays", False)
 
         # Only process arrays if enabled
         if not visit_arrays:
             return
 
         # Process arrays for each record in the batch
-        for record, parent_id in zip(batch, main_ids):
+        for i, (record, parent_id) in enumerate(zip(batch, main_ids)):
             # Skip if we don't have a valid parent ID
             if parent_id is None:
                 continue
@@ -1275,6 +1339,7 @@ class ChunkedStrategy(ProcessingStrategy):
                 default_id_field=default_id_field,
                 id_generation_strategy=id_generation_strategy,
                 recovery_strategy=params.get("recovery_strategy"),
+                keep_arrays=keep_arrays,
             )
 
             # Add arrays to result for this record - ensure arrays is a dict
@@ -1283,11 +1348,23 @@ class ChunkedStrategy(ProcessingStrategy):
                     for child in records:
                         result.add_child_record(table_name, child)
 
+                # Only remove array fields if keep_arrays is False
+                if not keep_arrays:
+                    # Remove array fields from the original record after they've been
+                    # processed
+                    # This ensures arrays don't exist in both the main table
+                    # and child tables
+                    self._remove_array_fields_from_record(record)
+
+                    # Also update the main record in the result if it exists
+                    if i < len(result.main_table):
+                        self._remove_array_fields_from_record(result.main_table[i])
+
 
 class CSVStrategy(ProcessingStrategy):
     """Strategy for processing CSV files."""
 
-    @error_context("Failed to process CSV file", log_exceptions=True)
+    @error_context("Failed to process CSV file", log_exceptions=True)  # type: ignore
     def process(
         self,
         data: Any,

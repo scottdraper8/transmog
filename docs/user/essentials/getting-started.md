@@ -171,114 +171,40 @@ Orders: [
 ]
 ```
 
+By default, arrays are removed from the main table after being extracted. If you want to keep
+the original arrays in the main table while still creating child tables, use the `keep_arrays` parameter:
+
+```python
+# Configure to keep arrays in main table after processing
+processor = tm.Processor(
+    tm.TransmogConfig.default().keep_arrays()
+)
+result = processor.process(data, entity_name="users")
+
+# The main table will contain both flattened fields and the original arrays
+main_data = result.get_main_table()
+# The child tables are still created as before
+```
+
 ### Processing Options
 
-Configuration system:
+Configuration system for customizing processing behavior:
 
 ```python
-# Create a custom configuration
-config = (
+# Create a processor with custom processing options
+processor = tm.Processor(
     tm.TransmogConfig.default()
     .with_processing(
-        cast_to_string=True,  # Convert all values to strings
-        include_empty=False,  # Skip empty strings
-        skip_null=True,       # Skip null values
-        batch_size=500        # Process in batches of 500
-    )
-    .with_naming(
-        separator="_"         # Use underscore as path separator
+        cast_to_string=True,      # Convert values to strings
+        include_empty=False,      # Exclude empty values
+        skip_null=True,           # Skip null values
+        visit_arrays=True         # Process arrays into child tables
     )
 )
-
-# Use the configuration
-processor = tm.Processor(config=config)
 ```
 
-## Exporting Data
+For detailed configuration options, see:
 
-Output format options:
-
-```python
-# Get structured output
-tables = result.to_dict()                # Get all tables as Python dictionaries
-pa_tables = result.to_pyarrow_tables()   # Get as PyArrow Tables
-
-# Bytes output for direct writing
-json_bytes = result.to_json_bytes(indent=2)  # Get all tables as JSON bytes
-csv_bytes = result.to_csv_bytes()        # Get all tables as CSV bytes
-parquet_bytes = result.to_parquet_bytes()    # Get all tables as Parquet bytes
-
-# Direct write to files
-result.write_all_json("output_dir/json")
-result.write_all_csv("output_dir/csv")
-result.write_all_parquet("output_dir/parquet")
-```
-
-## Error Handling
-
-Error recovery strategies:
-
-```python
-# Create a configuration with error handling
-config = (
-    tm.TransmogConfig.default()
-    .with_error_handling(
-        allow_malformed_data=True,
-        recovery_strategy="skip",
-        max_retries=3
-    )
-)
-
-# Use the configuration
-processor = tm.Processor(config=config)
-
-# Process potentially problematic data
-result = processor.process(data, entity_name="users")
-```
-
-## Deterministic IDs
-
-Configure deterministic IDs for consistent processing:
-
-```python
-# Configure deterministic IDs based on specific fields
-processor = tm.Processor.with_deterministic_ids({
-    "": "id",                     # Root level uses "id" field
-    "users_user_orders": "id"     # Order records use "id" field
-})
-
-# Process data with deterministic IDs
-result = processor.process(data, entity_name="users")
-```
-
-## Processing Different Input Types
-
-Transmog automatically selects the appropriate processing strategy based on the input type:
-
-```python
-# Process in-memory data (dictionary or list)
-result = processor.process(data, entity_name="users")
-
-# Process a file directly
-result = processor.process("data.json", entity_name="users")
-
-# Process data in chunks for large datasets
-result = processor.process_chunked("large_data.jsonl", entity_name="users", chunk_size=1000)
-
-# Process a CSV file
-result = processor.process_csv("data.csv", entity_name="users", has_header=True)
-
-# Process a batch of records
-batch_data = [{"id": 1}, {"id": 2}, {"id": 3}]
-result = processor.process_batch(batch_data, entity_name="users")
-```
-
-## Next Steps
-
-Once you're comfortable with the basics, you can explore more advanced topics:
-
-- [Data Transformation Guide](../processing/data-transformation.md)
-- [JSON Handling and Transformation](../processing/json-handling.md)
-- [Processing Overview](../processing/processing-overview.md)
-- [File Processing Guide](../processing/file-processing.md)
-- [Output Format Options](../output/output-formats.md)
+- [Configuration Guide](configuration.md) - Complete configuration system documentation
+- [Array Handling Options](../examples/array_handling.md) - Detailed array processing options
+- [Configuration API Reference](../../api/config.md) - Technical API details

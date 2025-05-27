@@ -244,6 +244,34 @@ for item in items_table:
     print(f"Item {item['product']} has parent ID {item['__parent_id']}")
 ```
 
+### Array Processing Options
+
+Transmog provides several options for controlling how arrays are processed:
+
+1. **Default Behavior**: Arrays are extracted into child tables and removed from the main table
+
+   ```python
+   processor = tm.Processor()
+   ```
+
+2. **Keep Arrays in Main Table**: Arrays are extracted into child tables but also kept in the main table
+
+   ```python
+   processor = tm.Processor(
+       tm.TransmogConfig.default().keep_arrays()
+   )
+   ```
+
+3. **Skip Array Processing**: Arrays are kept in the main table and not processed into child tables
+
+   ```python
+   processor = tm.Processor(
+       tm.TransmogConfig.default().disable_arrays()
+   )
+   ```
+
+For a complete guide to array handling options, see [Array Handling](../examples/array_handling.md).
+
 ## Part 3: Understanding Parent-Child Relationships
 
 When processing nested data, Transmog:

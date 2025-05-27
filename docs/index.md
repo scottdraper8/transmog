@@ -181,6 +181,18 @@ See our [ROADMAP.md](https://github.com/scottdraper8/transmog/blob/main/ROADMAP.
 - Streaming data processing
 - Batch processing
 
+### Arrays and Nested Objects
+
+- 🔄 **Array Extraction**: Automatically extract arrays into separate child tables with parent-child
+  relationships preserved
+- 🌲 **Deep Nesting Support**: Handle arbitrarily nested objects and arrays with automatic table
+  generation
+- 🔗 **Relationship Preservation**: Maintain parent-child relationships between extracted entities
+- ⚙️ **Configurable Array Handling**: Choose whether to extract arrays, keep arrays in the main
+  table, or process arrays in-place
+- 📋 **Array Options**: Fine-grained control over array extraction with `visit_arrays` and
+  `keep_arrays` parameters
+
 ```{toctree}
 :maxdepth: 1
 :hidden:

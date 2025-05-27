@@ -76,6 +76,9 @@ class ProcessingConfig:
     max_depth: int = 100  # Maximum recursion depth
     path_parts_optimization: bool = True
     visit_arrays: bool = True
+    keep_arrays: bool = (
+        False  # Whether to keep arrays in main table after exploding into child tables
+    )
     batch_size: int = 1000
     processing_mode: ProcessingMode = ProcessingMode.STANDARD
     # Validation settings
@@ -489,6 +492,18 @@ class TransmogConfig:
             Updated TransmogConfig with array processing disabled
         """
         return self.with_processing(visit_arrays=False)
+
+    def keep_arrays(self) -> "TransmogConfig":
+        """Configure to keep arrays in the main table after processing.
+
+        When enabled, arrays will be processed into child tables but will also
+        remain in the main table. This can be useful for backward compatibility
+        or when the same array data is needed in both forms.
+
+        Returns:
+            Updated TransmogConfig with arrays kept in main table after processing
+        """
+        return self.with_processing(keep_arrays=True)
 
     def use_string_format(self) -> "TransmogConfig":
         """Configure all fields to be cast to strings.

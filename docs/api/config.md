@@ -106,6 +106,43 @@ def with_custom_id_generation(
     return cls(metadata=MetadataConfig(id_generation_strategy=strategy))
 ```
 
+#### `disable_arrays()`
+
+Configure to skip array processing and keep arrays as JSON strings.
+
+```python
+def disable_arrays(self) -> "TransmogConfig":
+    """
+    Configure to skip array processing and keep arrays as JSON strings.
+
+    This is useful when you want to keep arrays as single fields rather
+    than creating child tables.
+
+    Returns:
+        Updated TransmogConfig with array processing disabled
+    """
+    return self.with_processing(visit_arrays=False)
+```
+
+#### `keep_arrays()`
+
+Configure to keep arrays in the main table after processing them into child tables.
+
+```python
+def keep_arrays(self) -> "TransmogConfig":
+    """
+    Configure to keep arrays in the main table after processing.
+
+    When enabled, arrays will be processed into child tables but will also
+    remain in the main table. This can be useful when you need both the
+    normalized form in child tables and the original arrays.
+
+    Returns:
+        Updated TransmogConfig with arrays kept in main table after processing
+    """
+    return self.with_processing(keep_arrays=True)
+```
+
 ### Instance Methods
 
 #### `with_naming(**kwargs)`
@@ -255,6 +292,7 @@ class ProcessingConfig:
 - **max_depth** (`int`, default: `100`): Maximum recursion depth for nested structures.
 - **path_parts_optimization** (`bool`, default: `True`): Whether to optimize path handling.
 - **visit_arrays** (`bool`, default: `True`): Whether to process arrays as separate tables.
+- **keep_arrays** (`bool`, default: `False`): Whether to keep arrays in the main table after processing them into child tables.
 - **batch_size** (`int`, default: `1000`): Batch size for processing.
 - **processing_mode** (`ProcessingMode`, default: `ProcessingMode.STANDARD`): Processing mode.
 

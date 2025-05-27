@@ -143,7 +143,8 @@ config = (
         cast_to_string=True,      # Convert values to strings
         include_empty=False,      # Exclude empty values
         skip_null=True,           # Skip null values
-        visit_arrays=True         # Process arrays as separate tables
+        visit_arrays=True,        # Process arrays as separate tables
+        keep_arrays=False         # Remove arrays from main table after processing
     )
     .with_naming(
         separator=".",            # Use dots as separators

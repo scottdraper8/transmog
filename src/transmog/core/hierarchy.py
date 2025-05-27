@@ -4,6 +4,7 @@ Provides functions to process complete JSON structures with
 parent-child relationship preservation.
 """
 
+import json
 import logging
 from collections.abc import Generator
 from datetime import datetime
@@ -52,6 +53,7 @@ def process_structure(
     streaming: bool = False,
     recovery_strategy: Optional[Any] = None,
     max_depth: int = 100,
+    keep_arrays: bool = False,
 ) -> tuple[FlatDict, ArrayResult]:
     """Process JSON structure with parent-child relationship preservation.
 
@@ -81,6 +83,7 @@ def process_structure(
         streaming: Whether to return a generator for child tables
         recovery_strategy: Strategy for handling errors
         max_depth: Maximum recursion depth for nested structures
+        keep_arrays: Whether to keep arrays in the main table after processing
 
     Returns:
         Tuple of (flattened main object, array tables dictionary or generator)
@@ -117,13 +120,24 @@ def process_structure(
         separator=separator,
         cast_to_string=cast_to_string,
         include_empty=include_empty,
-        skip_arrays=True,
+        skip_arrays=not keep_arrays,  # If keeping arrays, don't skip them
         skip_null=skip_null,
         deeply_nested_threshold=deeply_nested_threshold,
         mode="streaming",
         recovery_strategy=recovery_strategy,
         max_depth=max_depth,
     )
+
+    # Create a copy of the original data for array extraction if keeping arrays
+    if keep_arrays:
+        # Copy arrays from original data to flattened output
+        for key, value in data.items():
+            if isinstance(value, (list, dict)) and key not in flattened_obj:
+                # If it's a complex type and not already flattened, add it to output
+                if cast_to_string:
+                    flattened_obj[key] = json.dumps(value)
+                else:
+                    flattened_obj[key] = value
 
     # Resolve source field for deterministic ID generation
     source_field = None
@@ -221,7 +235,24 @@ def process_structure(
 
 
 def process_record_batch(
-    records: list[JsonDict], entity_name: str, batch_size: int = 100, **kwargs: Any
+    records: list[JsonDict],
+    entity_name: str,
+    extract_time: Optional[Any] = None,
+    separator: str = "_",
+    cast_to_string: bool = True,
+    include_empty: bool = False,
+    skip_null: bool = True,
+    id_field: str = "__extract_id",
+    parent_field: str = "__parent_extract_id",
+    time_field: str = "__extract_datetime",
+    visit_arrays: bool = True,
+    deeply_nested_threshold: int = 4,
+    default_id_field: Optional[Union[str, dict[str, str]]] = None,
+    id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
+    recovery_strategy: Optional[Any] = None,
+    max_depth: int = 100,
+    keep_arrays: bool = False,
+    batch_size: int = 100,
 ) -> tuple[list[FlatDict], ArrayDict]:
     """Process a batch of records separately and combine the results.
 
@@ -231,14 +262,47 @@ def process_record_batch(
     Args:
         records: List of top-level records to process
         entity_name: Entity name for all records
+        extract_time: Extraction timestamp
+        separator: Separator for path components
+        cast_to_string: Whether to cast all values to strings
+        include_empty: Whether to include empty values
+        skip_null: Whether to skip null values
+        id_field: ID field name
+        parent_field: Parent ID field name
+        time_field: Timestamp field name
+        visit_arrays: Whether to visit and process arrays
+        deeply_nested_threshold: Threshold for when to consider a path deeply nested
+        default_id_field: Field name or dict mapping paths to field names for
+            deterministic IDs
+        id_generation_strategy: Custom function for ID generation
+        recovery_strategy: Strategy for error recovery
+        max_depth: Maximum recursion depth for nested structures
+        keep_arrays: Whether to keep arrays in the main table after processing
         batch_size: Number of records to process in a single batch
-        **kwargs: Additional keyword args to pass to process_structure
 
     Returns:
         Tuple of (flattened main objects, combined array tables)
     """
     # Process records in smaller batches for better memory usage
-    return process_records_in_single_pass(records, entity_name=entity_name, **kwargs)
+    return process_records_in_single_pass(
+        records,
+        entity_name=entity_name,
+        extract_time=extract_time,
+        separator=separator,
+        cast_to_string=cast_to_string,
+        include_empty=include_empty,
+        skip_null=skip_null,
+        id_field=id_field,
+        parent_field=parent_field,
+        time_field=time_field,
+        visit_arrays=visit_arrays,
+        deeply_nested_threshold=deeply_nested_threshold,
+        default_id_field=default_id_field,
+        id_generation_strategy=id_generation_strategy,
+        recovery_strategy=recovery_strategy,
+        max_depth=max_depth,
+        keep_arrays=keep_arrays,
+    )
 
 
 def process_records_in_single_pass(
@@ -258,7 +322,7 @@ def process_records_in_single_pass(
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     recovery_strategy: Optional[Any] = None,
     max_depth: int = 100,
-    **kwargs: Any,
+    keep_arrays: bool = False,
 ) -> tuple[list[FlatDict], ArrayDict]:
     r"""Process multiple records and combine the results.
 
@@ -284,7 +348,7 @@ def process_records_in_single_pass(
         id_generation_strategy: Custom function for ID generation
         recovery_strategy: Strategy for error recovery
         max_depth: Maximum recursion depth for nested structures
-        **kwargs: Additional keyword args
+        keep_arrays: Whether to keep arrays in the main table after processing
 
     Returns:
         Tuple of (flattened main objects, array tables)
@@ -300,12 +364,7 @@ def process_records_in_single_pass(
     # Process each record
     for i, record in enumerate(records):
         try:
-            # Process a single record - Don't pass batch_size to process_structure
-            process_kwargs = {
-                k: v
-                for k, v in kwargs.items()
-                if k != "batch_size" and k != "use_deterministic_ids"
-            }
+            # Process a single record
             main_record, child_tables = process_structure(
                 record,
                 entity_name=entity_name,
@@ -323,7 +382,7 @@ def process_records_in_single_pass(
                 id_generation_strategy=id_generation_strategy,
                 recovery_strategy=recovery_strategy,
                 max_depth=max_depth,
-                **process_kwargs,
+                keep_arrays=keep_arrays,
             )
 
             # Add main record to results
@@ -383,7 +442,8 @@ def stream_process_records(
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     max_depth: int = 100,
-    **kwargs: Any,
+    keep_arrays: bool = False,
+    use_deterministic_ids: bool = False,
 ) -> tuple[list[FlatDict], StreamingChildTables]:
     r"""Process records in streaming mode.
 
@@ -408,7 +468,8 @@ def stream_process_records(
             deterministic IDs
         id_generation_strategy: Custom function for ID generation
         max_depth: Maximum recursion depth for nested structures
-        **kwargs: Additional keyword args
+        keep_arrays: Whether to keep arrays in the main table after processing
+        use_deterministic_ids: Whether to use deterministic ID generation
 
     Returns:
         Tuple of (flattened main objects, generator for array tables)
@@ -422,12 +483,6 @@ def stream_process_records(
     all_generators: list[Generator[tuple[str, dict[str, Any]], None, None]] = []
 
     for record in records:
-        # Don't pass batch_size to process_structure
-        process_kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k != "batch_size" and k != "use_deterministic_ids"
-        }
         main_record, child_generator = process_structure(
             record,
             entity_name=entity_name,
@@ -445,7 +500,7 @@ def stream_process_records(
             id_generation_strategy=id_generation_strategy,
             streaming=True,  # Enable streaming mode
             max_depth=max_depth,
-            **process_kwargs,
+            keep_arrays=keep_arrays,
         )
 
         # Add main record to results

@@ -13,21 +13,23 @@ These guides are organized into logical categories:
 
 #### Essentials (`/user/essentials/`)
 
-- [Getting Started](user/essentials/getting-started.md) - First steps with Transmog
-- [Basic Concepts](user/essentials/basic-concepts.md) - Core concepts and terminology
-- [Configuration](user/essentials/configuration.md) - Configuring Transmog for your needs
-- [Data Structures](user/essentials/data-structures.md) - Understanding data types and flow
+- 🚀 [Getting Started](user/essentials/getting-started.md) - Getting started with Transmog
+- 📚 [Basic Concepts](user/essentials/basic-concepts.md) - Fundamental concepts
+- 🧩 [Data Structures](user/essentials/data-structures.md) - Input and output data structures
+- 🌉 [Extension](user/essentials/extension.md) - Extending Transmog
+- 🗺️ [Configuration](user/essentials/configuration.md) - Options for customizing Transmog
 - [Dependencies and Features](user/essentials/dependencies-and-features.md) - Optional dependencies and features
 
 #### Processing (`/user/processing/`)
 
-- [Processing Overview](user/processing/processing-overview.md) - Understanding the processing workflow
-- [Data Transformation](user/processing/data-transformation.md) - Comprehensive guide to transforming data
-- [JSON Handling](user/processing/json-handling.md) - Working with JSON data
-- [CSV Processing](user/processing/csv-processing.md) - Working with CSV data
-- [File Processing](user/processing/file-processing.md) - Processing data from files
+- 🔄 [Processing Overview](user/processing/processing-overview.md) - General processing guide
+- 🧬 [Data Transformation](user/processing/data-transformation.md) - Transforming data structures
+- 📄 [File Processing](user/processing/file-processing.md) - Working with files
+- 📊 [JSON Handling](user/processing/json-handling.md) - Working with JSON data
+- 📋 [CSV Processing](user/processing/csv-processing.md) - Working with CSV data
+- 🏷️ [Naming](user/processing/naming.md) - Field and table naming
+- 📦 [Array Handling](user/examples/array_handling.md) - Options for array processing
 - [Metadata](user/processing/metadata.md) - Working with metadata
-- [Naming](user/processing/naming.md) - Naming conventions and strategies
 - [Transforms](user/processing/transforms.md) - Transformation functions and operations
 - [IO Operations](user/processing/io.md) - Input/output operations
 

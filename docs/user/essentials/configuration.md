@@ -161,6 +161,7 @@ processing_config = tm.ProcessingConfig(
     max_nesting_depth=100,        # Maximum nesting depth (None for unlimited)
     path_parts_optimization=True, # Optimize path handling
     visit_arrays=True,            # Process arrays as separate tables
+    keep_arrays=False,            # Keep arrays in main table after processing
     batch_size=1000,              # Batch size for processing
     processing_mode=tm.ProcessingMode.STANDARD  # Processing mode
 )
