@@ -5,7 +5,7 @@ requires = [ "poetry>=1" ]
 
 [project]
 name = "transmog"
-version = "1.0.3"
+version = "1.0.4"
 description = "An ETL/ELT transformation library for converting nested JSON structures into flat, tabular formats"
 readme = "README.md"
 keywords = [
@@ -56,6 +56,7 @@ optional-dependencies.dev = [
   "types-pyyaml",
   "types-toml",
 ]
+
 # Documentation dependencies
 optional-dependencies.docs = [
   "furo>=2024.1.29",
@@ -78,6 +79,7 @@ optional-dependencies.docs = [
 ]
 # For users who want the absolute minimum dependencies
 optional-dependencies.minimal = [  ]
+
 # Additional optional features
 optional-dependencies.test = [
   "pytest>=7",
@@ -87,26 +89,6 @@ optional-dependencies.test = [
 urls."Bug Tracker" = "https://github.com/scottdraper8/transmog/issues"
 urls."Documentation" = "https://scottdraper8.github.io/transmog/"
 urls."Homepage" = "https://github.com/scottdraper8/transmog"
-
-[tool.poetry]
-name = "transmog"
-description = "JSON data transformation and flattening utility"
-authors = [ "Scott Leishman <scottleish@gmail.com>" ]
-repository = "https://github.com/scottleibrand/transmog"
-version = "1.0.3"
-readme = "README.md"
-license = "MIT"
-packages = [ { include = "transmog", from = "src" } ]
-keywords = [ "json", "data", "transformation", "etl", "tables" ]
-classifiers = [
-  "Topic :: Software Development :: Libraries :: Python Modules",
-  "Topic :: Scientific/Engineering :: Information Analysis",
-  "Topic :: Database",
-  "Programming Language :: Python :: 3",
-  "Development Status :: 5 - Production/Stable",
-  "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
-]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
