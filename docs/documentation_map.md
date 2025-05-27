@@ -16,7 +16,6 @@ These guides are organized into logical categories:
 - 🚀 [Getting Started](user/essentials/getting-started.md) - Getting started with Transmog
 - 📚 [Basic Concepts](user/essentials/basic-concepts.md) - Fundamental concepts
 - 🧩 [Data Structures](user/essentials/data-structures.md) - Input and output data structures
-- 🌉 [Extension](user/essentials/extension.md) - Extending Transmog
 - 🗺️ [Configuration](user/essentials/configuration.md) - Options for customizing Transmog
 - [Dependencies and Features](user/essentials/dependencies-and-features.md) - Optional dependencies and features
 
@@ -28,7 +27,7 @@ These guides are organized into logical categories:
 - 📊 [JSON Handling](user/processing/json-handling.md) - Working with JSON data
 - 📋 [CSV Processing](user/processing/csv-processing.md) - Working with CSV data
 - 🏷️ [Naming](user/processing/naming.md) - Field and table naming
-- 📦 [Array Handling](user/examples/array_handling.md) - Options for array processing
+- 📦 [Array Handling](user/processing/array-handling.md) - Options for array processing
 - [Metadata](user/processing/metadata.md) - Working with metadata
 - [Transforms](user/processing/transforms.md) - Transformation functions and operations
 - [IO Operations](user/processing/io.md) - Input/output operations

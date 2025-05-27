@@ -218,6 +218,7 @@ user/processing/data-transformation
 user/processing/json-handling
 user/processing/csv-processing
 user/processing/file-processing
+user/processing/array-handling
 user/processing/metadata
 user/processing/naming
 user/processing/transforms
