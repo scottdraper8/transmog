@@ -2,13 +2,14 @@
 
 /* Improve code block styling */
 div.highlight {
-    border-left: 3px solid #2980B9;
-    background-color: #f8f8f8;
+    border-left: 3px solid var(--color-brand-primary);
+    background-color: var(--color-background-secondary);
+    border-radius: 4px;
 }
 
 /* Improve table styling */
 table.docutils {
-    border: 1px solid #e1e4e5;
+    border: 1px solid var(--color-background-border);
     border-collapse: collapse;
     border-spacing: 0;
     width: 100%;
@@ -18,11 +19,11 @@ table.docutils {
 table.docutils td,
 table.docutils th {
     padding: 8px 16px;
-    border: 1px solid #e1e4e5;
+    border: 1px solid var(--color-background-border);
 }
 
 table.docutils th {
-    background-color: #f3f6f6;
+    background-color: var(--color-background-secondary);
     font-weight: bold;
 }
 
@@ -33,7 +34,7 @@ h3,
 h4,
 h5,
 h6 {
-    color: #2c3e50;
+    color: var(--color-foreground-primary);
     font-weight: 700;
 }
 
@@ -45,19 +46,19 @@ ol li {
 
 /* Improve note and warning boxes */
 .admonition.note {
-    background-color: #e7f2fa;
-    border-left-color: #2980B9;
+    background-color: var(--color-background-secondary);
+    border-left-color: var(--color-brand-primary);
 }
 
 .admonition.warning {
-    background-color: #ffedcc;
+    background-color: var(--color-background-secondary);
     border-left-color: #f0b37e;
 }
 
 /* API documentation parameter styling */
 dl.field-list>dt {
     font-weight: bold;
-    background-color: #f3f6f6;
+    background-color: var(--color-background-secondary);
     padding: 3px 8px;
     border-radius: 3px;
 }
@@ -66,4 +67,74 @@ dl.field-list>dt {
 .mermaid {
     margin: 1.5em 0;
     text-align: center;
+}
+
+/* Center the main content */
+.content {
+    margin: 0 auto;
+    max-width: var(--content-width);
+}
+
+/* Make code blocks more readable in dark mode */
+.highlight {
+    border-radius: 4px;
+}
+
+/* Better link styling */
+a {
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s ease-in-out;
+}
+
+a:hover {
+    border-bottom: 1px solid var(--color-brand-primary);
+}
+
+/* Better spacing for sidebar navigation */
+.sidebar-tree li {
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+}
+
+/* Make the page width wider */
+article.bd-article {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+/* Improve API documentation styling */
+dl.py.class,
+dl.py.function,
+dl.py.method {
+    padding: 1em;
+    margin: 1em 0;
+    border-radius: 4px;
+    background-color: var(--color-background-secondary);
+    border-left: 3px solid var(--color-brand-primary);
+}
+
+/* Improve code blocks */
+pre {
+    padding: 1em;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+
+/* Override default Furo theme font size for better readability */
+:root {
+    --font-size--normal: 16px;
+    --font-size--small: 14px;
+    --sidebar-item-spacing-vertical: 0.4rem;
+}
+
+/* Add shadow to code blocks */
+div[class*="highlight-"] {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode toggle styling */
+.theme-toggle-header {
+    font-size: 1.2em;
+    cursor: pointer;
 }

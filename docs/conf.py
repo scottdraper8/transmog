@@ -39,6 +39,7 @@ extensions = [
     "sphinx_copybutton",  # Add copy button to code blocks
     "sphinx_design",  # Enhanced styling components
     "sphinxcontrib.mermaid",  # Mermaid diagram support
+    "furo.sphinxext",  # Furo theme extension
 ]
 
 # Configure MyST-Parser
@@ -105,23 +106,33 @@ mermaid_init_js = """
 """
 
 # -- Options for HTML output -------------------------------------------------
-html_theme = "sphinx_rtd_theme"
+html_theme = "furo"
 html_static_path = ["_static"]
 html_css_files = ["css/custom.css"]
 html_js_files = ["js/custom.js"]
 
 # Theme options
 html_theme_options = {
-    "logo_only": False,
-    "prev_next_buttons_location": "bottom",
-    "style_external_links": True,
-    "style_nav_header_background": "#2980B9",
-    # Toc options
-    "collapse_navigation": False,
-    "sticky_navigation": True,
-    "navigation_depth": 4,
-    "includehidden": True,
-    "titles_only": False,
+    # Light and dark mode
+    "light_css_variables": {
+        "color-brand-primary": "#2980B9",
+        "color-brand-content": "#2980B9",
+        "color-sidebar-background": "#f8f9fb",
+        "color-background-primary": "#ffffff",
+        "color-background-secondary": "#f8f9fb",
+        "content-width": "1000px",
+    },
+    "dark_css_variables": {
+        "color-brand-primary": "#58a6ff",
+        "color-brand-content": "#58a6ff",
+        "color-sidebar-background": "#1a1d21",
+        "color-background-primary": "#0d1117",
+        "color-background-secondary": "#161b22",
+        "content-width": "1000px",
+    },
+    "sidebar_hide_name": False,
+    "navigation_with_keys": True,
+    "footer_icons": [],
 }
 
 # -- Options for linkcheck builder -------------------------------------------

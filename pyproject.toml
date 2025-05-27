@@ -58,6 +58,7 @@ optional-dependencies.dev = [
 ]
 # Documentation dependencies
 optional-dependencies.docs = [
+  "furo>=2024.1.29",
   "linkify-it-py>=2",
   "myst-parser>=2",
   "pyproject-parser>=0.7",
