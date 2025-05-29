@@ -6,7 +6,6 @@ with different memory/performance tradeoffs.
 
 import json
 import os
-import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Generator, Iterator
 from datetime import datetime, timezone
@@ -24,7 +23,6 @@ from ..config import (
     TransmogConfig,
 )
 from ..core.extractor import extract_arrays
-from ..core.flattener import flatten_json
 from ..core.hierarchy import (
     process_records_in_single_pass,
 )
@@ -38,6 +36,7 @@ from ..error import (
     error_context,
     logger,
 )
+from ..naming.conventions import sanitize_name
 from .result import ProcessingResult
 from .utils import handle_file_error
 
@@ -207,6 +206,10 @@ class ProcessingStrategy(ABC):
         Args:
             record: The record to remove array fields from
         """
+        # Don't process None or non-dict records
+        if record is None or not isinstance(record, dict):
+            return
+
         # Identify keys to remove (complex types that would be extracted to
         # child tables)
         keys_to_remove = []
@@ -221,7 +224,8 @@ class ProcessingStrategy(ABC):
 
         # Remove the identified keys
         for key in keys_to_remove:
-            del record[key]
+            if key in record:  # Extra safety check
+                del record[key]
 
 
 class InMemoryStrategy(ProcessingStrategy):
@@ -696,41 +700,59 @@ class FileStrategy(ProcessingStrategy):
 
         Returns:
             List of extract IDs for the processed records
-
-        NOTE: This method does NOT return ProcessingResult. It returns a list of IDs
-        that are needed for processing child records. It updates the result object
-        in-place. Callers should NOT expect this to return a ProcessingResult.
         """
         if not params:
             params = {}
 
         main_ids = []
         for record in batch:
-            # Add metadata and track
+            # Skip None or empty records
+            if record is None or (isinstance(record, dict) and not record):
+                continue
+
+            # Resolve source field for deterministic ID
             source_field_str = None
-            if isinstance(default_id_field, str):
-                source_field_str = default_id_field
+            if default_id_field:
+                if isinstance(default_id_field, str):
+                    source_field_str = default_id_field
+                elif isinstance(default_id_field, dict):
+                    # First try root path (empty string)
+                    if "" in default_id_field:
+                        source_field_str = default_id_field[""]
+                    # Then try wildcard match
+                    elif "*" in default_id_field:
+                        source_field_str = default_id_field["*"]
+                    # Finally try entity name
+                    elif entity_name in default_id_field:
+                        source_field_str = default_id_field[entity_name]
 
-            annotated = annotate_with_metadata(
-                record,
-                parent_id=None,
-                extract_time=extract_time,
-                id_field=id_field,
-                parent_field=parent_field,
-                time_field=time_field,
-                source_field=source_field_str,
-                in_place=True,
-            )
+            # Process the record
+            main_record = {}
+            if isinstance(record, dict):
+                main_record = record.copy()
 
-            # Add extract ID to track for child relationships
-            if id_field in annotated:
-                main_ids.append(annotated[id_field])
-            else:
-                # Fallback if ID field not present for some reason
-                main_ids.append(None)
+                # Add metadata with in-place optimization
+                annotated = annotate_with_metadata(
+                    main_record,
+                    parent_id=None,
+                    extract_time=extract_time,
+                    id_field=id_field,
+                    parent_field=parent_field,
+                    time_field=time_field,
+                    source_field=source_field_str,
+                    id_generation_strategy=id_generation_strategy,
+                    in_place=True,
+                )
 
-            # Add to result's main table
-            result.add_main_record(annotated)
+                # Add extract ID to track for child relationships
+                if id_field in annotated:
+                    main_ids.append(annotated[id_field])
+                else:
+                    # Fallback if ID field not present for some reason
+                    main_ids.append(None)
+
+                # Add to result's main table
+                result.add_main_record(annotated)
 
         return main_ids
 
@@ -753,18 +775,38 @@ class FileStrategy(ProcessingStrategy):
 
         # Only process arrays if enabled
         if not visit_arrays:
+            logger.debug("Array processing disabled, skipping")
             return
 
         # Process arrays for each record in batch
         for i, record in enumerate(batch):
             if i >= len(main_ids):
                 # Shouldn't happen, but safety check
+                logger.warning(
+                    f"Record index {i} exceeds main_ids length {len(main_ids)}"
+                )
                 continue
+
+            # Skip null or empty records
+            if record is None:
+                logger.debug(f"Skipping null record at index {i}")
+                continue
+
+            # Get parent ID for this record
+            parent_id = main_ids[i]
+            if parent_id is None:
+                logger.warning(
+                    f"Null parent ID for record at index {i}, skipping arrays"
+                )
+                continue
+
+            # Deep copy the record to prevent modification
+            record_copy = record.copy() if isinstance(record, dict) else record
 
             # Extract arrays for this record
             arrays = extract_arrays(
-                record,
-                parent_id=main_ids[i],
+                record_copy,
+                parent_id=parent_id,
                 entity_name=entity_name,
                 separator=params["separator"],
                 cast_to_string=params["cast_to_string"],
@@ -780,6 +822,13 @@ class FileStrategy(ProcessingStrategy):
             # Add arrays to result for this record - ensure arrays is a dict
             if isinstance(arrays, dict):
                 for table_name, records in arrays.items():
+                    if not records:
+                        logger.debug(f"Empty records list for table {table_name}")
+                        continue
+
+                    logger.debug(
+                        f"Adding {len(records)} records to child table {table_name}"
+                    )
                     for child in records:
                         result.add_child_record(table_name, child)
 
@@ -794,6 +843,8 @@ class FileStrategy(ProcessingStrategy):
                     # Also update the main record in the result if it exists
                     if i < len(result.main_table):
                         self._remove_array_fields_from_record(result.main_table[i])
+            else:
+                logger.warning(f"No arrays found for record at index {i}")
 
 
 class BatchStrategy(ProcessingStrategy):
@@ -944,31 +995,53 @@ class BatchStrategy(ProcessingStrategy):
 
         main_ids = []
         for record in batch:
-            # Add metadata and track
+            # Skip None or empty records
+            if record is None or (isinstance(record, dict) and not record):
+                continue
+
+            # Resolve source field for deterministic ID
             source_field_str = None
-            if isinstance(default_id_field, str):
-                source_field_str = default_id_field
+            if default_id_field:
+                if isinstance(default_id_field, str):
+                    source_field_str = default_id_field
+                elif isinstance(default_id_field, dict):
+                    # First try root path (empty string)
+                    if "" in default_id_field:
+                        source_field_str = default_id_field[""]
+                    # Then try wildcard match
+                    elif "*" in default_id_field:
+                        source_field_str = default_id_field["*"]
+                    # Finally try entity name
+                    elif entity_name in default_id_field:
+                        source_field_str = default_id_field[entity_name]
 
-            annotated = annotate_with_metadata(
-                record,
-                parent_id=None,
-                extract_time=extract_time,
-                id_field=id_field,
-                parent_field=parent_field,
-                time_field=time_field,
-                source_field=source_field_str,
-                in_place=True,
-            )
+            # Process the record
+            main_record = {}
+            if isinstance(record, dict):
+                main_record = record.copy()
 
-            # Add extract ID to track for child relationships
-            if id_field in annotated:
-                main_ids.append(annotated[id_field])
-            else:
-                # Fallback if ID field not present for some reason
-                main_ids.append(None)
+                # Add metadata with in-place optimization
+                annotated = annotate_with_metadata(
+                    main_record,
+                    parent_id=None,
+                    extract_time=extract_time,
+                    id_field=id_field,
+                    parent_field=parent_field,
+                    time_field=time_field,
+                    source_field=source_field_str,
+                    id_generation_strategy=id_generation_strategy,
+                    in_place=True,
+                )
 
-            # Add to result's main table
-            result.add_main_record(annotated)
+                # Add extract ID to track for child relationships
+                if id_field in annotated:
+                    main_ids.append(annotated[id_field])
+                else:
+                    # Fallback if ID field not present for some reason
+                    main_ids.append(None)
+
+                # Add to result's main table
+                result.add_main_record(annotated)
 
         return main_ids
 
@@ -991,18 +1064,38 @@ class BatchStrategy(ProcessingStrategy):
 
         # Only process arrays if enabled
         if not visit_arrays:
+            logger.debug("Array processing disabled, skipping")
             return
 
         # Process arrays for each record in batch
         for i, record in enumerate(batch):
             if i >= len(main_ids):
                 # Shouldn't happen, but safety check
+                logger.warning(
+                    f"Record index {i} exceeds main_ids length {len(main_ids)}"
+                )
                 continue
+
+            # Skip null or empty records
+            if record is None:
+                logger.debug(f"Skipping null record at index {i}")
+                continue
+
+            # Get parent ID for this record
+            parent_id = main_ids[i]
+            if parent_id is None:
+                logger.warning(
+                    f"Null parent ID for record at index {i}, skipping arrays"
+                )
+                continue
+
+            # Deep copy the record to prevent modification
+            record_copy = record.copy() if isinstance(record, dict) else record
 
             # Extract arrays for this record
             arrays = extract_arrays(
-                record,
-                parent_id=main_ids[i],
+                record_copy,
+                parent_id=parent_id,
                 entity_name=entity_name,
                 separator=params["separator"],
                 cast_to_string=params["cast_to_string"],
@@ -1018,6 +1111,13 @@ class BatchStrategy(ProcessingStrategy):
             # Add arrays to result for this record - ensure arrays is a dict
             if isinstance(arrays, dict):
                 for table_name, records in arrays.items():
+                    if not records:
+                        logger.debug(f"Empty records list for table {table_name}")
+                        continue
+
+                    logger.debug(
+                        f"Adding {len(records)} records to child table {table_name}"
+                    )
                     for child in records:
                         result.add_child_record(table_name, child)
 
@@ -1032,6 +1132,8 @@ class BatchStrategy(ProcessingStrategy):
                     # Also update the main record in the result if it exists
                     if i < len(result.main_table):
                         self._remove_array_fields_from_record(result.main_table[i])
+            else:
+                logger.warning(f"No arrays found for record at index {i}")
 
 
 class ChunkedStrategy(ProcessingStrategy):
@@ -1189,90 +1291,39 @@ class ChunkedStrategy(ProcessingStrategy):
         id_generation_strategy: Optional[Callable[[dict[str, Any]], str]],
         params: dict[str, Any],
     ) -> ProcessingResult:
-        """Process a chunk of data.
+        """Process a chunk of records with arrays."""
+        if not chunk:
+            return result
 
-        Args:
-            chunk: Chunk of data to process
-            entity_name: Name of the entity being processed
-            extract_time: Extraction timestamp
-            result: Result object to update
-            id_field: ID field name
-            parent_field: Parent ID field name
-            time_field: Timestamp field name
-            default_id_field: Field name or dict mapping paths to field names
-                for deterministic IDs
-            id_generation_strategy: Custom function for ID generation
-            params: Processing parameters
+        # Process the main records
+        flattened_records, table_arrays = process_records_in_single_pass(
+            chunk,
+            entity_name=entity_name,
+            extract_time=extract_time,
+            separator=params.get("separator", "_"),
+            cast_to_string=params.get("cast_to_string", True),
+            include_empty=params.get("include_empty", False),
+            skip_null=params.get("skip_null", True),
+            id_field=id_field,
+            parent_field=parent_field,
+            time_field=time_field,
+            visit_arrays=params.get("visit_arrays", True),
+            deeply_nested_threshold=params.get("deeply_nested_threshold", 4),
+            default_id_field=default_id_field,
+            id_generation_strategy=id_generation_strategy,
+            recovery_strategy=params.get("recovery_strategy"),
+            max_depth=params.get("max_depth", 100),
+            keep_arrays=params.get("keep_arrays", False),
+        )
 
-        Returns:
-            Updated ProcessingResult
-        """
-        main_ids = []
+        # Add records to results
+        for record in flattened_records:
+            result.add_main_record(record)
 
-        # Process main records first
-        for record in chunk:
-            try:
-                # Skip non-dict records
-                if not isinstance(record, dict):
-                    continue
-
-                # Generate ID
-                if id_generation_strategy:
-                    record_id = id_generation_strategy(record)
-                elif default_id_field:
-                    if isinstance(default_id_field, dict):
-                        id_source = default_id_field.get(entity_name)
-                        record_id = (
-                            str(record.get(id_source, ""))
-                            if id_source
-                            else str(uuid.uuid4())
-                        )
-                    else:
-                        record_id = str(record.get(default_id_field, ""))
-                else:
-                    record_id = str(uuid.uuid4())
-
-                # Store ID for array processing
-                main_ids.append(record_id)
-
-                # Add metadata
-                record[id_field] = record_id
-                record[parent_field] = None  # Main records have no parent
-                record[time_field] = extract_time
-
-                # Flatten
-                flattened = flatten_json(
-                    record,
-                    separator=params.get("separator", "_"),
-                    cast_to_string=params.get("cast_to_string", True),
-                    include_empty=params.get("include_empty", False),
-                    skip_null=params.get("skip_null", True),
-                    skip_arrays=True,
-                    deeply_nested_threshold=params.get("deeply_nested_threshold", 4),
-                    max_depth=params.get("max_depth", 100),
-                    recovery_strategy=params.get("recovery_strategy"),
-                )
-
-                # Add to result - ensure flattened is not None
-                if flattened is not None:
-                    result.add_main_record(flattened)
-            except Exception as e:
-                # Log and continue with other records
-                logger.warning(f"Error processing record: {str(e)}")
-
-        # Process arrays if enabled
-        if params.get("visit_arrays", True):
-            self._process_batch_arrays(
-                chunk,
-                entity_name,
-                extract_time,
-                result,
-                id_field,
-                main_ids,
-                default_id_field,
-                id_generation_strategy,
-                params,
-            )
+        # Add array tables
+        for table_name, records in table_arrays.items():
+            for record in records:
+                result.add_child_record(table_name, record)
 
         return result
 
@@ -1317,12 +1368,16 @@ class ChunkedStrategy(ProcessingStrategy):
 
         # Only process arrays if enabled
         if not visit_arrays:
+            logger.debug("Array processing disabled, skipping")
             return
 
         # Process arrays for each record in the batch
         for i, (record, parent_id) in enumerate(zip(batch, main_ids)):
             # Skip if we don't have a valid parent ID
             if parent_id is None:
+                logger.warning(
+                    f"Null parent ID for record at index {i}, skipping arrays"
+                )
                 continue
 
             # Process arrays for this record
@@ -1345,6 +1400,13 @@ class ChunkedStrategy(ProcessingStrategy):
             # Add arrays to result for this record - ensure arrays is a dict
             if isinstance(arrays, dict):
                 for table_name, records in arrays.items():
+                    if not records:
+                        logger.debug(f"Empty records list for table {table_name}")
+                        continue
+
+                    logger.debug(
+                        f"Adding {len(records)} records to child table {table_name}"
+                    )
                     for child in records:
                         result.add_child_record(table_name, child)
 
@@ -1359,6 +1421,8 @@ class ChunkedStrategy(ProcessingStrategy):
                     # Also update the main record in the result if it exists
                     if i < len(result.main_table):
                         self._remove_array_fields_from_record(result.main_table[i])
+            else:
+                logger.warning(f"No arrays found for record at index {i}")
 
 
 class CSVStrategy(ProcessingStrategy):
@@ -1525,7 +1589,7 @@ class CSVStrategy(ProcessingStrategy):
         """Process a chunk of CSV records.
 
         Args:
-            records: List of records to process
+            records: Chunk of records to process
             entity_name: Name of the entity being processed
             extract_time: Extraction timestamp
             result: Result object to update
@@ -1541,63 +1605,66 @@ class CSVStrategy(ProcessingStrategy):
         Returns:
             Updated ProcessingResult
         """
-        # Handle column name sanitization
-        if sanitize_column_names and records:
-            from ..naming.conventions import sanitize_name
+        # Skip if no records
+        if not records:
+            return result
 
-            separator = params.get("separator", "_")
-
-            # Create a mapping of original to sanitized column names
-            col_mapping = {}
-            for record in records:
-                for col in list(record.keys()):
-                    if col not in col_mapping:
-                        sanitized = sanitize_name(col, separator, "_")
-                        col_mapping[col] = sanitized
-
-            # Update records with sanitized column names
-            sanitized_records = []
-            for record in records:
-                sanitized_record = {}
-                for col, value in record.items():
-                    sanitized_record[col_mapping.get(col, col)] = value
-                sanitized_records.append(sanitized_record)
-
-            records = sanitized_records
-
-        # Apply cast_to_string if enabled
-        cast_to_string = params.get("cast_to_string", True)
-        if cast_to_string:
-            for record in records:
-                for col, value in list(record.items()):
-                    if value is not None and not isinstance(value, str):
-                        if isinstance(value, bool):
-                            record[col] = "true" if value else "false"
-                        else:
-                            record[col] = str(value)
-
-        # Process flattened records
-        for record in records:
-            # Add metadata
-            source_field_str = None
+        # Resolve source field for deterministic ID
+        source_field_str = None
+        if default_id_field:
             if isinstance(default_id_field, str):
                 source_field_str = default_id_field
+            elif isinstance(default_id_field, dict):
+                # First try root path (empty string)
+                if "" in default_id_field:
+                    source_field_str = default_id_field[""]
+                # Then try wildcard match
+                elif "*" in default_id_field:
+                    source_field_str = default_id_field["*"]
+                # Finally try entity name
+                elif entity_name in default_id_field:
+                    source_field_str = default_id_field[entity_name]
 
-            annotated = annotate_with_metadata(
-                record,
-                parent_id=None,
-                extract_time=extract_time,
-                id_field=id_field,
-                parent_field=parent_field,
-                time_field=time_field,
-                source_field=source_field_str,
-                in_place=True,
-            )
+        # Process each record
+        for record in records:
+            try:
+                # Skip empty records
+                if record is None or (isinstance(record, dict) and not record):
+                    continue
 
-            # Add to main table
-            result.add_main_record(annotated)
+                # Apply data type inference if needed
+                if params.get("infer_types", False):
+                    record = self._infer_record_types(record)
 
-        # Explicitly return the ProcessingResult object to help type checking
+                # Sanitize column names if requested
+                if sanitize_column_names:
+                    sanitized_record = {}
+                    for key, value in record.items():
+                        sanitized_key = sanitize_name(key, params.get("separator", "_"))
+                        sanitized_record[sanitized_key] = value
+                    record = sanitized_record
+
+                # Add metadata
+                annotated = annotate_with_metadata(
+                    record,
+                    parent_id=None,
+                    extract_time=extract_time,
+                    id_field=id_field,
+                    parent_field=parent_field,
+                    time_field=time_field,
+                    source_field=source_field_str,
+                    id_generation_strategy=id_generation_strategy,
+                    in_place=False,
+                )
+
+                # Add to result
+                result.add_main_record(annotated)
+            except Exception as e:
+                logger.warning(f"Error processing CSV record: {str(e)}")
+                # Skip the problematic record based on recovery strategy
+                if params.get("recovery_strategy") != "skip":
+                    raise
+
         return result
 
     def _infer_record_types(self, record: dict[str, Any]) -> dict[str, Any]:

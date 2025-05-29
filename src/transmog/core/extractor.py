@@ -141,10 +141,15 @@ def _extract_arrays_impl(
                             # the index
                             if current_path in default_id_field:
                                 source_field = default_id_field[current_path]
+                            # Try wildcard match
                             elif "*" in default_id_field:
                                 source_field = default_id_field["*"]
+                            # Try table name
                             elif table_name in default_id_field:
                                 source_field = default_id_field[table_name]
+                            # Try root path (empty string) as fallback
+                            elif "" in default_id_field:
+                                source_field = default_id_field[""]
 
                     if isinstance(item, dict):
                         # Process dictionary item

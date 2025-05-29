@@ -145,21 +145,19 @@ def process_structure(
         if isinstance(default_id_field, str):
             source_field = default_id_field
         else:
+            # First try exact path match
             normalized_path = parent_path.strip(separator) if parent_path else ""
-
-            # Path resolution with simplified naming scheme
             if normalized_path in default_id_field:
                 source_field = default_id_field[normalized_path]
+            # Then try the root path (empty string)
+            elif "" in default_id_field:
+                source_field = default_id_field[""]
+            # Then try wildcard match
             elif "*" in default_id_field:
                 source_field = default_id_field["*"]
-            else:
-                # Try matching based on path components without level numbers
-                for path_key in default_id_field:
-                    if path_key.endswith("*"):
-                        prefix = path_key[:-1]
-                        if normalized_path.startswith(prefix):
-                            source_field = default_id_field[path_key]
-                            break
+            # Finally try table name
+            elif entity_name in default_id_field:
+                source_field = default_id_field[entity_name]
 
     # Add metadata with in-place optimization
     flattened_obj_dict = flattened_obj if flattened_obj is not None else {}
@@ -187,9 +185,16 @@ def process_structure(
         else:
             return annotated_obj, {}
 
-    # Handle array extraction based on streaming mode
+    # Get the extract ID for the parent to pass to child records
     extract_id = annotated_obj.get(id_field)
 
+    # Log the extract ID for debugging
+    logger.debug(f"Parent record extract ID: {extract_id} for entity {entity_name}")
+
+    # For deterministic IDs, make sure these are properly passed to child records
+    child_default_id_field = default_id_field
+
+    # Handle array extraction based on streaming mode
     if streaming:
         # Stream extraction version
         return annotated_obj, stream_extract_arrays(
@@ -206,14 +211,19 @@ def process_structure(
             parent_field=parent_field,
             time_field=time_field,
             deeply_nested_threshold=deeply_nested_threshold,
-            default_id_field=default_id_field,
+            default_id_field=child_default_id_field,
             id_generation_strategy=id_generation_strategy,
             recovery_strategy=recovery_strategy,
             max_depth=max_depth,
         )
     else:
         # Batch extraction version
-        return annotated_obj, extract_arrays(
+        # Log the arrays to extract
+        for key, value in data.items():
+            if isinstance(value, list) and value:
+                logger.debug(f"Found array {key} with {len(value)} items")
+
+        arrays = extract_arrays(
             data,
             parent_id=extract_id,
             parent_path=parent_path,
@@ -227,11 +237,22 @@ def process_structure(
             parent_field=parent_field,
             time_field=time_field,
             deeply_nested_threshold=deeply_nested_threshold,
-            default_id_field=default_id_field,
+            default_id_field=child_default_id_field,
             id_generation_strategy=id_generation_strategy,
             recovery_strategy=recovery_strategy,
             max_depth=max_depth,
         )
+
+        # Log what we found
+        if arrays:
+            for table_name, records in arrays.items():
+                logger.debug(
+                    f"Extracted table {table_name} with {len(records)} records"
+                )
+        else:
+            logger.debug(f"No arrays extracted for entity {entity_name}")
+
+        return annotated_obj, arrays
 
 
 def process_record_batch(
