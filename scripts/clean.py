@@ -19,13 +19,23 @@ def clean_python_dirs():
         "*.egg-info",
     ]
 
+    # Directories to skip
+    dirs_to_skip = [".env"]
+
     # Get the current directory
     current_dir = Path(__file__).parent.parent.resolve()
 
     # Walk through all directories
     for root, dirs, _files in os.walk(current_dir):
+        # Skip directories in the skip list
+        dirs[:] = [d for d in dirs if d not in dirs_to_skip]
+
         for dir_name in dirs:
-            if dir_name in dirs_to_clean:
+            if any(
+                dir_name == pattern
+                or (pattern.startswith("*") and dir_name.endswith(pattern[1:]))
+                for pattern in dirs_to_clean
+            ):
                 try:
                     shutil.rmtree(os.path.join(root, dir_name))
                     print(f"Removed {os.path.join(root, dir_name)}")
