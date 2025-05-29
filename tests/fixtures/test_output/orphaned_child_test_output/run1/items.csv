@@ -1,5 +1,0 @@
-id,value,__extract_id,__parent_extract_id,__extract_datetime,__array_field,__array_index
-child_1,Child Value 1,41277205-2cbb-529b-82c1-ef9842e1e711,dc90e45b-2f52-593a-9d0c-2fc489f941c5,2025-05-28 17:35:10.624192,items,0
-child_2,Child Value 2,92887059-a945-5d6b-973d-a79095bb64bd,dc90e45b-2f52-593a-9d0c-2fc489f941c5,2025-05-28 17:35:10.624192,items,1
-child_3,Child Value 3,54d100f3-c945-5cde-add4-fa79703e7547,f96e3a7a-ecce-5549-a4c2-b0cfc8a276cc,2025-05-28 17:35:10.624192,items,0
-child_4,Child Value 4,9e430e0a-41e7-58ed-9291-03d378bbf02e,f96e3a7a-ecce-5549-a4c2-b0cfc8a276cc,2025-05-28 17:35:10.624192,items,1
