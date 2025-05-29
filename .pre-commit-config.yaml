@@ -52,4 +52,4 @@ repos:
     rev: v0.18.1
     hooks:
       - id: markdownlint-cli2
-        args: ["--fix", "--config", ".markdownlint.json"]
+        args: ["--config", ".markdownlint.json"]

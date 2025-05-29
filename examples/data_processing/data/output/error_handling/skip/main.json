@@ -1,0 +1,49 @@
+[
+  {
+    "id": "1",
+    "name": "Valid Record",
+    "attributes_category": "test",
+    "attributes_active": "1",
+    "attributes_score": "95.5",
+    "__extract_id": "6848a3c4-e9a5-4ed4-a191-1cee9661feea",
+    "__extract_datetime": "2025-05-29 18:17:14.874495+00:00"
+  },
+  {
+    "id": "2",
+    "name": "Circular Reference",
+    "__extract_id": "2f9dbbea-0b3d-4a8d-9055-10b4e6dbc6ce",
+    "__extract_datetime": "2025-05-29 18:17:14.874495+00:00"
+  },
+  {
+    "id": "3",
+    "attributes_active": "1",
+    "attributes_score": "85.0",
+    "__extract_id": "0c148b15-06dd-4028-b0d3-cf6d249ed503",
+    "__extract_datetime": "2025-05-29 18:17:14.874495+00:00"
+  },
+  {
+    "id": "4",
+    "name": "404",
+    "attributes_active": "false",
+    "attributes_score": "invalid",
+    "tags": "not-an-array",
+    "__extract_id": "b0bcc026-cc3d-4a30-9b0a-34ce2bf30f84",
+    "__extract_datetime": "2025-05-29 18:17:14.874495+00:00"
+  },
+  {
+    "id": "5",
+    "name": "Bad Structure",
+    "__extract_id": "d7bfc92f-8bf5-44c2-8649-10cb87f3a0b3",
+    "__extract_datetime": "2025-05-29 18:17:14.874495+00:00"
+  },
+  {
+    "id": "6",
+    "name": "Deep Error",
+    "attributes_category": "test",
+    "attributes_active": "1",
+    "attributes_metadata_created": "2023-01-01",
+    "attributes_metadata_nested_valid": "1",
+    "__extract_id": "c88a4ed9-66ca-4f52-a72f-d08490c14095",
+    "__extract_datetime": "2025-05-29 18:17:14.874495+00:00"
+  }
+]

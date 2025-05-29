@@ -1,0 +1,19 @@
+[
+  {
+    "organization.id": 1001,
+    "organization.name": "Example Corp",
+    "organization.founded": 1995,
+    "organization.active": true,
+    "organization.address.street": "123 Business Ave",
+    "organization.address.city": "Enterprise",
+    "organization.address.state": "CA",
+    "organization.address.zip": "94000",
+    "organization.address.coordinates.latitude": 37.7749,
+    "organization.address.coordinates.longitude": -122.4194,
+    "organization.contact.email": "info@example.com",
+    "organization.contact.phone": "555-1234",
+    "organization.contact.website": "https://example.com",
+    "__extract_id": "87b9ddc7-196a-414f-a1d7-fa9c7cc076b7",
+    "__extract_datetime": "2025-05-29 18:17:08.740026+00:00"
+  }
+]

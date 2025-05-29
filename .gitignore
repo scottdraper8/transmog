@@ -53,11 +53,7 @@ coverage.xml
 
 # Project specific
 # Example output directories - ignore generated files but not example code
-examples/data/output/
-examples/**/output/**
-!examples/**/output/*.py
-!examples/**/output/**/*.py
-examples/**/formats/*/
+examples/output/
 logs/
 
 # Documentation

@@ -1,0 +1,24 @@
+[
+  {
+    "id": "LOC-001",
+    "name": "Headquarters",
+    "address_city": "San Francisco",
+    "address_state": "CA",
+    "__extract_id": "a4bd6aae-843f-5000-9ff1-891508720212",
+    "__parent_extract_id": "ca4e2dfd-1894-40d5-ab5b-b73b954a415d",
+    "__extract_datetime": "2025-05-29 18:17:23.670674+00:00",
+    "__array_field": "locations",
+    "__array_index": 0
+  },
+  {
+    "id": "LOC-002",
+    "name": "East Coast Office",
+    "address_city": "New York",
+    "address_state": "NY",
+    "__extract_id": "2215b2ee-56f8-5e3b-b8ac-177f6f7830d8",
+    "__parent_extract_id": "ca4e2dfd-1894-40d5-ab5b-b73b954a415d",
+    "__extract_datetime": "2025-05-29 18:17:23.670674+00:00",
+    "__array_field": "locations",
+    "__array_index": 1
+  }
+]

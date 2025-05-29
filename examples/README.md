@@ -1,33 +1,74 @@
 # Transmog Examples
 
-This directory contains examples demonstrating how to use Transmog for data transformation.
+This directory contains example code demonstrating various features and use cases of Transmog.
 
 ## Directory Structure
 
-- **essentials/** - Core functionality examples
-  - Flattening basics
-  - Configuration options
-  - Processing modes
+```text
+examples/
+├── data_processing/
+│   ├── basic/              # Basic data processing examples
+│   │   ├── flattening_basics.py
+│   │   ├── naming_example.py
+│   │   └── primitive_arrays_example.py
+│   ├── file_formats/       # File format specific examples
+│   │   ├── csv_processing.py
+│   │   ├── json_processing.py
+│   │   └── multiple_formats.py
+│   ├── advanced/           # Advanced processing examples
+│   │   ├── streaming_processing.py
+│   │   ├── error_handling.py
+│   │   └── performance_optimization.py
+│   └── data/              # Example data files
+├── data_transformation/
+│   ├── basic/             # Basic transformation examples
+│   │   ├── data_cleanup_example.py
+│   │   └── data_validation_example.py
+│   ├── advanced/          # Advanced transformation examples
+│   │   ├── deep_nesting_example.py
+│   │   └── deterministic_ids.py
+│   └── data/             # Example data files
+├── configuration/
+│   ├── basic/            # Basic configuration examples
+│   │   └── config_examples.py
+│   ├── advanced/         # Advanced configuration examples
+│   │   └── optimization.py
+│   └── data/            # Example data files
+└── output/              # Example output directory
+    ├── data_processing/  # Outputs from data processing examples
+    │   ├── basic/
+    │   ├── file_formats/
+    │   └── advanced/
+    ├── data_transformation/  # Outputs from transformation examples
+    │   ├── basic/
+    │   └── advanced/
+    └── configuration/    # Outputs from configuration examples
+        ├── basic/
+        └── advanced/
+```
 
-- **processing/** - Data processing examples
-  - JSON processing
-  - CSV processing
-  - File handling
+## Output Directory
 
-- **advanced/** - Advanced functionality
-  - Streaming processing
-  - Performance optimization
-  - Error handling
-  - Deterministic IDs
+Each example writes its output to a dedicated subdirectory in the `output/` directory,
+organized by example category and type:
 
-- **output/** - Output format examples
-  - Different output formats
-  - Formatting options
-  - File writing options
+- `data_processing/`: Outputs from data processing examples
+  - `basic/`: Basic processing example outputs
+  - `file_formats/`: File format specific outputs
+  - `advanced/`: Advanced processing outputs
+- `data_transformation/`: Outputs from transformation examples
+  - `basic/`: Basic transformation outputs
+  - `advanced/`: Advanced transformation outputs
+- `configuration/`: Outputs from configuration examples
+  - `basic/`: Basic configuration outputs
+  - `advanced/`: Advanced configuration outputs
 
-- **data/** - Data files and example outputs
-  - Input data files for examples
-  - Output directory for example results
+Each example's output directory contains the following format subdirectories:
+
+- `json/`: JSON output files
+- `csv/`: CSV output files
+- `parquet/`: Parquet output files
+- `streaming/`: Streaming output files
 
 ## Example Format
 

@@ -3,7 +3,8 @@
     "MD013": {
         "line_length": 120,
         "headings": false,
-        "code_blocks": false
+        "code_blocks": false,
+        "ignore_pattern": "```text.*?```"
     },
     "MD033": {
         "allowed_elements": [
