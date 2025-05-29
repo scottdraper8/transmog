@@ -19,7 +19,6 @@ from transmog.dependencies import DependencyManager
 ```python
 # Check if a feature is available
 parquet_available = DependencyManager.check_feature_available("parquet")
-pandas_available = DependencyManager.check_feature_available("pandas_csv")
 ```
 
 ### Required Packages for Features
@@ -39,19 +38,12 @@ The dependency manager maps features to their required packages:
 | `parquet` | `pyarrow` |
 | `pyarrow` | `pyarrow` |
 | `fast_json` | `orjson` |
-| `pandas_csv` | `pandas` |
 
 ### Importing Optional Modules
 
 ```python
 # Import an optional module
 pyarrow = DependencyManager.import_optional_module("pyarrow")
-
-# Import with custom error message
-pandas = DependencyManager.import_optional_module(
-    "pandas",
-    error_message="Pandas is required for CSV processing"
-)
 ```
 
 ### Checking Package Installation
@@ -109,25 +101,12 @@ orjson enables:
 has_orjson = Features.has_orjson()
 ```
 
-#### Pandas Integration
-
-Pandas enables:
-
-- Advanced CSV processing
-- Additional data transformation capabilities
-
-```python
-# Check pandas availability
-has_pandas = Features.has_pandas()
-```
-
 ### Feature Fallbacks
 
 When optional features are not available, Transmog falls back to built-in alternatives:
 
 - Without PyArrow: Uses built-in formats (JSON, CSV)
 - Without orjson: Uses standard json module
-- Without pandas: Uses built-in CSV processing
 
 ## Part 3: Handling Missing Dependencies
 
@@ -173,9 +152,6 @@ pip install pyarrow
 
 # For faster JSON processing
 pip install orjson
-
-# For Pandas integration
-pip install pandas
 ```
 
 ## Part 4: Best Practices
@@ -214,7 +190,7 @@ For production use, consider installing all dependencies for a feature group:
 
 ```bash
 # For all data science features
-pip install transmog[datascience]  # Includes pandas, pyarrow
+pip install transmog[datascience]  # Includes pyarrow
 
 # For all performance features
 pip install transmog[performance]  # Includes orjson, pyarrow

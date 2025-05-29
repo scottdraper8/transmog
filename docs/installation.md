@@ -83,12 +83,11 @@ Optional packages:
 
 - **pyarrow**: For Parquet file support and PyArrow Table output
 - **orjson**: For faster JSON processing
-- **pandas**: For CSV processing with pandas
 
 To install optional dependencies:
 
 ```bash
-pip install pyarrow orjson pandas
+pip install pyarrow orjson
 ```
 
 ## System Requirements
@@ -110,7 +109,6 @@ print(transmog.__version__)
 from transmog.features import Features
 print(f"PyArrow available: {Features.has_pyarrow()}")
 print(f"Orjson available: {Features.has_orjson()}")
-print(f"Pandas available: {Features.has_pandas()}")
 ```
 
 ## Troubleshooting

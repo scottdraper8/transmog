@@ -44,7 +44,7 @@ rather than a general-purpose ETL tool.
    - Optional schema enforcement with clear error reporting
 
 2. **Integration Optimizations**
-   - Streamlined integration with data processing frameworks (pandas, polars)
+   - Streamlined integration with data processing frameworks
    - Better PyArrow interoperability and zero-copy operations where possible
    - Simplified usage patterns for common data workflows
 

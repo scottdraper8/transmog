@@ -58,7 +58,6 @@ main_pa_table = pa_tables["main"]
 
 # Use PyArrow functionality
 print(f"Table has {main_pa_table.num_rows} rows and {main_pa_table.num_columns} columns")
-main_pa_table.to_pandas()  # Convert to pandas DataFrame
 ```
 
 ## Bytes Serialization

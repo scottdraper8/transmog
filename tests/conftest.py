@@ -247,7 +247,6 @@ def dependency_status():
     return {
         "pyarrow": _is_dependency_available("pyarrow"),
         "orjson": _is_dependency_available("orjson"),
-        "pandas": _is_dependency_available("pandas"),
         "zstandard": _is_dependency_available("zstandard"),
     }
 
@@ -321,9 +320,6 @@ def pytest_configure(config):
         "markers", "requires_orjson: mark test that requires orjson"
     )
     config.addinivalue_line(
-        "markers", "requires_pandas: mark test that requires pandas"
-    )
-    config.addinivalue_line(
         "markers", "requires_zstandard: mark test that requires zstandard"
     )
     config.addinivalue_line("markers", "integration: mark test as an integration test")
@@ -344,10 +340,6 @@ def pytest_runtest_setup(item):
             "orjson"
         ):
             pytest.skip("orjson is required for this test")
-        elif marker.name == "requires_pandas" and not _is_dependency_available(
-            "pandas"
-        ):
-            pytest.skip("pandas is required for this test")
         elif marker.name == "requires_zstandard" and not _is_dependency_available(
             "zstandard"
         ):
