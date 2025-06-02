@@ -183,14 +183,14 @@ See our [ROADMAP.md](https://github.com/scottdraper8/transmog/blob/main/ROADMAP.
 
 ### Arrays and Nested Objects
 
-- 🔄 **Array Extraction**: Automatically extract arrays into separate child tables with parent-child
+- **Array Extraction**: Automatically extract arrays into separate child tables with parent-child
   relationships preserved
-- 🌲 **Deep Nesting Support**: Handle arbitrarily nested objects and arrays with automatic table
+- **Deep Nesting Support**: Handle arbitrarily nested objects and arrays with automatic table
   generation
-- 🔗 **Relationship Preservation**: Maintain parent-child relationships between extracted entities
-- ⚙️ **Configurable Array Handling**: Choose whether to extract arrays, keep arrays in the main
+- **Relationship Preservation**: Maintain parent-child relationships between extracted entities
+- **Configurable Array Handling**: Choose whether to extract arrays, keep arrays in the main
   table, or process arrays in-place
-- 📋 **Array Options**: Fine-grained control over array extraction with `visit_arrays` and
+- **Array Options**: Fine-grained control over array extraction with `visit_arrays` and
   `keep_arrays` parameters
 
 ```{toctree}
@@ -228,6 +228,7 @@ user/advanced/performance-optimization
 user/advanced/error-handling
 user/advanced/deterministic-ids
 user/output/output-formats
+user/examples
 ```
 
 ```{toctree}
@@ -274,4 +275,4 @@ dev/code-style
 
 ## Indices and Tables
 
-- {ref}`
+- {ref}`genindex`

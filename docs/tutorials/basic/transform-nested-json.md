@@ -50,17 +50,67 @@ The following nested JSON structure represents a company with departments and em
 
 The transformation begins with installing Transmog and importing the necessary components:
 
-```include-example:data_processing/basic/flattening_basics.py
-:start-line: 9
-:end-line: 12
+```python
+from transmog import Processor, TransmogConfig
+import json
 ```
 
 The nested JSON structure is transformed as follows:
 
-```include-example:data_processing/basic/flattening_basics.py
-:start-line: 50
-:end-line: 105
-:strip-docstring: true
+```python
+# Load sample data
+company_data = {
+    "companyName": "Acme Inc",
+    "founded": 1985,
+    "headquarters": {
+        "city": "New York",
+        "country": "USA"
+    },
+    "departments": [
+        {
+            "name": "Engineering",
+            "headCount": 50,
+            "employees": [
+                {
+                    "id": "E001",
+                    "name": "Jane Smith",
+                    "title": "Software Engineer"
+                },
+                {
+                    "id": "E002",
+                    "name": "John Doe",
+                    "title": "Senior Developer"
+                }
+            ]
+        },
+        {
+            "name": "Marketing",
+            "headCount": 20,
+            "employees": [
+                {
+                    "id": "M001",
+                    "name": "Alice Johnson",
+                    "title": "Marketing Specialist"
+                }
+            ]
+        }
+    ]
+}
+
+# Create a processor with default configuration
+processor = Processor()
+
+# Process the data
+result = processor.process(data=company_data, entity_name="company")
+
+# Convert the result to a dictionary of tables
+tables = result.to_dict()
+
+# Display the tables
+for table_name, records in tables.items():
+    print(f"\n=== {table_name} ===")
+    for record in records:
+        print(record)
 ```
 
 ## Understanding the Output
@@ -77,9 +127,18 @@ Each table maintains relationships through ID fields.
 
 The transformation can be customized using `TransmogConfig`:
 
-```include-example:data_processing/basic/flattening_basics.py
-:start-line: 140
-:end-line: 152
+```python
+# Create a custom configuration
+config = TransmogConfig().with_naming(
+    entity_name_separator="_",
+    array_item_suffix=""
+)
+
+# Create a processor with the custom configuration
+processor = Processor(config=config)
+
+# Process the data with custom configuration
+result = processor.process(data=company_data, entity_name="company")
 ```
 
 ## Example Implementation
