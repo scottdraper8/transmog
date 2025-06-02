@@ -154,12 +154,11 @@ function createNavigationWidget(type, name, url) {
     const widget = document.createElement('div');
     widget.className = 'tutorial-example-nav';
 
-    const icon = type === 'example' ? '💻' : '📚';
     const label = type === 'example' ? 'View Example Code:' : 'Related Tutorial:';
 
     widget.innerHTML = `
         <div class="tutorial-example-nav-header">
-            ${icon} ${label}
+            ${label}
         </div>
         <div class="tutorial-example-nav-link">
             <a href="${url}" target="${type === 'example' ? '_blank' : '_self'}">${name}</a>

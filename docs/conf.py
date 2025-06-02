@@ -110,6 +110,8 @@ html_theme = "furo"
 html_static_path = ["_static"]
 html_css_files = ["css/custom.css"]
 html_js_files = ["js/custom.js"]
+html_title = "Transmog 1.0.4"
+html_short_title = "Transmog 1.0.4"
 
 # Theme options
 html_theme_options = {

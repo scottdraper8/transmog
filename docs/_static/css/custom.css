@@ -144,46 +144,48 @@ div[class*="highlight-"] {
     margin: 1.5rem 0;
     padding: 0.8rem 1rem;
     border-radius: 0.3rem;
-    background-color: #f8f9fa;
-    border-left: 4px solid #2980B9;
+    background-color: var(--color-background-secondary);
+    border-left: 4px solid var(--color-brand-primary);
 }
 
 .dark-mode .tutorial-example-nav {
-    background-color: #1a1d21;
-    border-left-color: #58a6ff;
+    background-color: var(--color-background-secondary);
+    border-left-color: var(--color-brand-primary);
 }
 
 .tutorial-example-nav-header {
     font-weight: bold;
     margin-bottom: 0.5rem;
-    color: #333;
+    color: var(--color-foreground-primary);
 }
 
 .dark-mode .tutorial-example-nav-header {
-    color: #eee;
+    color: var(--color-foreground-primary);
 }
 
 .tutorial-example-nav-link a {
     display: inline-block;
     font-family: monospace;
     padding: 0.3rem 0.5rem;
-    background-color: #e9ecef;
+    background-color: var(--color-background-primary);
     border-radius: 0.2rem;
     text-decoration: none;
     transition: background-color 0.2s;
+    color: var(--color-brand-primary);
 }
 
 .dark-mode .tutorial-example-nav-link a {
-    background-color: #2d333b;
+    background-color: var(--color-background-primary);
+    color: var(--color-brand-primary);
 }
 
 .tutorial-example-nav-link a:hover {
-    background-color: #dee2e6;
+    background-color: var(--color-background-secondary);
     text-decoration: none;
 }
 
 .dark-mode .tutorial-example-nav-link a:hover {
-    background-color: #444c56;
+    background-color: var(--color-background-secondary);
 }
 
 /* Code block styling */
@@ -225,4 +227,16 @@ div.highlight pre {
 .dark-mode .copybutton:hover {
     background-color: rgba(0, 0, 0, 0.4);
     color: #eee;
+}
+
+.sidebar-tree p[role="heading"] {
+    font-size: 1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 1.5em;
+}
+
+.toctree-l1 {
+    margin: 0 !important;
 }
