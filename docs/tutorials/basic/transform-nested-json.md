@@ -144,7 +144,7 @@ result = processor.process(data=company_data, entity_name="company")
 ## Example Implementation
 
 For a complete implementation example, see the flattening_basics.py
-file at `../../../examples/data_processing/basic/flattening_basics.py`.
+file at [GitHub](https://github.com/scottdraper8/transmog/blob/main/examples/data_processing/basic/flattening_basics.py).
 
 Key aspects demonstrated in the example:
 

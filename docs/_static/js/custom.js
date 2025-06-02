@@ -126,7 +126,7 @@ function addTutorialExampleNavigation() {
     if (tutorialPath) {
         // We're on a tutorial page, add navigation to example
         const examplePath = tutorialExampleMap[tutorialPath];
-        const exampleUrl = `https://github.com/username/transmog/blob/main/examples/${examplePath}`;
+        const exampleUrl = `https://github.com/scottdraper8/transmog/blob/main/examples/${examplePath}`;
 
         // Create navigation widget
         createNavigationWidget('example', examplePath, exampleUrl);

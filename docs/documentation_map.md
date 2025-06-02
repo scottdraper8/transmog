@@ -87,39 +87,53 @@ Practical code examples demonstrating Transmog functionality in real-world scena
 
 #### Basic Examples (`/examples/data_processing/basic/`)
 
-- [Flattening Basics](../examples/data_processing/basic/flattening_basics.py) - Core functionality for
+<!-- markdownlint-disable-next-line MD013 -->
+- [Flattening Basics](https://github.com/scottdraper8/transmog/blob/main/examples/data_processing/basic/flattening_basics.py) - Core functionality for
   flattening nested structures
-- [Naming Example](../examples/data_processing/basic/naming_example.py) - Field and table naming conventions
-- [Primitive Arrays](../examples/data_processing/basic/primitive_arrays_example.py) - Handling arrays of
+<!-- markdownlint-disable-next-line MD013 -->
+- [Naming Example](https://github.com/scottdraper8/transmog/blob/main/examples/data_processing/basic/naming_example.py) - Field and table naming conventions
+<!-- markdownlint-disable-next-line MD013 -->
+- [Primitive Arrays](https://github.com/scottdraper8/transmog/blob/main/examples/data_processing/basic/primitive_arrays_example.py) - Handling arrays of
   primitive values
 
 #### File Formats (`/examples/data_processing/file_formats/`)
 
-- [CSV Processing](../examples/data_processing/file_formats/csv_processing.py) - Working with CSV data
-- [JSON Processing](../examples/data_processing/file_formats/json_processing.py) - Working with JSON data
-- [Multiple Formats](../examples/data_processing/file_formats/multiple_formats_example.py) - Converting
+<!-- markdownlint-disable-next-line MD013 -->
+- [CSV Processing](https://github.com/scottdraper8/transmog/blob/main/examples/data_processing/file_formats/csv_processing.py) - Working with CSV data
+<!-- markdownlint-disable-next-line MD013 -->
+- [JSON Processing](https://github.com/scottdraper8/transmog/blob/main/examples/data_processing/file_formats/json_processing.py) - Working with JSON data
+<!-- markdownlint-disable-next-line MD013 -->
+- [Multiple Formats](https://github.com/scottdraper8/transmog/blob/main/examples/data_processing/file_formats/multiple_formats_example.py) - Converting
   between different formats
 
 #### Data Transformation (`/examples/data_transformation/`)
 
-- [Data Cleanup](../examples/data_transformation/basic/data_cleanup_example.py) - Cleaning and standardizing data
-- [Data Validation](../examples/data_transformation/basic/data_validation_example.py) - Validating data
+<!-- markdownlint-disable-next-line MD013 -->
+- [Data Cleanup](https://github.com/scottdraper8/transmog/blob/main/examples/data_transformation/basic/data_cleanup_example.py) - Cleaning and standardizing data
+<!-- markdownlint-disable-next-line MD013 -->
+- [Data Validation](https://github.com/scottdraper8/transmog/blob/main/examples/data_transformation/basic/data_validation_example.py) - Validating data
   during processing
-- [Deep Nesting](../examples/data_transformation/advanced/deep_nesting_example.py) - Handling deeply
+<!-- markdownlint-disable-next-line MD013 -->
+- [Deep Nesting](https://github.com/scottdraper8/transmog/blob/main/examples/data_transformation/advanced/deep_nesting_example.py) - Handling deeply
   nested structures
-- [Deterministic IDs](../examples/data_transformation/advanced/deterministic_ids.py) - Consistent ID generation
+<!-- markdownlint-disable-next-line MD013 -->
+- [Deterministic IDs](https://github.com/scottdraper8/transmog/blob/main/examples/data_transformation/advanced/deterministic_ids.py) - Consistent ID generation
 
 #### Advanced Processing (`/examples/data_processing/advanced/`)
 
-- [Error Handling](../examples/data_processing/advanced/error_handling.py) - Handling errors and recovery strategies
-- [Performance Optimization](../examples/data_processing/advanced/performance_optimization.py) - Optimizing
+<!-- markdownlint-disable-next-line MD013 -->
+- [Error Handling](https://github.com/scottdraper8/transmog/blob/main/examples/data_processing/advanced/error_handling.py) - Handling errors and recovery strategies
+<!-- markdownlint-disable-next-line MD013 -->
+- [Performance Optimization](https://github.com/scottdraper8/transmog/blob/main/examples/data_processing/advanced/performance_optimization.py) - Optimizing
   for different performance goals
-- [Streaming Processing](../examples/data_processing/advanced/streaming_processing.py) - Memory-efficient
+<!-- markdownlint-disable-next-line MD013 -->
+- [Streaming Processing](https://github.com/scottdraper8/transmog/blob/main/examples/data_processing/advanced/streaming_processing.py) - Memory-efficient
   streaming data processing
 
 #### Configuration (`/examples/configuration/`)
 
-- [Basic Configuration](../examples/configuration/basic/configuration.py) - Options for configuring the processor
+<!-- markdownlint-disable-next-line MD013 -->
+- [Basic Configuration](https://github.com/scottdraper8/transmog/blob/main/examples/configuration/basic/configuration.py) - Options for configuring the processor
 
 ## When to Use Each Section
 

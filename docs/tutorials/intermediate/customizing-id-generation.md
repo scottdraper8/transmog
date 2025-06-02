@@ -199,7 +199,7 @@ result2 = processor.process_file("employee.json", entity_name="employee")
 ## Example Implementation
 
 For a complete implementation example, see the deterministic_ids.py
-file at `../../../examples/data_transformation/advanced/deterministic_ids.py`.
+file at [GitHub](https://github.com/scottdraper8/transmog/blob/main/examples/data_transformation/advanced/deterministic_ids.py).
 
 Key aspects demonstrated in the example:
 

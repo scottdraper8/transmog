@@ -263,7 +263,7 @@ Here's a comparison of memory usage for different configurations:
 ## Example Implementation
 
 For a complete implementation example, see the performance_optimization.py
-file at `../../../examples/data_processing/advanced/performance_optimization.py`.
+file at [GitHub](https://github.com/scottdraper8/transmog/blob/main/examples/data_processing/advanced/performance_optimization.py).
 
 Key aspects demonstrated in the example:
 
