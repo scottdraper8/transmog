@@ -2,11 +2,12 @@
 """Script to increment all version mentions, clean artifacts, and deploy to PyPI."""
 
 import os
+import platform
 import re
 import shlex
 import shutil
 import subprocess  # nosec
-import sys
+from pathlib import Path
 
 # Version bumping logic
 VERSION_FILES = [
@@ -17,6 +18,21 @@ VERSION_FILES = [
 ]
 
 VERSION_PATTERN = re.compile(r"(\d+)\.(\d+)\.(\d+)")
+VENV_DIR = ".env"
+
+
+def get_venv_python():
+    """Get the path to the Python executable in the virtual environment."""
+    venv_path = Path(VENV_DIR)
+    if platform.system() == "Windows":
+        python_path = venv_path / "Scripts" / "python.exe"
+    else:
+        python_path = venv_path / "bin" / "python"
+
+    if not python_path.exists():
+        raise RuntimeError(f"Python executable not found at {python_path}")
+
+    return python_path
 
 
 def run_command(command, description=None, check=False):
@@ -81,8 +97,9 @@ def update_versions(old_version, new_version):
 
 def ensure_tools():
     """Install or upgrade build and twine packages."""
+    python_path = get_venv_python()
     run_command(
-        [sys.executable, "-m", "pip", "install", "--upgrade", "build", "twine"],
+        [str(python_path), "-m", "pip", "install", "--upgrade", "build", "twine"],
         description="Installing/upgrading build tools",
         check=True,
     )
@@ -97,13 +114,14 @@ def clean_artifacts():
 
 def build_and_upload():
     """Build the package and upload to PyPI."""
+    python_path = get_venv_python()
     run_command(
-        [sys.executable, "-m", "build"],
+        [str(python_path), "-m", "build"],
         description="Building package",
         check=True,
     )
     run_command(
-        [sys.executable, "-m", "twine", "upload", "dist/*"],
+        [str(python_path), "-m", "twine", "upload", "dist/*"],
         description="Uploading to PyPI",
         check=True,
     )

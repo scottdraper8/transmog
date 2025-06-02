@@ -7,7 +7,7 @@ hide-toc: false
 Transmog is a Python library for transforming nested JSON data into flat, structured formats.
 
 :::info Version Note
-**Transmog 1.0.4 - Current Release**
+**Transmog 1.0.5 - Current Release**
 
 Features include:
 
