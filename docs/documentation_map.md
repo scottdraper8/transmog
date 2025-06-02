@@ -13,21 +13,21 @@ These guides are organized into logical categories:
 
 #### Essentials (`/user/essentials/`)
 
-- 🚀 [Getting Started](user/essentials/getting-started.md) - Getting started with Transmog
-- 📚 [Basic Concepts](user/essentials/basic-concepts.md) - Fundamental concepts
-- 🧩 [Data Structures](user/essentials/data-structures.md) - Input and output data structures
-- 🗺️ [Configuration](user/essentials/configuration.md) - Options for customizing Transmog
+- [Getting Started](user/essentials/getting-started.md) - Getting started with Transmog
+- [Basic Concepts](user/essentials/basic-concepts.md) - Fundamental concepts
+- [Data Structures](user/essentials/data-structures.md) - Input and output data structures
+- [Configuration](user/essentials/configuration.md) - Options for customizing Transmog
 - [Dependencies and Features](user/essentials/dependencies-and-features.md) - Optional dependencies and features
 
 #### Processing (`/user/processing/`)
 
-- 🔄 [Processing Overview](user/processing/processing-overview.md) - General processing guide
-- 🧬 [Data Transformation](user/processing/data-transformation.md) - Transforming data structures
-- 📄 [File Processing](user/processing/file-processing.md) - Working with files
-- 📊 [JSON Handling](user/processing/json-handling.md) - Working with JSON data
-- 📋 [CSV Processing](user/processing/csv-processing.md) - Working with CSV data
-- 🏷️ [Naming](user/processing/naming.md) - Field and table naming
-- 📦 [Array Handling](user/processing/array-handling.md) - Options for array processing
+- [Processing Overview](user/processing/processing-overview.md) - General processing guide
+- [Data Transformation](user/processing/data-transformation.md) - Transforming data structures
+- [File Processing](user/processing/file-processing.md) - Working with files
+- [JSON Handling](user/processing/json-handling.md) - Working with JSON data
+- [CSV Processing](user/processing/csv-processing.md) - Working with CSV data
+- [Naming](user/processing/naming.md) - Field and table naming
+- [Array Handling](user/processing/array-handling.md) - Options for array processing
 - [Metadata](user/processing/metadata.md) - Working with metadata
 - [Transforms](user/processing/transforms.md) - Transformation functions and operations
 - [IO Operations](user/processing/io.md) - Input/output operations
@@ -81,12 +81,54 @@ Step-by-step guides to accomplish specific tasks with Transmog, organized by dif
 - [Error Recovery Strategies](tutorials/advanced/error-recovery-strategies.md)
 - [Optimizing Memory Usage](tutorials/advanced/optimizing-memory-usage.md)
 
+### 5. Examples (`/examples/`)
+
+Practical code examples demonstrating Transmog functionality in real-world scenarios:
+
+#### Basic Examples (`/examples/data_processing/basic/`)
+
+- [Flattening Basics](../examples/data_processing/basic/flattening_basics.py) - Core functionality for
+  flattening nested structures
+- [Naming Example](../examples/data_processing/basic/naming_example.py) - Field and table naming conventions
+- [Primitive Arrays](../examples/data_processing/basic/primitive_arrays_example.py) - Handling arrays of
+  primitive values
+
+#### File Formats (`/examples/data_processing/file_formats/`)
+
+- [CSV Processing](../examples/data_processing/file_formats/csv_processing.py) - Working with CSV data
+- [JSON Processing](../examples/data_processing/file_formats/json_processing.py) - Working with JSON data
+- [Multiple Formats](../examples/data_processing/file_formats/multiple_formats_example.py) - Converting
+  between different formats
+
+#### Data Transformation (`/examples/data_transformation/`)
+
+- [Data Cleanup](../examples/data_transformation/basic/data_cleanup_example.py) - Cleaning and standardizing data
+- [Data Validation](../examples/data_transformation/basic/data_validation_example.py) - Validating data
+  during processing
+- [Deep Nesting](../examples/data_transformation/advanced/deep_nesting_example.py) - Handling deeply
+  nested structures
+- [Deterministic IDs](../examples/data_transformation/advanced/deterministic_ids.py) - Consistent ID generation
+
+#### Advanced Processing (`/examples/data_processing/advanced/`)
+
+- [Error Handling](../examples/data_processing/advanced/error_handling.py) - Handling errors and recovery strategies
+- [Performance Optimization](../examples/data_processing/advanced/performance_optimization.py) - Optimizing
+  for different performance goals
+- [Streaming Processing](../examples/data_processing/advanced/streaming_processing.py) - Memory-efficient
+  streaming data processing
+
+#### Configuration (`/examples/configuration/`)
+
+- [Basic Configuration](../examples/configuration/basic/configuration.py) - Options for configuring the processor
+
 ## When to Use Each Section
 
-- **New to Transmog?** Start with [Getting Started](user/essentials/getting-started.md) and [Basic Concepts](user/essentials/basic-concepts.md)
+- **New to Transmog?** Start with [Getting Started](user/essentials/getting-started.md) and
+  [Basic Concepts](user/essentials/basic-concepts.md)
 - **Looking for specific method details?** Check the API reference
 - **Want to contribute?** See the developer guides
 - **Need to solve a specific problem?** Try the tutorials
+- **Want to see practical code?** Explore the examples
 
 ## Related Documentation
 
@@ -118,14 +160,14 @@ The user guides focus on concepts and usage examples, while the API references p
 
 1. [Getting Started](user/essentials/getting-started.md)
 2. [Basic Concepts](user/essentials/basic-concepts.md)
-3. [Transform Nested JSON Tutorial](tutorials/basic/transform-nested-json.md)
+3. [Transform Nested JSON](tutorials/basic/transform-nested-json.md)
 4. [Data Transformation Guide](user/processing/data-transformation.md)
 
 ### For Data Engineers
 
 1. [Performance Optimization](user/advanced/performance-optimization.md)
 2. [Streaming](user/advanced/streaming.md)
-3. [Streaming Large Datasets Tutorial](tutorials/intermediate/streaming-large-datasets.md)
+3. [Streaming Large Datasets](tutorials/intermediate/streaming-large-datasets.md)
 4. [Error Handling](user/advanced/error-handling.md)
 
 ### For Integration Developers
@@ -133,4 +175,4 @@ The user guides focus on concepts and usage examples, while the API references p
 1. [Configuration](user/essentials/configuration.md)
 2. [Output Formats](user/output/output-formats.md)
 3. [Deterministic IDs](user/advanced/deterministic-ids.md)
-4. [Customizing ID Generation Tutorial](tutorials/intermediate/customizing-id-generation.md)
+4. [Customizing ID Generation](tutorials/intermediate/customizing-id-generation.md)

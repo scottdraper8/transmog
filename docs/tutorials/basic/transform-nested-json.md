@@ -50,70 +50,17 @@ The following nested JSON structure represents a company with departments and em
 
 The transformation begins with installing Transmog and importing the necessary components:
 
-```python
-# Install transmog
-pip install transmog
-
-# Import required components
-from transmog import Processor, TransmogConfig
+```include-example:data_processing/basic/flattening_basics.py
+:start-line: 9
+:end-line: 12
 ```
 
 The nested JSON structure is transformed as follows:
 
-```python
-# Sample data
-company_data = {
-  "companyName": "Acme Inc",
-  "founded": 1985,
-  "headquarters": {
-    "city": "New York",
-    "country": "USA"
-  },
-  "departments": [
-    {
-      "name": "Engineering",
-      "headCount": 50,
-      "employees": [
-        {
-          "id": "E001",
-          "name": "Jane Smith",
-          "title": "Software Engineer"
-        },
-        {
-          "id": "E002",
-          "name": "John Doe",
-          "title": "Senior Developer"
-        }
-      ]
-    },
-    {
-      "name": "Marketing",
-      "headCount": 20,
-      "employees": [
-        {
-          "id": "M001",
-          "name": "Alice Johnson",
-          "title": "Marketing Specialist"
-        }
-      ]
-    }
-  ]
-}
-
-# Create a processor with default configuration
-processor = Processor()
-
-# Process the data
-result = processor.process(company_data, entity_name="company")
-
-# Convert to JSON objects and display the result
-tables = result.to_json_objects()
-
-# Display the tables
-for table_name, records in tables.items():
-    print(f"\n=== {table_name} ===")
-    for record in records:
-        print(record)
+```include-example:data_processing/basic/flattening_basics.py
+:start-line: 50
+:end-line: 105
+:strip-docstring: true
 ```
 
 ## Understanding the Output
@@ -130,23 +77,22 @@ Each table maintains relationships through ID fields.
 
 The transformation can be customized using `TransmogConfig`:
 
-```python
-# Create a custom configuration
-config = (
-    TransmogConfig.default()
-    .performance_optimized()
-    .with_naming(deep_nesting_threshold=4)
-)
-
-# Create a processor with custom configuration
-processor = Processor(config)
-
-# Process the data
-result = processor.process(company_data, entity_name="company")
-
-# Convert to JSON objects
-tables = result.to_json_objects()
+```include-example:data_processing/basic/flattening_basics.py
+:start-line: 140
+:end-line: 152
 ```
+
+## Example Implementation
+
+For a complete implementation example, see the flattening_basics.py
+file at `../../../examples/data_processing/basic/flattening_basics.py`.
+
+Key aspects demonstrated in the example:
+
+- Basic transformation of nested JSON data
+- Creating a processor with default configuration
+- Accessing and displaying the transformed data
+- Customizing the transformation with configuration options
 
 ## Related Documentation
 

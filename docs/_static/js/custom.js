@@ -60,4 +60,115 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
     });
+
+    // Apply custom styling to admonitions
+    customizeAdmonitions();
+
+    // Add tutorial-to-example navigation widgets
+    addTutorialExampleNavigation();
 });
+
+function customizeAdmonitions() {
+    // Add custom styling to admonitions if needed
+    const admonitions = document.querySelectorAll('.admonition');
+    admonitions.forEach(admonition => {
+        // Add any custom admonition styling here
+    });
+}
+
+function addTutorialExampleNavigation() {
+    // Tutorial to example mapping
+    const tutorialExampleMap = {
+        // Basic tutorials
+        '/tutorials/basic/transform-nested-json': 'data_processing/basic/flattening_basics.py',
+        '/tutorials/basic/flatten-and-normalize': 'data_processing/basic/flattening_basics.py',
+
+        // Intermediate tutorials
+        '/tutorials/intermediate/streaming-large-datasets': 'data_processing/advanced/streaming_processing.py',
+        '/tutorials/intermediate/customizing-id-generation': 'data_transformation/advanced/deterministic_ids.py',
+
+        // Advanced tutorials
+        '/tutorials/advanced/error-recovery-strategies': 'data_processing/advanced/error_handling.py',
+        '/tutorials/advanced/optimizing-memory-usage': 'data_processing/advanced/performance_optimization.py'
+    };
+
+    // Example to tutorial mapping
+    const exampleTutorialMap = {
+        'data_processing/basic/flattening_basics.py': [
+            { path: '/tutorials/basic/transform-nested-json', name: 'Transform Nested JSON' },
+            { path: '/tutorials/basic/flatten-and-normalize', name: 'Flatten and Normalize' }
+        ],
+        'data_processing/advanced/streaming_processing.py': [
+            { path: '/tutorials/intermediate/streaming-large-datasets', name: 'Streaming Large Datasets' }
+        ],
+        'data_transformation/advanced/deterministic_ids.py': [
+            { path: '/tutorials/intermediate/customizing-id-generation', name: 'Customizing ID Generation' }
+        ],
+        'data_processing/advanced/error_handling.py': [
+            { path: '/tutorials/advanced/error-recovery-strategies', name: 'Error Recovery Strategies' }
+        ],
+        'data_processing/advanced/performance_optimization.py': [
+            { path: '/tutorials/advanced/optimizing-memory-usage', name: 'Optimizing Memory Usage' }
+        ]
+    };
+
+    // Check if we're on a tutorial page
+    const currentPath = window.location.pathname;
+    let tutorialPath = '';
+
+    for (const path in tutorialExampleMap) {
+        if (currentPath.includes(path)) {
+            tutorialPath = path;
+            break;
+        }
+    }
+
+    if (tutorialPath) {
+        // We're on a tutorial page, add navigation to example
+        const examplePath = tutorialExampleMap[tutorialPath];
+        const exampleUrl = `https://github.com/username/transmog/blob/main/examples/${examplePath}`;
+
+        // Create navigation widget
+        createNavigationWidget('example', examplePath, exampleUrl);
+    } else {
+        // Check if we're on an example page in the documentation
+        const examplePattern = /\/examples\/(.+?)\.html/;
+        const match = currentPath.match(examplePattern);
+
+        if (match) {
+            const examplePath = match[1].replace(/\//g, '_') + '.py';
+            const tutorials = exampleTutorialMap[examplePath];
+
+            if (tutorials && tutorials.length) {
+                // Create navigation widgets for each tutorial
+                tutorials.forEach(tutorial => {
+                    createNavigationWidget('tutorial', tutorial.name, tutorial.path);
+                });
+            }
+        }
+    }
+}
+
+function createNavigationWidget(type, name, url) {
+    // Create widget element
+    const widget = document.createElement('div');
+    widget.className = 'tutorial-example-nav';
+
+    const icon = type === 'example' ? '💻' : '📚';
+    const label = type === 'example' ? 'View Example Code:' : 'Related Tutorial:';
+
+    widget.innerHTML = `
+        <div class="tutorial-example-nav-header">
+            ${icon} ${label}
+        </div>
+        <div class="tutorial-example-nav-link">
+            <a href="${url}" target="${type === 'example' ? '_blank' : '_self'}">${name}</a>
+        </div>
+    `;
+
+    // Find insertion point (after title)
+    const title = document.querySelector('h1');
+    if (title && title.parentNode) {
+        title.parentNode.insertBefore(widget, title.nextSibling);
+    }
+}

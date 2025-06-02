@@ -260,6 +260,19 @@ Here's a comparison of memory usage for different configurations:
 6. **Control Field Selection**: Process only the fields you need
 7. **Consider Hardware**: Adjust strategies based on available RAM
 
+## Example Implementation
+
+For a complete implementation example, see the performance_optimization.py
+file at `../../../examples/data_processing/advanced/performance_optimization.py`.
+
+Key aspects demonstrated in the example:
+
+- Comparison of default, memory-optimized, and performance-optimized configurations
+- Memory usage tracking with psutil
+- Benchmarking of different configurations on various data sizes
+- Real-world performance metrics for different optimization strategies
+- Custom configuration with balanced memory and performance trade-offs
+
 ## Next Steps
 
 - Explore [streaming large datasets](../intermediate/streaming-large-datasets.md)

@@ -196,6 +196,19 @@ result2 = processor.process_file("employee.json", entity_name="employee")
 4. **Test for Collisions**: Ensure your ID generation strategy doesn't create duplicates
 5. **Document Your Approach**: Make your ID generation strategy clear to others
 
+## Example Implementation
+
+For a complete implementation example, see the deterministic_ids.py
+file at `../../../examples/data_transformation/advanced/deterministic_ids.py`.
+
+Key aspects demonstrated in the example:
+
+- Basic deterministic IDs using organization ID field
+- Comprehensive ID mapping for all tables in a nested structure
+- Custom ID generation using multiple fields and hash functions
+- ID consistency verification across multiple processing runs
+- Output to JSON files to examine ID relationships
+
 ## Next Steps
 
 - Explore [error recovery strategies](../advanced/error-recovery-strategies.md)

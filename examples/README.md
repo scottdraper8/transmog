@@ -47,6 +47,38 @@ examples/
         └── advanced/
 ```
 
+## Related Documentation
+
+For a comprehensive guide to all examples and their documentation, see the [Examples Catalog](https://transmog.readthedocs.io/en/latest/user/examples.html).
+
+### Data Processing Examples
+
+| Example | Documentation |
+|---------|---------------|
+| [flattening_basics.py](data_processing/basic/flattening_basics.py) | [Transform Nested JSON Tutorial](https://transmog.readthedocs.io/en/latest/tutorials/basic/transform-nested-json.html), [Flatten and Normalize Tutorial](https://transmog.readthedocs.io/en/latest/tutorials/basic/flatten-and-normalize.html) |
+| [naming_example.py](data_processing/basic/naming_example.py) | [Naming Guide](https://transmog.readthedocs.io/en/latest/user/processing/naming.html) |
+| [primitive_arrays_example.py](data_processing/basic/primitive_arrays_example.py) | [Array Handling Guide](https://transmog.readthedocs.io/en/latest/user/processing/array-handling.html) |
+| [csv_processing.py](data_processing/file_formats/csv_processing.py) | [CSV Processing Guide](https://transmog.readthedocs.io/en/latest/user/processing/csv-processing.html) |
+| [json_processing.py](data_processing/file_formats/json_processing.py) | [JSON Handling Guide](https://transmog.readthedocs.io/en/latest/user/processing/json-handling.html) |
+| [streaming_processing.py](data_processing/advanced/streaming_processing.py) | [Streaming Guide](https://transmog.readthedocs.io/en/latest/user/advanced/streaming.html), [Streaming Large Datasets Tutorial](https://transmog.readthedocs.io/en/latest/tutorials/intermediate/streaming-large-datasets.html) |
+| [error_handling.py](data_processing/advanced/error_handling.py) | [Error Handling Guide](https://transmog.readthedocs.io/en/latest/user/advanced/error-handling.html), [Error Recovery Strategies Tutorial](https://transmog.readthedocs.io/en/latest/tutorials/advanced/error-recovery-strategies.html) |
+| [performance_optimization.py](data_processing/advanced/performance_optimization.py) | [Performance Optimization Guide](https://transmog.readthedocs.io/en/latest/user/advanced/performance-optimization.html), [Optimizing Memory Usage Tutorial](https://transmog.readthedocs.io/en/latest/tutorials/advanced/optimizing-memory-usage.html) |
+
+### Data Transformation Examples
+
+| Example | Documentation |
+|---------|---------------|
+| [data_cleanup_example.py](data_transformation/basic/data_cleanup_example.py) | [Data Transformation Guide](https://transmog.readthedocs.io/en/latest/user/processing/data-transformation.html) |
+| [data_validation_example.py](data_transformation/basic/data_validation_example.py) | [Data Transformation Guide](https://transmog.readthedocs.io/en/latest/user/processing/data-transformation.html) |
+| [deep_nesting_example.py](data_transformation/advanced/deep_nesting_example.py) | [Data Transformation Guide](https://transmog.readthedocs.io/en/latest/user/processing/data-transformation.html) |
+| [deterministic_ids.py](data_transformation/advanced/deterministic_ids.py) | [Deterministic IDs Guide](https://transmog.readthedocs.io/en/latest/user/advanced/deterministic-ids.html), [Customizing ID Generation Tutorial](https://transmog.readthedocs.io/en/latest/tutorials/intermediate/customizing-id-generation.html) |
+
+### Configuration Examples
+
+| Example | Documentation |
+|---------|---------------|
+| [configuration.py](configuration/basic/configuration.py) | [Configuration Guide](https://transmog.readthedocs.io/en/latest/user/essentials/configuration.html) |
+
 ## Output Directory
 
 Each example writes its output to a dedicated subdirectory in the `output/` directory,
@@ -82,6 +114,8 @@ Demonstrates: [Specific functionality demonstrated]
 
 Related Documentation:
 - [Link to related documentation section]
+- [Link to related tutorial]
+- [Link to related API reference]
 
 Learning Objectives:
 - [What the user will learn from this example]
