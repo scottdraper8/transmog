@@ -37,14 +37,20 @@ For contributors and developers:
 pip install transmog[dev]
 ```
 
-Includes tools for testing, development, and linting.
+Includes tools for:
 
-#### Development Setup Script
+- Development and testing (pytest, ruff, mypy, bandit, pre-commit)
+- Documentation building (Sphinx, MyST-parser)
+- Performance analysis (memory-profiler)
+
+## Development Setup
 
 The easiest way to set up a complete development environment is to use the provided setup script:
 
 ```bash
-python scripts/setup_dev.py
+git clone https://github.com/scottdraper8/transmog.git
+cd transmog
+python3 scripts/setup_dev.py
 ```
 
 This script automates the development setup process by:
@@ -58,28 +64,18 @@ This script automates the development setup process by:
 7. Validating optional dependencies for performance optimization
 8. Creating required directories for benchmarks and documentation
 
-### Full Installation
+After running the setup script, activate the virtual environment:
 
-Install all optional dependencies:
+For Linux/macOS:
 
 ```bash
-pip install transmog[all]
+source .env/bin/activate
 ```
 
-## Installing from Source
-
-To install the development version:
+For Windows:
 
 ```bash
-git clone https://github.com/scottdraper8/transmog.git
-cd transmog
-pip install -e .
-```
-
-For development with dev dependencies:
-
-```bash
-pip install -e ".[dev]"
+.env\Scripts\activate
 ```
 
 ## System Requirements

@@ -45,29 +45,23 @@ dependencies = [
 ]
 
 # Data integration dependencies - Optional packages for working with other data formats (empty now)
-optional-dependencies.data = [  ]
 optional-dependencies.dev = [
   "bandit>=1.7.5",
+  # Documentation dependencies
+  "furo>=2024.1.29",
   "interrogate>=1.5",
+  "linkify-it-py>=2",
   "memory-profiler>=0.60",
   "mypy>=0.9",
+  "myst-parser>=2",
   "pre-commit>=3.5",
   "pyproject-fmt>=1.5.1",
+  "pyproject-parser>=0.7",
   "pytest>=7",
   "pytest-benchmark>=4",
   "pytest-cov>=3",
   "ruff>=0.3",
   "safety>=2.3.5",
-  "types-pyyaml",
-  "types-toml",
-]
-
-# Documentation dependencies
-optional-dependencies.docs = [
-  "furo>=2024.1.29",
-  "linkify-it-py>=2",
-  "myst-parser>=2",
-  "pyproject-parser>=0.7",
   "sphinx>=7.2",
   "sphinx-autobuild>=2021.3.14",
   "sphinx-autodoc-typehints>=1.24",
@@ -81,16 +75,13 @@ optional-dependencies.docs = [
   "sphinxcontrib-napoleon>=0.7",
   "sphinxcontrib-qthelp>=1",
   "sphinxcontrib-serializinghtml>=1",
+  "types-pyyaml",
+  "types-toml",
 ]
+
 # For users who want the absolute minimum dependencies
 optional-dependencies.minimal = [  ]
 
-# Additional optional features
-optional-dependencies.test = [
-  "pytest>=7",
-  "pytest-benchmark>=4",
-  "pytest-cov>=3",
-]
 urls."Bug Tracker" = "https://github.com/scottdraper8/transmog/issues"
 urls."Documentation" = "https://scottdraper8.github.io/transmog/"
 urls."Homepage" = "https://github.com/scottdraper8/transmog"

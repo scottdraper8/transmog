@@ -31,179 +31,87 @@ Transmog features:
 - Processing large datasets
 - Configuring memory usage
 
-## Documentation Structure
-
-For an overview of how the documentation is organized, see the [Documentation Map](documentation_map.md).
-
-## Getting Started
+## Quick Links
 
 - [Installation Guide](installation.md)
 - [Getting Started Guide](user/essentials/getting-started.md)
 - [Basic Concepts](user/essentials/basic-concepts.md)
 - [Data Structures](user/essentials/data-structures.md)
 
-## Quick Start Tutorials
+## Documentation Structure
+
+The Transmog documentation is organized into several key sections:
+
+### User Guides
+
+User guides provide conceptual overviews, practical examples, and best practices for using Transmog.
+
+#### Essentials
+
+- [Getting Started](user/essentials/getting-started.md) - First steps with Transmog
+- [Basic Concepts](user/essentials/basic-concepts.md) - Fundamental concepts
+- [Data Structures](user/essentials/data-structures.md) - Input and output data structures
+- [Configuration](user/essentials/configuration.md) - Options for customizing Transmog
+- [Dependencies and Features](user/essentials/dependencies-and-features.md) - Optional dependencies and features
+
+#### Processing
+
+- [Processing Overview](user/processing/processing-overview.md) - General processing guide
+- [Data Transformation](user/processing/data-transformation.md) - Transforming data structures
+- [File Processing](user/processing/file-processing.md) - Working with files
+- [JSON Handling](user/processing/json-handling.md) - Working with JSON data
+- [CSV Processing](user/processing/csv-processing.md) - Working with CSV data
+- [Naming](user/processing/naming.md) - Field and table naming
+- [Array Handling](user/processing/array-handling.md) - Options for array processing
+- [Metadata](user/processing/metadata.md) - Working with metadata
+- [Transforms](user/processing/transforms.md) - Transformation functions and operations
+- [IO Operations](user/processing/io.md) - Input/output operations
+
+#### Advanced Topics
+
+- [Streaming](user/advanced/streaming.md) - Processing large datasets
+- [Performance Optimization](user/advanced/performance-optimization.md) - Optimizing for speed and memory
+- [Error Handling](user/advanced/error-handling.md) - Dealing with problematic data
+- [Deterministic IDs](user/advanced/deterministic-ids.md) - Generating consistent IDs
+
+#### Output Options
+
+- [Output Formats](user/output/output-formats.md) - Available output formats and when to use them
+
+### API Reference
+
+API reference documents provide technical details about the Transmog API.
+
+### Developer Guides
+
+Developer guides contain information for those contributing to Transmog or extending its functionality.
+
+### Tutorials
+
+Step-by-step guides to accomplish specific tasks with Transmog:
 
 - [Transform Nested JSON](tutorials/basic/transform-nested-json.md)
 - [Flatten and Normalize](tutorials/basic/flatten-and-normalize.md)
-
-## Core User Guides
-
-### Essentials
-
-- [Configuration](user/essentials/configuration.md)
-- [Dependencies and Features](user/essentials/dependencies-and-features.md)
-
-### Processing
-
-- [Processing Overview](user/processing/processing-overview.md)
-- [Data Transformation](user/processing/data-transformation.md)
-- [JSON Handling](user/processing/json-handling.md)
-- [CSV Processing](user/processing/csv-processing.md)
-- [File Processing](user/processing/file-processing.md)
-- [Metadata](user/processing/metadata.md)
-- [Naming](user/processing/naming.md)
-- [Transforms](user/processing/transforms.md)
-- [IO Operations](user/processing/io.md)
-
-### Advanced
-
-- [Streaming](user/advanced/streaming.md)
-- [Performance Optimization](user/advanced/performance-optimization.md)
-- [Error Handling](user/advanced/error-handling.md)
-- [Deterministic ID Generation](user/advanced/deterministic-ids.md)
-
-### Output
-
-- [Output Formats](user/output/output-formats.md)
-
-## API Reference
-
-- [Processor API](api/processor.md)
-- [ProcessingResult API](api/processing-result.md)
-- [Process API](api/process.md)
-- [Configuration API](api/config.md)
-- [CSV Reader API](api/csv-reader.md)
-- [Error Handling API](api/error.md)
-- [IO API](api/io.md)
-- [Naming API](api/naming.md)
-- [Types API](api/types.md)
-
-## Advanced Tutorials
-
 - [Streaming Large Datasets](tutorials/intermediate/streaming-large-datasets.md)
 - [Customizing ID Generation](tutorials/intermediate/customizing-id-generation.md)
 - [Error Recovery Strategies](tutorials/advanced/error-recovery-strategies.md)
 - [Optimizing Memory Usage](tutorials/advanced/optimizing-memory-usage.md)
 
-## For Developers
+## Where to Start
 
-- [Architecture](dev/architecture.md)
-- [Extending Transmog](dev/extending.md)
-- [Testing Guide](dev/testing.md)
-- [Benchmarking Guide](dev/benchmarking.md)
-- [Code Style Guide](dev/code-style.md)
-
-## Roadmap
-
-See our [ROADMAP.md](https://github.com/scottdraper8/transmog/blob/main/ROADMAP.md) file for upcoming features.
-
-## Support & Community
-
-- [GitHub Issues](https://github.com/scottdraper8/transmog/issues)
-
-## Key Features
-
-### Configuration System
-
-- Configuration with `TransmogConfig` class
-- Pre-configured modes (`memory_optimized`, `performance_optimized`)
-- Fluent API for configuration (`with_naming`, `with_processing`, etc.)
-- Configuration components for different aspects (`NamingConfig`, `ProcessingConfig`, etc.)
-
-### Processing Strategies
-
-- Strategies for different data sources:
-- `InMemoryStrategy` for small datasets
-- `FileStrategy` for processing files
-- `BatchStrategy` for batch processing
-- `ChunkedStrategy` for large datasets
-- `CSVStrategy` for CSV processing
-
-### Input Handling
-
-- Process nested JSON/dict structures
-- Handle arrays and nested arrays
-- Extract arrays to child tables with parent-child relationships
-- Support for streaming data processing
-
-### ID Generation Options
-
-- Random UUIDs (default)
-- Field-based deterministic IDs using specified fields
-- Custom function-based ID generation
-
-### Output Formats
-
-- Native Data Structures:
-  - Python dictionaries (`to_dict()`)
-  - JSON-serializable objects (`to_json_objects()`)
-  - PyArrow Tables (`to_pyarrow_tables()`)
-
-- Bytes Serialization:
-  - JSON bytes (`to_json_bytes()`)
-  - CSV bytes (`to_csv_bytes()`)
-  - Parquet bytes (`to_parquet_bytes()`)
-
-- File Output:
-  - JSON files (`write_all_json()`)
-  - CSV files (`write_all_csv()`)
-  - Parquet files (`write_all_parquet()`)
-
-- Memory Management with `ConversionMode`:
-  - Eager conversion - converts and caches data (`EAGER`)
-  - Lazy conversion - converts when needed (`LAZY`)
-  - Memory-efficient conversion - minimizes memory (`MEMORY_EFFICIENT`)
-
-### Error Recovery Strategies
-
-- Error recovery options:
-  - Strict recovery - raises errors
-  - Skip-and-log recovery - skips problematic records
-  - Partial recovery - extracts valid portions of records with errors
-  - Logging and error tracking
-  - Configurable error handling
-
-### Performance Options
-
-- Memory-efficient processing modes
-- Processing modes for memory/performance trade-offs
-- Streaming data processing
-- Batch processing
-
-### Arrays and Nested Objects
-
-- **Array Extraction**: Automatically extract arrays into separate child tables with parent-child
-  relationships preserved
-- **Deep Nesting Support**: Handle arbitrarily nested objects and arrays with automatic table
-  generation
-- **Relationship Preservation**: Maintain parent-child relationships between extracted entities
-- **Configurable Array Handling**: Choose whether to extract arrays, keep arrays in the main
-  table, or process arrays in-place
-- **Array Options**: Fine-grained control over array extraction with `visit_arrays` and
-  `keep_arrays` parameters
+- **New to Transmog?** Start with [Getting Started](user/essentials/getting-started.md) and [Basic Concepts](user/essentials/basic-concepts.md)
+- **Need to solve a specific problem?** Try the tutorials section
+- **Looking for detailed API information?** Check the API reference section
 
 ```{toctree}
 :maxdepth: 1
 :hidden:
 :caption: Getting Started
 
+installation
 user/essentials/getting-started
 user/essentials/basic-concepts
 user/essentials/data-structures
-installation
-documentation_map
-README
 ```
 
 ```{toctree}
@@ -272,7 +180,3 @@ dev/testing
 dev/benchmarking
 dev/code-style
 ```
-
-## Indices and Tables
-
-- {ref}`genindex`

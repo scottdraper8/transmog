@@ -2,16 +2,6 @@
 
 This guide covers basic usage of Transmog for transforming nested JSON into flattened formats.
 
-## Installation
-
-```bash
-# Basic installation
-pip install transmog
-
-# With optional dependencies
-pip install transmog[all]
-```
-
 ## Basic Usage
 
 Flattening nested JSON structures:
