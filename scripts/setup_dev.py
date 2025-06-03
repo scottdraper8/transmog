@@ -191,34 +191,13 @@ def validate_dependencies(python_path, dependencies):
                 print(f"⚠️ {pkg} is not installed")
 
 
-def install_performance_dependencies(python_path):
-    """Install optional performance-related dependencies."""
-    print("\nInstalling optional performance dependencies...")
-
-    # List of optional performance packages to install
-    performance_packages = [
-        "ujson",
-        "fastparquet",
-    ]
-
-    # Install each performance package
-    for package in performance_packages:
-        run_command(
-            [str(python_path), "-m", "pip", "install", package],
-            description=f"Installing {package}",
-            check=False,
-        )
-
-
-def check_optional_dependencies(python_path):
-    """Check optional dependencies for performance optimization."""
-    print("\nChecking optional dependencies for performance optimization...")
+def check_dependencies(python_path):
+    """Check dependencies for performance optimization."""
+    print("\nChecking dependencies for performance optimization...")
 
     # List of packages to check
     performance_packages = [
-        "ujson",
         "orjson",
-        "fastparquet",
         "pyarrow",
         "polars",
     ]
@@ -304,17 +283,14 @@ def main():
         description="Installing documentation dependencies",
     )
 
-    # Install optional performance dependencies
-    install_performance_dependencies(python_path)
-
     # Create necessary directories
     create_directories(root_dir)
 
     # Validate dependencies
     validate_dependencies(python_path, dependencies)
 
-    # Check optional dependencies
-    check_optional_dependencies(python_path)
+    # Check dependencies
+    check_dependencies(python_path)
 
     # Setup security tools
     setup_security_tools(python_path, root_dir)

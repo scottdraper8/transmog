@@ -82,19 +82,6 @@ For development with dev dependencies:
 pip install -e ".[dev]"
 ```
 
-## Optional Dependencies
-
-While the core dependencies are included by default, there are some additional optional packages for extended functionality:
-
-- **ujson**: Alternative JSON processor for specific use cases
-- **fastparquet**: Alternative Parquet implementation
-
-To install optional dependencies:
-
-```bash
-pip install ujson fastparquet
-```
-
 ## System Requirements
 
 - Python 3.9 or higher

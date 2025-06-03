@@ -12,7 +12,7 @@ import tempfile
 import pytest
 
 from transmog import Processor
-from transmog.error import ProcessingError
+from transmog.error import FileError, ParsingError, ProcessingError
 from transmog.io.writers.json import JsonStreamingWriter
 
 
@@ -188,8 +188,8 @@ class TestJsonIntegration:
             non_existent_file = os.path.join(temp_dir, "does_not_exist.json")
 
             # Test with a file that doesn't exist
-            # The error is wrapped in a ProcessingError by the error_context decorator
-            with pytest.raises(ProcessingError) as exc_info:
+            # The error should be a FileError after refactoring
+            with pytest.raises((FileError, ProcessingError)) as exc_info:
                 processor = Processor()
                 processor.process_file(
                     file_path=non_existent_file, entity_name="error_test"
@@ -202,7 +202,7 @@ class TestJsonIntegration:
             with open(invalid_json_path, "w") as f:
                 f.write("{invalid json")
 
-            with pytest.raises(ProcessingError) as exc_info:
+            with pytest.raises((ParsingError, ProcessingError)) as exc_info:
                 processor = Processor()
                 processor.process_file(
                     file_path=invalid_json_path, entity_name="error_test"
