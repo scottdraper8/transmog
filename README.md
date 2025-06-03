@@ -1,8 +1,8 @@
 # Transmog
 
-[![PyPI version](https://img.shields.io/pypi/v/transmog.svg)](https://pypi.org/project/transmog/)
-[![Python versions](https://img.shields.io/pypi/pyversions/transmog.svg)](https://pypi.org/project/transmog/)
-[![License](https://img.shields.io/github/license/scottdraper8/transmog.svg)](https://github.com/scottdraper8/transmog/blob/main/LICENSE)
+[![PyPI version](https://img.shields.io/pypi/v/transmog.svg?logo=pypi)](https://pypi.org/project/transmog/)
+[![Python versions](https://img.shields.io/badge/python-3.9%2B-blue?logo=python)](https://pypi.org/project/transmog/)
+[![License](https://img.shields.io/github/license/scottdraper8/transmog.svg?logo=github)](https://github.com/scottdraper8/transmog/blob/main/LICENSE)
 
 A Python library for transforming complex nested JSON data into flat, structured formats while preserving
 parent-child relationships.
