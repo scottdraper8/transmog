@@ -308,51 +308,60 @@ class ProcessingResult(ResultInterface):
         return result
 
     def to_pyarrow_tables(self) -> dict[str, Any]:
-        """Convert all tables to PyArrow Table format.
+        """Convert all tables to PyArrow tables.
 
         Returns:
-            Dict mapping table names to PyArrow Tables
+            Dictionary of table names to PyArrow tables
 
         Raises:
             MissingDependencyError: If PyArrow is not available
+            OutputError: If conversion fails
         """
+        # Check for cached result first
+        cache_key = _get_cache_key(self.to_dict(), "pyarrow_tables")
+        if cache_key in _conversion_cache:
+            return cast(dict[str, Any], _conversion_cache[cache_key])
+
         if not _check_pyarrow_available():
             raise MissingDependencyError(
-                "PyArrow is required for this operation. "
+                "PyArrow is required for PyArrow table conversion. "
                 "Install with 'pip install pyarrow'.",
                 package="pyarrow",
-                feature="pyarrow",
+                feature="arrow",
             )
 
-        # Check if we have cached result
-        if "pyarrow_tables" in self._converted_formats:
-            return cast(dict[str, Any], self._converted_formats["pyarrow_tables"])
-
         try:
-            # Convert tables
+            # Convert tables to JSON objects first
+            tables = self.to_json_objects()
             result: dict[str, Any] = {}
 
-            # Convert main table
-            result["main"] = self._dict_list_to_pyarrow(self.main_table)
+            # Convert each table to PyArrow
+            for table_name, records in tables.items():
+                # Skip empty tables
+                if not records:
+                    continue
 
-            # Convert child tables
-            for table_name, table_data in self.child_tables.items():
-                result[table_name] = self._dict_list_to_pyarrow(table_data)
+                # Convert to PyArrow table using configuration-driven type handling
+                result[table_name] = self._dict_list_to_pyarrow(records)
 
-            # Cache result if using eager mode
+            # Cache the result if using eager mode
             if self.conversion_mode == ConversionMode.EAGER:
-                self._converted_formats["pyarrow_tables"] = result
+                _conversion_cache[cache_key] = result
 
             return result
         except Exception as e:
             logger.error(f"Error converting to PyArrow tables: {e}")
             raise OutputError(f"Failed to convert to PyArrow tables: {e}") from e
 
-    def _dict_list_to_pyarrow(self, data: list[dict[str, Any]]) -> Any:
+    def _dict_list_to_pyarrow(
+        self, data: list[dict[str, Any]], force_string_types: Optional[bool] = None
+    ) -> Any:
         """Convert a list of dictionaries to a PyArrow Table.
 
         Args:
             data: List of records to convert
+            force_string_types: If True, all values will be converted to strings
+                               If None, will use the global cast_to_string configuration
 
         Returns:
             PyArrow Table
@@ -365,14 +374,36 @@ class ProcessingResult(ResultInterface):
 
             return pa.table({})
 
+        import pyarrow as pa
+
+        # Get the cast_to_string value from configuration if not explicitly provided
+        from transmog.config import settings
+
+        use_string_types = (
+            force_string_types
+            if force_string_types is not None
+            else settings.get_option("cast_to_string", False)
+        )
+
         # Extract columns from dictionaries
         columns = {}
         for key in data[0].keys():
-            columns[key] = [record.get(key) for record in data]
+            values = [record.get(key) for record in data]
 
-        import pyarrow as pa
+            # Convert all values to strings if configured to do so
+            if use_string_types:
+                # Convert non-None values to strings
+                values = [str(val) if val is not None else None for val in values]
+                columns[key] = pa.array(values, type=pa.string())
+            else:
+                columns[key] = values
 
-        return pa.table(columns)
+        # If using explicit string types, create the table with the prepared arrays
+        if use_string_types:
+            return pa.table(columns)
+        else:
+            # Otherwise use the default PyArrow table creation which infers types
+            return pa.table(columns)
 
     def to_parquet_bytes(
         self, compression: str = "snappy", **kwargs: Any
@@ -409,8 +440,11 @@ class ProcessingResult(ResultInterface):
             import pyarrow.parquet as pq
             from pyarrow.lib import ArrowInvalid
 
-            # Convert tables to PyArrow format first
-            arrow_tables = self.to_pyarrow_tables()
+            # Convert tables to PyArrow format first with config-driven type handling
+            arrow_tables = {}
+            for table_name, records in self.to_json_objects().items():
+                arrow_tables[table_name] = self._dict_list_to_pyarrow(records)
+
             result: dict[str, bytes] = {}
 
             # Convert each table to Parquet bytes
@@ -508,7 +542,7 @@ class ProcessingResult(ResultInterface):
                     complete_record.update(record)
                     complete_records.append(complete_record)
 
-                # Convert to PyArrow table with the complete schema
+                # Convert to PyArrow table with configuration-driven type handling
                 arrow_table = self._dict_list_to_pyarrow(complete_records)
 
                 # Write directly to file
@@ -577,7 +611,7 @@ class ProcessingResult(ResultInterface):
                 formatted_name = self.get_formatted_table_name(table_name)
                 file_path = os.path.join(base_path, f"{formatted_name}.parquet")
 
-                # Convert records to PyArrow table
+                # Convert records to PyArrow table with config-driven type handling
                 arrow_table = self._dict_list_to_pyarrow(records)
 
                 # Write to Parquet file

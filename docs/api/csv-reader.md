@@ -164,36 +164,89 @@ The CSV reader attempts to handle common errors:
 
 ## Implementation Details
 
-### Implementation Selection
+### Adaptive Reader Selection
 
-The CSV reader has two implementations:
+Transmog automatically selects the optimal CSV reader implementation based on file size:
 
-1. **PyArrow CSV reader** - Used when PyArrow is available
-2. **Fallback CSV reader** - Used when PyArrow is not available
+- **Small files (<100K rows)**: Native Python CSV reader
+- **Medium files (100K-1M rows)**: Polars
+- **Large files (>1M rows)**: Polars for best performance
 
-The selection is automatic based on available dependencies.
+File size is estimated based on the formula: `file_size_bytes / 100 = estimated_rows`
+
+### Environment Variable Override
+
+You can force the use of the native CSV reader for immediate performance improvements:
+
+```bash
+export TRANSMOG_FORCE_NATIVE_CSV=true
+```
+
+This is useful when processing files where the native reader provides better performance (typically 50K-500K records).
+
+### Available Implementations
+
+The CSV reader has three implementations:
+
+1. **Native Python CSV reader** - Default for small to medium files
+   - Fastest for files under 100K rows
+   - Lower memory overhead
+   - No additional dependencies required
+   - Excellent for row-oriented processing
+
+2. **Polars CSV reader** - Optimal for large files
+   - Best performance for files over 100K rows
+   - Efficient memory usage for large datasets
+   - Excellent for analytical workloads
+
+3. **PyArrow CSV reader** - Specialized use cases
+   - Used when specific Arrow features are needed
+   - Single-pass file reading (optimized)
+   - Batch columnar-to-dict conversion
+   - Good for Arrow ecosystem integration
+
+### Performance Optimizations
+
+Recent optimizations have significantly improved CSV processing:
+
+- **2x faster PyArrow processing**: Eliminated double-read issue with `cast_to_string=True`
+- **20x faster row conversion**: Batch conversion replaces row-by-row `.as_py()` calls
+- **Intelligent reader selection**: Automatically chooses the best reader for your file size
 
 ### PyArrow Implementation
 
-When PyArrow is available, Transmog uses it for CSV processing, providing:
+When PyArrow is selected, Transmog uses optimized processing:
 
+- Single-pass file reading (no double-read)
+- Batch conversion for columnar to row-oriented data
 - Memory-efficient processing of large files
-- Parallel processing capabilities
 - Automatic type inference
 - Optimized column-oriented data structure
 
-The PyArrow implementation is recommended for large files (>100MB) and when accurate type inference is required.
+The PyArrow implementation is now optimized for better performance but is generally not selected for typical
+CSV-to-dict processing due to the columnar-to-row conversion overhead.
 
 ### Standard Library Implementation
 
-When PyArrow is not available, the fallback implementation uses Python's CSV module with:
+The native Python CSV implementation provides:
 
-- Basic CSV parsing functionality
+- Best performance for small to medium files
 - Universal compatibility (no additional dependencies)
 - Support for all CSV dialect options
 - Basic type inference for numbers and booleans
+- Lower overhead for row-oriented processing
 
-The standard library implementation is suitable for smaller files and environments where PyArrow cannot be installed.
+The native implementation is the default choice for most use cases.
+
+### Polars Implementation
+
+When Polars is available and selected:
+
+- Excellent performance for large files
+- Efficient memory usage
+- Fast data type conversion
+- Optimized for both row and columnar operations
+- Requires `polars` as an optional dependency
 
 ### Chunked Processing
 
@@ -221,9 +274,10 @@ This approach allows processing of very large files with limited memory.
 
 ### File Size Guidelines
 
-- **Small files (<10MB)**: Both implementations perform well
-- **Medium files (10-100MB)**: PyArrow implementation recommended
-- **Large files (>100MB)**: PyArrow implementation with appropriate chunk_size strongly recommended
+- **Small files (<10MB, ~100K rows)**: Native implementation (fastest)
+- **Medium files (10-100MB, 100K-1M rows)**: Polars
+- **Large files (>100MB, >1M rows)**: Polars strongly recommended
+- **Very large files (>1GB)**: Polars with appropriate chunk_size
 
 ## Compatibility
 

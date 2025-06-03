@@ -281,6 +281,76 @@ def main():
 
     print(f"\nAll output files written to: {csv_processing_dir}")
 
+    # Example 6: Performance Optimization with Environment Variable
+    print("\n=== Performance Optimization with Environment Variable ===")
+
+    # Force native CSV reader for better performance on small/medium files
+    os.environ["TRANSMOG_FORCE_NATIVE_CSV"] = "true"
+
+    print("Processing with TRANSMOG_FORCE_NATIVE_CSV=true...")
+
+    # Time the processing with native reader
+    import time
+
+    start_time = time.time()
+
+    native_result = processor.process_file(
+        file_path=csv_filepath, entity_name="employees_native"
+    )
+
+    native_time = time.time() - start_time
+    print(f"Native CSV reader processing time: {native_time:.4f} seconds")
+    print(f"Records processed: {len(native_result.get_main_table())}")
+
+    # Clean up environment variable
+    os.environ.pop("TRANSMOG_FORCE_NATIVE_CSV", None)
+
+    # Example 7: Creating Large CSV for Performance Testing
+    print("\n=== Large CSV Performance Test ===")
+
+    # Create a larger CSV file for performance testing
+    large_csv_filepath = os.path.join(csv_processing_dir, "large_employees.csv")
+
+    with open(large_csv_filepath, "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        # Write header
+        writer.writerow(["id", "name", "department", "salary", "hire_date"])
+
+        # Generate 10,000 records
+        print("Generating 10,000 record CSV file...")
+        for i in range(10000):
+            writer.writerow(
+                [
+                    str(i + 1),
+                    f"Employee_{i + 1}",
+                    ["Engineering", "Marketing", "Finance", "HR"][i % 4],
+                    str(50000 + (i * 100)),
+                    f"20{15 + (i % 10)}-{(i % 12) + 1:02d}-{(i % 28) + 1:02d}",
+                ]
+            )
+
+    print(f"Created large CSV file: {large_csv_filepath}")
+
+    # Process the large file - adaptive selection will choose optimal reader
+    print("\nProcessing large file with adaptive reader selection...")
+    start_time = time.time()
+
+    large_result = processor.process_file(
+        file_path=large_csv_filepath, entity_name="large_employees"
+    )
+
+    adaptive_time = time.time() - start_time
+    print(f"Adaptive reader processing time: {adaptive_time:.4f} seconds")
+    print(f"Records processed: {len(large_result.get_main_table())}")
+
+    # Performance tips
+    print("\n=== Performance Tips ===")
+    print("1. For files <100K rows: Native CSV reader is usually fastest")
+    print("2. For files >100K rows: Polars provides best performance")
+    print("3. Use TRANSMOG_FORCE_NATIVE_CSV=true for immediate performance boost")
+    print("4. PyArrow is optimized but best for specific use cases (Arrow ecosystem)")
+    print("5. Use chunk_size parameter for very large files to control memory usage")
+
 
 if __name__ == "__main__":
     main()

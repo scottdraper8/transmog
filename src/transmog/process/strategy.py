@@ -1453,6 +1453,7 @@ class CSVStrategy(ProcessingStrategy):
                 - quote_char: Quote character for CSV parsing
                 - encoding: File encoding
                 - chunk_size: Size of processing chunks
+                - date_format: Date format for date columns
 
         Returns:
             ProcessingResult containing processed data
@@ -1468,6 +1469,7 @@ class CSVStrategy(ProcessingStrategy):
         quote_char = kwargs.pop("quote_char", None)
         encoding = kwargs.pop("encoding", "utf-8")
         chunk_size = kwargs.pop("chunk_size", None)
+        date_format = kwargs.pop("date_format", None)
 
         # Convert data to file path
         if not isinstance(data, str):
@@ -1514,6 +1516,8 @@ class CSVStrategy(ProcessingStrategy):
                 encoding=encoding,
                 sanitize_column_names=sanitize_column_names,
                 infer_types=infer_types,
+                cast_to_string=self.config.processing.cast_to_string,
+                date_format=date_format,
             ).read_records(file_path)
 
             # Get ID fields

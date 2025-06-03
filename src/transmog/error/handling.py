@@ -41,6 +41,7 @@ except (ImportError, ModuleNotFoundError):
 # Type variables for return type preservation
 T = TypeVar("T")
 R = TypeVar("R")
+F = TypeVar("F", bound=Callable[..., Any])
 
 # Module logger
 logger = logging.getLogger(__name__)
@@ -176,7 +177,7 @@ def error_context(
     wrap_as: None = None,
     reraise: bool = True,
     log_exceptions: bool = True,
-) -> Callable[[Callable[..., R]], Callable[..., Optional[R]]]: ...
+) -> Callable[[F], F]: ...
 
 
 @overload
@@ -185,7 +186,7 @@ def error_context(
     wrap_as: Callable[[Exception], Exception],
     reraise: bool = True,
     log_exceptions: bool = True,
-) -> Callable[[Callable[..., R]], Callable[..., Optional[R]]]: ...
+) -> Callable[[F], F]: ...
 
 
 def error_context(
@@ -193,7 +194,7 @@ def error_context(
     wrap_as: Optional[Callable[[Exception], Exception]] = None,
     reraise: bool = True,
     log_exceptions: bool = True,
-) -> Callable[[Callable[..., R]], Callable[..., Optional[R]]]:
+) -> Callable[[F], F]:
     """Decorator to add context to errors raised by a function.
 
     Args:
@@ -203,7 +204,7 @@ def error_context(
         log_exceptions: Whether to log exceptions
 
     Returns:
-        Decorated function
+        Decorated function with proper type preservation
     """
     # Default to ProcessingError if no wrapper provided
     if wrap_as is None:
@@ -211,9 +212,9 @@ def error_context(
         def wrap_as(e: Exception) -> ProcessingError:
             return ProcessingError(f"{context_message}: {str(e)}")
 
-    def decorator(func: Callable[..., R]) -> Callable[..., Optional[R]]:
+    def decorator(func: F) -> F:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Optional[R]:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return func(*args, **kwargs)
             except Exception as e:
@@ -248,19 +249,28 @@ def error_context(
 
                     try:
                         recovery_result = recovery_strategy.recover(e, path=path)
-                        return cast(R, recovery_result)
-                    except Exception as re:
-                        logger.warning(f"Recovery failed: {str(re)}")
+                        if recovery_result is not None:
+                            return recovery_result
+                    except Exception as recovery_err:
+                        logger.error(
+                            f"Recovery failed: {str(recovery_err)}. Original: {str(e)}"
+                        )
 
-                # Process exception
-                new_exception = wrap_as(e)
-                if hasattr(new_exception, "__cause__"):
-                    new_exception.__cause__ = e
+                # Wrap or reraise based on configuration
                 if reraise:
-                    raise new_exception from e
+                    if wrap_as and not isinstance(e, TransmogError):
+                        wrapped = wrap_as(e)
+                        if isinstance(wrapped, type):
+                            raise wrapped(error_msg) from e
+                        else:
+                            raise wrapped from e
+                    else:
+                        raise
+
+                # Default return value for non-reraising case
                 return None
 
-        return wrapper
+        return cast(F, wrapper)
 
     return decorator
 

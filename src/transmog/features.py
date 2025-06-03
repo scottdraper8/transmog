@@ -18,10 +18,12 @@ class Features:
     HAS_PYARROW = False
     HAS_ORJSON = False
     HAS_TYPING_EXTENSIONS = False
+    HAS_POLARS = False
 
     HAS_PARQUET_SUPPORT = False
     HAS_FAST_JSON = False
     HAS_ENHANCED_TYPING = False
+    HAS_FAST_CSV = False
 
     @classmethod
     def detect_features(cls) -> None:
@@ -36,11 +38,28 @@ class Features:
         cls.HAS_TYPING_EXTENSIONS = DependencyManager.has_dependency(
             "typing_extensions"
         )
+        cls.HAS_POLARS = DependencyManager.has_dependency("polars")
 
         # Check complete features
         cls.HAS_PARQUET_SUPPORT = DependencyManager.has_feature("parquet")
         cls.HAS_FAST_JSON = DependencyManager.has_feature("fast_json")
         cls.HAS_ENHANCED_TYPING = DependencyManager.has_feature("typing")
+        cls.HAS_FAST_CSV = cls.HAS_POLARS  # Polars enables fast CSV processing
+
+    @classmethod
+    def has_pyarrow(cls) -> bool:
+        """Check if PyArrow is available."""
+        return cls.HAS_PYARROW
+
+    @classmethod
+    def has_orjson(cls) -> bool:
+        """Check if orjson is available."""
+        return cls.HAS_ORJSON
+
+    @classmethod
+    def has_polars(cls) -> bool:
+        """Check if Polars is available."""
+        return cls.HAS_POLARS
 
 
 # Run detection at import time

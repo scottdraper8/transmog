@@ -321,6 +321,7 @@ def get_csv_file_iterator(
     skip_rows: int = 0,
     quote_char: Optional[str] = None,
     encoding: str = "utf-8",
+    date_format: Optional[str] = None,
 ) -> Iterator[dict[str, Any]]:
     """Create an iterator for a CSV file.
 
@@ -335,6 +336,7 @@ def get_csv_file_iterator(
         skip_rows: Number of rows to skip
         quote_char: Quote character
         encoding: File encoding
+        date_format: Optional format string for parsing dates
 
     Returns:
         Iterator that yields dictionaries
@@ -359,6 +361,7 @@ def get_csv_file_iterator(
             quote_char=quote_char,
             encoding=encoding,
             cast_to_string=processor.config.processing.cast_to_string,
+            date_format=date_format,
         )
 
         yield from reader.read_records(file_path)

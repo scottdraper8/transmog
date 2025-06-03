@@ -10,7 +10,12 @@ Standard installation:
 pip install transmog
 ```
 
-Installs Transmog with required dependencies.
+Installs Transmog with all required dependencies:
+
+- **orjson**: Fast JSON processing
+- **pyarrow**: Parquet file support and PyArrow Table output
+- **polars**: High-performance CSV processing for medium to large files
+- **typing-extensions**: Python typing compatibility
 
 ## Installation Options
 
@@ -22,7 +27,7 @@ For environments with strict requirements:
 pip install transmog[minimal]
 ```
 
-Installs Transmog with minimal dependencies.
+Installs Transmog without any external dependencies (limited functionality).
 
 ### Development Installation
 
@@ -79,15 +84,15 @@ pip install -e ".[dev]"
 
 ## Optional Dependencies
 
-Optional packages:
+While the core dependencies are included by default, there are some additional optional packages for extended functionality:
 
-- **pyarrow**: For Parquet file support and PyArrow Table output
-- **orjson**: For faster JSON processing
+- **ujson**: Alternative JSON processor for specific use cases
+- **fastparquet**: Alternative Parquet implementation
 
 To install optional dependencies:
 
 ```bash
-pip install pyarrow orjson
+pip install ujson fastparquet
 ```
 
 ## System Requirements
@@ -105,10 +110,11 @@ import transmog
 # Check version
 print(transmog.__version__)
 
-# Check available features
+# Check available features (all should be True with standard installation)
 from transmog.features import Features
 print(f"PyArrow available: {Features.has_pyarrow()}")
 print(f"Orjson available: {Features.has_orjson()}")
+print(f"Polars available: {Features.has_polars()}")
 ```
 
 ## Troubleshooting

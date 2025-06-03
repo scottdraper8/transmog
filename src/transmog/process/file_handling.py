@@ -8,6 +8,7 @@ import os
 from collections.abc import Generator
 from typing import (
     Any,
+    Callable,
     Optional,
     TypeVar,
     Union,
@@ -21,8 +22,11 @@ from .strategy import CSVStrategy, FileStrategy
 # Define a return type variable for the decorator's generic type
 R = TypeVar("R")
 
+# Define a type for the decorator function
+F = TypeVar("F", bound=Callable[..., Any])
 
-@error_context("Failed to process file", log_exceptions=True)
+
+@error_context("Failed to process file", log_exceptions=True)  # type: ignore
 def process_file(
     processor: Any,
     file_path: str,
@@ -56,7 +60,7 @@ def process_file(
     return cast(ProcessingResult, processed_result)
 
 
-@error_context("Failed to process file", log_exceptions=True)
+@error_context("Failed to process file to format", log_exceptions=True)  # type: ignore
 def process_file_to_format(
     processor: Any,
     file_path: str,
@@ -145,7 +149,7 @@ def detect_input_format(file_path: str) -> str:
         return "json"
 
 
-@error_context("Failed to process CSV file", log_exceptions=True)
+@error_context("Failed to process CSV file", log_exceptions=True)  # type: ignore
 def process_csv(
     processor: Any,
     file_path: str,
@@ -160,6 +164,7 @@ def process_csv(
     quote_char: Optional[str] = None,
     encoding: str = "utf-8",
     chunk_size: Optional[int] = None,
+    date_format: Optional[str] = None,
 ) -> ProcessingResult:
     """Process a CSV file.
 
@@ -177,6 +182,7 @@ def process_csv(
         quote_char: Quote character for CSV fields
         encoding: File encoding
         chunk_size: Size of chunks to process
+        date_format: Optional format string for parsing dates
 
     Returns:
         ProcessingResult containing processed data
@@ -204,12 +210,13 @@ def process_csv(
         quote_char=quote_char,
         encoding=encoding,
         chunk_size=chunk_size,
+        date_format=date_format,
     )
 
     return cast(ProcessingResult, processed_result)
 
 
-@error_context("Failed to process in chunks", log_exceptions=True)
+@error_context("Failed to process in chunks", log_exceptions=True)  # type: ignore
 def process_chunked(
     processor: Any,
     data: Union[dict[str, Any], list[dict[str, Any]], str, bytes],

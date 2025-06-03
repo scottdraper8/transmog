@@ -323,6 +323,7 @@ def stream_process_csv(
     skip_rows: int = 0,
     quote_char: Optional[str] = None,
     encoding: str = "utf-8",
+    date_format: Optional[str] = None,
     **format_options: Any,
 ) -> None:
     """Stream process a CSV file directly to the specified output format.
@@ -342,6 +343,7 @@ def stream_process_csv(
         skip_rows: Number of rows to skip
         quote_char: Quote character for CSV
         encoding: File encoding
+        date_format: Optional format string for parsing dates
         **format_options: Format-specific options for the writer
 
     Returns:
@@ -357,6 +359,7 @@ def stream_process_csv(
         "skip_rows": skip_rows,
         "quote_char": quote_char,
         "encoding": encoding,
+        "date_format": date_format,
     }
 
     # Merge with any other format options

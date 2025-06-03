@@ -219,3 +219,15 @@ for tag in tags_table:
 ```
 
 See the [primitive_arrays_example.py](basic/primitive_arrays_example.py) for a complete working example.
+
+### 📊 Performance Examples
+
+Located in `performance/`:
+
+- **csv_reader_benchmark.py**: Benchmarks different CSV reader implementations
+  - Compares adaptive vs native reader performance
+  - Tests across different file sizes
+  - Shows when to use each reader
+  - Demonstrates environment variable optimization
+
+## 🚀 Getting Started

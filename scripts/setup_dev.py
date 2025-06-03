@@ -220,6 +220,7 @@ def check_optional_dependencies(python_path):
         "orjson",
         "fastparquet",
         "pyarrow",
+        "polars",
     ]
 
     for package in performance_packages:

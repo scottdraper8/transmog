@@ -37,7 +37,12 @@ classifiers = [
   "Topic :: Database :: Database Engines/Servers",
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-dependencies = [ "orjson>=3.8", "pyarrow>=7", "typing-extensions>=4" ]
+dependencies = [
+  "orjson>=3.8",
+  "polars>=0.20",
+  "pyarrow>=7",
+  "typing-extensions>=4",
+]
 
 # Data integration dependencies - Optional packages for working with other data formats (empty now)
 optional-dependencies.data = [  ]

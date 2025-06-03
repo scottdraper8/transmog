@@ -1,8 +1,7 @@
 """CSV reader for Transmog input.
 
-This module provides functions for reading CSV data with PyArrow and built-in CSV module
-implementations, with support for type inference, null value handling, and column
-    sanitization.
+This module provides functions for reading CSV data with multiple implementations
+optimized for different scenarios and data sizes.
 """
 
 import bz2
@@ -15,6 +14,7 @@ from collections.abc import Generator, Iterator
 from typing import (
     Any,
     Optional,
+    cast,
 )
 
 # Try to import PyArrow
@@ -26,11 +26,81 @@ try:
 except ImportError:
     PYARROW_AVAILABLE = False
 
+# Import Polars (required dependency)
+import polars as pl
+
 from transmog.config import settings
 from transmog.error import FileError, ParsingError
 from transmog.naming.conventions import sanitize_column_names
 
 logger = logging.getLogger(__name__)
+
+# Performance thresholds for adaptive selection
+LARGE_FILE_THRESHOLD = 100_000  # rows
+VERY_LARGE_FILE_THRESHOLD = 1_000_000  # rows
+
+
+class CSVImplementation:
+    """Enumeration of available CSV implementations."""
+
+    NATIVE = "native"
+    POLARS = "polars"
+    PYARROW = "pyarrow"
+
+
+def select_optimal_csv_reader(file_path: str, cast_to_string: bool = False) -> str:
+    """Select the optimal CSV reader based on file characteristics.
+
+    Strategy:
+    - Small files (<100K rows): Native CSV (fastest for small data)
+    - Large files (100K-1M rows): Polars if available, otherwise Native
+    - Very large files (>1M rows): Polars for best performance
+    - Never use PyArrow for row-oriented dictionary output (performance anti-pattern)
+
+    Args:
+        file_path: Path to the CSV file
+        cast_to_string: Whether casting to string is needed
+
+    Returns:
+        CSVImplementation constant indicating best reader
+    """
+    try:
+        # Quick file size estimation
+        file_size = os.path.getsize(file_path)
+
+        # Rough estimation: assume ~100 bytes per row average
+        estimated_rows = file_size / 100
+
+        # For very large files, use Polars if available
+        if estimated_rows > VERY_LARGE_FILE_THRESHOLD:
+            logger.info(
+                f"Large file detected ({estimated_rows:.0f} estimated rows), "
+                f"using Polars CSV reader"
+            )
+            return CSVImplementation.POLARS
+
+        # For medium files, use Polars if available, otherwise native
+        elif estimated_rows > LARGE_FILE_THRESHOLD:
+            logger.info(
+                f"Medium file detected ({estimated_rows:.0f} estimated rows), "
+                f"using Polars CSV reader"
+            )
+            return CSVImplementation.POLARS
+
+        # For small files, native CSV is fastest
+        else:
+            logger.info(
+                f"Small file detected ({estimated_rows:.0f} estimated rows), "
+                f"using native CSV reader"
+            )
+            return CSVImplementation.NATIVE
+
+    except Exception as e:
+        logger.warning(
+            f"Could not estimate file size for {file_path}: {e}, "
+            f"defaulting to native CSV"
+        )
+        return CSVImplementation.NATIVE
 
 
 def read_csv_file(
@@ -44,6 +114,7 @@ def read_csv_file(
     skip_rows: int = 0,
     quote_char: Optional[str] = None,
     encoding: str = "utf-8",
+    date_format: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """Read a CSV file and return its contents as a list of dictionaries.
 
@@ -58,6 +129,7 @@ def read_csv_file(
         skip_rows: Number of rows to skip at the beginning
         quote_char: Character used for quoting fields
         encoding: File encoding (fallback mode only)
+        date_format: Optional format string for parsing dates
 
     Returns:
         List of dictionaries with column names as keys
@@ -79,6 +151,7 @@ def read_csv_file(
         quote_char=quote_char,
         encoding=encoding,
         cast_to_string=cast_to_string,
+        date_format=date_format,
     )
 
     return reader.read_all(file_path)
@@ -109,9 +182,26 @@ def read_csv_stream(
 
 
 class CSVReader:
-    """Reader for CSV files with auto-selection of implementation based on.
+    """Reader for CSV files with auto-selection of implementation.
 
-    available libraries.
+    Implementation is selected based on available libraries and file characteristics.
+
+    Performance Notes:
+    ==================
+    PyArrow vs Native CSV Performance:
+    - Native CSV is ~20x faster for typical use cases (1K-50K records)
+    - PyArrow overhead comes from:
+      1. Double file reading when cast_to_string=True (sampling + main read)
+      2. Row-by-row conversion from columnar to dict format (.as_py() calls)
+      3. Complex type system overhead for simple string processing
+
+    PyArrow is optimized for large-scale analytics (millions of rows) and columnar
+    operations, not small-to-medium row-oriented dictionary processing.
+
+    Potential Optimizations:
+    - Eliminate double read by pre-defining string schema
+    - Use batch conversion instead of row-by-row .as_py() calls
+    - Consider using PyArrow only for large files (>100K records)
     """
 
     def __init__(
@@ -125,6 +215,7 @@ class CSVReader:
         quote_char: Optional[str] = None,
         encoding: str = "utf-8",
         cast_to_string: Optional[bool] = None,
+        date_format: Optional[str] = None,
     ):
         """Initialize the CSV reader.
 
@@ -138,6 +229,7 @@ class CSVReader:
             quote_char: Quote character
             encoding: File encoding
             cast_to_string: Whether to cast all values to strings
+            date_format: Optional format string for parsing dates
         """
         # Configuration values from settings or defaults
         self.delimiter = delimiter or settings.get_option("csv_delimiter", ",")
@@ -153,21 +245,20 @@ class CSVReader:
         self.cast_to_string = cast_to_string or settings.get_option(
             "cast_to_string", False
         )
+        self.date_format = date_format
 
         # Separator for column name sanitization
         self.separator = settings.get_option("separator", "_")
 
-        # Flag for PyArrow usage
-        self._using_pyarrow = PYARROW_AVAILABLE
+        # If cast_to_string is True, disable type inference to prevent conversion issues
+        if self.cast_to_string:
+            self.infer_types = False
 
-    def read_records(
-        self, file_path: str, using_fallback: bool = False
-    ) -> Iterator[dict[str, Any]]:
+    def read_records(self, file_path: str) -> Iterator[dict[str, Any]]:
         """Read records one by one from a CSV file.
 
         Args:
             file_path: Path to the CSV file
-            using_fallback: Flag to prevent circular dependencies in fallback scenarios
 
         Returns:
             Iterator yielding records as dictionaries
@@ -178,107 +269,44 @@ class CSVReader:
         if not os.path.exists(file_path):
             raise FileError(f"File not found: {file_path}")
 
-        # Try PyArrow first if available and not in fallback mode
-        if PYARROW_AVAILABLE and not using_fallback:
-            try:
-                # Read in chunks and yield each record
-                pyarrow_success = False
-                for chunk in self.read_in_chunks(file_path, chunk_size=1000):
-                    yield from chunk
-                    pyarrow_success = True
+        # Check for environment override to force native CSV
+        if os.environ.get("TRANSMOG_FORCE_NATIVE_CSV", "").lower() in (
+            "true",
+            "1",
+            "yes",
+        ):
+            logger.info("TRANSMOG_FORCE_NATIVE_CSV is set, using native CSV reader")
+            yield from self._read_records_builtin(file_path)
+            return
 
-                if pyarrow_success:
-                    return
+        # Use adaptive reader selection
+        optimal_reader = select_optimal_csv_reader(file_path, self.cast_to_string)
+
+        if optimal_reader == CSVImplementation.POLARS:
+            try:
+                yield from self._read_records_polars(file_path)
+                return
+            except Exception as e:
+                logger.warning(
+                    f"Error reading CSV with Polars: {str(e)}. "
+                    f"Falling back to native CSV module."
+                )
+                yield from self._read_records_builtin(file_path)
+                return
+        elif optimal_reader == CSVImplementation.PYARROW and PYARROW_AVAILABLE:
+            try:
+                yield from self._read_records_pyarrow(file_path)
+                return
             except Exception as e:
                 logger.warning(
                     f"Error reading CSV with PyArrow: {str(e)}. "
-                    f"Falling back to built-in CSV module."
+                    f"Falling back to native CSV module."
                 )
-                self._using_pyarrow = False
-
-        # Fallback to built-in CSV module
-        try:
-            # Determine file opening mode based on extension
-            file_extension = os.path.splitext(file_path)[1].lower()
-            open_func, mode = self._get_file_opener(file_extension)
-
-            with open_func(file_path, mode) as file:
-                reader = csv.reader(
-                    file, delimiter=self.delimiter, quotechar=self.quote_char
-                )
-
-                # Skip rows if needed
-                for _ in range(self.skip_rows):
-                    next(reader, None)
-
-                # Read header row if present
-                if self.has_header:
-                    try:
-                        header_row = next(reader)
-                        # Sanitize column names if requested
-                        if self.sanitize_column_names:
-                            header_row = sanitize_column_names(
-                                header_row, separator=self.separator, sql_safe=True
-                            )
-                    except StopIteration:
-                        raise ParsingError(
-                            "CSV file is empty or has no header row"
-                        ) from None
-                else:
-                    # Generate column names if no header
-                    row = next(reader, None)
-                    if row is None:
-                        raise ParsingError("CSV file is empty")
-                    header_row = [f"column_{i + 1}" for i in range(len(row))]
-                    # Rewind to reprocess first row
-                    file.seek(0)
-                    for _ in range(self.skip_rows):
-                        next(reader, None)
-
-                # Process data rows
-                for row in reader:
-                    # Skip empty rows
-                    if not row:
-                        continue
-
-                    # Ensure row length matches header
-                    if len(row) < len(header_row):
-                        row.extend([""] * (len(header_row) - len(row)))
-                    elif len(row) > len(header_row):
-                        row = row[: len(header_row)]
-
-                    # Create record
-                    record = {}
-                    for i, value in enumerate(row):
-                        if i < len(header_row):  # Safety check
-                            column_name = header_row[i]
-
-                            # Process null values
-                            if value in self.null_values:
-                                processed_value = None
-                            else:
-                                # Infer types if requested
-                                if (
-                                    self.infer_types
-                                    and value
-                                    and not self.cast_to_string
-                                ):
-                                    processed_value = self._infer_type(value)
-                                else:
-                                    processed_value = value
-
-                            # Cast to string if required
-                            if self.cast_to_string and processed_value is not None:
-                                processed_value = str(processed_value)
-
-                            record[column_name] = processed_value
-
-                    yield record
-
-        except Exception as e:
-            if isinstance(e, (FileError, ParsingError)):
-                raise
-            raise ParsingError(f"Failed to parse CSV file: {str(e)}") from e
+                yield from self._read_records_builtin(file_path)
+                return
+        else:
+            # Use native CSV reader
+            yield from self._read_records_builtin(file_path)
 
     def read_all(self, file_path: str) -> list[dict[str, Any]]:
         """Read all records from a CSV file.
@@ -292,7 +320,7 @@ class CSVReader:
         Raises:
             FileError: If the file cannot be read
         """
-        return list(self.read_records(file_path, using_fallback=False))
+        return list(self.read_records(file_path))
 
     def read_in_chunks(
         self, file_path: str, chunk_size: int = 1000
@@ -312,120 +340,76 @@ class CSVReader:
         if not os.path.exists(file_path):
             raise FileError(f"File not found: {file_path}")
 
-        # Try PyArrow first if available
-        if PYARROW_AVAILABLE:
-            try:
-                # Collect all chunks to detect complete failure
-                pyarrow_success = False
-                for chunk in self._read_chunks_pyarrow(file_path, chunk_size):
-                    yield chunk
-                    pyarrow_success = True
+        # Check for environment override to force native CSV
+        if os.environ.get("TRANSMOG_FORCE_NATIVE_CSV", "").lower() in (
+            "true",
+            "1",
+            "yes",
+        ):
+            logger.info(
+                "TRANSMOG_FORCE_NATIVE_CSV is set, "
+                "using native CSV reader for chunked reading"
+            )
+            yield from self._read_chunks_builtin(file_path, chunk_size)
+            return
 
-                if pyarrow_success:
-                    return
+        # Use adaptive reader selection
+        optimal_reader = select_optimal_csv_reader(file_path, self.cast_to_string)
+
+        if optimal_reader == CSVImplementation.POLARS:
+            try:
+                yield from self._read_chunks_polars(file_path, chunk_size)
+                return
+            except Exception as e:
+                logger.warning(
+                    f"Error reading CSV chunks with Polars: {str(e)}. "
+                    f"Falling back to native CSV module."
+                )
+                yield from self._read_chunks_builtin(file_path, chunk_size)
+                return
+        elif optimal_reader == CSVImplementation.PYARROW and PYARROW_AVAILABLE:
+            try:
+                yield from self._read_chunks_pyarrow(file_path, chunk_size)
+                return
             except Exception as e:
                 logger.warning(
                     f"Error reading CSV chunks with PyArrow: {str(e)}. "
-                    f"Falling back to built-in CSV module."
+                    f"Falling back to native CSV module."
                 )
-                self._using_pyarrow = False
+                yield from self._read_chunks_builtin(file_path, chunk_size)
+                return
+        else:
+            # Use native CSV reader
+            yield from self._read_chunks_builtin(file_path, chunk_size)
 
-        # Fallback to built-in CSV module
-        try:
-            file_extension = os.path.splitext(file_path)[1].lower()
-            open_func, mode = self._get_file_opener(file_extension)
+    def _read_records_pyarrow(self, file_path: str) -> Iterator[dict[str, Any]]:
+        """Read records using PyArrow.
 
-            with open_func(file_path, mode) as file:
-                reader = csv.reader(
-                    file, delimiter=self.delimiter, quotechar=self.quote_char
-                )
+        Args:
+            file_path: Path to the CSV file
 
-                # Skip rows if needed
-                for _ in range(self.skip_rows):
-                    next(reader, None)
+        Returns:
+            Iterator yielding records as dictionaries
+        """
+        table = self._read_table_pyarrow(file_path)
+        column_names = self._get_column_names(table.column_names)
 
-                # Read header row if present
-                if self.has_header:
-                    try:
-                        header_row = next(reader)
-                        # Sanitize column names if requested
-                        if self.sanitize_column_names:
-                            header_row = sanitize_column_names(
-                                header_row, separator=self.separator, sql_safe=True
-                            )
-                    except StopIteration:
-                        raise ParsingError(
-                            "CSV file is empty or has no header row"
-                        ) from None
-                else:
-                    # Generate column names if no header
-                    row = next(reader, None)
-                    if row is None:
-                        raise ParsingError("CSV file is empty")
-                    header_row = [f"column_{i + 1}" for i in range(len(row))]
-                    # Rewind to reprocess first row
-                    file.seek(0)
-                    for _ in range(self.skip_rows):
-                        next(reader, None)
+        # Batch conversion optimization: convert entire columns to Python lists
+        column_data = {}
+        for i, col_name in enumerate(column_names):
+            if i < len(table.column_names):
+                # Convert entire column to Python list at once
+                column_data[col_name] = table.column(i).to_pylist()
 
-                chunk = []
-                count = 0
-
-                # Process data rows
-                for row in reader:
-                    # Skip empty rows
-                    if not row:
-                        continue
-
-                    # Ensure row length matches header
-                    if len(row) < len(header_row):
-                        row.extend([""] * (len(header_row) - len(row)))
-                    elif len(row) > len(header_row):
-                        row = row[: len(header_row)]
-
-                    # Create record
-                    record = {}
-                    for i, value in enumerate(row):
-                        if i < len(header_row):  # Safety check
-                            column_name = header_row[i]
-
-                            # Process null values
-                            if value in self.null_values:
-                                processed_value = None
-                            else:
-                                # Infer types if requested
-                                if (
-                                    self.infer_types
-                                    and value
-                                    and not self.cast_to_string
-                                ):
-                                    processed_value = self._infer_type(value)
-                                else:
-                                    processed_value = value
-
-                            # Cast to string if required
-                            if self.cast_to_string and processed_value is not None:
-                                processed_value = str(processed_value)
-
-                            record[column_name] = processed_value
-
-                    chunk.append(record)
-                    count += 1
-
-                    # Yield when chunk is full
-                    if count >= chunk_size:
-                        yield chunk
-                        chunk = []
-                        count = 0
-
-                # Yield the final chunk if not empty
-                if chunk:
-                    yield chunk
-
-        except Exception as e:
-            if isinstance(e, (FileError, ParsingError)):
-                raise
-            raise ParsingError(f"Failed to parse CSV file in chunks: {str(e)}") from e
+        # Zip columns into row dictionaries
+        num_rows = table.num_rows
+        for row_idx in range(num_rows):
+            record = {}
+            for col_name in column_names:
+                if col_name in column_data:
+                    value = column_data[col_name][row_idx]
+                    record[col_name] = self._process_value(value)
+            yield record
 
     def _read_chunks_pyarrow(
         self, file_path: str, chunk_size: int
@@ -438,79 +422,98 @@ class CSVReader:
 
         Yields:
             Chunks of records as lists of dictionaries
-
-        Raises:
-            ParsingError: If PyArrow fails to parse the CSV file
         """
-        # Check file size
-        file_size = os.path.getsize(file_path)
-        if file_size == 0:
-            logger.warning(f"File {file_path} is empty")
-            raise ParsingError("CSV file is empty")
-
-        # Estimate record count for large files
-        estimated_records = 0
-        if file_size > 10 * 1024 * 1024:  # If file is larger than 10MB
-            try:
-                # Sample first 1000 lines to estimate average line length
-                sample_lines = 1000
-                lines_read = 0
-                total_bytes = 0
-
-                with open(file_path, encoding=self.encoding) as f:
-                    for _ in range(sample_lines):
-                        line = f.readline()
-                        if not line:
-                            break
-                        lines_read += 1
-                        total_bytes += len(line.encode(self.encoding))
-
-                if lines_read > 0:
-                    avg_line_size = total_bytes / lines_read
-                    estimated_records = int(file_size / avg_line_size)
-                    if self.has_header:
-                        estimated_records = max(0, estimated_records - 1)
-
-                    logger.debug(
-                        f"Estimated {estimated_records} records in large file "
-                        f"(avg line size: {avg_line_size:.1f} bytes)"
-                    )
-                else:
-                    estimated_records = 0
-            except Exception as e:
-                logger.warning(f"Error estimating lines in file: {str(e)}")
-                # Estimate based on file size and chunk size
-                estimated_records = max(1000, file_size // 100)
-        else:
-            # Count lines in smaller files
-            try:
-                total_lines = 0
-                with open(file_path, encoding=self.encoding) as f:
-                    for _ in f:
-                        total_lines += 1
-
-                estimated_records = total_lines - (1 if self.has_header else 0)
-            except Exception as e:
-                logger.warning(f"Error counting lines in file: {str(e)}")
-                raise ParsingError(f"Could not read file: {str(e)}") from e
-
-        # Ensure non-negative record count
-        estimated_records = max(0, estimated_records)
-        if estimated_records == 0:
-            logger.warning(f"No data records in file {file_path}")
-            return
-
-        logger.debug(
-            f"Reading CSV file: {file_path}, size: {file_size} bytes, "
-            f"expecting ~{estimated_records} records"
-        )
-
-        # Configure PyArrow options
+        # Read table in batches using PyArrow's streaming reader
         read_options = pa_csv.ReadOptions(
             skip_rows=self.skip_rows,
             autogenerate_column_names=not self.has_header,
-            # Reasonable block size based on file size
-            block_size=min(chunk_size * 1024, file_size + 1024),
+            block_size=max(chunk_size * 512, 32768),  # Reasonable block size
+        )
+
+        parse_options = pa_csv.ParseOptions(
+            delimiter=self.delimiter,
+            quote_char=self.quote_char,
+        )
+
+        # Configure conversion options to handle dates as strings when needed
+        convert_options = pa_csv.ConvertOptions(
+            null_values=self.null_values,
+            strings_can_be_null=True,
+            # Force all columns to string type if cast_to_string is True
+            column_types={} if not self.cast_to_string else None,
+            timestamp_parsers=[]
+            if self.cast_to_string
+            else ([self.date_format] if self.date_format else []),
+            check_utf8=True,
+        )
+
+        # Force string types if cast_to_string is enabled
+        if self.cast_to_string:
+            # Use predefined string schema instead of sampling
+            convert_options = pa_csv.ConvertOptions(
+                column_types=pa.string(),  # Force all columns to string
+                auto_dict_encode=False,
+                strings_can_be_null=True,
+                null_values=self.null_values,
+                timestamp_parsers=[],
+                check_utf8=True,
+            )
+
+        # Stream the file in batches
+        with pa_csv.open_csv(
+            file_path,
+            read_options=read_options,
+            parse_options=parse_options,
+            convert_options=convert_options,
+        ) as reader:
+            column_names = None
+            chunk = []
+
+            for batch in reader:
+                if batch.num_rows == 0:
+                    continue
+
+                # Get column names from first batch
+                if column_names is None:
+                    column_names = self._get_column_names(batch.column_names)
+
+                # Batch conversion: convert entire batch columns to Python lists
+                batch_column_data = {}
+                for i, col_name in enumerate(column_names):
+                    if i < len(batch.column_names):
+                        batch_column_data[col_name] = batch.column(i).to_pylist()
+
+                # Process each row in the batch
+                for row_idx in range(batch.num_rows):
+                    record = {}
+                    for col_name in column_names:
+                        if col_name in batch_column_data:
+                            value = batch_column_data[col_name][row_idx]
+                            record[col_name] = self._process_value(value)
+
+                    chunk.append(record)
+
+                    # Yield chunk when it reaches desired size
+                    if len(chunk) >= chunk_size:
+                        yield chunk
+                        chunk = []
+
+            # Yield any remaining records
+            if chunk:
+                yield chunk
+
+    def _read_table_pyarrow(self, file_path: str) -> pa.Table:
+        """Read entire CSV as PyArrow table.
+
+        Args:
+            file_path: Path to the CSV file
+
+        Returns:
+            PyArrow table
+        """
+        read_options = pa_csv.ReadOptions(
+            skip_rows=self.skip_rows,
+            autogenerate_column_names=not self.has_header,
         )
 
         parse_options = pa_csv.ParseOptions(
@@ -521,148 +524,372 @@ class CSVReader:
         convert_options = pa_csv.ConvertOptions(
             null_values=self.null_values,
             strings_can_be_null=True,
-            auto_dict_encode=True,
+            timestamp_parsers=[]
+            if self.cast_to_string
+            else ([self.date_format] if self.date_format else []),
+            check_utf8=True,
         )
 
-        # Setup batch processing
-        record_count = 0
-        batch_count = 0
-        max_batches = max(
-            100, (estimated_records // chunk_size) + 10
-        )  # Reasonable upper limit
+        # Force string types if cast_to_string is enabled
+        if self.cast_to_string:
+            # Use predefined string schema instead of sampling
+            convert_options = pa_csv.ConvertOptions(
+                column_types=pa.string(),  # Force all columns to string
+                auto_dict_encode=False,
+                strings_can_be_null=True,
+                null_values=self.null_values,
+                timestamp_parsers=[],
+                check_utf8=True,
+            )
 
-        # Collect chunks for processing
-        all_chunks = []
-        success = False
+        return pa_csv.read_csv(
+            file_path,
+            read_options=read_options,
+            parse_options=parse_options,
+            convert_options=convert_options,
+        )
 
+    def _read_records_polars(self, file_path: str) -> Iterator[dict[str, Any]]:
+        """Read records using Polars.
+
+        Args:
+            file_path: Path to the CSV file
+
+        Returns:
+            Iterator yielding records as dictionaries
+        """
+        # Prepare Polars read options
+        read_options = {
+            "separator": self.delimiter,
+            "has_header": self.has_header,
+            "skip_rows": self.skip_rows,
+            "null_values": self.null_values,
+            "quote_char": self.quote_char,
+            "try_parse_dates": not self.cast_to_string,
+        }
+
+        # Read the CSV file
+        df = pl.read_csv(file_path, **read_options)
+
+        # Cast all columns to string if requested
+        if self.cast_to_string:
+            df = df.select([pl.col(col).cast(pl.Utf8).alias(col) for col in df.columns])
+
+        # Get column names and sanitize if needed
+        column_names = self._get_column_names(df.columns)
+
+        # Rename columns if sanitized
+        if column_names != df.columns:
+            df = df.rename(dict(zip(df.columns, column_names)))
+
+        # Convert to row-oriented dicts
+        for row in df.iter_rows(named=True):
+            # Process values according to configuration
+            processed_row = {}
+            for key, value in row.items():
+                processed_row[key] = self._process_value(value)
+            yield processed_row
+
+    def _read_chunks_polars(
+        self, file_path: str, chunk_size: int
+    ) -> Generator[list[dict[str, Any]], None, None]:
+        """Read CSV in chunks using Polars.
+
+        Args:
+            file_path: Path to the CSV file
+            chunk_size: Number of rows per chunk
+
+        Yields:
+            Chunks of records as lists of dictionaries
+        """
+        # Prepare Polars read options
+        read_options = {
+            "separator": self.delimiter,
+            "has_header": self.has_header,
+            "skip_rows": self.skip_rows,
+            "null_values": self.null_values,
+            "quote_char": self.quote_char,
+            "try_parse_dates": not self.cast_to_string,
+        }
+
+        # Read the CSV file
+        df = pl.read_csv(file_path, **read_options)
+
+        # Cast all columns to string if requested
+        if self.cast_to_string:
+            df = df.select([pl.col(col).cast(pl.Utf8).alias(col) for col in df.columns])
+
+        # Get column names and sanitize if needed
+        column_names = self._get_column_names(df.columns)
+
+        # Rename columns if sanitized
+        if column_names != df.columns:
+            df = df.rename(dict(zip(df.columns, column_names)))
+
+        # Process in chunks
+        total_rows = len(df)
+        for i in range(0, total_rows, chunk_size):
+            chunk_df = df[i : i + chunk_size]
+            chunk = []
+
+            for row in chunk_df.iter_rows(named=True):
+                # Process values according to configuration
+                processed_row = {}
+                for key, value in row.items():
+                    processed_row[key] = self._process_value(value)
+                chunk.append(processed_row)
+
+            yield chunk
+
+    def _read_records_builtin(self, file_path: str) -> Iterator[dict[str, Any]]:
+        """Read records using built-in CSV module.
+
+        Args:
+            file_path: Path to the CSV file
+
+        Returns:
+            Iterator yielding records as dictionaries
+        """
         try:
-            with pa_csv.open_csv(
-                file_path,
-                read_options=read_options,
-                parse_options=parse_options,
-                convert_options=convert_options,
-            ) as reader:
-                # Process each batch
-                while True:
-                    batch_count += 1
+            file_extension = os.path.splitext(file_path)[1].lower()
 
-                    # Prevent infinite loops with batch limit
-                    if batch_count > max_batches:
-                        logger.warning(
-                            f"Reached maximum batch count ({max_batches}), "
-                            f"stopping PyArrow processing"
-                        )
-                        raise ParsingError(
-                            f"Too many batches ({max_batches}) when processing CSV"
-                        )
+            # Get the appropriate opener based on file extension
+            file_opener, mode = self._get_file_opener(file_extension)
 
-                    try:
-                        batch = reader.read_next_batch()
-                        if batch is None:
-                            break
+            # Define file open function with parameters
+            def open_file() -> Any:
+                return file_opener(file_path, mode=mode, encoding=self.encoding)
 
-                        # Check for empty batches
-                        if batch.num_rows == 0:
-                            logger.warning(
-                                "Empty batch detected, stopping PyArrow processing"
-                            )
-                            break
+            # Handle encoding for text mode
+            if "t" in mode:
+                with open_file() as file:
+                    reader = csv.reader(
+                        file, delimiter=self.delimiter, quotechar=self.quote_char
+                    )
 
-                        # Convert batch to table
-                        table = pa.Table.from_batches([batch])
+                    # Skip rows if needed
+                    for _ in range(self.skip_rows):
+                        next(reader, None)
 
-                        # Limit records to prevent processing excessive data
-                        if record_count + table.num_rows > estimated_records * 1.5:
-                            total_records = record_count + table.num_rows
-                            expected_limit = estimated_records * 1.5
-                            logger.warning(
-                                f"Record count exceeds expected by significant margin: "
-                                f"{total_records} > {expected_limit}"
-                            )
-                            # Take only needed rows
-                            remaining = max(
-                                0, int(estimated_records * 1.5) - record_count
-                            )
-                            if remaining <= 0:
-                                break
-                            # Slice table to get remaining rows
-                            if remaining < table.num_rows:
-                                table = table.slice(0, remaining)
+                    # Read header row if present
+                    header_row = self._get_header_row(reader, file)
 
-                        # Process column names
-                        column_names = list(table.column_names)
+                    # Process data rows
+                    for row in reader:
+                        if not row:  # Skip empty rows
+                            continue
 
-                        # Handle column naming based on settings
-                        if not self.has_header:
-                            column_names = [
-                                f"column_{i + 1}" for i in range(len(column_names))
-                            ]
-                        elif self.sanitize_column_names:
-                            column_names = sanitize_column_names(
-                                column_names, separator=self.separator, sql_safe=True
-                            )
-
-                        # Convert batch to list of dictionaries
-                        records = []
-                        for row_idx in range(table.num_rows):
-                            record = {}
-                            for col_idx, col_name in enumerate(column_names):
-                                if col_idx < len(table.column_names):  # Safety check
-                                    value = table.column(col_idx)[row_idx].as_py()
-
-                                    # Cast to string if required
-                                    if self.cast_to_string and value is not None:
-                                        value = str(value)
-                                    elif (
-                                        not self.infer_types
-                                        and value is not None
-                                        and not self.cast_to_string
-                                    ):
-                                        # Convert to string then infer type
-                                        value = self._infer_type(str(value))
-
-                                    record[col_name] = value
-                            records.append(record)
-
-                        # Update record count
-                        record_count += len(records)
-
-                        # Process records into chunks
-                        if records:
-                            current_chunk = []
-                            for record in records:
-                                current_chunk.append(record)
-                                if len(current_chunk) >= chunk_size:
-                                    all_chunks.append(current_chunk)
-                                    current_chunk = []
-
-                            # Add remaining records
-                            if current_chunk:
-                                all_chunks.append(current_chunk)
-
-                    except Exception as e:
-                        logger.warning(
-                            f"Error processing batch {batch_count}: {str(e)}"
-                        )
-                        # Abort PyArrow processing on batch error
-                        raise
-
-                # Mark success if completed without exceptions
-                success = True
-
-            # Yield results only if PyArrow processing succeeded
-            if success:
-                yield from all_chunks
+                        record = self._process_row(row, header_row)
+                        if record:  # Only yield non-empty records
+                            yield record
             else:
-                # Trigger fallback on failure
-                raise ParsingError("PyArrow CSV reading failed")
+                # Binary mode for compressed files
+                with open_file() as file:
+                    reader = csv.reader(
+                        file, delimiter=self.delimiter, quotechar=self.quote_char
+                    )
+
+                    # Skip rows if needed
+                    for _ in range(self.skip_rows):
+                        next(reader, None)
+
+                    # Read header row if present
+                    header_row = self._get_header_row(reader, file)
+
+                    # Process data rows
+                    for row in reader:
+                        if not row:  # Skip empty rows
+                            continue
+
+                        record = self._process_row(row, header_row)
+                        if record:  # Only yield non-empty records
+                            yield record
 
         except Exception as e:
-            error_msg = f"Error reading CSV with PyArrow: {str(e)}"
-            logger.warning(error_msg)
-            # Clear PyArrow flag and trigger fallback
-            self._using_pyarrow = False
-            raise ParsingError(f"PyArrow CSV reading failed: {str(e)}") from e
+            if isinstance(e, (FileError, ParsingError)):
+                raise
+            raise ParsingError(f"Failed to parse CSV file: {str(e)}") from e
+
+    def _read_chunks_builtin(
+        self, file_path: str, chunk_size: int
+    ) -> Generator[list[dict[str, Any]], None, None]:
+        """Read CSV in chunks using built-in CSV module.
+
+        Args:
+            file_path: Path to the CSV file
+            chunk_size: Number of rows per chunk
+
+        Yields:
+            Chunks of records as lists of dictionaries
+        """
+        try:
+            file_extension = os.path.splitext(file_path)[1].lower()
+
+            # Get the appropriate opener based on file extension
+            file_opener, mode = self._get_file_opener(file_extension)
+
+            # Define file open function with parameters
+            def open_file() -> Any:
+                return file_opener(file_path, mode=mode, encoding=self.encoding)
+
+            # Handle encoding for text mode
+            if "t" in mode:
+                with open_file() as file:
+                    reader = csv.reader(
+                        file, delimiter=self.delimiter, quotechar=self.quote_char
+                    )
+
+                    # Skip rows if needed
+                    for _ in range(self.skip_rows):
+                        next(reader, None)
+
+                    # Read header row if present
+                    header_row = self._get_header_row(reader, file)
+
+                    chunk = []
+                    for row in reader:
+                        if not row:  # Skip empty rows
+                            continue
+
+                        record = self._process_row(row, header_row)
+                        if record:  # Only add non-empty records
+                            chunk.append(record)
+
+                        # Yield when chunk is full
+                        if len(chunk) >= chunk_size:
+                            yield chunk
+                            chunk = []
+
+                    # Yield the final chunk if not empty
+                    if chunk:
+                        yield chunk
+            else:
+                # Binary mode for compressed files
+                with open_file() as file:
+                    reader = csv.reader(
+                        file, delimiter=self.delimiter, quotechar=self.quote_char
+                    )
+
+                    # Skip rows if needed
+                    for _ in range(self.skip_rows):
+                        next(reader, None)
+
+                    # Read header row if present
+                    header_row = self._get_header_row(reader, file)
+
+                    chunk = []
+                    for row in reader:
+                        if not row:  # Skip empty rows
+                            continue
+
+                        record = self._process_row(row, header_row)
+                        if record:  # Only add non-empty records
+                            chunk.append(record)
+
+                        # Yield when chunk is full
+                        if len(chunk) >= chunk_size:
+                            yield chunk
+                            chunk = []
+
+                    # Yield the final chunk if not empty
+                    if chunk:
+                        yield chunk
+
+        except Exception as e:
+            if isinstance(e, (FileError, ParsingError)):
+                raise
+            raise ParsingError(f"Failed to parse CSV file in chunks: {str(e)}") from e
+
+    def _get_header_row(self, reader: Any, file: Any) -> list[str]:
+        """Get header row, either from file or generated.
+
+        Args:
+            reader: CSV reader object
+            file: File object for potential rewinding
+
+        Returns:
+            List of column names
+        """
+        if self.has_header:
+            try:
+                header_row: list[str] = next(reader)
+                if self.sanitize_column_names:
+                    header_row = sanitize_column_names(
+                        header_row, separator=self.separator, sql_safe=True
+                    )
+                return header_row
+            except StopIteration:
+                raise ParsingError("CSV file is empty or has no header row") from None
+        else:
+            # Generate column names if no header
+            try:
+                row: list[str] = next(reader)
+                if row is None:
+                    raise ParsingError("CSV file is empty")
+                header_row = [f"column_{i + 1}" for i in range(len(row))]
+                # Rewind to reprocess first row
+                if hasattr(file, "seek"):
+                    file.seek(0)
+                    for _ in range(self.skip_rows):
+                        next(reader, None)
+                return header_row
+            except StopIteration:
+                raise ParsingError("CSV file is empty") from None
+
+    def _process_row(self, row: list[str], header_row: list[str]) -> dict[str, Any]:
+        """Process a single CSV row into a record.
+
+        Args:
+            row: List of string values from CSV
+            header_row: List of column names
+
+        Returns:
+            Dictionary record
+        """
+        # Ensure row length matches header
+        if len(row) < len(header_row):
+            row.extend([""] * (len(header_row) - len(row)))
+        elif len(row) > len(header_row):
+            row = row[: len(header_row)]
+
+        # Create record
+        record = {}
+        for i, value in enumerate(row):
+            if i < len(header_row):  # Safety check
+                column_name = header_row[i]
+                record[column_name] = self._process_value(value)
+
+        return record
+
+    def _process_value(self, value: Any) -> Any:
+        """Process a single value according to configuration.
+
+        Args:
+            value: Raw value to process
+
+        Returns:
+            Processed value
+        """
+        # Handle None values
+        if value is None:
+            return None
+
+        # Convert to string first if needed
+        str_value = str(value) if value is not None else ""
+
+        # Process null values
+        if str_value in self.null_values:
+            return None
+
+        # Cast to string if required
+        if self.cast_to_string:
+            return str_value
+
+        # Infer types if requested and value is not empty
+        if self.infer_types and str_value:
+            return self._infer_type(str_value)
+
+        return str_value
 
     def _infer_type(self, value: str) -> Any:
         """Infer the type of a value.
@@ -675,7 +902,7 @@ class CSVReader:
         """
         # Try to convert to integer
         try:
-            if value.isdigit():
+            if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
                 return int(value)
         except (ValueError, AttributeError):
             pass
@@ -686,16 +913,37 @@ class CSVReader:
         except (ValueError, TypeError):
             pass
 
-        # Try to convert to boolean - only for non-numeric looking values
+        # Try to convert to boolean - only for explicit boolean values
         lower_value = value.lower()
-        if not value.isdigit() and lower_value not in ("0", "1"):
-            if lower_value in ("true", "yes"):
-                return True
-            elif lower_value in ("false", "no"):
-                return False
+        if lower_value in ("true", "yes", "1"):
+            return True
+        elif lower_value in ("false", "no", "0"):
+            return False
 
         # Return as string if no other type matches
         return value
+
+    def _get_column_names(self, raw_names: list[str]) -> list[str]:
+        """Get processed column names.
+
+        Args:
+            raw_names: Raw column names from file
+
+        Returns:
+            Processed column names
+        """
+        if not self.has_header:
+            return [f"column_{i + 1}" for i in range(len(raw_names))]
+
+        if self.sanitize_column_names:
+            return cast(
+                list[str],
+                sanitize_column_names(
+                    raw_names, separator=self.separator, sql_safe=True
+                ),
+            )
+
+        return raw_names
 
     def _get_file_opener(self, file_extension: str) -> tuple[Any, str]:
         """Get the appropriate file opener and mode based on file extension.
@@ -706,14 +954,19 @@ class CSVReader:
         Returns:
             Tuple of (file_opener, mode)
         """
+        opener: Any
+        mode: str
+
         if file_extension == ".gz":
-            return gzip.open, "rt"
+            opener, mode = gzip.open, "rt"
         elif file_extension == ".bz2":
-            return bz2.open, "rt"
+            opener, mode = bz2.open, "rt"
         elif file_extension in (".xz", ".lzma"):
-            return lzma.open, "rt"
+            opener, mode = lzma.open, "rt"
         else:
-            return open, "r"
+            opener, mode = open, "r"
+
+        return (opener, mode)
 
 
 def normalize_column_names(column_names: list[str], separator: str = "_") -> list[str]:
@@ -761,18 +1014,32 @@ def detect_delimiter(
         raise FileError(f"File not found: {file_path}", file_path=file_path)
 
     # Get file opener based on extension
-    opener, mode = (
-        _get_file_opener(file_path)
-        if hasattr(CSVReader, "_get_file_opener")
-        else (open, "rt")
-    )
+    file_extension = os.path.splitext(file_path)[1].lower()
+
+    # Define opener and mode based on file extension
+    opener: Any
+    mode: str
+
+    if file_extension == ".gz":
+        opener, mode = gzip.open, "rt"
+    elif file_extension == ".bz2":
+        opener, mode = bz2.open, "rt"
+    elif file_extension in (".xz", ".lzma"):
+        opener, mode = lzma.open, "rt"
+    else:
+        opener, mode = open, "r"
 
     try:
         with opener(file_path, mode) as f:
             sample = f.read(sample_size)
 
-        # Count occurrences of each delimiter
-        counts = {delim: sample.count(delim) for delim in possible_delimiters}
+        # Count occurrences for each potential delimiter
+        counts = {}
+        for delim in possible_delimiters:
+            if isinstance(sample, str):
+                counts[delim] = sample.count(delim)
+            else:
+                counts[delim] = sample.count(bytes(delim, "utf-8"))
 
         # Return the delimiter with the highest count
         most_common = max(counts.items(), key=lambda x: x[1])
@@ -785,25 +1052,3 @@ def detect_delimiter(
     except Exception as e:
         logger.warning(f"Failed to detect delimiter: {e}")
         return ","
-
-
-def _get_file_opener(file_path: str) -> tuple[Any, str]:
-    """Get the appropriate file opener and mode based on file extension.
-
-    Args:
-        file_path: Path to the file
-
-    Returns:
-        Tuple of (opener_function, mode)
-    """
-    _, ext = os.path.splitext(file_path)
-    ext = ext.lower()
-
-    if ext == ".gz":
-        return gzip.open, "rt"
-    elif ext == ".bz2":
-        return bz2.open, "rt"
-    elif ext in (".xz", ".lzma"):
-        return lzma.open, "rt"
-    else:
-        return open, "r"
