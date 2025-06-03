@@ -568,6 +568,17 @@ class CSVReader:
             "try_parse_dates": not self.cast_to_string,
         }
 
+        # When cast_to_string is True, disable all type inference
+        if self.cast_to_string:
+            # Ensure all data is read as strings by forcing string schema
+            read_options.update(
+                {
+                    "dtypes": None,  # No specific dtype mapping
+                    "infer_schema_length": 0,  # Disable schema inference
+                    "ignore_errors": True,  # Ignore parsing errors
+                }
+            )
+
         # Read the CSV file
         df = pl.read_csv(file_path, **read_options)
 
@@ -611,6 +622,17 @@ class CSVReader:
             "quote_char": self.quote_char,
             "try_parse_dates": not self.cast_to_string,
         }
+
+        # When cast_to_string is True, disable all type inference
+        if self.cast_to_string:
+            # Ensure all data is read as strings by forcing string schema
+            read_options.update(
+                {
+                    "dtypes": None,  # No specific dtype mapping
+                    "infer_schema_length": 0,  # Disable schema inference
+                    "ignore_errors": True,  # Ignore parsing errors
+                }
+            )
 
         # Read the CSV file
         df = pl.read_csv(file_path, **read_options)
