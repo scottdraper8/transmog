@@ -6,7 +6,7 @@ requires = [ "poetry>=1" ]
 [project]
 name = "transmog"
 version = "1.0.5"
-description = "An ETL/ELT transformation library for converting nested JSON structures into flat, tabular formats"
+description = "A data transformation library for flattening complex nested structures into tabular formats while preserving hierarchical relationships"
 readme = "README.md"
 keywords = [
   "csv",
