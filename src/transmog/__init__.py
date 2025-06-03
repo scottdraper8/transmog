@@ -3,7 +3,7 @@
 Provides tools to transform deeply nested JSON structures into flattened tables.
 """
 
-__version__ = "1.0.5"
+__version__ = "1.0.6"
 
 # Configuration functionality
 from transmog.config import (
