@@ -209,14 +209,6 @@ export TRANSMOG_FORCE_NATIVE_CSV=true
 
 This is particularly useful when processing files with 50K-500K records where the native reader often outperforms PyArrow.
 
-### Performance Improvements
-
-Recent optimizations have significantly improved CSV processing performance:
-
-- **2x faster PyArrow processing** with single-pass file reading (no double-read)
-- **20x faster row conversion** using batch columnar-to-dict conversion
-- **Intelligent reader selection** ensures optimal performance for different file sizes
-
 ### PyArrow Integration
 
 When PyArrow is available and selected, Transmog uses optimized processing:
