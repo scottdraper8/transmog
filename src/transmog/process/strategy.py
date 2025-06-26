@@ -126,12 +126,18 @@ class ProcessingStrategy(ABC):
             time_field = metadata_config.time_field
             default_id_field = metadata_config.default_id_field
             id_generation_strategy = metadata_config.id_generation_strategy
+            force_transmog_id = metadata_config.force_transmog_id
+            id_field_patterns = metadata_config.id_field_patterns
+            id_field_mapping = metadata_config.id_field_mapping
         else:
-            id_field = "__extract_id"
-            parent_field = "__parent_extract_id"
-            time_field = "__extract_datetime"
+            id_field = "__transmog_id"
+            parent_field = "__parent_transmog_id"
+            time_field = "__transmog_datetime"
             default_id_field = None
             id_generation_strategy = None
+            force_transmog_id = False
+            id_field_patterns = None
+            id_field_mapping = None
 
         # Get error handling parameters
         error_config = getattr(self.config, "error_handling", None)
@@ -155,7 +161,10 @@ class ProcessingStrategy(ABC):
             "time_field": time_field,
             "default_id_field": default_id_field,
             "id_generation_strategy": id_generation_strategy,
-            "extract_time": extract_time,
+            "force_transmog_id": force_transmog_id,
+            "id_field_patterns": id_field_patterns,
+            "id_field_mapping": id_field_mapping,
+            "transmog_time": extract_time,
             "recovery_strategy": recovery_strategy,
             "max_depth": max_depth,
         }
@@ -301,25 +310,28 @@ class InMemoryStrategy(ProcessingStrategy):
         keep_arrays = params.get("keep_arrays", False)
 
         # Get common parameters
-        extract_time = params.get("extract_time")
+        transmog_time = params.get("transmog_time")
         separator = params.get("separator", "_")
         cast_to_string = params.get("cast_to_string", True)
         include_empty = params.get("include_empty", False)
         skip_null = params.get("skip_null", True)
-        id_field = params.get("id_field", "__extract_id")
-        parent_field = params.get("parent_field", "__parent_extract_id")
-        time_field = params.get("time_field", "__extract_datetime")
+        id_field = params.get("id_field", "__transmog_id")
+        parent_field = params.get("parent_field", "__parent_transmog_id")
+        time_field = params.get("time_field", "__transmog_datetime")
         visit_arrays = params.get("visit_arrays", True)
         deeply_nested_threshold = params.get("deeply_nested_threshold", 4)
         default_id_field = params.get("default_id_field")
         id_generation_strategy = params.get("id_generation_strategy")
+        force_transmog_id = params.get("force_transmog_id", False)
+        id_field_patterns = params.get("id_field_patterns")
+        id_field_mapping = params.get("id_field_mapping")
         max_depth = params.get("max_depth", 100)
 
         # Process all records in a single pass
         main_records, child_tables = process_records_in_single_pass(
             records=data_list,
             entity_name=entity_name,
-            extract_time=extract_time,
+            transmog_time=transmog_time,
             separator=separator,
             cast_to_string=cast_to_string,
             include_empty=include_empty,
@@ -334,6 +346,9 @@ class InMemoryStrategy(ProcessingStrategy):
             recovery_strategy=recovery_strategy,
             max_depth=max_depth,
             keep_arrays=keep_arrays,
+            id_field_patterns=id_field_patterns,
+            id_field_mapping=id_field_mapping,
+            force_transmog_id=force_transmog_id,
         )
 
         # Update result
@@ -509,9 +524,9 @@ class FileStrategy(ProcessingStrategy):
         params = self._get_common_config_params(extract_time)
 
         # Get id fields
-        id_field = params.get("id_field", "__extract_id")
-        parent_field = params.get("parent_field", "__parent_extract_id")
-        time_field = params.get("time_field", "__extract_datetime")
+        id_field = params.get("id_field", "__transmog_id")
+        parent_field = params.get("parent_field", "__parent_transmog_id")
+        time_field = params.get("time_field", "__transmog_datetime")
         default_id_field = params.get("default_id_field")
         id_generation_strategy = params.get("id_generation_strategy")
 
@@ -735,13 +750,17 @@ class FileStrategy(ProcessingStrategy):
                 annotated = annotate_with_metadata(
                     main_record,
                     parent_id=None,
-                    extract_time=extract_time,
+                    transmog_time=extract_time,
                     id_field=id_field,
                     parent_field=parent_field,
                     time_field=time_field,
                     source_field=source_field_str,
                     id_generation_strategy=id_generation_strategy,
                     in_place=True,
+                    id_field_patterns=params.get("id_field_patterns"),
+                    path=entity_name,
+                    id_field_mapping=params.get("id_field_mapping"),
+                    force_transmog_id=params.get("force_transmog_id", False),
                 )
 
                 # Add extract ID to track for child relationships
@@ -812,11 +831,17 @@ class FileStrategy(ProcessingStrategy):
                 cast_to_string=params["cast_to_string"],
                 include_empty=params["include_empty"],
                 skip_null=params["skip_null"],
-                extract_time=extract_time,
+                transmog_time=extract_time,
                 deeply_nested_threshold=params.get("deeply_nested_threshold", 4),
                 default_id_field=default_id_field,
                 id_generation_strategy=id_generation_strategy,
                 recovery_strategy=params.get("recovery_strategy"),
+                id_field=id_field,
+                parent_field=params.get("parent_field", "__parent_transmog_id"),
+                time_field=params.get("time_field", "__transmog_datetime"),
+                id_field_patterns=params.get("id_field_patterns"),
+                id_field_mapping=params.get("id_field_mapping"),
+                force_transmog_id=params.get("force_transmog_id", False),
             )
 
             # Add arrays to result for this record - ensure arrays is a dict
@@ -888,9 +913,9 @@ class BatchStrategy(ProcessingStrategy):
         batch_size = self._get_batch_size(kwargs.get("chunk_size"))
 
         # Get id fields
-        id_field = params.get("id_field", "__extract_id")
-        parent_field = params.get("parent_field", "__parent_extract_id")
-        time_field = params.get("time_field", "__extract_datetime")
+        id_field = params.get("id_field", "__transmog_id")
+        parent_field = params.get("parent_field", "__parent_transmog_id")
+        time_field = params.get("time_field", "__transmog_datetime")
         default_id_field = params.get("default_id_field")
         id_generation_strategy = params.get("id_generation_strategy")
 
@@ -1024,13 +1049,17 @@ class BatchStrategy(ProcessingStrategy):
                 annotated = annotate_with_metadata(
                     main_record,
                     parent_id=None,
-                    extract_time=extract_time,
+                    transmog_time=extract_time,
                     id_field=id_field,
                     parent_field=parent_field,
                     time_field=time_field,
                     source_field=source_field_str,
                     id_generation_strategy=id_generation_strategy,
                     in_place=True,
+                    id_field_patterns=params.get("id_field_patterns"),
+                    path=entity_name,
+                    id_field_mapping=params.get("id_field_mapping"),
+                    force_transmog_id=params.get("force_transmog_id", False),
                 )
 
                 # Add extract ID to track for child relationships
@@ -1101,11 +1130,17 @@ class BatchStrategy(ProcessingStrategy):
                 cast_to_string=params["cast_to_string"],
                 include_empty=params["include_empty"],
                 skip_null=params["skip_null"],
-                extract_time=extract_time,
+                transmog_time=extract_time,
                 deeply_nested_threshold=params.get("deeply_nested_threshold", 4),
                 default_id_field=default_id_field,
                 id_generation_strategy=id_generation_strategy,
                 recovery_strategy=params.get("recovery_strategy"),
+                id_field=id_field,
+                parent_field=params.get("parent_field", "__parent_transmog_id"),
+                time_field=params.get("time_field", "__transmog_datetime"),
+                id_field_patterns=params.get("id_field_patterns"),
+                id_field_mapping=params.get("id_field_mapping"),
+                force_transmog_id=params.get("force_transmog_id", False),
             )
 
             # Add arrays to result for this record - ensure arrays is a dict
@@ -1226,9 +1261,9 @@ class ChunkedStrategy(ProcessingStrategy):
         chunk_size = self._get_batch_size(kwargs.get("chunk_size"))
 
         # Get ID fields
-        id_field = params.get("id_field", "__extract_id")
-        parent_field = params.get("parent_field", "__parent_extract_id")
-        time_field = params.get("time_field", "__extract_datetime")
+        id_field = params.get("id_field", "__transmog_id")
+        parent_field = params.get("parent_field", "__parent_transmog_id")
+        time_field = params.get("time_field", "__transmog_datetime")
         default_id_field = params.get("default_id_field")
         id_generation_strategy = params.get("id_generation_strategy")
 
@@ -1299,7 +1334,7 @@ class ChunkedStrategy(ProcessingStrategy):
         flattened_records, table_arrays = process_records_in_single_pass(
             chunk,
             entity_name=entity_name,
-            extract_time=extract_time,
+            transmog_time=extract_time,
             separator=params.get("separator", "_"),
             cast_to_string=params.get("cast_to_string", True),
             include_empty=params.get("include_empty", False),
@@ -1314,6 +1349,9 @@ class ChunkedStrategy(ProcessingStrategy):
             recovery_strategy=params.get("recovery_strategy"),
             max_depth=params.get("max_depth", 100),
             keep_arrays=params.get("keep_arrays", False),
+            id_field_patterns=params.get("id_field_patterns"),
+            id_field_mapping=params.get("id_field_mapping"),
+            force_transmog_id=params.get("force_transmog_id", False),
         )
 
         # Add records to results
@@ -1389,12 +1427,18 @@ class ChunkedStrategy(ProcessingStrategy):
                 cast_to_string=params.get("cast_to_string", True),
                 include_empty=params.get("include_empty", False),
                 skip_null=params.get("skip_null", True),
-                extract_time=extract_time,
+                transmog_time=extract_time,
                 deeply_nested_threshold=params.get("deeply_nested_threshold", 4),
                 default_id_field=default_id_field,
                 id_generation_strategy=id_generation_strategy,
                 recovery_strategy=params.get("recovery_strategy"),
                 keep_arrays=keep_arrays,
+                id_field=id_field,
+                parent_field=params.get("parent_field", "__parent_transmog_id"),
+                time_field=params.get("time_field", "__transmog_datetime"),
+                id_field_patterns=params.get("id_field_patterns"),
+                id_field_mapping=params.get("id_field_mapping"),
+                force_transmog_id=params.get("force_transmog_id", False),
             )
 
             # Add arrays to result for this record - ensure arrays is a dict
@@ -1521,9 +1565,9 @@ class CSVStrategy(ProcessingStrategy):
             ).read_records(file_path)
 
             # Get ID fields
-            id_field = params.get("id_field", "__extract_id")
-            parent_field = params.get("parent_field", "__parent_extract_id")
-            time_field = params.get("time_field", "__extract_datetime")
+            id_field = params.get("id_field", "__transmog_id")
+            parent_field = params.get("parent_field", "__parent_transmog_id")
+            time_field = params.get("time_field", "__transmog_datetime")
             default_id_field = params.get("default_id_field")
             id_generation_strategy = params.get("id_generation_strategy")
 
@@ -1652,13 +1696,17 @@ class CSVStrategy(ProcessingStrategy):
                 annotated = annotate_with_metadata(
                     record,
                     parent_id=None,
-                    extract_time=extract_time,
+                    transmog_time=extract_time,
                     id_field=id_field,
                     parent_field=parent_field,
                     time_field=time_field,
                     source_field=source_field_str,
                     id_generation_strategy=id_generation_strategy,
                     in_place=False,
+                    id_field_patterns=params.get("id_field_patterns"),
+                    path=entity_name,
+                    id_field_mapping=params.get("id_field_mapping"),
+                    force_transmog_id=params.get("force_transmog_id", False),
                 )
 
                 # Add to result

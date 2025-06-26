@@ -23,8 +23,19 @@ class AbstractIntegrationTest:
     @pytest.fixture
     def processor(self):
         """Create a processor instance for integration testing."""
-        config = TransmogConfig.default().with_processing(cast_to_string=True)
+        config = (
+            TransmogConfig.default()
+            .with_processing(cast_to_string=True)
+            .with_metadata(force_transmog_id=True)
+        )
         return Processor(config=config)
+
+    @pytest.fixture
+    def processor_with_deterministic_ids(self):
+        """Create a processor with deterministic IDs for integration testing."""
+        return Processor.with_deterministic_ids("id").with_metadata(
+            force_transmog_id=True
+        )
 
     @pytest.fixture
     def sample_data(self):
@@ -77,7 +88,7 @@ class AbstractIntegrationTest:
     def test_end_to_end_processing(self, processor, sample_data):
         """Test end-to-end processing from input to output."""
         # Check if data is already processed (has metadata fields)
-        is_processed = any("__extract_id" in record for record in sample_data)
+        is_processed = any("__transmog_id" in record for record in sample_data)
 
         # Create our own test data with items that we can use for reliable testing
         test_sample_data = [
@@ -122,11 +133,11 @@ class AbstractIntegrationTest:
 
         # Verify parent-child relationships
         for item in items:
-            assert "__parent_extract_id" in item
+            assert "__parent_transmog_id" in item
             # Find corresponding parent
             parent_found = False
             for main_record in main_table:
-                if main_record["__extract_id"] == item["__parent_extract_id"]:
+                if main_record["__transmog_id"] == item["__parent_transmog_id"]:
                     parent_found = True
                     break
             assert parent_found, "Item has no matching parent record"
@@ -136,10 +147,14 @@ class AbstractIntegrationTest:
             assert "items" not in record, "Arrays should be removed from main table"
             assert "nested" not in record, "Nested objects should be flattened"
 
-    def test_hierarchical_consistency(self, processor, complex_data):
+    def test_hierarchical_consistency(
+        self, processor_with_deterministic_ids, complex_data
+    ):
         """Test consistency of hierarchical relationships in nested structures."""
         # Process the complex data
-        result = processor.process(complex_data, entity_name="complex")
+        result = processor_with_deterministic_ids.process(
+            complex_data, entity_name="complex"
+        )
 
         # Get all tables
         all_tables = result.get_table_names()
@@ -184,19 +199,29 @@ class AbstractIntegrationTest:
         # Verify parent-child relationships
         # Each level1 record should be referenced by some level2 records
         for level1_record in level1_records:
-            level1_id = level1_record["__extract_id"]
+            level1_id = level1_record["__transmog_id"]
+            level1_natural_id = level1_record["id"]
             # Check that at least one level2 record references this level1
+            # by either its transmog ID or its natural ID
             assert any(
-                record["__parent_extract_id"] == level1_id for record in level2_records
-            ), f"No level2 record references level1 record with ID {level1_id}"
+                record["__parent_transmog_id"] in [level1_id, level1_natural_id]
+                for record in level2_records
+            ), (
+                f"No level2 record references level1 record with ID {level1_id} or natural ID {level1_natural_id}"
+            )
 
         # Each level2 record should be referenced by some level3 records
         for level2_record in level2_records:
-            level2_id = level2_record["__extract_id"]
+            level2_id = level2_record["__transmog_id"]
+            level2_natural_id = level2_record["id"]
             # Check that at least one level3 record references this level2
+            # by either its transmog ID or its natural ID
             assert any(
-                record["__parent_extract_id"] == level2_id for record in level3_records
-            ), f"No level3 record references level2 record with ID {level2_id}"
+                record["__parent_transmog_id"] in [level2_id, level2_natural_id]
+                for record in level3_records
+            ), (
+                f"No level3 record references level2 record with ID {level2_id} or natural ID {level2_natural_id}"
+            )
 
     def test_output_formats(self, processor, sample_data, output_dir):
         """Test that processed data can be written to different output formats."""

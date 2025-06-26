@@ -94,7 +94,7 @@ class AbstractHierarchyTest:
         )
 
         # Verify main record is properly processed
-        assert "__extract_id" in main_record
+        assert "__transmog_id" in main_record
 
         # Verify arrays are extracted
         assert "test_items" in arrays
@@ -102,8 +102,8 @@ class AbstractHierarchyTest:
 
         # Check array items have required fields
         for item in arrays["test_items"]:
-            assert "__extract_id" in item
-            assert "__parent_extract_id" in item
+            assert "__transmog_id" in item
+            assert "__parent_transmog_id" in item
             # Original fields may or may not be included depending on implementation
 
     def test_process_complex_structure(self, complex_table_structure):
@@ -114,7 +114,7 @@ class AbstractHierarchyTest:
         )
 
         # Verify main table properties
-        assert "__extract_id" in main_record
+        assert "__transmog_id" in main_record
 
         # Verify arrays are extracted
         assert "test_items" in arrays
@@ -132,21 +132,21 @@ class AbstractHierarchyTest:
         assert len(arrays["test_tags"]) == 1
 
         # Check parent relationships
-        main_id = main_record["__extract_id"]
+        main_id = main_record["__transmog_id"]
 
         # Items should have main record as parent
         for item in arrays["test_items"]:
-            assert item["__parent_extract_id"] == main_id
+            assert item["__parent_transmog_id"] == main_id
 
         # Tags should have main record as parent
         for tag in arrays["test_tags"]:
-            assert tag["__parent_extract_id"] == main_id
+            assert tag["__parent_transmog_id"] == main_id
 
         # Subitems should have items as parents
         for subitem in arrays[subitems_table]:
-            parent_id = subitem["__parent_extract_id"]
+            parent_id = subitem["__parent_transmog_id"]
             assert any(
-                item["__extract_id"] == parent_id for item in arrays["test_items"]
+                item["__transmog_id"] == parent_id for item in arrays["test_items"]
             )
 
     def test_process_record_batch(self, simple_table_structure):
@@ -160,7 +160,7 @@ class AbstractHierarchyTest:
         # Verify main records
         assert len(main_records) == 3
         for record in main_records:
-            assert "__extract_id" in record
+            assert "__transmog_id" in record
 
         # Verify arrays
         assert "test_items" in arrays
@@ -179,7 +179,7 @@ class AbstractHierarchyTest:
         # Verify main records
         assert len(main_records) == 2
         for record in main_records:
-            assert "__extract_id" in record
+            assert "__transmog_id" in record
 
         # Convert generator to tables
         child_tables = {}
@@ -213,7 +213,7 @@ class AbstractHierarchyTest:
         main_record, arrays = process_structure(deeply_nested_data, entity_name="test")
 
         # Verify it processes without errors
-        assert "__extract_id" in main_record
+        assert "__transmog_id" in main_record
 
         # Test with limited max_depth
         main_record_limited, arrays_limited = process_structure(
@@ -223,4 +223,4 @@ class AbstractHierarchyTest:
         )
 
         # It should still complete without errors
-        assert "__extract_id" in main_record_limited
+        assert "__transmog_id" in main_record_limited

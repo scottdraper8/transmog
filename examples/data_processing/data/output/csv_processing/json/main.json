@@ -9,8 +9,8 @@
     "address_city": "San Francisco",
     "address_state": "CA",
     "skills": "Python,Java,SQL",
-    "__extract_id": "e4c40f08-020f-44a2-9832-0f8ff2a9cbdc",
-    "__extract_datetime": "2025-05-29 18:11:32.062157"
+    "__transmog_id": "e4c40f08-020f-44a2-9832-0f8ff2a9cbdc",
+    "__transmog_datetime": "2025-05-29 18:11:32.062157"
   },
   {
     "id": "2",
@@ -22,8 +22,8 @@
     "address_city": "New York",
     "address_state": "NY",
     "skills": "SEO,Content,Analytics",
-    "__extract_id": "71603ef3-7192-4b93-a96a-32c335026ce3",
-    "__extract_datetime": "2025-05-29 18:11:32.062157"
+    "__transmog_id": "71603ef3-7192-4b93-a96a-32c335026ce3",
+    "__transmog_datetime": "2025-05-29 18:11:32.062157"
   },
   {
     "id": "3",
@@ -35,8 +35,8 @@
     "address_city": "Austin",
     "address_state": "TX",
     "skills": "C++,Go,Rust",
-    "__extract_id": "b8057ef1-3761-4a9a-98c6-18cccd19a4c5",
-    "__extract_datetime": "2025-05-29 18:11:32.062157"
+    "__transmog_id": "b8057ef1-3761-4a9a-98c6-18cccd19a4c5",
+    "__transmog_datetime": "2025-05-29 18:11:32.062157"
   },
   {
     "id": "4",
@@ -48,8 +48,8 @@
     "address_city": "Chicago",
     "address_state": "IL",
     "skills": "Accounting,Excel,Tableau",
-    "__extract_id": "9c6694a8-56a2-4a69-807e-801dab0700e8",
-    "__extract_datetime": "2025-05-29 18:11:32.062157"
+    "__transmog_id": "9c6694a8-56a2-4a69-807e-801dab0700e8",
+    "__transmog_datetime": "2025-05-29 18:11:32.062157"
   },
   {
     "id": "5",
@@ -61,8 +61,8 @@
     "address_city": "Seattle",
     "address_state": "WA",
     "skills": "Python,Management,Architecture",
-    "__extract_id": "655e26d7-8e00-466e-b8d3-ae4c201411e0",
-    "__extract_datetime": "2025-05-29 18:11:32.062157"
+    "__transmog_id": "655e26d7-8e00-466e-b8d3-ae4c201411e0",
+    "__transmog_datetime": "2025-05-29 18:11:32.062157"
   },
   {
     "id": "6",
@@ -74,8 +74,8 @@
     "address_city": "Boston",
     "address_state": "MA",
     "skills": "Strategy,Leadership,Analytics",
-    "__extract_id": "1987935a-1524-441d-8105-c9d9117197a0",
-    "__extract_datetime": "2025-05-29 18:11:32.062157"
+    "__transmog_id": "1987935a-1524-441d-8105-c9d9117197a0",
+    "__transmog_datetime": "2025-05-29 18:11:32.062157"
   },
   {
     "id": "7",
@@ -87,7 +87,7 @@
     "address_city": "Denver",
     "address_state": "CO",
     "skills": "Budgeting,Forecasting,Investment",
-    "__extract_id": "303e63fd-f2e8-4ecf-804b-e990b8f87e4a",
-    "__extract_datetime": "2025-05-29 18:11:32.062157"
+    "__transmog_id": "303e63fd-f2e8-4ecf-804b-e990b8f87e4a",
+    "__transmog_datetime": "2025-05-29 18:11:32.062157"
   }
 ]

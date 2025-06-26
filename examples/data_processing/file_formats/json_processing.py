@@ -135,7 +135,7 @@ def main():
         # Print the first record, limited to a few fields
         record = main_table[0]
         for key in [
-            "__extract_id",
+            "__transmog_id",
             "organization_id",
             "organization_name",
             "organization_founded",
@@ -179,7 +179,7 @@ def main():
         # Print the first record, limited to a few fields to show differences
         record = main_table[0]
         for key in [
-            "__extract_id",
+            "__transmog_id",
             "organization.id",
             "organization.name",
             "organization.address.city",

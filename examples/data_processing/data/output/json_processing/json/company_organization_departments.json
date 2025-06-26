@@ -3,9 +3,9 @@
     "id": 101,
     "name": "Engineering",
     "head_count": 50,
-    "__extract_id": "56b479cd-eadb-4296-9863-ce8f67fa22cc",
-    "__parent_extract_id": "87b9ddc7-196a-414f-a1d7-fa9c7cc076b7",
-    "__extract_datetime": "2025-05-29 18:17:08.740026+00:00",
+    "__transmog_id": "56b479cd-eadb-4296-9863-ce8f67fa22cc",
+    "__parent_transmog_id": "87b9ddc7-196a-414f-a1d7-fa9c7cc076b7",
+    "__transmog_datetime": "2025-05-29 18:17:08.740026+00:00",
     "__array_field": "departments",
     "__array_index": 0
   },
@@ -13,9 +13,9 @@
     "id": 102,
     "name": "Marketing",
     "head_count": 25,
-    "__extract_id": "176530be-fd82-4708-95a2-b9c2471dacf0",
-    "__parent_extract_id": "87b9ddc7-196a-414f-a1d7-fa9c7cc076b7",
-    "__extract_datetime": "2025-05-29 18:17:08.740026+00:00",
+    "__transmog_id": "176530be-fd82-4708-95a2-b9c2471dacf0",
+    "__parent_transmog_id": "87b9ddc7-196a-414f-a1d7-fa9c7cc076b7",
+    "__transmog_datetime": "2025-05-29 18:17:08.740026+00:00",
     "__array_field": "departments",
     "__array_index": 1
   },
@@ -23,9 +23,9 @@
     "id": 103,
     "name": "Finance",
     "head_count": 15,
-    "__extract_id": "cad5b479-e308-4773-8eb4-9726223ec21b",
-    "__parent_extract_id": "87b9ddc7-196a-414f-a1d7-fa9c7cc076b7",
-    "__extract_datetime": "2025-05-29 18:17:08.740026+00:00",
+    "__transmog_id": "cad5b479-e308-4773-8eb4-9726223ec21b",
+    "__parent_transmog_id": "87b9ddc7-196a-414f-a1d7-fa9c7cc076b7",
+    "__transmog_datetime": "2025-05-29 18:17:08.740026+00:00",
     "__array_field": "departments",
     "__array_index": 2
   }

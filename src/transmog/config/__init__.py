@@ -90,11 +90,14 @@ class ProcessingConfig:
 class MetadataConfig:
     """Configuration for metadata generation."""
 
-    id_field: str = "__extract_id"
-    parent_field: str = "__parent_extract_id"
-    time_field: str = "__extract_datetime"
+    id_field: str = "__transmog_id"
+    parent_field: str = "__parent_transmog_id"
+    time_field: str = "__transmog_datetime"
     default_id_field: Optional[Union[str, dict[str, str]]] = None
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None
+    force_transmog_id: bool = False
+    id_field_patterns: Optional[list[str]] = None
+    id_field_mapping: Optional[dict[str, str]] = None
 
 
 @dataclass
@@ -191,6 +194,30 @@ class TransmogConfig:
         """Create a configuration with custom ID generation."""
         return cls(metadata=MetadataConfig(id_generation_strategy=strategy))
 
+    @classmethod
+    def with_natural_ids(
+        cls,
+        id_field_patterns: Optional[list[str]] = None,
+        id_field_mapping: Optional[dict[str, str]] = None,
+    ) -> "TransmogConfig":
+        """Create a configuration that discovers and uses natural IDs from data.
+
+        Args:
+            id_field_patterns: List of field names to check for natural IDs.
+                               If None, uses default patterns (id, ID, uuid, etc.)
+            id_field_mapping: Optional mapping of table names to specific ID field names
+
+        Returns:
+            TransmogConfig with natural ID discovery enabled
+        """
+        return cls(
+            metadata=MetadataConfig(
+                id_field_patterns=id_field_patterns,
+                id_field_mapping=id_field_mapping,
+                force_transmog_id=False,
+            )
+        )
+
     # Predefined configurations for common use cases
 
     @classmethod
@@ -204,7 +231,7 @@ class TransmogConfig:
             metadata=MetadataConfig(
                 id_field="id",
                 parent_field="parent_id",
-                time_field="extract_time",
+                time_field="transmog_time",
             ),
             processing=ProcessingConfig(
                 cast_to_string=False,

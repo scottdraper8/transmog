@@ -68,7 +68,7 @@ class AbstractFormatConversionTest:
         assert len(main_table) == 1
         assert "id" in main_table[0]
         assert "name" in main_table[0]
-        assert "__extract_id" in main_table[0]  # Should have metadata fields
+        assert "__transmog_id" in main_table[0]  # Should have metadata fields
 
         # Verify child tables
         child_tables = result_dict["child_tables"]
@@ -125,7 +125,7 @@ class AbstractFormatConversionTest:
         # Verify main table structure
         main_table = tables["main"]
         assert main_table.num_rows > 0
-        assert "__extract_id" in main_table.column_names
+        assert "__transmog_id" in main_table.column_names
         assert "id" in main_table.column_names
         assert "name" in main_table.column_names
 
@@ -178,7 +178,7 @@ class AbstractFormatConversionTest:
         main_buffer = io.BytesIO(parquet_bytes["main"])
         table = pq.read_table(main_buffer)
         assert table.num_rows > 0
-        assert "__extract_id" in table.column_names
+        assert "__transmog_id" in table.column_names
 
         # Verify child tables
         for table_name, data in parquet_bytes.items():
@@ -186,8 +186,8 @@ class AbstractFormatConversionTest:
                 buffer = io.BytesIO(data)
                 child_table = pq.read_table(buffer)
                 assert child_table.num_rows > 0
-                assert "__extract_id" in child_table.column_names
-                assert "__parent_extract_id" in child_table.column_names
+                assert "__transmog_id" in child_table.column_names
+                assert "__parent_transmog_id" in child_table.column_names
 
     def test_to_csv_bytes(self, processing_result_factory):
         """Test to_csv_bytes() method."""
@@ -207,15 +207,15 @@ class AbstractFormatConversionTest:
         main_csv = csv_bytes["main"].decode("utf-8")
         assert "id" in main_csv
         assert "name" in main_csv
-        assert "__extract_id" in main_csv
+        assert "__transmog_id" in main_csv
         assert "\n" in main_csv  # Should have at least one newline
 
         # Verify child tables
         for table_name, data in csv_bytes.items():
             if table_name != "main":
                 child_csv = data.decode("utf-8")
-                assert "__extract_id" in child_csv
-                assert "__parent_extract_id" in child_csv
+                assert "__transmog_id" in child_csv
+                assert "__parent_transmog_id" in child_csv
                 assert "\n" in child_csv
 
     def test_to_json_bytes(self, processing_result_factory):
@@ -238,7 +238,7 @@ class AbstractFormatConversionTest:
         assert "{" in main_json  # Should contain objects
         assert "id" in main_json
         assert "name" in main_json
-        assert "__extract_id" in main_json
+        assert "__transmog_id" in main_json
 
         # Verify child tables
         for table_name, data in json_bytes.items():
@@ -246,8 +246,8 @@ class AbstractFormatConversionTest:
                 child_json = data.decode("utf-8")
                 assert "[" in child_json
                 assert "{" in child_json
-                assert "__extract_id" in child_json
-                assert "__parent_extract_id" in child_json
+                assert "__transmog_id" in child_json
+                assert "__parent_transmog_id" in child_json
 
     @pytest.mark.skipif(
         not pytest.importorskip("pyarrow", reason="PyArrow not available"),
@@ -309,7 +309,7 @@ class AbstractFormatConversionTest:
 
         # Check for expected fields
         assert "id" in parsed_data["main"][0]
-        assert "__extract_id" in parsed_data["main"][0]
+        assert "__transmog_id" in parsed_data["main"][0]
 
         # Find items table
         items_table = None

@@ -133,8 +133,10 @@ class TestProcessorIntegration:
 
     def test_deterministic_ids(self, complex_data, tmp_path):
         """Test deterministic ID generation."""
-        # Create processor with deterministic ID field
-        processor = Processor.with_deterministic_ids("id")
+        # Create processor with deterministic ID field and force_transmog_id
+        processor = Processor.with_deterministic_ids("id").with_metadata(
+            force_transmog_id=True
+        )
 
         # Process the data twice - should get the same IDs
         result1 = processor.process(complex_data, entity_name="test")
@@ -145,8 +147,8 @@ class TestProcessorIntegration:
         main2 = result2.get_main_table()
 
         # Extract IDs
-        id1 = main1[0]["__extract_id"]
-        id2 = main2[0]["__extract_id"]
+        id1 = main1[0]["__transmog_id"]
+        id2 = main2[0]["__transmog_id"]
 
         # IDs should match
         assert id1 == id2, "Deterministic IDs should be the same across runs"
@@ -177,8 +179,8 @@ class TestProcessorIntegration:
                         i < len(sorted_table2)
                         and sorted_table1[i]["id"] == sorted_table2[i]["id"]
                     ):
-                        child_id1 = sorted_table1[i]["__extract_id"]
-                        child_id2 = sorted_table2[i]["__extract_id"]
+                        child_id1 = sorted_table1[i]["__transmog_id"]
+                        child_id2 = sorted_table2[i]["__transmog_id"]
                         assert child_id1 == child_id2, (
                             f"Deterministic IDs should match for {table_name} record with id={sorted_table1[i]['id']}"
                         )

@@ -19,7 +19,7 @@ Process a CSV file into a ProcessingResult object.
 Processor.process_csv(
     file_path: str,
     entity_name: str,
-    extract_time: Optional[Any] = None,
+    transmog_time: Optional[Any] = None,
     delimiter: Optional[str] = None,
     has_header: bool = True,
     null_values: Optional[list[str]] = None,
@@ -38,7 +38,7 @@ Processor.process_csv(
 |-----------|------|---------|-------------|
 | file_path | str | Required | Path to the CSV file |
 | entity_name | str | Required | Name of the entity (used for table naming) |
-| extract_time | Any | None | Extraction timestamp (current time if None) |
+| transmog_time | Any | None | Extraction timestamp (current time if None) |
 | delimiter | str | None | Delimiter character (auto-detect or comma if None) |
 | has_header | bool | True | Whether the file has a header row |
 | null_values | list[str] | None | List of strings to interpret as null values |

@@ -318,12 +318,12 @@ def test_process_complex_data_with_deterministic_ids():
     assert len(orders_table) == 2
 
     # Verify deterministic IDs were used
-    assert orders_table[0]["__extract_id"].startswith("order1")
-    assert orders_table[1]["__extract_id"].startswith("order2")
+    assert orders_table[0]["__transmog_id"].startswith("order1")
+    assert orders_table[1]["__transmog_id"].startswith("order2")
 
     # Verify parent-child relationships
-    assert orders_table[0]["__parent_extract_id"] == main_table[0]["__extract_id"]
-    assert orders_table[1]["__parent_extract_id"] == main_table[0]["__extract_id"]
+    assert orders_table[0]["__parent_transmog_id"] == main_table[0]["__transmog_id"]
+    assert orders_table[1]["__parent_transmog_id"] == main_table[0]["__transmog_id"]
 ```
 
 ### Testing with Fixtures

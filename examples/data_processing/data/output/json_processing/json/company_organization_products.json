@@ -4,9 +4,9 @@
     "name": "Product A",
     "category": "Software",
     "price": 99.99,
-    "__extract_id": "6feecf85-42c3-42d9-8948-bab65c7d499a",
-    "__parent_extract_id": "87b9ddc7-196a-414f-a1d7-fa9c7cc076b7",
-    "__extract_datetime": "2025-05-29 18:17:08.740026+00:00",
+    "__transmog_id": "6feecf85-42c3-42d9-8948-bab65c7d499a",
+    "__parent_transmog_id": "87b9ddc7-196a-414f-a1d7-fa9c7cc076b7",
+    "__transmog_datetime": "2025-05-29 18:17:08.740026+00:00",
     "__array_field": "products",
     "__array_index": 0
   },
@@ -15,9 +15,9 @@
     "name": "Product B",
     "category": "Hardware",
     "price": 299.99,
-    "__extract_id": "65746e15-8c12-49ad-8572-49a70fd57855",
-    "__parent_extract_id": "87b9ddc7-196a-414f-a1d7-fa9c7cc076b7",
-    "__extract_datetime": "2025-05-29 18:17:08.740026+00:00",
+    "__transmog_id": "65746e15-8c12-49ad-8572-49a70fd57855",
+    "__parent_transmog_id": "87b9ddc7-196a-414f-a1d7-fa9c7cc076b7",
+    "__transmog_datetime": "2025-05-29 18:17:08.740026+00:00",
     "__array_field": "products",
     "__array_index": 1
   }

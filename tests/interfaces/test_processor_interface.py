@@ -147,12 +147,12 @@ class AbstractProcessorTest:
                 assert main_records[0]["name"] == complex_data["name"]
 
                 # Get the ID to verify parent-child relationships
-                parent_id = main_records[0]["__extract_id"]
+                parent_id = main_records[0]["__transmog_id"]
 
                 # Verify parent-child relationships if possible
                 items = result.get_child_table("complex_items")
                 for item in items:
-                    assert item["__parent_extract_id"] == parent_id
+                    assert item["__parent_transmog_id"] == parent_id
         except Exception:
             # If main table isn't available, that's acceptable
             pass
@@ -166,9 +166,9 @@ class AbstractProcessorTest:
             assert "id" in item
             assert "name" in item
             assert "value" in item
-            assert "__parent_extract_id" in item
+            assert "__parent_transmog_id" in item
             # Parent ID should be present
-            assert item["__parent_extract_id"] is not None
+            assert item["__parent_transmog_id"] is not None
 
     def test_process_batch(self, processor, batch_data):
         """Test processing a batch of records."""
@@ -194,7 +194,7 @@ class AbstractProcessorTest:
 
         # Verify each record has expected fields
         for record in main_records:
-            assert "__extract_id" in record
+            assert "__transmog_id" in record
             assert "id" in record
             assert "name" in record
             assert "value" in record

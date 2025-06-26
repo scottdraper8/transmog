@@ -134,7 +134,7 @@ class TestChunkedStrategy(AbstractStrategyTest):
         # even if the main table doesn't exist, the relationships should be preserved in the child records
         item_groups = {}
         for item in items_table:
-            _parent_id = item["__parent_extract_id"]
+            _parent_id = item["__parent_transmog_id"]
             if _parent_id not in item_groups:
                 item_groups[_parent_id] = []
             item_groups[_parent_id].append(item)

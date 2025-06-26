@@ -176,9 +176,9 @@ Controls metadata generation through the following parameters:
 
 ```python
 metadata_config = tm.MetadataConfig(
-    id_field="__extract_id",     # Field name for record IDs
-    parent_field="__parent_extract_id",  # Field name for parent IDs
-    time_field="__extract_datetime", # Field name for timestamps
+    id_field="__transmog_id",     # Field name for record IDs
+    parent_field="__parent_transmog_id",  # Field name for parent IDs
+    time_field="__transmog_datetime", # Field name for timestamps
     deterministic_id_fields={    # Fields to use for deterministic IDs
         "users": "user_id",
         "orders": "order_id"

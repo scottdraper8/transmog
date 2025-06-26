@@ -125,6 +125,7 @@ def _process_value_wrapper(
     include_empty: bool,
     skip_null: bool,
     context: Literal["standard", "streaming"] = "standard",
+    recovery_strategy: Optional[Any] = None,
 ) -> Optional[Any]:
     """Simplified wrapper that handles edge cases and uses LRU cache.
 
@@ -134,6 +135,7 @@ def _process_value_wrapper(
         include_empty: Whether to include empty strings
         skip_null: Whether to skip null values
         context: Cache context
+        recovery_strategy: Strategy for error recovery
 
     Returns:
         Processed value or None if it should be skipped
@@ -145,19 +147,29 @@ def _process_value_wrapper(
     # Check if caching is enabled in settings
     cache_enabled = getattr(settings, "cache_enabled", True)
 
-    # Cache simple scalar values
-    if cache_enabled and isinstance(value, (int, float, bool, str)):
-        try:
-            value_hash = hash(value)
-            return _process_value_cached(
-                value_hash, cast_to_string, include_empty, skip_null, value
-            )
-        except (TypeError, ValueError):
-            # Fall back to direct processing for unhashable values
-            return _process_value(value, cast_to_string, include_empty, skip_null)
+    try:
+        # Cache simple scalar values
+        if cache_enabled and isinstance(value, (int, float, bool, str)):
+            try:
+                value_hash = hash(value)
+                return _process_value_cached(
+                    value_hash, cast_to_string, include_empty, skip_null, value
+                )
+            except (TypeError, ValueError):
+                # Fall back to direct processing for unhashable values
+                return _process_value(value, cast_to_string, include_empty, skip_null)
 
-    # Process complex objects directly
-    return _process_value(value, cast_to_string, include_empty, skip_null)
+        # Process complex objects directly
+        return _process_value(value, cast_to_string, include_empty, skip_null)
+    except Exception as e:
+        # Handle errors based on recovery strategy
+        if recovery_strategy == "skip":
+            return None
+        elif recovery_strategy == "partial":
+            return f"_error_{str(e)}"
+        else:
+            # Re-raise for strict handling
+            raise ProcessingError(f"Failed to process value: {value!r}") from e
 
 
 def _flatten_json_core(
@@ -321,6 +333,7 @@ def _flatten_json_core(
                     include_empty,
                     skip_null,
                     context=context,
+                    recovery_strategy=recovery_strategy,
                 )
                 if processed_value is not None:
                     result[current_path] = processed_value
@@ -335,6 +348,7 @@ def _flatten_json_core(
                     include_empty=include_empty,
                     skip_null=skip_null,
                     context=context,
+                    recovery_strategy=recovery_strategy,
                 )
                 if processed_value is not None:
                     result[current_path] = processed_value
@@ -344,7 +358,12 @@ def _flatten_json_core(
         else:
             # For scalar values, process and add to the result
             processed_value = _process_value_wrapper(
-                value, cast_to_string, include_empty, skip_null, context=context
+                value,
+                cast_to_string,
+                include_empty,
+                skip_null,
+                context=context,
+                recovery_strategy=recovery_strategy,
             )
             if processed_value is not None:
                 result[current_path] = processed_value
@@ -431,13 +450,39 @@ def flatten_json(
     if data is None:
         return {}
 
+    # Check for non-serializable objects at the top level
+    try:
+        # Attempt to serialize the data to JSON to check if it's serializable
+        import json
+
+        for key, value in data.items():
+            try:
+                json.dumps(value)
+            except (TypeError, ValueError, OverflowError):
+                # If the value is not serializable and we're using a recovery strategy
+                if recovery_strategy == "skip":
+                    # Skip this field
+                    continue
+                elif recovery_strategy == "partial":
+                    # Replace with error message
+                    data[key] = f"_error_non_serializable_{type(value).__name__}"
+                else:
+                    # Strict mode - raise an error
+                    raise ProcessingError(
+                        f"Non-serializable object found in key '{key}': {value!r}"
+                    ) from None
+    except Exception as e:
+        if not isinstance(e, ProcessingError):
+            raise ProcessingError(f"Failed to process data: {e}") from e
+        raise
+
     # Initialize path_parts for optimization
     if path_parts_optimization and path_parts is None:
         path_parts = parent_path.split(separator) if parent_path else []
 
     # Choose recursive function based on mode
     if mode == "streaming":
-        # For streaming mode, always use in-place = False
+        # For streaming mode, always use in_place = False
         return _flatten_json_core(
             data,
             separator=separator,

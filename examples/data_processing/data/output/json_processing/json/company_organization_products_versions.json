@@ -2,45 +2,45 @@
   {
     "version": "1.0",
     "release_date": "2020-01-15",
-    "__extract_id": "6c60c49f-597c-408e-936f-e3686fb2af34",
-    "__parent_extract_id": "6feecf85-42c3-42d9-8948-bab65c7d499a",
-    "__extract_datetime": "2025-05-29 18:17:08.740026+00:00",
+    "__transmog_id": "6c60c49f-597c-408e-936f-e3686fb2af34",
+    "__parent_transmog_id": "6feecf85-42c3-42d9-8948-bab65c7d499a",
+    "__transmog_datetime": "2025-05-29 18:17:08.740026+00:00",
     "__array_field": "versions",
     "__array_index": 0
   },
   {
     "version": "1.1",
     "release_date": "2020-06-30",
-    "__extract_id": "222b0398-a865-4fbb-8cd6-86f8c2cd1fb0",
-    "__parent_extract_id": "6feecf85-42c3-42d9-8948-bab65c7d499a",
-    "__extract_datetime": "2025-05-29 18:17:08.740026+00:00",
+    "__transmog_id": "222b0398-a865-4fbb-8cd6-86f8c2cd1fb0",
+    "__parent_transmog_id": "6feecf85-42c3-42d9-8948-bab65c7d499a",
+    "__transmog_datetime": "2025-05-29 18:17:08.740026+00:00",
     "__array_field": "versions",
     "__array_index": 1
   },
   {
     "version": "2.0",
     "release_date": "2021-03-10",
-    "__extract_id": "acb98f92-40bd-4288-95fa-1c13a753c71e",
-    "__parent_extract_id": "6feecf85-42c3-42d9-8948-bab65c7d499a",
-    "__extract_datetime": "2025-05-29 18:17:08.740026+00:00",
+    "__transmog_id": "acb98f92-40bd-4288-95fa-1c13a753c71e",
+    "__parent_transmog_id": "6feecf85-42c3-42d9-8948-bab65c7d499a",
+    "__transmog_datetime": "2025-05-29 18:17:08.740026+00:00",
     "__array_field": "versions",
     "__array_index": 2
   },
   {
     "version": "MK1",
     "release_date": "2019-05-20",
-    "__extract_id": "8ede0229-7d95-4c5c-b8a4-58c0a42abcb9",
-    "__parent_extract_id": "65746e15-8c12-49ad-8572-49a70fd57855",
-    "__extract_datetime": "2025-05-29 18:17:08.740026+00:00",
+    "__transmog_id": "8ede0229-7d95-4c5c-b8a4-58c0a42abcb9",
+    "__parent_transmog_id": "65746e15-8c12-49ad-8572-49a70fd57855",
+    "__transmog_datetime": "2025-05-29 18:17:08.740026+00:00",
     "__array_field": "versions",
     "__array_index": 0
   },
   {
     "version": "MK2",
     "release_date": "2021-02-15",
-    "__extract_id": "24215de2-2be8-4159-9b82-fb045a5f836d",
-    "__parent_extract_id": "65746e15-8c12-49ad-8572-49a70fd57855",
-    "__extract_datetime": "2025-05-29 18:17:08.740026+00:00",
+    "__transmog_id": "24215de2-2be8-4159-9b82-fb045a5f836d",
+    "__parent_transmog_id": "65746e15-8c12-49ad-8572-49a70fd57855",
+    "__transmog_datetime": "2025-05-29 18:17:08.740026+00:00",
     "__array_field": "versions",
     "__array_index": 1
   }

@@ -256,6 +256,7 @@ class JsonStreamingWriter(StreamingWriter):
         self.record_counts: dict[str, int] = {}
         self.should_close: bool = False
         self.base_dir: Optional[str] = None
+        self.finalized: bool = False
 
         # Initialize destination
         if destination is None:
@@ -475,6 +476,10 @@ class JsonStreamingWriter(StreamingWriter):
         Returns:
             None
         """
+        # Skip if already finalized
+        if self.finalized:
+            return
+
         # Close open tables
         for table_name in list(self.initialized_tables):
             # Skip already closed tables
@@ -498,6 +503,9 @@ class JsonStreamingWriter(StreamingWriter):
 
             file_obj.flush()
 
+        # Mark as finalized
+        self.finalized = True
+
         # Close file handles
         if self.should_close:
             self.close()
@@ -508,6 +516,10 @@ class JsonStreamingWriter(StreamingWriter):
         Returns:
             None
         """
+        # Call finalize if there are initialized tables that need closing
+        if self.initialized_tables and not self.finalized:
+            self.finalize()
+
         # Skip standard streams when closing
         for table_name, file_obj in list(self.file_objects.items()):
             if file_obj not in (sys.stdout, sys.stderr, sys.stdin):

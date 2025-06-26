@@ -1,6 +1,6 @@
 """Metadata handling module for data annotation.
 
-Provides functions to generate extract IDs, timestamps,
+Provides functions to generate transmog IDs, timestamps,
 and other metadata for record tracking and lineage.
 """
 
@@ -10,6 +10,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional, Union
 
+from .id_discovery import should_add_transmog_id
+
 # Logger initialization
 logger = logging.getLogger(__name__)
 
@@ -17,7 +19,7 @@ logger = logging.getLogger(__name__)
 TRANSMOG_NAMESPACE = uuid.UUID("a9b8c7d6-e5f4-1234-abcd-0123456789ab")
 
 
-def generate_extract_id(
+def generate_transmog_id(
     record: Optional[dict[str, Any]] = None,
     source_field: Optional[str] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
@@ -125,30 +127,38 @@ def get_current_timestamp(
 def annotate_with_metadata(
     record: dict[str, Any],
     parent_id: Optional[str] = None,
-    extract_id: Optional[str] = None,
-    extract_time: Optional[Any] = None,
-    id_field: str = "__extract_id",
-    parent_field: str = "__parent_extract_id",
-    time_field: str = "__extract_datetime",
+    transmog_id: Optional[str] = None,
+    transmog_time: Optional[Any] = None,
+    id_field: str = "__transmog_id",
+    parent_field: str = "__parent_transmog_id",
+    time_field: str = "__transmog_datetime",
     extra_fields: Optional[dict[str, Any]] = None,
     in_place: bool = False,
     source_field: Optional[str] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
+    id_field_patterns: Optional[list[str]] = None,
+    path: Optional[str] = None,
+    id_field_mapping: Optional[dict[str, str]] = None,
+    force_transmog_id: bool = False,
 ) -> dict[str, Any]:
     """Annotate a record with metadata fields.
 
     Args:
         record: Record dictionary to annotate
         parent_id: Optional parent record ID
-        extract_id: Extract ID (generated if None)
-        extract_time: Extraction timestamp (current time if None)
-        id_field: Field name for extract ID
+        transmog_id: Transmog ID (generated if None)
+        transmog_time: Transmog timestamp (current time if None)
+        id_field: Field name for transmog ID
         parent_field: Field name for parent ID
         time_field: Field name for timestamp
         extra_fields: Additional metadata fields to add
         in_place: Whether to modify the record in place
         source_field: Field name to use for deterministic ID generation
         id_generation_strategy: Custom function to generate ID
+        id_field_patterns: List of field names to check for natural IDs
+        path: Current path/table name for ID mapping
+        id_field_mapping: Optional mapping of paths to specific ID fields
+        force_transmog_id: If True, always add transmog ID
 
     Returns:
         Annotated record
@@ -156,23 +166,27 @@ def annotate_with_metadata(
     # Create copy if not modifying in-place
     annotated = record if in_place else record.copy()
 
-    # Add extract ID
-    if extract_id is None:
-        extract_id = generate_extract_id(
-            record=annotated,
-            source_field=source_field,
-            id_generation_strategy=id_generation_strategy,
-        )
-    annotated[id_field] = extract_id
+    # Check if transmog ID should be added
+    if should_add_transmog_id(
+        annotated, id_field_patterns, path, id_field_mapping, force_transmog_id
+    ):
+        # Add transmog ID
+        if transmog_id is None:
+            transmog_id = generate_transmog_id(
+                record=annotated,
+                source_field=source_field,
+                id_generation_strategy=id_generation_strategy,
+            )
+        annotated[id_field] = transmog_id
 
     # Add parent ID if provided
     if parent_id is not None:
         annotated[parent_field] = parent_id
 
-    # Add extract timestamp
-    if extract_time is None:
-        extract_time = get_current_timestamp()
-    annotated[time_field] = extract_time
+    # Add transmog timestamp
+    if transmog_time is None:
+        transmog_time = get_current_timestamp()
+    annotated[time_field] = transmog_time
 
     # Add extra fields
     if extra_fields:
@@ -183,7 +197,7 @@ def annotate_with_metadata(
 
 def create_batch_metadata(
     batch_size: int,
-    extract_time: Optional[Any] = None,
+    transmog_time: Optional[Any] = None,
     parent_id: Optional[str] = None,
     records: Optional[list[dict[str, Any]]] = None,
     source_field: Optional[str] = None,
@@ -193,7 +207,7 @@ def create_batch_metadata(
 
     Args:
         batch_size: Number of records in the batch
-        extract_time: Extraction timestamp
+        transmog_time: Transmog timestamp
         parent_id: Optional parent record ID
         records: Optional record data for ID generation
         source_field: Field name to use for deterministic ID generation
@@ -206,7 +220,7 @@ def create_batch_metadata(
     if records and (source_field or id_generation_strategy):
         # Use first record for deterministic ID
         first_record = records[0]
-        batch_id = generate_extract_id(
+        batch_id = generate_transmog_id(
             record=first_record,
             source_field=source_field,
             id_generation_strategy=id_generation_strategy,
@@ -216,14 +230,14 @@ def create_batch_metadata(
         batch_id = str(uuid.uuid4())
 
     # Use current timestamp if not provided
-    if extract_time is None:
-        extract_time = get_current_timestamp()
+    if transmog_time is None:
+        transmog_time = get_current_timestamp()
 
     # Construct metadata dictionary
     metadata = {
         "batch_id": batch_id,
         "batch_size": batch_size,
-        "extract_time": extract_time,
+        "transmog_time": transmog_time,
     }
 
     # Include parent ID if available

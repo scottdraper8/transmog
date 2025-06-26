@@ -122,9 +122,9 @@ Paths are matched based on the nested structure of your data:
 
 Transmog adds several metadata fields during processing, which can be configured:
 
-- `__extract_id`: The unique identifier for each record
-- `__parent_extract_id`: A reference to the parent record's ID
-- `__extract_datetime`: The timestamp when the extraction occurred
+- `__transmog_id`: The unique identifier for each record
+- `__parent_transmog_id`: A reference to the parent record's ID
+- `__transmog_datetime`: The timestamp when the extraction occurred
 - `__array_field`: The name of the original array field (for child tables)
 - `__array_index`: The original index in the array (for child tables)
 
@@ -183,7 +183,7 @@ result = processor.process(data, entity_name="test")
 
 # The same data processed again will have the same ID
 result2 = processor.process(data, entity_name="test")
-assert result.get_main_table()[0]["__extract_id"] == result2.get_main_table()[0]["__extract_id"]
+assert result.get_main_table()[0]["__transmog_id"] == result2.get_main_table()[0]["__transmog_id"]
 ```
 
 ### Example: Nested Structure with Different ID Fields

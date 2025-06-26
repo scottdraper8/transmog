@@ -19,16 +19,16 @@ class TestMetadata(AbstractMetadataTest):
     """
     Concrete implementation of the AbstractMetadataTest for the core metadata functions.
 
-    Tests the annotate_with_metadata, generate_extract_id, and generate_deterministic_id functions.
+    Tests the annotate_with_metadata, generate_transmog_id, and generate_deterministic_id functions.
     """
 
     def test_id_format_validation(self, simple_record):
         """Test that generated IDs follow the expected UUID format."""
         # Annotate record with metadata
-        annotated = annotate_with_metadata(simple_record)
+        annotated = annotate_with_metadata(simple_record, force_transmog_id=True)
 
         # Get the extract ID
-        extract_id = annotated["__extract_id"]
+        extract_id = annotated["__transmog_id"]
 
         # Check if it's a valid UUID
         try:
@@ -47,7 +47,7 @@ class TestMetadata(AbstractMetadataTest):
         annotated = annotate_with_metadata(simple_record)
 
         # Get the extract datetime
-        extract_datetime = annotated["__extract_datetime"]
+        extract_datetime = annotated["__transmog_datetime"]
 
         # Check format
         if isinstance(extract_datetime, str):
@@ -63,23 +63,23 @@ class TestMetadata(AbstractMetadataTest):
         """Test that metadata fields don't overwrite existing fields."""
         # Create a record with a field that would collide with metadata
         record_with_collision = simple_record.copy()
-        record_with_collision["__extract_id"] = "ORIGINAL"
+        record_with_collision["__transmog_id"] = "ORIGINAL"
 
         # Annotate with metadata
         annotated = annotate_with_metadata(record_with_collision)
 
         # Check if original field was preserved or overwritten
         # The behavior depends on implementation, but should be consistent
-        assert "__extract_id" in annotated
+        assert "__transmog_id" in annotated
 
         # If implementation preserves original fields:
-        if annotated["__extract_id"] == "ORIGINAL":
+        if annotated["__transmog_id"] == "ORIGINAL":
             print("Implementation preserves original metadata fields")
         else:
             print("Implementation overwrites metadata fields")
             # Make sure the new ID is valid
-            assert isinstance(annotated["__extract_id"], str)
-            assert annotated["__extract_id"] != "ORIGINAL"
+            assert isinstance(annotated["__transmog_id"], str)
+            assert annotated["__transmog_id"] != "ORIGINAL"
 
     def test_extra_fields_handling(self):
         """Test handling of extra fields in metadata annotation."""
@@ -88,7 +88,7 @@ class TestMetadata(AbstractMetadataTest):
 
         # Define extra fields
         extra_fields = {
-            "__extract_path": "path/to/record",
+            "__transmog_path": "path/to/record",
             "__custom_field": "custom value",
         }
 
@@ -96,8 +96,8 @@ class TestMetadata(AbstractMetadataTest):
         annotated = annotate_with_metadata(record, extra_fields=extra_fields)
 
         # Verify extra fields are added
-        assert "__extract_path" in annotated
-        assert annotated["__extract_path"] == "path/to/record"
+        assert "__transmog_path" in annotated
+        assert annotated["__transmog_path"] == "path/to/record"
         assert "__custom_field" in annotated
         assert annotated["__custom_field"] == "custom value"
 
@@ -116,6 +116,7 @@ class TestMetadata(AbstractMetadataTest):
                 parent_field=custom_parent_field,
                 time_field=custom_time_field,
                 parent_id="parent123",
+                force_transmog_id=True,
             )
 
             # Check if custom fields were used
@@ -124,28 +125,30 @@ class TestMetadata(AbstractMetadataTest):
             assert custom_time_field in annotated
 
             # Standard fields should not be present
-            assert "__extract_id" not in annotated
-            assert "__parent_extract_id" not in annotated
-            assert "__extract_datetime" not in annotated
+            assert "__transmog_id" not in annotated
+            assert "__parent_transmog_id" not in annotated
+            assert "__transmog_datetime" not in annotated
         except TypeError:
             # If custom field names are not supported, this will raise
             # In that case, test the standard behavior
-            annotated = annotate_with_metadata(simple_record, parent_id="parent123")
+            annotated = annotate_with_metadata(
+                simple_record, parent_id="parent123", force_transmog_id=True
+            )
 
             # Standard fields should be present
-            assert "__extract_id" in annotated
-            assert "__parent_extract_id" in annotated
-            assert "__extract_datetime" in annotated
+            assert "__transmog_id" in annotated
+            assert "__parent_transmog_id" in annotated
+            assert "__transmog_datetime" in annotated
 
     def test_multiple_metadata_annotations(self, simple_record):
         """Test applying metadata multiple times to the same record."""
         # First annotation
-        annotated_once = annotate_with_metadata(simple_record)
-        first_id = annotated_once["__extract_id"]
+        annotated_once = annotate_with_metadata(simple_record, force_transmog_id=True)
+        first_id = annotated_once["__transmog_id"]
 
         # Second annotation
-        annotated_twice = annotate_with_metadata(annotated_once)
-        second_id = annotated_twice["__extract_id"]
+        annotated_twice = annotate_with_metadata(annotated_once, force_transmog_id=True)
+        second_id = annotated_twice["__transmog_id"]
 
         # Check if ID was preserved or changed
         # The behavior depends on implementation, but should be consistent
@@ -181,14 +184,16 @@ class TestMetadata(AbstractMetadataTest):
         original = simple_record.copy()
 
         # Annotate in place
-        result = annotate_with_metadata(simple_record, in_place=True)
+        result = annotate_with_metadata(
+            simple_record, in_place=True, force_transmog_id=True
+        )
 
         # Verify the result is the same object as the input
         assert result is simple_record
 
         # Verify metadata was added
-        assert "__extract_id" in simple_record
-        assert "__extract_datetime" in simple_record
+        assert "__transmog_id" in simple_record
+        assert "__transmog_datetime" in simple_record
 
         # Original fields should be preserved
         for key in original:

@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Any, Callable, Optional, Union
 
 from transmog.core.flattener import flatten_json
+from transmog.core.id_discovery import get_record_id
 from transmog.core.metadata import annotate_with_metadata
 from transmog.error import logger
 from transmog.naming.conventions import sanitize_name
@@ -30,10 +31,10 @@ def _extract_arrays_impl(
     cast_to_string: bool = True,
     include_empty: bool = False,
     skip_null: bool = True,
-    extract_time: Optional[Any] = None,
-    id_field: str = "__extract_id",
-    parent_field: str = "__parent_extract_id",
-    time_field: str = "__extract_datetime",
+    transmog_time: Optional[Any] = None,
+    id_field: str = "__transmog_id",
+    parent_field: str = "__parent_transmog_id",
+    time_field: str = "__transmog_datetime",
     deeply_nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
@@ -41,6 +42,9 @@ def _extract_arrays_impl(
     max_depth: int = 100,
     current_depth: int = 0,
     streaming_mode: bool = False,
+    id_field_patterns: Optional[list[str]] = None,
+    id_field_mapping: Optional[dict[str, str]] = None,
+    force_transmog_id: bool = False,
 ) -> Generator[tuple[str, dict[str, Any]], None, None]:
     """Implementation helper for array extraction.
 
@@ -58,7 +62,7 @@ def _extract_arrays_impl(
         cast_to_string: Whether to cast all values to strings
         include_empty: Whether to include empty values
         skip_null: Whether to skip null values
-        extract_time: Extraction timestamp
+        transmog_time: Transmog timestamp
         id_field: ID field name
         parent_field: Parent ID field name
         time_field: Timestamp field name
@@ -70,6 +74,9 @@ def _extract_arrays_impl(
         max_depth: Maximum recursion depth allowed
         current_depth: Current depth in the recursion
         streaming_mode: Whether to operate in streaming mode
+        id_field_patterns: List of field names to check for natural IDs
+        id_field_mapping: Optional mapping of paths to specific ID fields
+        force_transmog_id: If True, always add transmog ID
 
     Yields:
         Tuples of (table_name, record) for each extracted record
@@ -177,13 +184,17 @@ def _extract_arrays_impl(
                     annotated = annotate_with_metadata(
                         metadata_dict,
                         parent_id=parent_id,
-                        extract_time=extract_time,
+                        transmog_time=transmog_time,
                         id_field=id_field,
                         parent_field=parent_field,
                         time_field=time_field,
                         in_place=True,
                         source_field=source_field,
                         id_generation_strategy=id_generation_strategy,
+                        id_field_patterns=id_field_patterns,
+                        path=table_name,
+                        id_field_mapping=id_field_mapping,
+                        force_transmog_id=force_transmog_id,
                     )
 
                     # Track array source information
@@ -195,16 +206,24 @@ def _extract_arrays_impl(
 
                     # Process any nested arrays recursively, but only for dict items
                     if isinstance(item, dict):
+                        # Get the parent ID - use natural ID if available
+                        parent_id_field, parent_id_value = get_record_id(
+                            annotated,
+                            id_field_patterns=id_field_patterns,
+                            path=table_name,
+                            id_field_mapping=id_field_mapping,
+                            fallback_field=id_field,
+                        )
                         nested_generator = _extract_arrays_impl(
                             item,
-                            parent_id=annotated.get(id_field),
+                            parent_id=parent_id_value,
                             parent_path=item_path,
                             entity_name=entity_name,
                             separator=separator,
                             cast_to_string=cast_to_string,
                             include_empty=include_empty,
                             skip_null=skip_null,
-                            extract_time=extract_time,
+                            transmog_time=transmog_time,
                             id_field=id_field,
                             parent_field=parent_field,
                             time_field=time_field,
@@ -215,6 +234,9 @@ def _extract_arrays_impl(
                             max_depth=max_depth,
                             current_depth=current_depth + 1,
                             streaming_mode=streaming_mode,
+                            id_field_patterns=id_field_patterns,
+                            id_field_mapping=id_field_mapping,
+                            force_transmog_id=force_transmog_id,
                         )
                         # Process nested arrays one by one
                         yield from nested_generator
@@ -234,11 +256,15 @@ def _extract_arrays_impl(
                         annotated = annotate_with_metadata(
                             error_record,
                             parent_id=parent_id,
-                            extract_time=extract_time,
+                            transmog_time=transmog_time,
                             id_field=id_field,
                             parent_field=parent_field,
                             time_field=time_field,
                             in_place=True,
+                            id_field_patterns=id_field_patterns,
+                            path=f"{table_name}{separator}errors",
+                            id_field_mapping=id_field_mapping,
+                            force_transmog_id=force_transmog_id,
                         )
                         # Output the error record
                         yield f"{table_name}{separator}errors", annotated
@@ -262,7 +288,7 @@ def _extract_arrays_impl(
                 cast_to_string=cast_to_string,
                 include_empty=include_empty,
                 skip_null=skip_null,
-                extract_time=extract_time,
+                transmog_time=transmog_time,
                 id_field=id_field,
                 parent_field=parent_field,
                 time_field=time_field,
@@ -273,6 +299,9 @@ def _extract_arrays_impl(
                 max_depth=max_depth,
                 current_depth=current_depth + 1,
                 streaming_mode=streaming_mode,
+                id_field_patterns=id_field_patterns,
+                id_field_mapping=id_field_mapping,
+                force_transmog_id=force_transmog_id,
             )
             # Process nested arrays one by one
             yield from nested_generator
@@ -287,10 +316,10 @@ def extract_arrays(
     cast_to_string: bool = True,
     include_empty: bool = False,
     skip_null: bool = True,
-    extract_time: Optional[Any] = None,
-    id_field: str = "__extract_id",
-    parent_field: str = "__parent_extract_id",
-    time_field: str = "__extract_datetime",
+    transmog_time: Optional[Any] = None,
+    id_field: str = "__transmog_id",
+    parent_field: str = "__parent_transmog_id",
+    time_field: str = "__transmog_datetime",
     deeply_nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
@@ -298,6 +327,9 @@ def extract_arrays(
     recovery_strategy: Optional[Any] = None,
     max_depth: int = 100,
     current_depth: int = 0,
+    id_field_patterns: Optional[list[str]] = None,
+    id_field_mapping: Optional[dict[str, str]] = None,
+    force_transmog_id: bool = False,
 ) -> ExtractResult:
     """Extract nested arrays into flattened tables.
 
@@ -313,7 +345,7 @@ def extract_arrays(
         cast_to_string: Whether to cast all values to strings
         include_empty: Whether to include empty values
         skip_null: Whether to skip null values
-        extract_time: Extraction timestamp
+        transmog_time: Transmog timestamp
         id_field: ID field name
         parent_field: Parent ID field name
         time_field: Timestamp field name
@@ -325,6 +357,9 @@ def extract_arrays(
         recovery_strategy: Strategy for error recovery
         max_depth: Maximum recursion depth allowed
         current_depth: Current depth in the recursion
+        id_field_patterns: List of field names to check for natural IDs
+        id_field_mapping: Optional mapping of paths to specific ID fields
+        force_transmog_id: If True, always add transmog ID
 
     Returns:
         Dictionary mapping table names to lists of records
@@ -334,9 +369,9 @@ def extract_arrays(
         - Dictionary items that are empty are also skipped
         - Null values in arrays are skipped when skip_null is True
     """
-    # Initialize extraction timestamp if not provided
-    if extract_time is None:
-        extract_time = datetime.now()
+    # Initialize transmog timestamp if not provided
+    if transmog_time is None:
+        transmog_time = datetime.now()
 
     # Collect records in streaming mode
     result: ExtractResult = {}
@@ -349,7 +384,7 @@ def extract_arrays(
         cast_to_string=cast_to_string,
         include_empty=include_empty,
         skip_null=skip_null,
-        extract_time=extract_time,
+        transmog_time=transmog_time,
         id_field=id_field,
         parent_field=parent_field,
         time_field=time_field,
@@ -360,6 +395,9 @@ def extract_arrays(
         max_depth=max_depth,
         current_depth=current_depth,
         streaming_mode=False,
+        id_field_patterns=id_field_patterns,
+        id_field_mapping=id_field_mapping,
+        force_transmog_id=force_transmog_id,
     ):
         # Accumulate records by table
         if table_name not in result:
@@ -378,16 +416,19 @@ def stream_extract_arrays(
     cast_to_string: bool = True,
     include_empty: bool = False,
     skip_null: bool = True,
-    extract_time: Optional[Any] = None,
-    id_field: str = "__extract_id",
-    parent_field: str = "__parent_extract_id",
-    time_field: str = "__extract_datetime",
+    transmog_time: Optional[Any] = None,
+    id_field: str = "__transmog_id",
+    parent_field: str = "__parent_transmog_id",
+    time_field: str = "__transmog_datetime",
     deeply_nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     recovery_strategy: Optional[Any] = None,
     max_depth: int = 100,
     current_depth: int = 0,
+    id_field_patterns: Optional[list[str]] = None,
+    id_field_mapping: Optional[dict[str, str]] = None,
+    force_transmog_id: bool = False,
 ) -> StreamExtractResult:
     """Extract nested arrays into a stream of records for memory-efficient processing.
 
@@ -404,7 +445,7 @@ def stream_extract_arrays(
         cast_to_string: Whether to cast all values to strings
         include_empty: Whether to include empty values
         skip_null: Whether to skip null values
-        extract_time: Extraction timestamp
+        transmog_time: Transmog timestamp
         id_field: ID field name
         parent_field: Parent ID field name
         time_field: Timestamp field name
@@ -415,6 +456,9 @@ def stream_extract_arrays(
         recovery_strategy: Strategy for error recovery
         max_depth: Maximum recursion depth allowed
         current_depth: Current depth in the recursion
+        id_field_patterns: List of field names to check for natural IDs
+        id_field_mapping: Optional mapping of paths to specific ID fields
+        force_transmog_id: If True, always add transmog ID
 
     Yields:
         Tuples of (table_name, record) for each extracted record
@@ -424,9 +468,9 @@ def stream_extract_arrays(
         - Dictionary items that are empty are also skipped
         - Null values in arrays are skipped when skip_null is True
     """
-    # Initialize extraction timestamp if not provided
-    if extract_time is None:
-        extract_time = datetime.now()
+    # Initialize transmog timestamp if not provided
+    if transmog_time is None:
+        transmog_time = datetime.now()
 
     # Process all records from the implementation and yield each record individually
     yield from _extract_arrays_impl(
@@ -438,7 +482,7 @@ def stream_extract_arrays(
         cast_to_string=cast_to_string,
         include_empty=include_empty,
         skip_null=skip_null,
-        extract_time=extract_time,
+        transmog_time=transmog_time,
         id_field=id_field,
         parent_field=parent_field,
         time_field=time_field,
@@ -449,4 +493,7 @@ def stream_extract_arrays(
         max_depth=max_depth,
         current_depth=current_depth,
         streaming_mode=True,
+        id_field_patterns=id_field_patterns,
+        id_field_mapping=id_field_mapping,
+        force_transmog_id=force_transmog_id,
     )

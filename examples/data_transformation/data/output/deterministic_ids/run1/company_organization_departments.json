@@ -2,18 +2,18 @@
   {
     "id": "DEPT-ENG",
     "name": "Engineering",
-    "__extract_id": "fdca178b-16d1-592e-a0ae-08d7a565f0c1",
-    "__parent_extract_id": "8338fad7-e025-4171-966d-99d4fd6945c8",
-    "__extract_datetime": "2025-05-29 18:17:23.670493+00:00",
+    "__transmog_id": "fdca178b-16d1-592e-a0ae-08d7a565f0c1",
+    "__parent_transmog_id": "8338fad7-e025-4171-966d-99d4fd6945c8",
+    "__transmog_datetime": "2025-05-29 18:17:23.670493+00:00",
     "__array_field": "departments",
     "__array_index": 0
   },
   {
     "id": "DEPT-MKT",
     "name": "Marketing",
-    "__extract_id": "114e2811-fc63-5454-8177-40b6e4298781",
-    "__parent_extract_id": "8338fad7-e025-4171-966d-99d4fd6945c8",
-    "__extract_datetime": "2025-05-29 18:17:23.670493+00:00",
+    "__transmog_id": "114e2811-fc63-5454-8177-40b6e4298781",
+    "__parent_transmog_id": "8338fad7-e025-4171-966d-99d4fd6945c8",
+    "__transmog_datetime": "2025-05-29 18:17:23.670493+00:00",
     "__array_field": "departments",
     "__array_index": 1
   }

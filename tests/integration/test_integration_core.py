@@ -8,6 +8,8 @@ using the new interface-based testing approach.
 import json
 import os
 
+import pytest
+
 from tests.interfaces.test_integration_interface import AbstractIntegrationTest
 from transmog import Processor, TransmogConfig
 
@@ -19,6 +21,16 @@ class TestCoreIntegration(AbstractIntegrationTest):
     Tests key component interactions and end-to-end flows using the interface-based
     testing approach.
     """
+
+    @pytest.fixture
+    def processor(self):
+        """Create a processor for core integration testing."""
+        config = (
+            TransmogConfig.default()
+            .with_processing(cast_to_string=True)
+            .with_metadata(force_transmog_id=True)
+        )
+        return Processor(config=config)
 
     def test_processor_config_flow(self, output_dir):
         """Test that processor configuration flows through the entire processing chain."""
@@ -151,8 +163,8 @@ class TestCoreIntegration(AbstractIntegrationTest):
             # Verify files contain expected data
             with open(paths[level1_table]) as f:
                 header = f.readline().strip().lower()
-                assert "__extract_id" in header
-                assert "__parent_extract_id" in header
+                assert "__transmog_id" in header
+                assert "__parent_transmog_id" in header
 
     def test_reader_writer_roundtrip(self, processor, sample_data, output_dir):
         """Test complete roundtrip through the processor, writer, and reader."""
@@ -227,7 +239,7 @@ class TestCoreIntegration(AbstractIntegrationTest):
             # With our new array processing behavior, the parent-child relationships might be different
             # So we'll just verify that each value has a parent ID field
             for value in values:
-                assert "__parent_extract_id" in value, (
+                assert "__parent_transmog_id" in value, (
                     "Value missing parent ID reference"
                 )
 

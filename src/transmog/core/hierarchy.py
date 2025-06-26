@@ -17,6 +17,7 @@ from typing import (
 
 from transmog.core.extractor import extract_arrays, stream_extract_arrays
 from transmog.core.flattener import flatten_json
+from transmog.core.id_discovery import get_record_id
 from transmog.core.metadata import (
     annotate_with_metadata,
     generate_deterministic_id,
@@ -41,19 +42,22 @@ def process_structure(
     cast_to_string: bool = True,
     include_empty: bool = False,
     skip_null: bool = True,
-    extract_time: Optional[Any] = None,
+    transmog_time: Optional[Any] = None,
     root_entity: Optional[str] = None,
     deeply_nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
-    id_field: str = "__extract_id",
-    parent_field: str = "__parent_extract_id",
-    time_field: str = "__extract_datetime",
+    id_field: str = "__transmog_id",
+    parent_field: str = "__parent_transmog_id",
+    time_field: str = "__transmog_datetime",
     visit_arrays: bool = True,
     streaming: bool = False,
     recovery_strategy: Optional[Any] = None,
     max_depth: int = 100,
     keep_arrays: bool = False,
+    id_field_patterns: Optional[list[str]] = None,
+    id_field_mapping: Optional[dict[str, str]] = None,
+    force_transmog_id: bool = False,
 ) -> tuple[FlatDict, ArrayResult]:
     """Process JSON structure with parent-child relationship preservation.
 
@@ -69,7 +73,7 @@ def process_structure(
         cast_to_string: Whether to cast all values to strings
         include_empty: Whether to include empty values
         skip_null: Whether to skip null values
-        extract_time: Extraction timestamp
+        transmog_time: Transmog timestamp
         root_entity: Top-level entity name
         deeply_nested_threshold: Threshold for when to consider a path deeply nested
             (default 4)
@@ -84,6 +88,9 @@ def process_structure(
         recovery_strategy: Strategy for handling errors
         max_depth: Maximum recursion depth for nested structures
         keep_arrays: Whether to keep arrays in the main table after processing
+        id_field_patterns: List of field names to check for natural IDs
+        id_field_mapping: Optional mapping of paths to specific ID fields
+        force_transmog_id: If True, always add transmog ID
 
     Returns:
         Tuple of (flattened main object, array tables dictionary or generator)
@@ -96,7 +103,7 @@ def process_structure(
     if data is None:
         empty_result = {
             id_field: generate_deterministic_id(str(entity_name) + "_empty"),
-            time_field: extract_time or datetime.now(),
+            time_field: transmog_time or datetime.now(),
             "__original_entity": entity_name,
         }
         if parent_id:
@@ -164,13 +171,17 @@ def process_structure(
     annotated_obj = annotate_with_metadata(
         flattened_obj_dict,
         parent_id=parent_id,
-        extract_time=extract_time,
+        transmog_time=transmog_time,
         id_field=id_field,
         parent_field=parent_field,
         time_field=time_field,
         in_place=True,
         source_field=source_field,
         id_generation_strategy=id_generation_strategy,
+        id_field_patterns=id_field_patterns,
+        path=entity_name,
+        id_field_mapping=id_field_mapping,
+        force_transmog_id=force_transmog_id,
     )
 
     # Skip array processing if not needed
@@ -185,11 +196,20 @@ def process_structure(
         else:
             return annotated_obj, {}
 
-    # Get the extract ID for the parent to pass to child records
-    extract_id = annotated_obj.get(id_field)
+    # Get the ID for the parent to pass to child records - use natural ID if available
+    parent_id_field, parent_id_value = get_record_id(
+        annotated_obj,
+        id_field_patterns=id_field_patterns,
+        path=entity_name,
+        id_field_mapping=id_field_mapping,
+        fallback_field=id_field,
+    )
 
-    # Log the extract ID for debugging
-    logger.debug(f"Parent record extract ID: {extract_id} for entity {entity_name}")
+    # Log the ID for debugging
+    logger.debug(
+        f"Parent record ID (field: {parent_id_field}): {parent_id_value} "
+        f"for entity {entity_name}"
+    )
 
     # For deterministic IDs, make sure these are properly passed to child records
     child_default_id_field = default_id_field
@@ -199,14 +219,14 @@ def process_structure(
         # Stream extraction version
         return annotated_obj, stream_extract_arrays(
             data,
-            parent_id=extract_id,
+            parent_id=parent_id_value,
             parent_path=parent_path,
             entity_name=entity_name,
             separator=separator,
             cast_to_string=cast_to_string,
             include_empty=include_empty,
             skip_null=skip_null,
-            extract_time=extract_time,
+            transmog_time=transmog_time,
             id_field=id_field,
             parent_field=parent_field,
             time_field=time_field,
@@ -215,6 +235,9 @@ def process_structure(
             id_generation_strategy=id_generation_strategy,
             recovery_strategy=recovery_strategy,
             max_depth=max_depth,
+            id_field_patterns=id_field_patterns,
+            id_field_mapping=id_field_mapping,
+            force_transmog_id=force_transmog_id,
         )
     else:
         # Batch extraction version
@@ -225,14 +248,14 @@ def process_structure(
 
         arrays = extract_arrays(
             data,
-            parent_id=extract_id,
+            parent_id=parent_id_value,
             parent_path=parent_path,
             entity_name=entity_name,
             separator=separator,
             cast_to_string=cast_to_string,
             include_empty=include_empty,
             skip_null=skip_null,
-            extract_time=extract_time,
+            transmog_time=transmog_time,
             id_field=id_field,
             parent_field=parent_field,
             time_field=time_field,
@@ -241,6 +264,9 @@ def process_structure(
             id_generation_strategy=id_generation_strategy,
             recovery_strategy=recovery_strategy,
             max_depth=max_depth,
+            id_field_patterns=id_field_patterns,
+            id_field_mapping=id_field_mapping,
+            force_transmog_id=force_transmog_id,
         )
 
         # Log what we found
@@ -258,14 +284,14 @@ def process_structure(
 def process_record_batch(
     records: list[JsonDict],
     entity_name: str,
-    extract_time: Optional[Any] = None,
+    transmog_time: Optional[Any] = None,
     separator: str = "_",
     cast_to_string: bool = True,
     include_empty: bool = False,
     skip_null: bool = True,
-    id_field: str = "__extract_id",
-    parent_field: str = "__parent_extract_id",
-    time_field: str = "__extract_datetime",
+    id_field: str = "__transmog_id",
+    parent_field: str = "__parent_transmog_id",
+    time_field: str = "__transmog_datetime",
     visit_arrays: bool = True,
     deeply_nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
@@ -274,6 +300,9 @@ def process_record_batch(
     max_depth: int = 100,
     keep_arrays: bool = False,
     batch_size: int = 100,
+    id_field_patterns: Optional[list[str]] = None,
+    id_field_mapping: Optional[dict[str, str]] = None,
+    force_transmog_id: bool = False,
 ) -> tuple[list[FlatDict], ArrayDict]:
     """Process a batch of records separately and combine the results.
 
@@ -283,7 +312,7 @@ def process_record_batch(
     Args:
         records: List of top-level records to process
         entity_name: Entity name for all records
-        extract_time: Extraction timestamp
+        transmog_time: Transmog timestamp
         separator: Separator for path components
         cast_to_string: Whether to cast all values to strings
         include_empty: Whether to include empty values
@@ -300,6 +329,9 @@ def process_record_batch(
         max_depth: Maximum recursion depth for nested structures
         keep_arrays: Whether to keep arrays in the main table after processing
         batch_size: Number of records to process in a single batch
+        id_field_patterns: List of field names to check for natural IDs
+        id_field_mapping: Optional mapping of paths to specific ID fields
+        force_transmog_id: If True, always add transmog ID
 
     Returns:
         Tuple of (flattened main objects, combined array tables)
@@ -308,7 +340,7 @@ def process_record_batch(
     return process_records_in_single_pass(
         records,
         entity_name=entity_name,
-        extract_time=extract_time,
+        transmog_time=transmog_time,
         separator=separator,
         cast_to_string=cast_to_string,
         include_empty=include_empty,
@@ -323,20 +355,23 @@ def process_record_batch(
         recovery_strategy=recovery_strategy,
         max_depth=max_depth,
         keep_arrays=keep_arrays,
+        id_field_patterns=id_field_patterns,
+        id_field_mapping=id_field_mapping,
+        force_transmog_id=force_transmog_id,
     )
 
 
 def process_records_in_single_pass(
     records: list[JsonDict],
     entity_name: str,
-    extract_time: Optional[Any] = None,
+    transmog_time: Optional[Any] = None,
     separator: str = "_",
     cast_to_string: bool = True,
     include_empty: bool = False,
     skip_null: bool = True,
-    id_field: str = "__extract_id",
-    parent_field: str = "__parent_extract_id",
-    time_field: str = "__extract_datetime",
+    id_field: str = "__transmog_id",
+    parent_field: str = "__parent_transmog_id",
+    time_field: str = "__transmog_datetime",
     visit_arrays: bool = True,
     deeply_nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
@@ -344,6 +379,9 @@ def process_records_in_single_pass(
     recovery_strategy: Optional[Any] = None,
     max_depth: int = 100,
     keep_arrays: bool = False,
+    id_field_patterns: Optional[list[str]] = None,
+    id_field_mapping: Optional[dict[str, str]] = None,
+    force_transmog_id: bool = False,
 ) -> tuple[list[FlatDict], ArrayDict]:
     r"""Process multiple records and combine the results.
 
@@ -353,7 +391,7 @@ def process_records_in_single_pass(
     Args:
         records: List of records to process
         entity_name: Entity name for all records
-        extract_time: Extraction timestamp
+        transmog_time: Transmog timestamp
         separator: Separator for path components
         cast_to_string: Whether to cast all values to strings
         include_empty: Whether to include empty values
@@ -370,13 +408,16 @@ def process_records_in_single_pass(
         recovery_strategy: Strategy for error recovery
         max_depth: Maximum recursion depth for nested structures
         keep_arrays: Whether to keep arrays in the main table after processing
+        id_field_patterns: List of field names to check for natural IDs
+        id_field_mapping: Optional mapping of paths to specific ID fields
+        force_transmog_id: If True, always add transmog ID
 
     Returns:
         Tuple of (flattened main objects, array tables)
     """
     # Timestamp for all records in batch if not provided
-    if extract_time is None:
-        extract_time = datetime.now()
+    if transmog_time is None:
+        transmog_time = datetime.now()
 
     # Initialize results
     main_records: list[FlatDict] = []
@@ -389,7 +430,7 @@ def process_records_in_single_pass(
             main_record, child_tables = process_structure(
                 record,
                 entity_name=entity_name,
-                extract_time=extract_time,
+                transmog_time=transmog_time,
                 separator=separator,
                 cast_to_string=cast_to_string,
                 include_empty=include_empty,
@@ -404,6 +445,9 @@ def process_records_in_single_pass(
                 recovery_strategy=recovery_strategy,
                 max_depth=max_depth,
                 keep_arrays=keep_arrays,
+                id_field_patterns=id_field_patterns,
+                id_field_mapping=id_field_mapping,
+                force_transmog_id=force_transmog_id,
             )
 
             # Add main record to results
@@ -450,14 +494,14 @@ def process_records_in_single_pass(
 def stream_process_records(
     records: list[JsonDict],
     entity_name: str,
-    extract_time: Optional[Any] = None,
+    transmog_time: Optional[Any] = None,
     separator: str = "_",
     cast_to_string: bool = True,
     include_empty: bool = False,
     skip_null: bool = True,
-    id_field: str = "__extract_id",
-    parent_field: str = "__parent_extract_id",
-    time_field: str = "__extract_datetime",
+    id_field: str = "__transmog_id",
+    parent_field: str = "__parent_transmog_id",
+    time_field: str = "__transmog_datetime",
     visit_arrays: bool = True,
     deeply_nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
@@ -465,6 +509,9 @@ def stream_process_records(
     max_depth: int = 100,
     keep_arrays: bool = False,
     use_deterministic_ids: bool = False,
+    id_field_patterns: Optional[list[str]] = None,
+    id_field_mapping: Optional[dict[str, str]] = None,
+    force_transmog_id: bool = False,
 ) -> tuple[list[FlatDict], StreamingChildTables]:
     r"""Process records in streaming mode.
 
@@ -474,7 +521,7 @@ def stream_process_records(
     Args:
         records: List of records to process
         entity_name: Entity name for all records
-        extract_time: Extraction timestamp
+        transmog_time: Transmog timestamp
         separator: Separator for path components
         cast_to_string: Whether to cast all values to strings
         include_empty: Whether to include empty values
@@ -491,13 +538,16 @@ def stream_process_records(
         max_depth: Maximum recursion depth for nested structures
         keep_arrays: Whether to keep arrays in the main table after processing
         use_deterministic_ids: Whether to use deterministic ID generation
+        id_field_patterns: List of field names to check for natural IDs
+        id_field_mapping: Optional mapping of paths to specific ID fields
+        force_transmog_id: If True, always add transmog ID
 
     Returns:
         Tuple of (flattened main objects, generator for array tables)
     """
     # Timestamp for all records in batch if not provided
-    if extract_time is None:
-        extract_time = datetime.now()
+    if transmog_time is None:
+        transmog_time = datetime.now()
 
     # Process each record with streaming enabled
     main_records: list[FlatDict] = []
@@ -507,7 +557,7 @@ def stream_process_records(
         main_record, child_generator = process_structure(
             record,
             entity_name=entity_name,
-            extract_time=extract_time,
+            transmog_time=transmog_time,
             separator=separator,
             cast_to_string=cast_to_string,
             include_empty=include_empty,
@@ -522,6 +572,9 @@ def stream_process_records(
             streaming=True,  # Enable streaming mode
             max_depth=max_depth,
             keep_arrays=keep_arrays,
+            id_field_patterns=id_field_patterns,
+            id_field_mapping=id_field_mapping,
+            force_transmog_id=force_transmog_id,
         )
 
         # Add main record to results

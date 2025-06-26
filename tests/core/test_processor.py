@@ -381,12 +381,12 @@ class TestProcessor(AbstractProcessorTest):
                     and len(main_table2) > 0
                 ):
                     if (
-                        "__extract_id" in main_table1[0]
-                        and "__extract_id" in main_table2[0]
+                        "__transmog_id" in main_table1[0]
+                        and "__transmog_id" in main_table2[0]
                     ):
                         assert (
-                            main_table1[0]["__extract_id"]
-                            == main_table2[0]["__extract_id"]
+                            main_table1[0]["__transmog_id"]
+                            == main_table2[0]["__transmog_id"]
                         )
                         consistency_verified = True
             except Exception:
@@ -422,12 +422,12 @@ class TestProcessor(AbstractProcessorTest):
                                     if matching_records:
                                         record2 = matching_records[0]
                                         if (
-                                            "__extract_id" in record1
-                                            and "__extract_id" in record2
+                                            "__transmog_id" in record1
+                                            and "__transmog_id" in record2
                                         ):
                                             assert (
-                                                record1["__extract_id"]
-                                                == record2["__extract_id"]
+                                                record1["__transmog_id"]
+                                                == record2["__transmog_id"]
                                             )
                                             consistency_verified = True
                                             break
@@ -435,12 +435,12 @@ class TestProcessor(AbstractProcessorTest):
                                 # Try matching by position
                                 for i in range(min(len(items1), len(items2))):
                                     if (
-                                        "__extract_id" in items1[i]
-                                        and "__extract_id" in items2[i]
+                                        "__transmog_id" in items1[i]
+                                        and "__transmog_id" in items2[i]
                                     ):
                                         assert (
-                                            items1[i]["__extract_id"]
-                                            == items2[i]["__extract_id"]
+                                            items1[i]["__transmog_id"]
+                                            == items2[i]["__transmog_id"]
                                         )
                                         consistency_verified = True
                                         break

@@ -10,9 +10,9 @@ When processing data, Transmog automatically adds several metadata fields to eac
 
 | Field | Default Name | Description |
 |-------|--------------|-------------|
-| ID | `__extract_id` | Unique identifier for each record |
-| Parent ID | `__parent_extract_id` | Reference to the parent record's ID |
-| Timestamp | `__extract_datetime` | When the record was processed |
+| ID | `__transmog_id` | Unique identifier for each record |
+| Parent ID | `__parent_transmog_id` | Reference to the parent record's ID |
+| Timestamp | `__transmog_datetime` | When the record was processed |
 | Array Field | `__array_field` | Name of the original array field (for child tables) |
 | Array Index | `__array_index` | Original index in the array (for child tables) |
 
@@ -63,8 +63,8 @@ Main table:
 
 ```python
 [{
-    "__extract_id": "abcd1234-5678-90ef-1234-567890abcdef",
-    "__extract_datetime": "2023-06-15T10:30:00",
+    "__transmog_id": "abcd1234-5678-90ef-1234-567890abcdef",
+    "__transmog_datetime": "2023-06-15T10:30:00",
     "id": "1",
     "name": "Example",
     "details_category": "test",
@@ -76,17 +76,17 @@ Items table:
 
 ```python
 [{
-    "__extract_id": "bcde2345-6789-01fg-2345-67890abcdef1",
-    "__parent_extract_id": "abcd1234-5678-90ef-1234-567890abcdef",
-    "__extract_datetime": "2023-06-15T10:30:00",
+    "__transmog_id": "bcde2345-6789-01fg-2345-67890abcdef1",
+    "__parent_transmog_id": "abcd1234-5678-90ef-1234-567890abcdef",
+    "__transmog_datetime": "2023-06-15T10:30:00",
     "__array_field": "items",
     "__array_index": 0,
     "item_id": "A",
     "value": "10"
 }, {
-    "__extract_id": "cdef3456-789a-01gh-3456-7890abcdef12",
-    "__parent_extract_id": "abcd1234-5678-90ef-1234-567890abcdef",
-    "__extract_datetime": "2023-06-15T10:30:00",
+    "__transmog_id": "cdef3456-789a-01gh-3456-7890abcdef12",
+    "__parent_transmog_id": "abcd1234-5678-90ef-1234-567890abcdef",
+    "__transmog_datetime": "2023-06-15T10:30:00",
     "__array_field": "items",
     "__array_index": 1,
     "item_id": "B",
@@ -117,9 +117,9 @@ result = processor.process(data, entity_name="example")
 
 With this configuration, the metadata fields would be:
 
-- `record_id` instead of `__extract_id`
-- `parent_record_id` instead of `__parent_extract_id`
-- `processed_at` instead of `__extract_datetime`
+- `record_id` instead of `__transmog_id`
+- `parent_record_id` instead of `__parent_transmog_id`
+- `processed_at` instead of `__transmog_datetime`
 
 ## ID Generation
 
@@ -173,7 +173,7 @@ Transmog preserves parent-child relationships through the parent ID reference:
 ```text
 Main Record
   │
-  │ (__extract_id referenced by __parent_extract_id)
+  │ (__transmog_id referenced by __parent_transmog_id)
   │
   ├─► Child Record 1
   │
@@ -185,12 +185,12 @@ These references create a directed graph that mirrors the original nested struct
 ```python
 # Access the main record
 main_record = result.get_main_table()[0]
-main_id = main_record["__extract_id"]
+main_id = main_record["__transmog_id"]
 
 # Find child records that reference this parent
 child_records = [
     r for r in result.get_child_table("example_items")
-    if r["__parent_extract_id"] == main_id
+    if r["__parent_transmog_id"] == main_id
 ]
 ```
 
@@ -202,8 +202,8 @@ You can specify a custom extraction timestamp when processing data:
 from datetime import datetime
 
 # Use a specific timestamp
-extract_time = datetime(2023, 6, 15, 10, 30, 0)
-result = processor.process(data, entity_name="example", extract_time=extract_time)
+transmog_time = datetime(2023, 6, 15, 10, 30, 0)
+result = processor.process(data, entity_name="example", transmog_time=transmog_time)
 ```
 
 This is useful for:
@@ -239,10 +239,10 @@ level1_table = result.get_child_table("nested_level1")
 level2_table = result.get_child_table("nested_level1_level2")
 
 # Follow the chain of relationships
-root_id = main_table[0]["__extract_id"]
-level1_records = [r for r in level1_table if r["__parent_extract_id"] == root_id]
-level1_id = level1_records[0]["__extract_id"]
-level2_records = [r for r in level2_table if r["__parent_extract_id"] == level1_id]
+root_id = main_table[0]["__transmog_id"]
+level1_records = [r for r in level1_table if r["__parent_transmog_id"] == root_id]
+level1_id = level1_records[0]["__transmog_id"]
+level2_records = [r for r in level2_table if r["__parent_transmog_id"] == level1_id]
 ```
 
 ## Using Metadata in Database Loading
@@ -271,7 +271,7 @@ CREATE TABLE items (
 );
 ```
 
-The `__extract_id` and `__parent_extract_id` fields enable proper foreign key relationships,
+The `__transmog_id` and `__parent_transmog_id` fields enable proper foreign key relationships,
 maintaining the integrity of your data.
 
 ## Best Practices

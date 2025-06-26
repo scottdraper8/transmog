@@ -50,9 +50,9 @@ class TransmogSettings:
     DEFAULT_CAST_TO_STRING = True
     DEFAULT_INCLUDE_EMPTY = False
     DEFAULT_SKIP_NULL = True
-    DEFAULT_ID_FIELD = "__extract_id"
-    DEFAULT_PARENT_FIELD = "__parent_extract_id"
-    DEFAULT_TIME_FIELD = "__extract_datetime"
+    DEFAULT_ID_FIELD = "__transmog_id"
+    DEFAULT_PARENT_FIELD = "__parent_transmog_id"
+    DEFAULT_TIME_FIELD = "__transmog_datetime"
     DEFAULT_BATCH_SIZE = 1000
     DEFAULT_OPTIMIZE_FOR_MEMORY = False
     DEFAULT_MAX_NESTING_DEPTH = None
@@ -62,6 +62,27 @@ class TransmogSettings:
     DEFAULT_DEFAULT_ID_FIELD = None
     DEFAULT_ID_GENERATION_STRATEGY = None
     DEFAULT_DEEPLY_NESTED_THRESHOLD = 4
+    DEFAULT_FORCE_TRANSMOG_ID = False
+    DEFAULT_ID_FIELD_PATTERNS = [
+        "id",
+        "ID",
+        "Id",
+        "_id",
+        "uuid",
+        "UUID",
+        "guid",
+        "GUID",
+        "pk",
+        "PK",
+        "primary_key",
+        "key",
+        "identifier",
+        "code",
+        "number",
+        "no",
+    ]
+    DEFAULT_NATURAL_ID_FIELD = None  # Will use ID discovery by default
+    DEFAULT_ID_FIELD_MAPPING = None  # Optional per-table mapping
 
     # CSV settings
     DEFAULT_CSV_DELIMITER = ","

@@ -21,7 +21,9 @@ class TestExtractor(AbstractExtractorTest):
         """Test specific behavior unique to this extractor implementation."""
         # Extract arrays with custom entity name
         entity_name = "customer"
-        arrays = extract_arrays(complex_nested_data, entity_name=entity_name)
+        arrays = extract_arrays(
+            complex_nested_data, entity_name=entity_name, force_transmog_id=True
+        )
 
         # Get the items table name (should include entity name)
         items_table = next(
@@ -34,7 +36,9 @@ class TestExtractor(AbstractExtractorTest):
     def test_extraction_id_consistency(self, complex_nested_data):
         """Test that extraction IDs are consistent across streaming and batch extraction."""
         # Extract using non-streaming method
-        batch_arrays = extract_arrays(complex_nested_data, entity_name="test")
+        batch_arrays = extract_arrays(
+            complex_nested_data, entity_name="test", force_transmog_id=True
+        )
 
         # Print batch tables for debugging
         print("\nBatch tables:")
@@ -43,7 +47,9 @@ class TestExtractor(AbstractExtractorTest):
 
         # Extract using streaming method
         stream_records = list(
-            stream_extract_arrays(complex_nested_data, entity_name="test")
+            stream_extract_arrays(
+                complex_nested_data, entity_name="test", force_transmog_id=True
+            )
         )
 
         # Convert streaming results to the same format as batch for comparison
@@ -83,43 +89,49 @@ class TestExtractor(AbstractExtractorTest):
 
     def test_metadata_fields(self, simple_nested_data):
         """Test that metadata fields are correctly added to extracted records."""
-        arrays = extract_arrays(simple_nested_data, entity_name="test")
+        arrays = extract_arrays(
+            simple_nested_data, entity_name="test", force_transmog_id=True
+        )
 
         # Get the items table name
         items_table = next(key for key in arrays.keys() if "items" in key)
 
         # Check metadata fields in array records
         for item in arrays[items_table]:
-            assert "__extract_id" in item
-            assert "__extract_datetime" in item
+            assert "__transmog_id" in item
+            assert "__transmog_datetime" in item
             # Note: Other metadata fields might be present depending on configuration
 
     def test_id_generation(self, simple_nested_data):
         """Test ID generation for extracted arrays."""
         # Extract arrays with default settings
-        arrays = extract_arrays(simple_nested_data, entity_name="test")
+        arrays = extract_arrays(
+            simple_nested_data, entity_name="test", force_transmog_id=True
+        )
 
         # Get the items table name
         items_table = next(key for key in arrays.keys() if "items" in key)
 
         # Check that IDs are generated
         for item in arrays[items_table]:
-            assert "__extract_id" in item
+            assert "__transmog_id" in item
             # IDs should be UUID strings
-            assert len(item["__extract_id"]) > 0
-            assert isinstance(item["__extract_id"], str)
+            assert len(item["__transmog_id"]) > 0
+            assert isinstance(item["__transmog_id"], str)
 
         # Extract again and verify IDs are different
         # This is the default behavior without deterministic configuration
-        arrays2 = extract_arrays(simple_nested_data, entity_name="test")
+        arrays2 = extract_arrays(
+            simple_nested_data, entity_name="test", force_transmog_id=True
+        )
 
         # IDs should be different between runs without deterministic configuration
         for i in range(len(arrays[items_table])):
             # Skip this assertion if deterministic IDs are the default
             try:
                 assert (
-                    arrays[items_table][i]["__extract_id"]
-                    != arrays2[items_table][i]["__extract_id"]
+                    arrays[items_table][i]["__transmog_id"]
+                    != arrays2[items_table][i]["__transmog_id"]
                 )
             except AssertionError:
                 # If IDs are the same, print a note and continue
@@ -134,6 +146,7 @@ class TestExtractor(AbstractExtractorTest):
             complex_nested_data,
             entity_name="test",
             deeply_nested_threshold=4,
+            force_transmog_id=True,
         )
 
         # Check that tables are extracted
@@ -144,6 +157,7 @@ class TestExtractor(AbstractExtractorTest):
             complex_nested_data,
             entity_name="test",
             deeply_nested_threshold=2,  # Lower threshold should simplify more paths
+            force_transmog_id=True,
         )
 
         # For the test_items_subitems table name, we expect a simplification
@@ -174,6 +188,7 @@ class TestExtractor(AbstractExtractorTest):
             very_nested_data,
             entity_name="test",
             deeply_nested_threshold=3,  # This should trigger the "nested" pattern
+            force_transmog_id=True,
         )
 
         # The deep table name should contain "nested" with this threshold
@@ -189,7 +204,9 @@ class TestExtractor(AbstractExtractorTest):
     def test_max_depth(self, deeply_nested_data):
         """Test that the extractor handles deeply nested data correctly."""
         # Extract arrays with default settings
-        arrays = extract_arrays(deeply_nested_data, entity_name="test")
+        arrays = extract_arrays(
+            deeply_nested_data, entity_name="test", force_transmog_id=True
+        )
 
         # Verify it handles deep nesting correctly
         assert isinstance(arrays, dict)
@@ -199,14 +216,21 @@ class TestExtractor(AbstractExtractorTest):
 
         # Test with a very small max_depth to verify the limit is respected
         with patch("transmog.core.extractor.logger") as mock_logger:
-            extract_arrays(deeply_nested_data, entity_name="test", max_depth=3)
+            extract_arrays(
+                deeply_nested_data,
+                entity_name="test",
+                max_depth=3,
+                force_transmog_id=True,
+            )
             # Should log a warning about max depth
             mock_logger.warning.assert_called_with(ANY)
 
     def test_nested_array_extraction(self, complex_nested_data):
         """Test extraction of nested arrays."""
         # Extract arrays with default settings
-        arrays = extract_arrays(complex_nested_data, entity_name="test")
+        arrays = extract_arrays(
+            complex_nested_data, entity_name="test", force_transmog_id=True
+        )
 
         # Print table names for debugging
         print(f"Extracted tables: {list(arrays.keys())}")
@@ -228,7 +252,11 @@ class TestExtractor(AbstractExtractorTest):
     def test_streaming_extraction(self, complex_nested_data):
         """Test streaming array extraction."""
         # Use streaming extraction
-        records = list(stream_extract_arrays(complex_nested_data, entity_name="test"))
+        records = list(
+            stream_extract_arrays(
+                complex_nested_data, entity_name="test", force_transmog_id=True
+            )
+        )
 
         # Verify results structure
         tables = {}
@@ -264,7 +292,7 @@ class TestExtractor(AbstractExtractorTest):
         }
 
         # Extract arrays with default settings
-        arrays = extract_arrays(data, entity_name="test")
+        arrays = extract_arrays(data, entity_name="test", force_transmog_id=True)
 
         # Print table names for debugging
         print(f"Extracted tables: {list(arrays.keys())}")
@@ -280,9 +308,9 @@ class TestExtractor(AbstractExtractorTest):
             for item in arrays[table_name]:
                 assert "value" in item
                 # And should have metadata
-                assert "__extract_id" in item
+                assert "__transmog_id" in item
                 # Parent ID might not be present for direct top-level arrays
-                assert "__extract_datetime" in item
+                assert "__transmog_datetime" in item
                 # Check array-specific fields
                 assert "__array_field" in item
                 assert "__array_index" in item
@@ -307,7 +335,7 @@ class TestExtractor(AbstractExtractorTest):
         }
 
         # Extract arrays
-        result = extract_arrays(data, entity_name="test")
+        result = extract_arrays(data, entity_name="test", force_transmog_id=True)
         table_names = list(result.keys())
 
         # Print table names for debugging
@@ -354,3 +382,27 @@ class TestExtractor(AbstractExtractorTest):
                 if record.get("__array_field") == "valid_array":
                     assert "id" in record
                     assert "value" in record
+
+    def test_basic_array_extraction(self, simple_nested_data):
+        """Test basic array extraction functionality."""
+        # Extract arrays with default settings
+        arrays = extract_arrays(
+            simple_nested_data, entity_name="test", force_transmog_id=True
+        )
+
+        # Get the items table name
+        items_table = next(key for key in arrays.keys() if "items" in key)
+
+        # Check that arrays are extracted
+        assert len(arrays[items_table]) > 0
+
+        # Check structure of extracted items
+        for item in arrays[items_table]:
+            # Should have original fields
+            assert "id" in item
+            assert "name" in item
+            # Should have metadata fields
+            assert "__transmog_id" in item
+            assert "__transmog_datetime" in item
+            assert "__array_field" in item
+            assert "__array_index" in item

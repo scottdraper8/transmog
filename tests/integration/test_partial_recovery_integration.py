@@ -196,7 +196,7 @@ class TestPartialRecoveryIntegration:
                     # Group records by parent ID to verify correct grouping
                     scores_by_parent = {}
                     for record in table:
-                        _parent_id = record.get("__parent_extract_id")
+                        _parent_id = record.get("__parent_transmog_id")
                         if _parent_id not in scores_by_parent:
                             scores_by_parent[_parent_id] = []
                         # Some values might be stored as strings due to cast_to_string=True

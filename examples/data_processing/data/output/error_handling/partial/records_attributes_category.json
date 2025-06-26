@@ -1,17 +1,17 @@
 [
   {
     "value": "wrong",
-    "__extract_id": "d600c82c-3bc1-4aa2-a779-33448d9fa3cf",
-    "__parent_extract_id": "8fa0f2e3-d052-4e56-8edf-25738baa3a3a",
-    "__extract_datetime": "2025-05-29 18:17:14.876173+00:00",
+    "__transmog_id": "d600c82c-3bc1-4aa2-a779-33448d9fa3cf",
+    "__parent_transmog_id": "8fa0f2e3-d052-4e56-8edf-25738baa3a3a",
+    "__transmog_datetime": "2025-05-29 18:17:14.876173+00:00",
     "__array_field": "category",
     "__array_index": 0
   },
   {
     "value": "type",
-    "__extract_id": "9eac98a6-0d27-481d-aaa6-4b479cdc79a6",
-    "__parent_extract_id": "8fa0f2e3-d052-4e56-8edf-25738baa3a3a",
-    "__extract_datetime": "2025-05-29 18:17:14.876173+00:00",
+    "__transmog_id": "9eac98a6-0d27-481d-aaa6-4b479cdc79a6",
+    "__parent_transmog_id": "8fa0f2e3-d052-4e56-8edf-25738baa3a3a",
+    "__transmog_datetime": "2025-05-29 18:17:14.876173+00:00",
     "__array_field": "category",
     "__array_index": 1
   }

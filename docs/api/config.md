@@ -311,22 +311,31 @@ class MetadataConfig:
     """
 
     # Generation options
+    id_field: str = "__transmog_id"
     default_id_field: Optional[Union[str, dict[str, str]]] = None
-    parent_field: str = "__parent_extract_id"
-    time_field: str = "__extract_datetime"
+    parent_field: str = "__parent_transmog_id"
+    time_field: str = "__transmog_datetime"
     deterministic_id_fields: dict[str, str] = field(default_factory=dict)
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None
+    force_transmog_id: bool = False
+    id_field_patterns: Optional[list[str]] = None
+    id_field_mapping: Optional[dict[str, str]] = None
 ```
 
 ### Parameters
 
+- **id_field** (`str`, default: `"__transmog_id"`): Field name for transmog IDs.
 - **default_id_field** (`Optional[Union[str, dict[str, str]]]`, default: `None`): Field name or dictionary mapping
   paths to field names used for deterministic ID generation.
-- **parent_field** (`str`, default: `"__parent_extract_id"`): Field name for parent IDs.
-- **time_field** (`str`, default: `"__extract_datetime"`): Field name for timestamps.
-- **deterministic_id_fields** (`dict[str, str]`, default: `{}`): Dictionary mapping table paths to field names for
-  deterministic ID generation.
+- **parent_field** (`str`, default: `"__parent_transmog_id"`): Field name for parent IDs.
+- **time_field** (`str`, default: `"__transmog_datetime"`): Field name for timestamps.
+- **deterministic_id_fields** (`dict[str, str]`, default: `{}`): Dictionary mapping table paths to field names
+  for deterministic ID generation.
 - **id_generation_strategy** (`Optional[Callable[[dict[str, Any]], str]]`, default: `None`): Custom function for ID generation.
+- **force_transmog_id** (`bool`, default: `False`): Whether to always add transmog IDs even when natural IDs are found.
+- **id_field_patterns** (`Optional[list[str]]`, default: `None`): List of field names to check for natural IDs.
+- **id_field_mapping** (`Optional[dict[str, str]]`, default: `None`): Dictionary mapping table paths to field names
+  for natural ID discovery.
 
 ## ErrorHandlingConfig
 

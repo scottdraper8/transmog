@@ -52,7 +52,7 @@ from transmog.process import (
 ```python
 class ProcessingStrategy(ABC):
     @abstractmethod
-    def process(self, data, entity_name: str, extract_time=None) -> ProcessingResult:
+    def process(self, data, entity_name: str, transmog_time=None) -> ProcessingResult:
         """Process the data and return a ProcessingResult."""
         pass
 ```
@@ -338,7 +338,7 @@ class CustomStrategy(ProcessingStrategy):
         self.config = config
         self.memory_strategy = InMemoryStrategy(config)
 
-    def process(self, data, entity_name, extract_time=None):
+    def process(self, data, entity_name, transmog_time=None):
         # Pre-process data
         processed_data = self.preprocess(data)
 
@@ -346,7 +346,7 @@ class CustomStrategy(ProcessingStrategy):
         return self.memory_strategy.process(
             processed_data,
             entity_name,
-            extract_time
+            transmog_time
         )
 
     def preprocess(self, data):

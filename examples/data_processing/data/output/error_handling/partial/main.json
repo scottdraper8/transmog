@@ -5,21 +5,21 @@
     "attributes_category": "test",
     "attributes_active": "1",
     "attributes_score": "95.5",
-    "__extract_id": "f6185ad4-030b-499f-ba99-01be27a6d8de",
-    "__extract_datetime": "2025-05-29 18:17:14.876173+00:00"
+    "__transmog_id": "f6185ad4-030b-499f-ba99-01be27a6d8de",
+    "__transmog_datetime": "2025-05-29 18:17:14.876173+00:00"
   },
   {
     "id": "2",
     "name": "Circular Reference",
-    "__extract_id": "6c700d75-e70f-4460-b376-d2a93f89559b",
-    "__extract_datetime": "2025-05-29 18:17:14.876173+00:00"
+    "__transmog_id": "6c700d75-e70f-4460-b376-d2a93f89559b",
+    "__transmog_datetime": "2025-05-29 18:17:14.876173+00:00"
   },
   {
     "id": "3",
     "attributes_active": "1",
     "attributes_score": "85.0",
-    "__extract_id": "4c44efee-2917-44a4-b16d-bfd3bd9b235f",
-    "__extract_datetime": "2025-05-29 18:17:14.876173+00:00"
+    "__transmog_id": "4c44efee-2917-44a4-b16d-bfd3bd9b235f",
+    "__transmog_datetime": "2025-05-29 18:17:14.876173+00:00"
   },
   {
     "id": "4",
@@ -27,14 +27,14 @@
     "attributes_active": "false",
     "attributes_score": "invalid",
     "tags": "not-an-array",
-    "__extract_id": "8fa0f2e3-d052-4e56-8edf-25738baa3a3a",
-    "__extract_datetime": "2025-05-29 18:17:14.876173+00:00"
+    "__transmog_id": "8fa0f2e3-d052-4e56-8edf-25738baa3a3a",
+    "__transmog_datetime": "2025-05-29 18:17:14.876173+00:00"
   },
   {
     "id": "5",
     "name": "Bad Structure",
-    "__extract_id": "1622c5a6-0995-42f4-bdae-6a7c0c78d8e0",
-    "__extract_datetime": "2025-05-29 18:17:14.876173+00:00"
+    "__transmog_id": "1622c5a6-0995-42f4-bdae-6a7c0c78d8e0",
+    "__transmog_datetime": "2025-05-29 18:17:14.876173+00:00"
   },
   {
     "id": "6",
@@ -43,7 +43,7 @@
     "attributes_active": "1",
     "attributes_metadata_created": "2023-01-01",
     "attributes_metadata_nested_valid": "1",
-    "__extract_id": "53e5b74e-734d-46c9-9ff1-d9d2319ee339",
-    "__extract_datetime": "2025-05-29 18:17:14.876173+00:00"
+    "__transmog_id": "53e5b74e-734d-46c9-9ff1-d9d2319ee339",
+    "__transmog_datetime": "2025-05-29 18:17:14.876173+00:00"
   }
 ]

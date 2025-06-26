@@ -7,6 +7,8 @@ This module tests the complete processing flow from raw data to output files.
 import json
 import os
 
+import pytest
+
 from tests.interfaces.test_integration_interface import AbstractIntegrationTest
 from transmog import Processor, TransmogConfig
 
@@ -18,6 +20,16 @@ class TestEndToEnd(AbstractIntegrationTest):
     These tests verify the complete processing flow from raw data to output files,
     focusing on component interaction rather than implementation details.
     """
+
+    @pytest.fixture
+    def processor(self):
+        """Create a processor for end-to-end testing."""
+        config = (
+            TransmogConfig.default()
+            .with_processing(cast_to_string=True)
+            .with_metadata(force_transmog_id=True)
+        )
+        return Processor(config=config)
 
     def test_json_to_csv_flow(self, processor, sample_data, output_dir):
         """Test complete flow from JSON data to CSV output."""

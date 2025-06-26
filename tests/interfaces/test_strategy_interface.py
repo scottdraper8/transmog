@@ -62,7 +62,11 @@ class AbstractStrategyTest:
     @pytest.fixture
     def config(self):
         """Create a standard configuration."""
-        return TransmogConfig.default().with_processing(cast_to_string=True)
+        return (
+            TransmogConfig.default()
+            .with_processing(cast_to_string=True)
+            .with_metadata(force_transmog_id=True)
+        )
 
     @pytest.fixture
     def strategy(self, config):

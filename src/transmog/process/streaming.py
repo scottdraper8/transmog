@@ -33,6 +33,7 @@ def _get_streaming_params(
     processor: Any,
     extract_time: Optional[Any] = None,
     use_deterministic_ids: Optional[bool] = None,
+    force_transmog_id: Optional[bool] = None,
 ) -> dict[str, Any]:
     """Get parameters for streaming processing functions.
 
@@ -40,6 +41,7 @@ def _get_streaming_params(
         processor: Processor instance
         extract_time: Optional extraction timestamp
         use_deterministic_ids: Whether to use deterministic IDs
+        force_transmog_id: Whether to force transmog ID generation
 
     Returns:
         Dictionary of parameters for streaming processing
@@ -50,6 +52,9 @@ def _get_streaming_params(
     # Add streaming-specific params
     if use_deterministic_ids is not None:
         params["use_deterministic_ids"] = use_deterministic_ids
+
+    if force_transmog_id is not None:
+        params["force_transmog_id"] = force_transmog_id
 
     return params
 
@@ -62,6 +67,7 @@ def _stream_process_batch(
     child_tables_registry: dict[str, bool],
     extract_time: Optional[Any] = None,
     use_deterministic_ids: bool = False,
+    force_transmog_id: bool = False,
 ) -> None:
     """Process a batch of records and write to output directly.
 
@@ -73,12 +79,14 @@ def _stream_process_batch(
         child_tables_registry: Registry of discovered child tables
         extract_time: Optional extraction timestamp
         use_deterministic_ids: Whether to use deterministic ID generation
+        force_transmog_id: Whether to force transmog ID generation
     """
     # Get processing parameters
     params = _get_streaming_params(
         processor=processor,
         extract_time=extract_time,
         use_deterministic_ids=use_deterministic_ids,
+        force_transmog_id=force_transmog_id,
     )
 
     # Import here to avoid circular imports
@@ -130,6 +138,7 @@ def _stream_process_in_batches(
     extract_time: Optional[Any] = None,
     batch_size: Optional[int] = 1000,
     use_deterministic_ids: bool = False,
+    force_transmog_id: bool = False,
 ) -> None:
     """Stream process data in batches and write directly to output.
 
@@ -141,6 +150,7 @@ def _stream_process_in_batches(
         extract_time: Optional extraction timestamp
         batch_size: Size of batches to process
         use_deterministic_ids: Whether to use deterministic ID generation
+        force_transmog_id: Whether to force transmog ID generation
     """
     # Process records in batches
     record_buffer = []
@@ -159,6 +169,7 @@ def _stream_process_in_batches(
                 writer=writer,
                 child_tables_registry=child_tables_registry,
                 use_deterministic_ids=use_deterministic_ids,
+                force_transmog_id=force_transmog_id,
             )
             record_buffer = []
 
@@ -172,6 +183,7 @@ def _stream_process_in_batches(
             writer=writer,
             child_tables_registry=child_tables_registry,
             use_deterministic_ids=use_deterministic_ids,
+            force_transmog_id=force_transmog_id,
         )
 
 
@@ -391,35 +403,23 @@ def stream_process(
     extract_time: Optional[Any] = None,
     batch_size: Optional[int] = None,
     use_deterministic_ids: bool = False,
+    force_transmog_id: bool = False,
     **format_options: Any,
 ) -> None:
-    """Stream process data directly to output format.
+    """Stream process data and write directly to output.
 
     Args:
         processor: Processor instance
         data: Input data (dict, list, string, bytes, or iterator)
-        entity_name: Name of the entity
-        output_format: Output format
-        output_destination: Output destination (file path or file-like object)
+        entity_name: Name of the entity being processed
+        output_format: Output format ("json", "csv", "parquet", etc)
+        output_destination: File path or file-like object to write to
         extract_time: Optional extraction timestamp
-        batch_size: Optional batch size for processing
-        use_deterministic_ids: Whether to use deterministic IDs
-        **format_options: Format-specific options
+        batch_size: Size of batches to process
+        use_deterministic_ids: Whether to use deterministic ID generation
+        force_transmog_id: Whether to force transmog ID generation
+        **format_options: Format-specific options for the writer
     """
-    # Validate input format and destination
-    if not output_format:
-        raise ValueError("Output format must be specified for streaming processing")
-
-    # Get the data iterator
-    data_iterator = get_data_iterator(processor, data)
-
-    # Use batch size from config if not specified
-    batch_size = get_batch_size(processor, batch_size)
-
-    # Get extract time if not provided
-    if extract_time is None:
-        extract_time = get_current_timestamp()
-
     # Create streaming writer
     writer = _create_streaming_writer(
         processor=processor,
@@ -429,22 +429,28 @@ def stream_process(
         **format_options,
     )
 
-    try:
-        # Process and write the main table header
-        writer.initialize_main_table()
+    # Get data iterator
+    data_iterator = get_data_iterator(processor, data)
 
-        # Process data in batches to manage memory
+    # Get batch size
+    batch_size = get_batch_size(processor, batch_size)
+
+    # Set extraction timestamp if not provided
+    if extract_time is None:
+        extract_time = get_current_timestamp()
+
+    try:
+        # Stream process in batches
         _stream_process_in_batches(
             processor=processor,
             data_iterator=data_iterator,
             entity_name=entity_name,
-            extract_time=extract_time,
-            batch_size=batch_size if batch_size is not None else 1000,
             writer=writer,
+            extract_time=extract_time,
+            batch_size=batch_size,
             use_deterministic_ids=use_deterministic_ids,
+            force_transmog_id=force_transmog_id,
         )
-
-        # Finalize the output
-        writer.finalize()
     finally:
+        # Ensure writer is closed
         writer.close()

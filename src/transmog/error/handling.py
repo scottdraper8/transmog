@@ -207,9 +207,10 @@ def error_context(
         Decorated function with proper type preservation
     """
     # Default to ProcessingError if no wrapper provided
-    if wrap_as is None:
+    wrapper_func = wrap_as
+    if wrapper_func is None:
 
-        def wrap_as(e: Exception) -> ProcessingError:
+        def wrapper_func(e: Exception) -> ProcessingError:
             return ProcessingError(f"{context_message}: {str(e)}")
 
     def decorator(func: F) -> F:
@@ -258,8 +259,8 @@ def error_context(
 
                 # Wrap or reraise based on configuration
                 if reraise:
-                    if wrap_as and not isinstance(e, TransmogError):
-                        wrapped = wrap_as(e)
+                    if not isinstance(e, TransmogError) and wrapper_func is not None:
+                        wrapped = wrapper_func(e)
                         if isinstance(wrapped, type):
                             raise wrapped(error_msg) from e
                         else:

@@ -44,8 +44,11 @@ def get_common_config_params(
         "time_field": processor.config.metadata.time_field,
         "default_id_field": processor.config.metadata.default_id_field,
         "id_generation_strategy": processor.config.metadata.id_generation_strategy,
+        "force_transmog_id": processor.config.metadata.force_transmog_id,
+        "id_field_patterns": processor.config.metadata.id_field_patterns,
+        "id_field_mapping": processor.config.metadata.id_field_mapping,
         # Timestamps
-        "extract_time": extract_time,
+        "transmog_time": extract_time,
     }
 
 

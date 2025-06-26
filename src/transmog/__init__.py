@@ -32,7 +32,7 @@ from transmog.core.hierarchy import (
 from transmog.core.metadata import (
     annotate_with_metadata,
     create_batch_metadata,
-    generate_extract_id,
+    generate_transmog_id,
     get_current_timestamp,
 )
 
@@ -178,7 +178,7 @@ __all__ = [
     # Metadata
     "annotate_with_metadata",
     "create_batch_metadata",
-    "generate_extract_id",
+    "generate_transmog_id",
     "get_current_timestamp",
     # Naming utilities
     "get_standard_field_name",

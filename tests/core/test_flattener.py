@@ -108,11 +108,11 @@ class TestFlattener(AbstractFlattenerTest):
 
         # Test with lenient error handling
         with pytest.raises(ProcessingError):
-            flatten_json(data, error_handling="lenient")
+            flatten_json(data, recovery_strategy="lenient")
 
         # Test with strict error handling
         with pytest.raises(ProcessingError):
-            flatten_json(data, error_handling="strict")
+            flatten_json(data, recovery_strategy="strict")
 
     def test_max_depth(self, deep_data):
         """Test the max_depth option to limit recursion depth."""

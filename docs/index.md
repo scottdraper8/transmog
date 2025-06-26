@@ -7,7 +7,7 @@ hide-toc: false
 Transmog is a Python library for transforming nested JSON data into flat, structured formats.
 
 :::info Version Note
-**Transmog 1.0.6 - Current Release**
+**Transmog 1.1.0 - Current Release**
 
 Features include:
 
@@ -17,6 +17,7 @@ Features include:
 - Memory efficiency options
 - Error handling strategies
 - Multiple output format options
+- Natural ID discovery
 :::
 
 ## Overview
@@ -30,6 +31,7 @@ Transmog features:
 - Converting to various output formats
 - Processing large datasets
 - Configuring memory usage
+- Using existing natural IDs in data
 
 ## Quick Links
 
@@ -73,6 +75,7 @@ User guides provide conceptual overviews, practical examples, and best practices
 - [Performance Optimization](user/advanced/performance-optimization.md) - Optimizing for speed and memory
 - [Error Handling](user/advanced/error-handling.md) - Dealing with problematic data
 - [Deterministic IDs](user/advanced/deterministic-ids.md) - Generating consistent IDs
+- [Natural IDs](user/advanced/natural-ids.md) - Using existing ID fields in data
 
 #### Output Options
 
@@ -94,6 +97,7 @@ Step-by-step guides to accomplish specific tasks with Transmog:
 - [Flatten and Normalize](tutorials/basic/flatten-and-normalize.md)
 - [Streaming Large Datasets](tutorials/intermediate/streaming-large-datasets.md)
 - [Customizing ID Generation](tutorials/intermediate/customizing-id-generation.md)
+- [Using Natural IDs](tutorials/intermediate/using-natural-ids.md)
 - [Error Recovery Strategies](tutorials/advanced/error-recovery-strategies.md)
 - [Optimizing Memory Usage](tutorials/advanced/optimizing-memory-usage.md)
 
@@ -135,6 +139,7 @@ user/advanced/streaming
 user/advanced/performance-optimization
 user/advanced/error-handling
 user/advanced/deterministic-ids
+user/advanced/natural-ids
 user/output/output-formats
 user/examples
 ```
@@ -148,6 +153,7 @@ tutorials/basic/transform-nested-json
 tutorials/basic/flatten-and-normalize
 tutorials/intermediate/streaming-large-datasets
 tutorials/intermediate/customizing-id-generation
+tutorials/intermediate/using-natural-ids
 tutorials/advanced/error-recovery-strategies
 tutorials/advanced/optimizing-memory-usage
 ```

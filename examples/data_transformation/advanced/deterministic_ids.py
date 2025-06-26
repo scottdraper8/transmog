@@ -98,7 +98,7 @@ def main():
     main_table = default_result.get_main_table()
     if main_table:
         print("Default-generated ID (random UUID):")
-        print(f"  Main record ID: {main_table[0].get('__extract_id', 'N/A')}")
+        print(f"  Main record ID: {main_table[0].get('__transmog_id', 'N/A')}")
 
     # Get a child table to show its IDs too
     departments_table = default_result.get_child_table(
@@ -106,11 +106,12 @@ def main():
     )
     if departments_table and len(departments_table) > 0:
         print(
-            f"  Department record ID: {departments_table[0].get('__extract_id', 'N/A')}"
+            f"  Department record ID: "
+            f"{departments_table[0].get('__transmog_id', 'N/A')}"
         )
         print(
             f"  Parent reference: "
-            f"{departments_table[0].get('__parent_extract_id', 'N/A')}"
+            f"{departments_table[0].get('__parent_transmog_id', 'N/A')}"
         )
 
     # Example 2: Basic Deterministic IDs
@@ -137,8 +138,8 @@ def main():
     main_table_2 = basic_result_2.get_main_table()
 
     if main_table_1 and main_table_2:
-        id_1 = main_table_1[0].get("__extract_id", "N/A")
-        id_2 = main_table_2[0].get("__extract_id", "N/A")
+        id_1 = main_table_1[0].get("__transmog_id", "N/A")
+        id_2 = main_table_2[0].get("__transmog_id", "N/A")
         print(f"First run main record ID:  {id_1}")
         print(f"Second run main record ID: {id_2}")
         print(f"IDs are identical: {id_1 == id_2}")
@@ -164,7 +165,7 @@ def main():
     # Main table ID
     main_table = detailed_result.get_main_table()
     if main_table:
-        print(f"Main table ID: {main_table[0].get('__extract_id', 'N/A')}")
+        print(f"Main table ID: {main_table[0].get('__transmog_id', 'N/A')}")
 
     # Department table IDs
     departments = detailed_result.get_child_table("company_organization_departments")
@@ -173,7 +174,7 @@ def main():
         for dept in departments:
             print(
                 f"  Department '{dept.get('name', 'Unknown')}': "
-                f"{dept.get('__extract_id', 'N/A')}"
+                f"{dept.get('__transmog_id', 'N/A')}"
             )
 
     # Employee table IDs
@@ -185,7 +186,7 @@ def main():
         for emp in employees[:2]:  # Show first two employees
             print(
                 f"  Employee '{emp.get('name', 'Unknown')}': "
-                f"{emp.get('__extract_id', 'N/A')}"
+                f"{emp.get('__transmog_id', 'N/A')}"
             )
 
     # Example 4: Custom ID Generation Function
@@ -239,7 +240,7 @@ def main():
     # Main table ID
     main_table = custom_result.get_main_table()
     if main_table:
-        print(f"Main table ID: {main_table[0].get('__extract_id', 'N/A')}")
+        print(f"Main table ID: {main_table[0].get('__transmog_id', 'N/A')}")
 
     # Department table IDs
     departments = custom_result.get_child_table("company_organization_departments")
@@ -248,7 +249,7 @@ def main():
         for dept in departments:
             print(
                 f"  Department '{dept.get('name', 'Unknown')}': "
-                f"{dept.get('__extract_id', 'N/A')}"
+                f"{dept.get('__transmog_id', 'N/A')}"
             )
 
     # Example 5: Relationship Preservation Across Processing Runs
@@ -280,8 +281,8 @@ def main():
 
     if run1_depts and run2_depts and run1_employees and run2_employees:
         # Get IDs for the first department in each run
-        dept1_id_run1 = run1_depts[0].get("__extract_id", "N/A")
-        dept1_id_run2 = run2_depts[0].get("__extract_id", "N/A")
+        dept1_id_run1 = run1_depts[0].get("__transmog_id", "N/A")
+        dept1_id_run2 = run2_depts[0].get("__transmog_id", "N/A")
 
         print(f"Department ID (Run 1): {dept1_id_run1}")
         print(f"Department ID (Run 2): {dept1_id_run2}")
@@ -289,10 +290,10 @@ def main():
 
         # Get employees for this department in each run
         dept1_employees_run1 = [
-            e for e in run1_employees if e.get("__parent_extract_id") == dept1_id_run1
+            e for e in run1_employees if e.get("__parent_transmog_id") == dept1_id_run1
         ]
         dept1_employees_run2 = [
-            e for e in run2_employees if e.get("__parent_extract_id") == dept1_id_run2
+            e for e in run2_employees if e.get("__parent_transmog_id") == dept1_id_run2
         ]
 
         print(f"Number of employees in department (Run 1): {len(dept1_employees_run1)}")
@@ -308,8 +309,8 @@ def main():
                 name1 = emp1.get("name", "Unknown")
                 _ = emp2.get("name", "Unknown")  # Unused but kept for symmetry
 
-                id1 = emp1.get("__extract_id", "N/A")
-                id2 = emp2.get("__extract_id", "N/A")
+                id1 = emp1.get("__transmog_id", "N/A")
+                id2 = emp2.get("__transmog_id", "N/A")
 
                 print(f"  Employee: {name1}")
                 print(f"    ID (Run 1): {id1}")

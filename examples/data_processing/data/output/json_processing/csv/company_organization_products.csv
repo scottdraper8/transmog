@@ -1,3 +1,3 @@
-"id","name","category","price","__extract_id","__parent_extract_id","__extract_datetime","__array_field","__array_index"
+"id","name","category","price","__transmog_id","__parent_transmog_id","__transmog_datetime","__array_field","__array_index"
 "P001","Product A","Software",99.99,"6feecf85-42c3-42d9-8948-bab65c7d499a","87b9ddc7-196a-414f-a1d7-fa9c7cc076b7",2025-05-29 18:17:08.740026Z,"products",0
 "P002","Product B","Hardware",299.99,"65746e15-8c12-49ad-8572-49a70fd57855","87b9ddc7-196a-414f-a1d7-fa9c7cc076b7",2025-05-29 18:17:08.740026Z,"products",1

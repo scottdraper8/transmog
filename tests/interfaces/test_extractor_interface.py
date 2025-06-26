@@ -89,8 +89,8 @@ class AbstractExtractorTest:
 
         # Check array items have expected fields
         for item in arrays["test_items"]:
-            assert "__extract_id" in item
-            assert "__extract_datetime" in item
+            assert "__transmog_id" in item
+            assert "__transmog_datetime" in item
             # Note: In the actual implementation, parent_id isn't included if entity_name is provided
             # instead of parent_id directly
 
@@ -113,10 +113,10 @@ class AbstractExtractorTest:
 
         # Check parent-child relationships if parent IDs are included
         for subitem in arrays[subitems_table]:
-            if "__parent_extract_id" in subitem:
-                parent_id = subitem["__parent_extract_id"]
+            if "__parent_transmog_id" in subitem:
+                parent_id = subitem["__parent_transmog_id"]
                 assert any(
-                    item["__extract_id"] == parent_id for item in arrays["test_items"]
+                    item["__transmog_id"] == parent_id for item in arrays["test_items"]
                 )
 
     def test_streaming_extraction(self, complex_nested_data):

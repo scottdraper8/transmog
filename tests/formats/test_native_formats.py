@@ -19,9 +19,7 @@ class TestNativeFormats(AbstractFormatConversionTest):
         """Provide a processor factory function."""
 
         def create_processor(cast_to_string=True, visit_arrays=True):
-            config = TransmogConfig.default().with_processing(
-                cast_to_string=cast_to_string, visit_arrays=visit_arrays
-            )
+            config = TransmogConfig.default().with_metadata(force_transmog_id=True)
             return Processor(config=config)
 
         return create_processor

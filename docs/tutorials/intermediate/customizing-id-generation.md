@@ -56,7 +56,7 @@ tables = result.to_dict()
 for table_name, records in tables.items():
     print(f"\n=== {table_name} ===")
     for record in records:
-        print(f"ID: {record['__extract_id']}, Data: {record}")
+        print(f"ID: {record['__transmog_id']}, Data: {record}")
 ```
 
 ## Using Different Fields for Different Tables
@@ -145,8 +145,8 @@ When using custom ID generation, you can create hierarchical IDs that include pa
 def hierarchical_id_generator(record):
     """Create hierarchical IDs that include parent information when available"""
     # Check if this is a child record with parent reference
-    if "__parent_extract_id" in record:
-        parent_id = record.get("__parent_extract_id", "")
+    if "__parent_transmog_id" in record:
+        parent_id = record.get("__parent_transmog_id", "")
 
         # For project records
         if "projectId" in record:

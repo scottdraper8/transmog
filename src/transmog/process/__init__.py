@@ -5,7 +5,6 @@ This module contains the main processor and processing strategies.
 
 import os
 from collections.abc import Iterator
-from io import StringIO
 from typing import (
     Any,
     BinaryIO,
@@ -151,6 +150,28 @@ class Processor:
         return cls(TransmogConfig.with_custom_id_generation(strategy))
 
     @classmethod
+    def with_natural_ids(
+        cls,
+        id_field_patterns: Optional[list[str]] = None,
+        id_field_mapping: Optional[dict[str, str]] = None,
+    ) -> "Processor":
+        """Create a processor that uses natural IDs from records when available.
+
+        Args:
+            id_field_patterns: List of patterns to check for ID fields
+            id_field_mapping: Mapping of table names to ID field names
+
+        Returns:
+            Processor configured to use natural IDs
+        """
+        return cls(
+            TransmogConfig.with_natural_ids(
+                id_field_patterns=id_field_patterns,
+                id_field_mapping=id_field_mapping,
+            )
+        )
+
+    @classmethod
     def with_partial_recovery(cls) -> "Processor":
         """Create a processor with partial recovery strategy.
 
@@ -221,7 +242,7 @@ class Processor:
         """
         return self.with_config(self.config.with_error_handling(**kwargs))
 
-    @error_context("Failed to process data", log_exceptions=True)
+    @error_context("Failed to process data", log_exceptions=True)  # type: ignore[misc]
     def process(
         self,
         data: Union[dict[str, Any], list[dict[str, Any]], str, bytes],
@@ -275,7 +296,7 @@ class Processor:
 
         return cast(ProcessingResult, processed_result)
 
-    @error_context("Failed to process batch", log_exceptions=True)
+    @error_context("Failed to process batch", log_exceptions=True)  # type: ignore[misc]
     def process_batch(
         self,
         batch_data: list[dict[str, Any]],
@@ -400,7 +421,7 @@ class Processor:
             chunk_size,
         )
 
-    @error_context("Failed to process chunked data", log_exceptions=True)
+    @error_context("Failed to process chunked data", log_exceptions=True)  # type: ignore[misc]
     def process_chunked(
         self,
         data: Union[dict[str, Any], list[dict[str, Any]], str, bytes],
@@ -438,7 +459,7 @@ class Processor:
         data: Union[dict[str, Any], list[dict[str, Any]], str, bytes],
         entity_name: str,
         output_format: str,
-        output_destination: Union[str, BinaryIO, StringIO],
+        output_destination: Optional[Union[str, BinaryIO]] = None,
         extract_time: Optional[Any] = None,
         **format_options: Any,
     ) -> None:
@@ -452,7 +473,7 @@ class Processor:
             extract_time: Optional extraction timestamp
             **format_options: Format-specific options
         """
-        return stream_process(
+        stream_process(
             self,
             data,
             entity_name,
@@ -481,7 +502,7 @@ class Processor:
             extract_time: Optional extraction timestamp
             **format_options: Format-specific options
         """
-        return stream_process_file(
+        stream_process_file(
             self,
             file_path,
             entity_name,
@@ -496,7 +517,7 @@ class Processor:
         file_path: str,
         entity_name: str,
         output_format: str,
-        output_destination: Union[str, BinaryIO, StringIO],
+        output_destination: Optional[Union[str, BinaryIO]] = None,
         extract_time: Optional[Any] = None,
         delimiter: Optional[str] = None,
         has_header: bool = True,
@@ -526,7 +547,7 @@ class Processor:
             encoding: File encoding
             **format_options: Format-specific options
         """
-        return stream_process_csv(
+        stream_process_csv(
             self,
             file_path,
             entity_name,
@@ -565,7 +586,7 @@ class Processor:
             extract_time: Optional extraction timestamp
             **format_options: Format-specific options
         """
-        return stream_process_file_with_format(
+        stream_process_file_with_format(
             self,
             file_path,
             entity_name,
@@ -804,7 +825,7 @@ class Processor:
 
         # Process the data
         result: ProcessingResult
-        if isinstance(data, (str, bytes)) and os.path.isfile(data):
+        if isinstance(data, str) and os.path.isfile(data):
             # For file paths, use file processing methods
             processed_result = process_file(self, data, entity_name, extract_time)
             result = cast(ProcessingResult, processed_result)

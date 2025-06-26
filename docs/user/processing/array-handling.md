@@ -30,7 +30,7 @@ result = processor.process(data, entity_name="record")
 # Main table - arrays are removed
 main_table = result.get_main_table()[0]
 print("Main table fields:", list(main_table.keys()))
-# Output: Main table fields: ['__extract_id', '__extract_datetime', 'id', 'name']
+# Output: Main table fields: ['__transmog_id', '__transmog_datetime', 'id', 'name']
 
 # Child table - contains the array items
 child_table = result.get_child_table("record_items")
@@ -51,7 +51,7 @@ result = processor.process(data, entity_name="record")
 # Main table - arrays are kept
 main_table = result.get_main_table()[0]
 print("Main table fields:", list(main_table.keys()))
-# Output: Main table fields: ['__extract_id', '__extract_datetime', 'id', 'name', 'items']
+# Output: Main table fields: ['__transmog_id', '__transmog_datetime', 'id', 'name', 'items']
 
 # Child table - still contains the array items
 child_table = result.get_child_table("record_items")
@@ -78,7 +78,7 @@ result = processor.process(data, entity_name="record")
 # Main table - arrays are kept in original form
 main_table = result.get_main_table()[0]
 print("Main table fields:", list(main_table.keys()))
-# Output: Main table fields: ['__extract_id', '__extract_datetime', 'id', 'name', 'items']
+# Output: Main table fields: ['__transmog_id', '__transmog_datetime', 'id', 'name', 'items']
 
 # No child tables are created
 table_names = result.get_table_names()

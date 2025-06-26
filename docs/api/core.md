@@ -103,7 +103,7 @@ extract_arrays(
     cast_to_string: bool = None,
     include_empty: bool = None,
     skip_null: bool = None,
-    extract_time: Optional[Any] = None,
+    transmog_time: Optional[Any] = None,
     parent_path_parts: Optional[list[str]] = None,
     max_component_length: Optional[int] = None,
     preserve_leaf: Optional[bool] = None,
@@ -129,7 +129,7 @@ process_structure(
     cast_to_string: bool = True,
     include_empty: bool = False,
     skip_null: bool = True,
-    extract_time: Optional[Any] = None,
+    transmog_time: Optional[Any] = None,
     root_entity: Optional[str] = None,
     max_table_component_length: int = None,
     max_field_component_length: int = None,
@@ -137,9 +137,9 @@ process_structure(
     deep_nesting_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
-    id_field: str = "__extract_id",
-    parent_field: str = "__parent_extract_id",
-    time_field: str = "__extract_datetime",
+    id_field: str = "__transmog_id",
+    parent_field: str = "__parent_transmog_id",
+    time_field: str = "__transmog_datetime",
     visit_arrays: bool = True,
     streaming: bool = False,
     recovery_strategy: Optional[Any] = None,
@@ -158,24 +158,28 @@ processing a complete JSON structure, handling both the main record and all nest
 annotate_with_metadata(
     record: dict[str, Any],
     parent_id: Optional[str] = None,
-    extract_id: Optional[str] = None,
-    extract_time: Optional[Any] = None,
-    id_field: str = "__extract_id",
-    parent_field: str = "__parent_extract_id",
-    time_field: str = "__extract_datetime",
+    transmog_id: Optional[str] = None,
+    transmog_time: Optional[Any] = None,
+    id_field: str = "__transmog_id",
+    parent_field: str = "__parent_transmog_id",
+    time_field: str = "__transmog_datetime",
     extra_fields: Optional[dict[str, Any]] = None,
     in_place: bool = False,
     source_field: Optional[str] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
+    id_field_patterns: Optional[list[str]] = None,
+    path: Optional[str] = None,
+    id_field_mapping: Optional[dict[str, str]] = None,
+    force_transmog_id: bool = False,
 ) -> dict[str, Any]
 ```
 
-Annotates a record with metadata fields like extract ID, parent ID, and timestamp.
+Annotates a record with metadata fields like transmog ID, parent ID, and timestamp.
 
-### generate_extract_id
+### generate_transmog_id
 
 ```python
-generate_extract_id(
+generate_transmog_id(
     record: Optional[dict[str, Any]] = None,
     source_field: Optional[str] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,

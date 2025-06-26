@@ -2,19 +2,19 @@
   "10": {
     "default": {
       "success": false,
-      "time": 0.0025348663330078125,
+      "time": 0.0013189315795898438,
       "error": "'ProcessingResult' object has no attribute 'items'",
       "traceback": "Traceback (most recent call last):\n  File \"/Users/scott/Documents/Repos/transmog/scripts/run_benchmarks.py\", line 93, in benchmark_processing\n    for _key, value in result.items():\n                       ^^^^^^^^^^^^\nAttributeError: 'ProcessingResult' object has no attribute 'items'\n"
     },
     "memory_optimized": {
       "success": false,
-      "time": 0.0025467872619628906,
+      "time": 0.001219034194946289,
       "error": "'ProcessingResult' object has no attribute 'items'",
       "traceback": "Traceback (most recent call last):\n  File \"/Users/scott/Documents/Repos/transmog/scripts/run_benchmarks.py\", line 93, in benchmark_processing\n    for _key, value in result.items():\n                       ^^^^^^^^^^^^\nAttributeError: 'ProcessingResult' object has no attribute 'items'\n"
     },
     "performance_optimized": {
       "success": false,
-      "time": 0.002146005630493164,
+      "time": 0.0011949539184570312,
       "error": "'ProcessingResult' object has no attribute 'items'",
       "traceback": "Traceback (most recent call last):\n  File \"/Users/scott/Documents/Repos/transmog/scripts/run_benchmarks.py\", line 93, in benchmark_processing\n    for _key, value in result.items():\n                       ^^^^^^^^^^^^\nAttributeError: 'ProcessingResult' object has no attribute 'items'\n"
     }
@@ -22,19 +22,19 @@
   "100": {
     "default": {
       "success": false,
-      "time": 0.016223907470703125,
+      "time": 0.013041019439697266,
       "error": "'ProcessingResult' object has no attribute 'items'",
       "traceback": "Traceback (most recent call last):\n  File \"/Users/scott/Documents/Repos/transmog/scripts/run_benchmarks.py\", line 93, in benchmark_processing\n    for _key, value in result.items():\n                       ^^^^^^^^^^^^\nAttributeError: 'ProcessingResult' object has no attribute 'items'\n"
     },
     "memory_optimized": {
       "success": false,
-      "time": 0.015091896057128906,
+      "time": 0.013115882873535156,
       "error": "'ProcessingResult' object has no attribute 'items'",
       "traceback": "Traceback (most recent call last):\n  File \"/Users/scott/Documents/Repos/transmog/scripts/run_benchmarks.py\", line 93, in benchmark_processing\n    for _key, value in result.items():\n                       ^^^^^^^^^^^^\nAttributeError: 'ProcessingResult' object has no attribute 'items'\n"
     },
     "performance_optimized": {
       "success": false,
-      "time": 0.013340950012207031,
+      "time": 0.012140035629272461,
       "error": "'ProcessingResult' object has no attribute 'items'",
       "traceback": "Traceback (most recent call last):\n  File \"/Users/scott/Documents/Repos/transmog/scripts/run_benchmarks.py\", line 93, in benchmark_processing\n    for _key, value in result.items():\n                       ^^^^^^^^^^^^\nAttributeError: 'ProcessingResult' object has no attribute 'items'\n"
     }
@@ -42,19 +42,19 @@
   "1000": {
     "default": {
       "success": false,
-      "time": 0.09982490539550781,
+      "time": 0.12688994407653809,
       "error": "'ProcessingResult' object has no attribute 'items'",
       "traceback": "Traceback (most recent call last):\n  File \"/Users/scott/Documents/Repos/transmog/scripts/run_benchmarks.py\", line 93, in benchmark_processing\n    for _key, value in result.items():\n                       ^^^^^^^^^^^^\nAttributeError: 'ProcessingResult' object has no attribute 'items'\n"
     },
     "memory_optimized": {
       "success": false,
-      "time": 0.0976710319519043,
+      "time": 0.1232912540435791,
       "error": "'ProcessingResult' object has no attribute 'items'",
       "traceback": "Traceback (most recent call last):\n  File \"/Users/scott/Documents/Repos/transmog/scripts/run_benchmarks.py\", line 93, in benchmark_processing\n    for _key, value in result.items():\n                       ^^^^^^^^^^^^\nAttributeError: 'ProcessingResult' object has no attribute 'items'\n"
     },
     "performance_optimized": {
       "success": false,
-      "time": 0.09789299964904785,
+      "time": 0.12352895736694336,
       "error": "'ProcessingResult' object has no attribute 'items'",
       "traceback": "Traceback (most recent call last):\n  File \"/Users/scott/Documents/Repos/transmog/scripts/run_benchmarks.py\", line 93, in benchmark_processing\n    for _key, value in result.items():\n                       ^^^^^^^^^^^^\nAttributeError: 'ProcessingResult' object has no attribute 'items'\n"
     }
@@ -62,19 +62,19 @@
   "10000": {
     "default": {
       "success": false,
-      "time": 0.9939970970153809,
+      "time": 1.2229340076446533,
       "error": "'ProcessingResult' object has no attribute 'items'",
       "traceback": "Traceback (most recent call last):\n  File \"/Users/scott/Documents/Repos/transmog/scripts/run_benchmarks.py\", line 93, in benchmark_processing\n    for _key, value in result.items():\n                       ^^^^^^^^^^^^\nAttributeError: 'ProcessingResult' object has no attribute 'items'\n"
     },
     "memory_optimized": {
       "success": false,
-      "time": 1.0005080699920654,
+      "time": 1.210900068283081,
       "error": "'ProcessingResult' object has no attribute 'items'",
       "traceback": "Traceback (most recent call last):\n  File \"/Users/scott/Documents/Repos/transmog/scripts/run_benchmarks.py\", line 93, in benchmark_processing\n    for _key, value in result.items():\n                       ^^^^^^^^^^^^\nAttributeError: 'ProcessingResult' object has no attribute 'items'\n"
     },
     "performance_optimized": {
       "success": false,
-      "time": 0.9921090602874756,
+      "time": 1.2085630893707275,
       "error": "'ProcessingResult' object has no attribute 'items'",
       "traceback": "Traceback (most recent call last):\n  File \"/Users/scott/Documents/Repos/transmog/scripts/run_benchmarks.py\", line 93, in benchmark_processing\n    for _key, value in result.items():\n                       ^^^^^^^^^^^^\nAttributeError: 'ProcessingResult' object has no attribute 'items'\n"
     }

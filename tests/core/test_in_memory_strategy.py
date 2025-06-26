@@ -70,7 +70,7 @@ class TestInMemoryStrategy(AbstractStrategyTest):
                 assert main_table[0]["name"] == complex_data["name"]
 
                 # Get the ID to verify parent-child relationships
-                parent_id = main_table[0]["__extract_id"]
+                parent_id = main_table[0]["__transmog_id"]
 
                 # Check items table
                 items_table = result.get_child_table("complex_items")
@@ -78,7 +78,7 @@ class TestInMemoryStrategy(AbstractStrategyTest):
 
                 # Verify all child records have the correct parent ID
                 for item in items_table:
-                    assert item["__parent_extract_id"] == parent_id
+                    assert item["__parent_transmog_id"] == parent_id
         except Exception:
             # If main table isn't available, that's acceptable
             pass

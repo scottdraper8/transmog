@@ -1,4 +1,4 @@
-"version","release_date","__extract_id","__parent_extract_id","__extract_datetime","__array_field","__array_index"
+"version","release_date","__transmog_id","__parent_transmog_id","__transmog_datetime","__array_field","__array_index"
 "1.0","2020-01-15","6c60c49f-597c-408e-936f-e3686fb2af34","6feecf85-42c3-42d9-8948-bab65c7d499a",2025-05-29 18:17:08.740026Z,"versions",0
 "1.1","2020-06-30","222b0398-a865-4fbb-8cd6-86f8c2cd1fb0","6feecf85-42c3-42d9-8948-bab65c7d499a",2025-05-29 18:17:08.740026Z,"versions",1
 "2.0","2021-03-10","acb98f92-40bd-4288-95fa-1c13a753c71e","6feecf85-42c3-42d9-8948-bab65c7d499a",2025-05-29 18:17:08.740026Z,"versions",2

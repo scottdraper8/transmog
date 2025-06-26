@@ -36,8 +36,8 @@ Output:
 
 ```python
 {
-    "__extract_id": "12345678-90ab-cdef-1234-567890abcdef",
-    "__extract_datetime": "2023-01-01T12:00:00",
+    "__transmog_id": "12345678-90ab-cdef-1234-567890abcdef",
+    "__transmog_datetime": "2023-01-01T12:00:00",
     "user_id": "1",
     "user_name": "John Doe",
     "user_contact_email": "john@example.com",
@@ -63,8 +63,8 @@ This will output:
 
 ```python
 {
-    "__extract_id": "12345678-90ab-cdef-1234-567890abcdef",
-    "__extract_datetime": "2023-01-01T12:00:00",
+    "__transmog_id": "12345678-90ab-cdef-1234-567890abcdef",
+    "__transmog_datetime": "2023-01-01T12:00:00",
     "user/id": "1",
     "user/name": "John Doe",
     "user/contact/email": "john@example.com",
@@ -97,9 +97,9 @@ Customize the field names for IDs:
 ```python
 processor = tm.Processor(
     tm.TransmogConfig.default().with_metadata(
-        id_field="record_id",              # Default: "__extract_id"
-        parent_field="parent_record_id",   # Default: "__parent_extract_id"
-        time_field="processed_at"          # Default: "__extract_datetime"
+        id_field="record_id",              # Default: "__transmog_id"
+        parent_field="parent_record_id",   # Default: "__parent_transmog_id"
+        time_field="processed_at"          # Default: "__transmog_datetime"
     )
 )
 ```
@@ -134,8 +134,8 @@ Output:
 
 ```python
 {
-    "__extract_id": "12345678-90ab-cdef-1234-567890abcdef",
-    "__extract_datetime": "2023-01-01T12:00:00",
+    "__transmog_id": "12345678-90ab-cdef-1234-567890abcdef",
+    "__transmog_datetime": "2023-01-01T12:00:00",
     "user_id": "1",
     "user_name": "Jane Doe",
     "user_tags_0": "customer",
@@ -181,8 +181,8 @@ Output:
 ```python
 Main table: [
     {
-        "__extract_id": "12345678-90ab-cdef-1234-567890abcdef",
-        "__extract_datetime": "2023-01-01T12:00:00",
+        "__transmog_id": "12345678-90ab-cdef-1234-567890abcdef",
+        "__transmog_datetime": "2023-01-01T12:00:00",
         "user_id": "1",
         "user_name": "John Doe"
     }
@@ -192,16 +192,16 @@ Table names: ["example_user_orders"]
 
 Orders table: [
     {
-        "__extract_id": "23456789-0abc-def1-2345-6789abcdef01",
-        "__parent_extract_id": "12345678-90ab-cdef-1234-567890abcdef",
-        "__extract_datetime": "2023-01-01T12:00:00",
+        "__transmog_id": "23456789-0abc-def1-2345-6789abcdef01",
+        "__parent_transmog_id": "12345678-90ab-cdef-1234-567890abcdef",
+        "__transmog_datetime": "2023-01-01T12:00:00",
         "id": "101",
         "amount": "99.99"
     },
     {
-        "__extract_id": "3456789a-bcde-f123-4567-89abcdef0123",
-        "__parent_extract_id": "12345678-90ab-cdef-1234-567890abcdef",
-        "__extract_datetime": "2023-01-01T12:00:00",
+        "__transmog_id": "3456789a-bcde-f123-4567-89abcdef0123",
+        "__parent_transmog_id": "12345678-90ab-cdef-1234-567890abcdef",
+        "__transmog_datetime": "2023-01-01T12:00:00",
         "id": "102",
         "amount": "45.50"
     }
@@ -235,7 +235,7 @@ items_table = result.get_child_table("customer_orders_items")
 
 # Each level links to its parent
 print(f"Customer ID: {main_table[0]['id']}")
-print(f"Customer extract ID: {main_table[0]['__extract_id']}")
+print(f"Customer transmog ID: {main_table[0]['__transmog_id']}")
 
 for order in orders_table:
     print(f"Order {order['order_id']} has parent ID {order['__parent_id']}")
@@ -284,8 +284,8 @@ When processing nested data, Transmog:
 
 Transmog automatically maintains relationships between tables through ID fields:
 
-- Each record in the main table gets a unique `__extract_id` field
-- Child records contain a `__parent_extract_id` field that references their parent's `__extract_id`
+- Each record in the main table gets a unique `__transmog_id` field
+- Child records contain a `__parent_transmog_id` field that references their parent's `__transmog_id`
 - Each child table is named based on the parent entity name and the array field's path
 
 ```python
@@ -311,11 +311,11 @@ print(f"Main table has {len(main_table)} records")
 print(f"Orders table has {len(child_table)} records")
 
 # Parent record
-print(main_table[0])  # Contains __extract_id, id, name
+print(main_table[0])  # Contains __transmog_id, id, name
 
 # Child records - each links back to the parent
 for order in child_table:
-    print(f"Order {order['order_id']} belongs to parent {order['__parent_extract_id']}")
+    print(f"Order {order['order_id']} belongs to parent {order['__parent_transmog_id']}")
 ```
 
 ### ID Generation Strategies

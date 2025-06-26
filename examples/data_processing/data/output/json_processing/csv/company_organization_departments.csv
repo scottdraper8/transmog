@@ -1,4 +1,4 @@
-"id","name","head_count","__extract_id","__parent_extract_id","__extract_datetime","__array_field","__array_index"
+"id","name","head_count","__transmog_id","__parent_transmog_id","__transmog_datetime","__array_field","__array_index"
 101,"Engineering",50,"56b479cd-eadb-4296-9863-ce8f67fa22cc","87b9ddc7-196a-414f-a1d7-fa9c7cc076b7",2025-05-29 18:17:08.740026Z,"departments",0
 102,"Marketing",25,"176530be-fd82-4708-95a2-b9c2471dacf0","87b9ddc7-196a-414f-a1d7-fa9c7cc076b7",2025-05-29 18:17:08.740026Z,"departments",1
 103,"Finance",15,"cad5b479-e308-4773-8eb4-9726223ec21b","87b9ddc7-196a-414f-a1d7-fa9c7cc076b7",2025-05-29 18:17:08.740026Z,"departments",2

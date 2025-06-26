@@ -95,7 +95,7 @@ Process data with the current configuration.
 process(
     data: Union[dict[str, Any], list[dict[str, Any]], str, bytes],
     entity_name: str,
-    extract_time: Optional[Any] = None,
+    transmog_time: Optional[Any] = None,
 ) -> ProcessingResult
 ```
 
@@ -105,7 +105,7 @@ process(
 |-----------|------|---------|-------------|
 | data | Dict, list[Dict], str, bytes | Required | JSON data to process (dict, list, JSON string, file path, or bytes) |
 | entity_name | str | Required | Name of the entity (used for table naming) |
-| extract_time | Any | None | Extraction timestamp (current time if None) |
+| transmog_time | Any | None | Extraction timestamp (current time if None) |
 
 #### Returns
 
@@ -132,7 +132,7 @@ Process a file containing JSON data.
 process_file(
     file_path: str,
     entity_name: str,
-    extract_time: Optional[Any] = None,
+    transmog_time: Optional[Any] = None,
     input_format: str = "auto"
 ) -> ProcessingResult
 ```
@@ -143,7 +143,7 @@ process_file(
 |-----------|------|---------|-------------|
 | file_path | str | Required | Path to the file to process |
 | entity_name | str | Required | Name of the entity (used for table naming) |
-| extract_time | Any | None | Extraction timestamp (current time if None) |
+| transmog_time | Any | None | Extraction timestamp (current time if None) |
 | input_format | str | "auto" | Format of the input file ("json", "jsonl", "auto") |
 
 #### Example
@@ -161,7 +161,7 @@ Process a batch of records.
 process_batch(
     batch_data: list[dict[str, Any]],
     entity_name: str,
-    extract_time: Optional[Any] = None,
+    transmog_time: Optional[Any] = None,
 ) -> ProcessingResult
 ```
 
@@ -171,7 +171,7 @@ process_batch(
 |-----------|------|---------|-------------|
 | batch_data | list[dict[str, Any]] | Required | List of records to process |
 | entity_name | str | Required | Name of the entity (used for table naming) |
-| extract_time | Any | None | Extraction timestamp (current time if None) |
+| transmog_time | Any | None | Extraction timestamp (current time if None) |
 
 #### Example
 
@@ -190,7 +190,7 @@ process_chunked(
     data: Union[list[dict[str, Any]], str, Iterator[dict[str, Any]]],
     entity_name: str,
     chunk_size: int = 1000,
-    extract_time: Optional[Any] = None,
+    transmog_time: Optional[Any] = None,
     input_format: str = "auto"
 ) -> ProcessingResult
 ```
@@ -202,7 +202,7 @@ process_chunked(
 | data | list[Dict], str, Iterator[Dict] | Required | Data to process in chunks |
 | entity_name | str | Required | Name of the entity (used for table naming) |
 | chunk_size | int | 1000 | Number of records to process in each chunk |
-| extract_time | Any | None | Extraction timestamp (current time if None) |
+| transmog_time | Any | None | Extraction timestamp (current time if None) |
 | input_format | str | "auto" | Format of the input ("json", "jsonl", "auto") |
 
 #### Example
@@ -228,7 +228,7 @@ process_csv(
     encoding: str = "utf-8",
     infer_types: bool = True,
     sanitize_column_names: bool = True,
-    extract_time: Optional[Any] = None
+    transmog_time: Optional[Any] = None
 ) -> ProcessingResult
 ```
 
@@ -246,7 +246,7 @@ process_csv(
 | encoding | str | "utf-8" | File encoding |
 | infer_types | bool | True | Whether to infer data types |
 | sanitize_column_names | bool | True | Whether to clean up column names |
-| extract_time | Any | None | Extraction timestamp (current time if None) |
+| transmog_time | Any | None | Extraction timestamp (current time if None) |
 
 #### Example
 
@@ -272,7 +272,7 @@ stream_process(
     entity_name: str,
     output_format: str,
     output_destination: Union[str, IO[Any]],
-    extract_time: Optional[Any] = None,
+    transmog_time: Optional[Any] = None,
     **format_options
 ) -> None
 ```
@@ -285,7 +285,7 @@ stream_process(
 | entity_name | str | Required | Name of the entity (used for table naming) |
 | output_format | str | Required | Output format ("json", "csv", "parquet") |
 | output_destination | str, IO | Required | Output path or file-like object |
-| extract_time | Any | None | Extraction timestamp (current time if None) |
+| transmog_time | Any | None | Extraction timestamp (current time if None) |
 | **format_options | Any | {} | Format-specific options |
 
 #### Example
@@ -311,7 +311,7 @@ stream_process_file(
     entity_name: str,
     output_format: str,
     output_destination: Union[str, IO[Any]],
-    extract_time: Optional[Any] = None,
+    transmog_time: Optional[Any] = None,
     input_format: str = "auto",
     **format_options
 ) -> None
@@ -348,7 +348,7 @@ stream_process_csv(
     encoding: str = "utf-8",
     infer_types: bool = True,
     sanitize_column_names: bool = True,
-    extract_time: Optional[Any] = None,
+    transmog_time: Optional[Any] = None,
     **format_options
 ) -> None
 ```

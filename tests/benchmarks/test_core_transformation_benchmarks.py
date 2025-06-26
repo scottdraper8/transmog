@@ -271,7 +271,7 @@ class TestHierarchyBenchmarks:
             entity_name="benchmark",
             separator="_",
             cast_to_string=True,
-            extract_time=get_current_timestamp(),
+            transmog_time=get_current_timestamp(),
             deeply_nested_threshold=4,
             visit_arrays=True,
         )
@@ -295,7 +295,7 @@ class TestHierarchyBenchmarks:
             entity_name="benchmark",
             separator="_",
             cast_to_string=True,
-            extract_time=get_current_timestamp(),
+            transmog_time=get_current_timestamp(),
             deeply_nested_threshold=4,
             visit_arrays=visit_arrays,
         )

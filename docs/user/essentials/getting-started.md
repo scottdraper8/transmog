@@ -40,8 +40,8 @@ This outputs a list containing the flattened record:
 ```python
 [
     {
-        "__extract_id": "12345678-90ab-cdef-1234-567890abcdef",
-        "__extract_datetime": "2023-01-01T12:00:00",
+        "__transmog_id": "12345678-90ab-cdef-1234-567890abcdef",
+        "__transmog_datetime": "2023-01-01T12:00:00",
         "user_id": "1",
         "user_name": "John Doe",
         "user_contact_email": "john@example.com",
@@ -92,8 +92,8 @@ Output with forward slash separators:
 ```python
 [
     {
-        "__extract_id": "12345678-90ab-cdef-1234-567890abcdef",
-        "__extract_datetime": "2023-01-01T12:00:00",
+        "__transmog_id": "12345678-90ab-cdef-1234-567890abcdef",
+        "__transmog_datetime": "2023-01-01T12:00:00",
         "user/id": "1",
         "user/name": "John Doe",
         "user/contact/email": "john@example.com",
@@ -128,8 +128,8 @@ Output:
 ```python
 Main data: [
     {
-        "__extract_id": "12345678-90ab-cdef-1234-567890abcdef",
-        "__extract_datetime": "2023-01-01T12:00:00",
+        "__transmog_id": "12345678-90ab-cdef-1234-567890abcdef",
+        "__transmog_datetime": "2023-01-01T12:00:00",
         "user_id": "1",
         "user_name": "John Doe",
         "user_contact_email": "john@example.com",
@@ -141,18 +141,18 @@ Tables: ['users_user_orders']
 
 Orders: [
     {
-        "__extract_id": "23456789-0abc-def1-2345-6789abcdef01",
-        "__parent_extract_id": "12345678-90ab-cdef-1234-567890abcdef",
-        "__extract_datetime": "2023-01-01T12:00:00",
+        "__transmog_id": "23456789-0abc-def1-2345-6789abcdef01",
+        "__parent_transmog_id": "12345678-90ab-cdef-1234-567890abcdef",
+        "__transmog_datetime": "2023-01-01T12:00:00",
         "id": "101",
         "amount": "99.99",
         "__array_field": "orders",
         "__array_index": 0
     },
     {
-        "__extract_id": "3456789a-bcde-f123-4567-89abcdef0123",
-        "__parent_extract_id": "12345678-90ab-cdef-1234-567890abcdef",
-        "__extract_datetime": "2023-01-01T12:00:00",
+        "__transmog_id": "3456789a-bcde-f123-4567-89abcdef0123",
+        "__parent_transmog_id": "12345678-90ab-cdef-1234-567890abcdef",
+        "__transmog_datetime": "2023-01-01T12:00:00",
         "id": "102",
         "amount": "45.50",
         "__array_field": "orders",
