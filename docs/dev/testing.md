@@ -174,10 +174,10 @@ class TestFlattener:
         """Test basic JSON flattening functionality."""
         data = {"name": "John", "address": {"city": "NYC", "zip": "10001"}}
         result = flatten_json(data)
-        
+
         expected = {
             "name": "John",
-            "address_city": "NYC", 
+            "address_city": "NYC",
             "address_zip": "10001"
         }
         assert result == expected
@@ -186,7 +186,7 @@ class TestFlattener:
         """Test flattening with custom field separator."""
         data = {"user": {"name": "Alice", "age": 30}}
         result = flatten_json(data, separator=".")
-        
+
         expected = {
             "user.name": "Alice",
             "user.age": 30

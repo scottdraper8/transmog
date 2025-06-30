@@ -12,7 +12,7 @@ Transmog is a Python library for transforming nested JSON data into flat, struct
 Transmog provides a simplified API while preserving all advanced functionality:
 
 - **Simple API**: `tm.flatten()` for easy data transformation
-- **Streaming Support**: `tm.flatten_stream()` for memory-efficient processing  
+- **Streaming Support**: `tm.flatten_stream()` for memory-efficient processing
 - **File Processing**: `tm.flatten_file()` for direct file handling
 - **Advanced Features**: Full `Processor` API available for complex use cases
 - **Intuitive Results**: `FlattenResult` with `.main`, `.tables`, and `.save()` methods
@@ -32,7 +32,7 @@ result.save("output.json")  # Save to file
 # Stream large datasets
 tm.flatten_stream(large_data, "output/", format="parquet")
 
-# Process files directly  
+# Process files directly
 result = tm.flatten_file("data.json", name="products")
 ```
 
@@ -42,7 +42,7 @@ Transmog features:
 
 - **Simple API**: Easy-to-use functions for 90% of use cases
 - **Powerful Processing**: Flattens nested JSON/dict structures into relational tables
-- **Array Extraction**: Converts arrays into separate tables with parent-child relationships  
+- **Array Extraction**: Converts arrays into separate tables with parent-child relationships
 - **Multiple Formats**: Output to JSON, CSV, Parquet, and more
 - **Memory Efficient**: Streaming support for datasets that don't fit in memory
 - **Flexible IDs**: Auto-generate IDs or use existing natural ID fields
@@ -71,7 +71,7 @@ tm.flatten_stream(data, "output/", format="json")    # Memory-efficient streamin
 
 # Result manipulation
 result.main              # Main table
-result.tables           # Child tables dictionary  
+result.tables           # Child tables dictionary
 result.save("out.csv")  # Save to file
 
 ```

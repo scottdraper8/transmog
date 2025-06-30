@@ -45,7 +45,7 @@ This transforms the nested structure into relational tables that can be easily s
 The new simple API provides three main functions:
 
 - **`tm.flatten(data, name)`**: Process data in memory
-- **`tm.flatten_file(filepath, name)`**: Process files directly  
+- **`tm.flatten_file(filepath, name)`**: Process files directly
 - **`tm.flatten_stream(data, output_dir, name)`**: Stream large datasets to files
 
 ### FlattenResult
@@ -126,7 +126,7 @@ result.main[0]  # {"_id": "...", "user_name": "John", "user_age": "30"}
 # Input
 data = {"company": "TechCorp", "employees": [{"name": "Alice"}]}
 
-# Process  
+# Process
 result = tm.flatten(data, name="companies")
 
 # Output
@@ -143,7 +143,7 @@ data = {"user": {"profile": {"settings": {"theme": "dark"}}}}
 # Process
 result = tm.flatten(data, name="users")
 
-# Output  
+# Output
 result.main[0]  # {"_id": "...", "user_profile_settings_theme": "dark"}
 ```
 
@@ -222,7 +222,7 @@ from transmog.process import Processor
 processor = Processor.memory_optimized()
 result = processor.process(data, entity_name="users")
 
-# Performance-optimized processing  
+# Performance-optimized processing
 processor = Processor.performance_optimized()
 result = processor.process(data, entity_name="users")
 ```
@@ -258,5 +258,5 @@ for input_file in input_files:
 ## Next Steps
 
 - [Getting Started Guide](getting-started.md) - Learn the basic usage patterns
-- [Configuration Guide](configuration.md) - Master all configuration options  
+- [Configuration Guide](configuration.md) - Master all configuration options
 - [Processing Guide](../processing/processing-overview.md) - Understand data transformation

@@ -114,7 +114,7 @@ import os
 def process_chunk(chunk_file):
     # Process the chunk
     output_path = f"output/{os.path.basename(chunk_file).split('.')[0]}"
-    
+
     tm.flatten_stream(
         file_path=chunk_file,
         name="records",
@@ -122,7 +122,7 @@ def process_chunk(chunk_file):
         output_format="parquet",
         low_memory=True
     )
-    
+
     return f"Processed {chunk_file}"
 
 # List of chunk files (previously split large file)

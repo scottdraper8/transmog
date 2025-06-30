@@ -168,8 +168,8 @@ mixed_data = {
 
 # Process with natural ID discovery
 result = tm.flatten(
-    mixed_data, 
-    name="company", 
+    mixed_data,
+    name="company",
     id_field={"": "id", "company_departments": "dept_code"}
 )
 

@@ -138,7 +138,7 @@ The transformation can be customized using various parameters:
 ```python
 # Transform with custom naming options
 result = tm.flatten(
-    data=company_data, 
+    data=company_data,
     name="company",
     separator="_",       # Separator for table names
     array_suffix=""      # Suffix for array items

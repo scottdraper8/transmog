@@ -159,7 +159,7 @@ result = tm.flatten_file("data.json", name="user")
 
 # Process a CSV file
 result = tm.flatten_file(
-    "data.csv", 
+    "data.csv",
     name="employees",
     has_header=True,
     delimiter=",",

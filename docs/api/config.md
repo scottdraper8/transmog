@@ -185,7 +185,7 @@ result = tm.flatten(data, name="records")
 
 # Save with format-specific options
 result.save(
-    "output_directory", 
+    "output_directory",
     format="parquet",
     compression="snappy",
     row_group_size=10000
@@ -193,7 +193,7 @@ result.save(
 
 # Save as CSV with options
 result.save(
-    "output_directory", 
+    "output_directory",
     format="csv",
     include_header=True,
     delimiter=",",

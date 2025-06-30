@@ -50,7 +50,7 @@ You can specify which field to use for generating deterministic IDs at different
 ```python
 # Configure deterministic IDs based on specific fields for different tables
 result = tm.flatten(
-    data, 
+    data,
     name="store",
     id_field={
         "": "id",                     # Main table uses "id" field
@@ -81,7 +81,7 @@ def generate_customer_id(record):
 
 # Apply transformations during flattening
 result = tm.flatten(
-    data, 
+    data,
     name="store",
     transforms={
         "customer_id": generate_customer_id  # Transform customer_id field
@@ -171,7 +171,7 @@ data = {
 
 # Process with deterministic IDs for different tables
 result = tm.flatten(
-    data, 
+    data,
     name="store",
     id_field={
         "": "id",                        # Main table uses "id" field
@@ -210,7 +210,7 @@ def order_id_generator(record):
 
 # Process with custom ID generation through transforms
 result = tm.flatten(
-    data, 
+    data,
     name="store",
     transforms={
         "customer_id": customer_id_generator,

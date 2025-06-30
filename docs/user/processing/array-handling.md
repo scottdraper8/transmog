@@ -140,7 +140,7 @@ data = {
 
 # Process with specific arrays processed differently
 result = tm.flatten(
-    data, 
+    data,
     name="product",
     arrays={
         "tags": "inline",     # Keep tags as inline array

@@ -59,29 +59,29 @@ import transmog as tm
 
 # Process with "skip" error handling (skip problematic records)
 result = tm.flatten(
-    data, 
-    name="customers", 
+    data,
+    name="customers",
     error_handling="skip"
 )
 
 # Process with "warn" error handling (log warnings but continue)
 result = tm.flatten(
-    data, 
-    name="customers", 
+    data,
+    name="customers",
     error_handling="warn"
 )
 
 # Process with strict error handling (default)
 result = tm.flatten(
-    data, 
-    name="customers", 
+    data,
+    name="customers",
     error_handling="raise"
 )
 
 # Specify an error log file
 result = tm.flatten(
-    data, 
-    name="customers", 
+    data,
+    name="customers",
     error_handling="skip",
     error_log="errors.log"
 )
@@ -132,8 +132,8 @@ result = tm.flatten(data, name="customers", error_handling="skip")
 
 # Skip with error logging
 result = tm.flatten(
-    data, 
-    name="customers", 
+    data,
+    name="customers",
     error_handling="skip",
     error_log="errors.log"
 )
@@ -166,8 +166,8 @@ Transmog can automatically cast values to strings to prevent type errors:
 ```python
 # Enable automatic type casting
 result = tm.flatten(
-    data, 
-    name="customers", 
+    data,
+    name="customers",
     cast_to_string=True
 )
 ```
@@ -180,7 +180,7 @@ When processing JSON files that might be malformed:
 # Process potentially malformed JSON
 result = tm.flatten_file(
     "potentially_malformed.json",
-    name="customers", 
+    name="customers",
     error_handling="skip",
     allow_malformed=True
 )
@@ -193,8 +193,8 @@ You can combine different error handling options:
 ```python
 # Comprehensive error handling
 result = tm.flatten(
-    data, 
-    name="customers", 
+    data,
+    name="customers",
     error_handling="skip",
     error_log="errors.log",
     cast_to_string=True,
@@ -234,8 +234,8 @@ data = [
 
 # Process with skip error handling
 result = tm.flatten(
-    data, 
-    name="records", 
+    data,
+    name="records",
     error_handling="skip",
     error_log="errors.log"
 )
@@ -258,7 +258,7 @@ try:
         allow_malformed=True
     )
     print(f"Successfully processed {len(result.main)} records")
-    
+
 except tm.error.TransmogError as e:
     print(f"Failed to process file: {e}")
 ```

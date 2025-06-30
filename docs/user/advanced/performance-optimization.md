@@ -165,7 +165,7 @@ child_tables = {}
 for result in results:
     # Combine main table records
     main_records.extend(result.main)
-    
+
     # Combine child table records
     for table_name, records in result.tables.items():
         if table_name not in child_tables:
@@ -191,17 +191,17 @@ import os
 def process_file(file_path, output_dir):
     file_name = os.path.basename(file_path)
     output_name = os.path.splitext(file_name)[0]
-    
+
     # Process file
     result = tm.flatten_file(
         file_path,
         name=output_name,
         low_memory=True
     )
-    
+
     # Save result
     result.save(os.path.join(output_dir, output_name))
-    
+
     return f"Processed {file_name}"
 
 # Process multiple files in parallel
@@ -213,7 +213,7 @@ with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
         executor.submit(process_file, file_path, output_dir)
         for file_path in file_paths
     ]
-    
+
     # Print results as they complete
     for future in concurrent.futures.as_completed(futures):
         print(future.result())
@@ -261,7 +261,7 @@ def process_large_file(file_path, name, output_dir, chunk_size=10000, workers=4)
               for i in range(0, total_lines, chunk_size)]
 
     os.makedirs(output_dir, exist_ok=True)
-    
+
     with ProcessPoolExecutor(max_workers=workers) as executor:
         futures = [
             executor.submit(
@@ -328,7 +328,7 @@ if failed_chunks:
         try:
             # Try again with more lenient error handling
             result = tm.flatten(
-                chunks[i], 
+                chunks[i],
                 name="records",
                 error_handling="skip"
             )

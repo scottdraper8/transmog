@@ -42,7 +42,7 @@ employee_data = {
 
 # Process with deterministic IDs based on a specific field
 result = tm.flatten(
-    data=employee_data, 
+    data=employee_data,
     name="employee",
     id_field="employeeId"  # Use employeeId field for IDs
 )
@@ -70,7 +70,7 @@ id_mapping = {
 
 # Process with the mapping
 result = tm.flatten(
-    data=employee_data, 
+    data=employee_data,
     name="employee",
     id_field=id_mapping
 )
@@ -105,7 +105,7 @@ def project_id_generator(record):
 
 # Process with transforms
 result = tm.flatten(
-    data=employee_data, 
+    data=employee_data,
     name="employee",
     transforms={
         "employeeId": employee_id_generator,  # Transform employeeId field
@@ -142,7 +142,7 @@ def create_project_id(record):
 
 # Process with advanced transforms
 result = tm.flatten(
-    data=employee_data, 
+    data=employee_data,
     name="employee",
     transforms={
         "employeeId": create_employee_id,  # Transform employeeId
@@ -162,7 +162,7 @@ You can create hierarchical IDs by accessing parent information in your transfor
 ```python
 # First, process the data normally to get parent-child relationships
 result = tm.flatten(
-    data=employee_data, 
+    data=employee_data,
     name="employee",
     id_field={
         "": "employeeId",
@@ -178,7 +178,7 @@ projects = result.tables["employee_projects"]
 for project in projects:
     parent_id = project["_parent_id"]  # Contains the parent's ID
     project_id = project["projectId"]
-    
+
     # Create a hierarchical ID
     hierarchical_id = f"{parent_id}_PROJ_{project_id}"
     print(f"Hierarchical ID: {hierarchical_id}")
@@ -197,7 +197,7 @@ with open("employee.json", "w") as f:
 
 # Process the file with deterministic IDs
 result = tm.flatten_file(
-    "employee.json", 
+    "employee.json",
     name="employee",
     id_field="employeeId"
 )
@@ -207,7 +207,7 @@ result.save("output_directory")
 
 # Process the same file again - will produce identical IDs
 result2 = tm.flatten_file(
-    "employee.json", 
+    "employee.json",
     name="employee",
     id_field="employeeId"
 )
@@ -223,7 +223,7 @@ If your data already contains good ID fields, you can use the "auto" option to a
 ```python
 # Process with natural ID discovery
 result = tm.flatten(
-    data=employee_data, 
+    data=employee_data,
     name="employee",
     id_field="auto"  # Automatically discover ID fields
 )

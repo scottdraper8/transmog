@@ -18,27 +18,27 @@ import transmog as tm
 result = tm.flatten(
     data,
     name="users",
-    
+
     # ID generation options
     id_field="id",               # Use natural IDs when available
     parent_id_field="_parent_id", # Custom parent ID field name
     add_timestamp=True,           # Add processing timestamp
-    
+
     # Naming options
     separator=".",                # Use dots for nested fields
     nested_threshold=5,           # Control when to create child tables
-    
+
     # Array handling
     arrays="separate",            # How to handle arrays: "separate", "inline", or "skip"
-    
+
     # Data options
     preserve_types=False,         # Convert values to strings
     skip_null=True,               # Skip null values
     skip_empty=True,              # Skip empty values
-    
+
     # Error handling
     errors="skip",                # Skip problematic records
-    
+
     # Performance
     batch_size=1000,              # Batch size for processing
     low_memory=False              # Enable memory optimization
@@ -74,7 +74,7 @@ result = tm.flatten_file(
     name="records",              # Base name for tables
     format="json",               # Force specific format
     errors="warn",               # Log warnings but continue
-    
+
     # All other options from flatten() are also available
     separator=".",
     arrays="separate",
@@ -93,10 +93,10 @@ tm.flatten_stream(
     output_path="output/",       # Output directory or file
     name="big_data",             # Base name for tables
     format="parquet",            # Output format: "json", "csv", "parquet"
-    
+
     # Format-specific options
     compression="snappy",        # Compression for Parquet
-    
+
     # Processing options (same as flatten())
     batch_size=10000,            # Records per batch
     add_timestamp=True,          # Add timestamps
@@ -212,8 +212,8 @@ result = tm.flatten(data, name="users", id_field="user_id")
 
 # Simple API - use different fields for different tables
 result = tm.flatten(
-    data, 
-    name="users", 
+    data,
+    name="users",
     id_field={
         "": "id",                # Root level uses "id" field
         "users_orders": "order_id"  # Order records use "order_id" field

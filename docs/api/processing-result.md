@@ -43,7 +43,7 @@ result.save("output_directory", format="parquet")
 
 # Save with format-specific options
 result.save(
-    "output.csv", 
+    "output.csv",
     format="csv",
     delimiter="|",
     include_header=True

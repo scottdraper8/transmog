@@ -81,7 +81,7 @@ with warnings.catch_warnings(record=True) as w:
         name="customer",
         error_handling="warn"  # Log warnings but continue
     )
-    
+
     # Print captured warnings
     for warning in w:
         print(f"Warning: {warning.message}")

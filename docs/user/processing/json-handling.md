@@ -370,5 +370,3 @@ result.save("output/data.csv")  # Format detected from extension
 result = tm.flatten_file("data.json", name="data")
 result.save("output/data.parquet")
 ```
-
-

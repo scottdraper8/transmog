@@ -298,5 +298,3 @@ tm.flatten_stream(
     compression="snappy"  # Parquet-specific option
 )
 ```
-
-

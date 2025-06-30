@@ -281,7 +281,7 @@ json_files = [f for f in os.listdir("data_dir") if f.endswith(".json")]
 for file_name in json_files:
     input_path = os.path.join("data_dir", file_name)
     output_name = os.path.splitext(file_name)[0]
-    
+
     tm.flatten_stream(
         file_path=input_path,
         name=output_name,
@@ -319,7 +319,7 @@ tm.flatten_stream(
    ```python
    # Larger chunks for better performance (if memory allows)
    tm.flatten_stream(file_path="data.json", name="data", chunk_size=50000, ...)
-   
+
    # Smaller chunks for lower memory usage
    tm.flatten_stream(file_path="data.json", name="data", chunk_size=1000, ...)
    ```
@@ -328,7 +328,7 @@ tm.flatten_stream(
    ```python
    # Snappy for better speed
    tm.flatten_stream(..., compression="snappy")
-   
+
    # Zstd for better compression ratio
    tm.flatten_stream(..., compression="zstd")
    ```

@@ -221,7 +221,7 @@ result = tm.flatten_file(
 # Process tables one at a time without loading all into memory
 for table_name, records in result.iter_tables():
     print(f"Processing table {table_name} with {len(records)} records")
-    
+
     # Process records in batches
     batch_size = 100
     for i in range(0, len(records), batch_size):

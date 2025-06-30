@@ -86,9 +86,9 @@ result.save("output.csv")
 ```python
 # For very large datasets, stream directly to files
 tm.flatten_stream(
-    large_data, 
-    output_dir="output/", 
-    name="users", 
+    large_data,
+    output_dir="output/",
+    name="users",
     format="parquet"
 )
 ```
@@ -98,7 +98,7 @@ tm.flatten_stream(
 ```python
 # Customize the flattening behavior
 result = tm.flatten(
-    data, 
+    data,
     name="users",
     natural_ids=True,        # Use natural IDs when possible
     add_timestamp=True,      # Add timestamp to records
@@ -123,7 +123,7 @@ print(result.main[0])
 {
     "_id": "12345678-90ab-cdef-1234-567890abcdef",
     "user_id": "1",
-    "user_name": "John Doe", 
+    "user_name": "John Doe",
     "user_contact_email": "john@example.com",
     "user_contact_phone": "555-1234"
 }
@@ -150,7 +150,7 @@ print(orders)
         "_array_index": 0
     },
     {
-        "_id": "3456789a-bcde-f123-4567-89abcdef0123", 
+        "_id": "3456789a-bcde-f123-4567-89abcdef0123",
         "_parent_id": "12345678-90ab-cdef-1234-567890abcdef",
         "id": "102",
         "amount": "45.50",
