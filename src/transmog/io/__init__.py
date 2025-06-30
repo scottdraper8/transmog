@@ -39,8 +39,7 @@ def initialize_io_features() -> None:
     This function checks for optional dependencies and registers
     available formats and handlers.
     """
-    # Nothing special to do for now, as the imports above
-    # handle registration of basic formats
+    # Nothing special to do here, as imports are handled above
     pass
 
 

@@ -139,9 +139,17 @@ class JsonWriter(DataWriter):
                 return output_path
             # Handle file-like object destination
             elif hasattr(output_path, "write"):
-                # Text stream handling
-                if hasattr(output_path, "mode") and "b" not in getattr(
-                    output_path, "mode", ""
+                # Text stream handling - check for text-like characteristics
+                if (
+                    hasattr(output_path, "mode")
+                    and "b" not in getattr(output_path, "mode", "")
+                ) or (
+                    # StringIO and other text-like objects without mode attribute
+                    not hasattr(output_path, "mode")
+                    and hasattr(output_path, "read")
+                    and not hasattr(
+                        output_path, "readinto"
+                    )  # Binary streams have readinto
                 ):
                     text_output = cast(TextIO, output_path)
                     text_output.write(json_bytes.decode("utf-8"))
@@ -285,7 +293,7 @@ class JsonStreamingWriter(StreamingWriter):
         if table_name in self.file_objects:
             return self.file_objects[table_name]
 
-        # Create new file when base directory is specified
+        # Create file when base directory is specified
         if self.base_dir is not None:
             # Sanitize path
             safe_name = table_name.replace("/", "_").replace("\\", "_")

@@ -236,7 +236,7 @@ def get_jsonl_file_iterator(processor: Any, file_path: str) -> Iterator[dict[str
                     # Handle error based on recovery strategy
                     if (
                         processor.config.error_handling.recovery_strategy is None
-                        or processor.config.error_handling.recovery_strategy.is_strict()
+                        or processor.config.error_handling.recovery_strategy == "strict"
                     ):
                         error_details = str(e)
                         error_msg = (
@@ -301,7 +301,7 @@ def get_jsonl_data_iterator(
             # Handle error based on recovery strategy
             if (
                 processor.config.error_handling.recovery_strategy is None
-                or processor.config.error_handling.recovery_strategy.is_strict()
+                or processor.config.error_handling.recovery_strategy == "strict"
             ):
                 raise ParsingError(f"Invalid JSON at line {i + 1}: {str(e)}") from e
         except Exception as e:

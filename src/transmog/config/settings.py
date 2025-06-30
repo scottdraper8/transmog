@@ -485,7 +485,7 @@ class TransmogSettings:
         raise AttributeError(f"Setting '{name}' not found")
 
     def update(self, **kwargs: Any) -> None:
-        """Update settings with new values.
+        """Update settings with values.
 
         Args:
             **kwargs: Settings to update
@@ -503,7 +503,7 @@ class TransmogSettings:
         return dict(self._settings)
 
     def configure_logging(self) -> None:
-        """Configure logging based on current settings."""
+        """Configure logging based on settings."""
         log_level = self.get("log_level", logging.WARNING)
         log_format = self.get("log_format")
         log_file = self.get("log_file")

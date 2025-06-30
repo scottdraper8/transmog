@@ -72,7 +72,7 @@ def _extract_arrays_impl(
         id_generation_strategy: Custom function for ID generation
         recovery_strategy: Strategy for error recovery
         max_depth: Maximum recursion depth allowed
-        current_depth: Current depth in the recursion
+        current_depth: Depth in the recursion
         streaming_mode: Whether to operate in streaming mode
         id_field_patterns: List of field names to check for natural IDs
         id_field_mapping: Optional mapping of paths to specific ID fields
@@ -98,7 +98,7 @@ def _extract_arrays_impl(
         if key.startswith("__"):
             continue
 
-        # Build the current path for this field
+        # Build the path for this field
         current_path = f"{parent_path}{separator}{key}" if parent_path else key
 
         # Skip empty arrays and dictionaries
@@ -356,7 +356,7 @@ def extract_arrays(
         streaming: Whether to use streaming mode (returns generator)
         recovery_strategy: Strategy for error recovery
         max_depth: Maximum recursion depth allowed
-        current_depth: Current depth in the recursion
+        current_depth: Depth in the recursion
         id_field_patterns: List of field names to check for natural IDs
         id_field_mapping: Optional mapping of paths to specific ID fields
         force_transmog_id: If True, always add transmog ID
@@ -455,7 +455,7 @@ def stream_extract_arrays(
         id_generation_strategy: Custom function for ID generation
         recovery_strategy: Strategy for error recovery
         max_depth: Maximum recursion depth allowed
-        current_depth: Current depth in the recursion
+        current_depth: Depth in the recursion
         id_field_patterns: List of field names to check for natural IDs
         id_field_mapping: Optional mapping of paths to specific ID fields
         force_transmog_id: If True, always add transmog ID

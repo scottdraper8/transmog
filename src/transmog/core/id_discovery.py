@@ -38,7 +38,7 @@ def discover_id_field(
     Args:
         record: The record to search for ID fields
         id_field_patterns: List of field names to check (uses defaults if None)
-        path: The current path/table name for path-specific mappings
+        path: The path/table name for path-specific mappings
         id_field_mapping: Optional mapping of paths to specific ID fields
 
     Returns:
@@ -62,7 +62,11 @@ def discover_id_field(
                 return field_name
 
     # Use provided patterns or defaults
-    patterns = id_field_patterns or DEFAULT_ID_FIELD_PATTERNS
+    patterns = (
+        id_field_patterns
+        if id_field_patterns is not None
+        else DEFAULT_ID_FIELD_PATTERNS
+    )
 
     # Check each pattern
     for pattern in patterns:
@@ -110,7 +114,7 @@ def get_record_id(
     Args:
         record: The record to get ID from
         id_field_patterns: List of field names to check
-        path: The current path/table name
+        path: The path/table name
         id_field_mapping: Optional mapping of paths to specific ID fields
         fallback_field: Field to check if natural ID not found
 
@@ -142,7 +146,7 @@ def should_add_transmog_id(
     Args:
         record: The record to check
         id_field_patterns: List of field names to check
-        path: The current path/table name
+        path: The path/table name
         id_field_mapping: Optional mapping of paths to specific ID fields
         force_transmog_id: If True, always add transmog ID
 
@@ -175,7 +179,7 @@ def build_id_field_mapping(
 
     # Check for direct mapping
     if "id_field_mapping" in config:
-        # Ensure we're returning the correct type
+        # Ensure correct return type
         mapping = config["id_field_mapping"]
         if isinstance(mapping, dict):
             return {str(k): str(v) for k, v in mapping.items()}

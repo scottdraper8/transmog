@@ -101,7 +101,7 @@ def generate_composite_id(values: dict[str, Any], fields: list) -> str:
 def get_current_timestamp(
     format_string: Optional[str] = None, as_string: bool = True
 ) -> Any:
-    """Get current timestamp in UTC with caching for improved performance.
+    """Get timestamp in UTC with caching for improved performance.
 
     This function is cached to avoid excessive timestamp generation in batch processing.
     The cache has a small size since timestamp values change frequently.
@@ -113,15 +113,15 @@ def get_current_timestamp(
     Returns:
         Formatted timestamp string or datetime object
     """
-    now = datetime.now(timezone.utc)
+    timestamp = datetime.now(timezone.utc)
 
     if as_string and format_string:
-        return now.strftime(format_string)
+        return timestamp.strftime(format_string)
     elif as_string:
         # ISO format with microseconds
-        return now.strftime("%Y-%m-%d %H:%M:%S.%f")
+        return timestamp.strftime("%Y-%m-%d %H:%M:%S.%f")
 
-    return now
+    return timestamp
 
 
 def annotate_with_metadata(
@@ -183,10 +183,11 @@ def annotate_with_metadata(
     if parent_id is not None:
         annotated[parent_field] = parent_id
 
-    # Add transmog timestamp
-    if transmog_time is None:
-        transmog_time = get_current_timestamp()
-    annotated[time_field] = transmog_time
+    # Add transmog timestamp only if time_field is provided
+    if time_field:
+        if transmog_time is None:
+            transmog_time = get_current_timestamp()
+        annotated[time_field] = transmog_time
 
     # Add extra fields
     if extra_fields:
@@ -229,7 +230,7 @@ def create_batch_metadata(
         # Random UUID fallback
         batch_id = str(uuid.uuid4())
 
-    # Use current timestamp if not provided
+    # Use timestamp if not provided
     if transmog_time is None:
         transmog_time = get_current_timestamp()
 

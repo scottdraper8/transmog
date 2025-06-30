@@ -148,10 +148,13 @@ class CsvWriter(DataWriter):
                     # For file-like objects, just return without writing
                     return output_path
 
-            # Extract field names from the first record
-            field_names = list(table_data[0].keys())
+            # Extract field names from all records to handle varying schemas
+            field_names = set()
+            for record in table_data:
+                field_names.update(record.keys())
+            field_names = sorted(field_names)  # Sort for consistent ordering
 
-            # Determine whether we're writing to a file or file-like object
+            # Determine whether writing to a file or file-like object
             if isinstance(output_path, (str, pathlib.Path)):
                 # Convert to string if Path
                 path_str = str(output_path)
@@ -612,7 +615,7 @@ class CsvStreamingWriter(StreamingWriter):
         if table_name in self.file_objects:
             return self.file_objects[table_name]
 
-        # Create a new file
+        # Create a file
         if hasattr(self, "base_dir"):
             # Make sure paths are safe
             safe_name = table_name.replace("/", "_").replace("\\", "_")

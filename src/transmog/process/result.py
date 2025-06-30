@@ -18,6 +18,7 @@ from typing import (
     cast,
 )
 
+# Import writers to trigger registration
 from transmog.error import MissingDependencyError, OutputError
 from transmog.io.writer_factory import (
     create_streaming_writer,
@@ -974,7 +975,7 @@ class ProcessingResult(ResultInterface):
                 else:
                     combined_children[table_name] = records.copy()
 
-        # Create a new result
+        # Create a result
         combined_result = cls(
             combined_main,
             combined_children,
@@ -1010,7 +1011,7 @@ class ProcessingResult(ResultInterface):
         Raises:
             ValueError: If the format has no registered converter
         """
-        # Check if we have a converter function for this format
+        # Check if a converter function exists for this format
         if format_name in self._conversion_functions:
             # Call the converter function with this result
             converter = self._conversion_functions[format_name]
@@ -1041,13 +1042,13 @@ class ProcessingResult(ResultInterface):
         # self.child_tables = {}
 
     def with_conversion_mode(self, mode: ConversionMode) -> "ProcessingResult":
-        """Create a new result with a different conversion mode.
+        """Create a result with a different conversion mode.
 
         Args:
-            mode: New conversion mode to use
+            mode: Conversion mode to use
 
         Returns:
-            New ProcessingResult instance with the specified mode
+            ProcessingResult instance with the specified mode
         """
         return ProcessingResult(
             main_table=self.main_table,

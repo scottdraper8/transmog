@@ -25,7 +25,7 @@ def get_common_config_params(
     Returns:
         Dictionary of common configuration parameters
     """
-    # Use current timestamp if not provided
+    # Use timestamp if not provided
     if extract_time is None:
         extract_time = get_current_timestamp()
 

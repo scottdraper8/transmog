@@ -27,22 +27,8 @@ from transmog.config.validation import (
 )
 from transmog.error import ConfigurationError
 
-__all__ = [
-    "settings",
-    "extensions",
-    "load_profile",
-    "load_config",
-    "configure",
-    "TransmogSettings",
-    "ExtensionRegistry",
-    "ProcessingMode",
-    "NamingConfig",
-    "ProcessingConfig",
-    "MetadataConfig",
-    "ErrorHandlingConfig",
-    "TransmogConfig",
-    "validate_component_length",
-]
+# Internal use only - use the tm.flatten() API
+# These are still needed internally but not exported
 
 # Global instances
 settings = TransmogSettings()
@@ -128,6 +114,145 @@ class TransmogConfig:
     metadata: MetadataConfig = field(default_factory=MetadataConfig)
     error_handling: ErrorHandlingConfig = field(default_factory=ErrorHandlingConfig)
     cache_config: CacheConfig = field(default_factory=CacheConfig)
+
+    def __init__(
+        self,
+        # Component configs (existing)
+        naming: Optional[NamingConfig] = None,
+        processing: Optional[ProcessingConfig] = None,
+        metadata: Optional[MetadataConfig] = None,
+        error_handling: Optional[ErrorHandlingConfig] = None,
+        cache_config: Optional[CacheConfig] = None,
+        # Convenience parameters
+        batch_size: Optional[int] = None,
+        separator: Optional[str] = None,
+        cast_to_string: Optional[bool] = None,
+        include_empty: Optional[bool] = None,
+        skip_null: Optional[bool] = None,
+        visit_arrays: Optional[bool] = None,
+        deeply_nested_threshold: Optional[int] = None,
+        id_field: Optional[str] = None,
+        parent_field: Optional[str] = None,
+        time_field: Optional[str] = None,
+        recovery_strategy: Optional[str] = None,
+        allow_malformed_data: Optional[bool] = None,
+        cache_enabled: Optional[bool] = None,
+        cache_maxsize: Optional[int] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize TransmogConfig with component configs or convenience parameters.
+
+        Args:
+            naming: Complete naming configuration
+            processing: Complete processing configuration
+            metadata: Complete metadata configuration
+            error_handling: Complete error handling configuration
+            cache_config: Complete cache configuration
+
+            # Convenience parameters
+            batch_size: Batch size for processing
+            separator: Separator character for path components
+            cast_to_string: Whether to cast all values to strings
+            include_empty: Whether to include empty values
+            skip_null: Whether to skip null values
+            visit_arrays: Whether to process arrays into child tables
+            deeply_nested_threshold: Threshold for deeply nested paths
+            id_field: ID field name for metadata
+            parent_field: Parent ID field name for metadata
+            time_field: Timestamp field name for metadata
+            recovery_strategy: Error recovery strategy
+            allow_malformed_data: Whether to allow malformed data
+            cache_enabled: Whether to enable caching
+            cache_maxsize: Maximum cache size
+            **kwargs: Additional parameters for component configs
+        """
+        # Start with default component configs
+        self.naming = naming or NamingConfig()
+        self.processing = processing or ProcessingConfig()
+        self.metadata = metadata or MetadataConfig()
+        self.error_handling = error_handling or ErrorHandlingConfig()
+        self.cache_config = cache_config or CacheConfig()
+
+        # Apply convenience parameters to appropriate components
+        if batch_size is not None:
+            validate_batch_size(batch_size)
+            self.processing = dataclasses.replace(
+                self.processing, batch_size=batch_size
+            )
+
+        if separator is not None:
+            validate_separator(separator)
+            self.naming = dataclasses.replace(self.naming, separator=separator)
+
+        if cast_to_string is not None:
+            self.processing = dataclasses.replace(
+                self.processing, cast_to_string=cast_to_string
+            )
+
+        if include_empty is not None:
+            self.processing = dataclasses.replace(
+                self.processing, include_empty=include_empty
+            )
+
+        if skip_null is not None:
+            self.processing = dataclasses.replace(self.processing, skip_null=skip_null)
+
+        if visit_arrays is not None:
+            self.processing = dataclasses.replace(
+                self.processing, visit_arrays=visit_arrays
+            )
+
+        if deeply_nested_threshold is not None:
+            self.naming = dataclasses.replace(
+                self.naming, deeply_nested_threshold=deeply_nested_threshold
+            )
+
+        if id_field is not None:
+            validate_field_name(id_field)
+            self.metadata = dataclasses.replace(self.metadata, id_field=id_field)
+
+        if parent_field is not None:
+            validate_field_name(parent_field)
+            self.metadata = dataclasses.replace(
+                self.metadata, parent_field=parent_field
+            )
+
+        if time_field is not None:
+            validate_field_name(time_field)
+            self.metadata = dataclasses.replace(self.metadata, time_field=time_field)
+
+        if recovery_strategy is not None:
+            validate_recovery_strategy(recovery_strategy)
+            self.error_handling = dataclasses.replace(
+                self.error_handling, recovery_strategy=recovery_strategy
+            )
+
+        if allow_malformed_data is not None:
+            self.error_handling = dataclasses.replace(
+                self.error_handling, allow_malformed_data=allow_malformed_data
+            )
+
+        if cache_enabled is not None:
+            self.cache_config = dataclasses.replace(
+                self.cache_config, enabled=cache_enabled
+            )
+
+        if cache_maxsize is not None:
+            validate_cache_size(cache_maxsize)
+            self.cache_config = dataclasses.replace(
+                self.cache_config, maxsize=cache_maxsize
+            )
+
+        # Validate field name uniqueness for metadata
+        if (
+            self.metadata.id_field == self.metadata.parent_field
+            or self.metadata.id_field == self.metadata.time_field
+            or self.metadata.parent_field == self.metadata.time_field
+        ):
+            raise ConfigurationError(
+                f"Metadata field names must be unique. Got: "
+                f"id={self.metadata.id_field}, parent={self.metadata.parent_field}, time={self.metadata.time_field}"
+            )
 
     # Basic factories
 
@@ -294,6 +419,49 @@ class TransmogConfig:
             ),
         )
 
+    @classmethod
+    def json_optimized(cls) -> "TransmogConfig":
+        """Create a configuration optimized for JSON output.
+
+        This configuration preserves data types and produces clean JSON
+        with minimal metadata overhead.
+        """
+        return cls(
+            processing=ProcessingConfig(
+                cast_to_string=False,  # JSON can handle native types
+                include_empty=True,  # JSON can represent null/empty values
+                skip_null=False,  # Include nulls in JSON
+            ),
+            naming=NamingConfig(
+                separator="_",
+            ),
+        )
+
+    @classmethod
+    def parquet_optimized(cls) -> "TransmogConfig":
+        """Create a configuration optimized for Parquet output.
+
+        This configuration preserves data types and optimizes for
+        columnar storage efficiency.
+        """
+        return cls(
+            processing=ProcessingConfig(
+                cast_to_string=False,  # Parquet handles native types well
+                include_empty=False,  # Parquet efficiently handles nulls
+                skip_null=True,  # Skip nulls for better compression
+                batch_size=10000,  # Larger batches for Parquet efficiency
+                processing_mode=ProcessingMode.HIGH_PERFORMANCE,
+            ),
+            naming=NamingConfig(
+                separator="_",  # Parquet column names work well with underscores
+            ),
+            cache_config=CacheConfig(
+                enabled=True,
+                maxsize=50000,  # Larger cache for performance
+                clear_after_batch=False,
+            ),
+        )
+
     # Component-specific configuration methods
 
     def with_naming(
@@ -322,7 +490,7 @@ class TransmogConfig:
         return dataclasses.replace(self, naming=naming)
 
     def with_processing(self, **kwargs: Any) -> "TransmogConfig":
-        """Create a new configuration with updated processing settings.
+        """Create a configuration with updated processing settings.
 
         Args:
             **kwargs: Processing options to update
@@ -346,7 +514,7 @@ class TransmogConfig:
         )
 
     def with_metadata(self, **kwargs: Any) -> "TransmogConfig":
-        """Create a new configuration with updated metadata settings.
+        """Create a configuration with updated metadata settings.
 
         Args:
             **kwargs: Metadata options to update
@@ -391,7 +559,7 @@ class TransmogConfig:
         )
 
     def with_error_handling(self, **kwargs: Any) -> "TransmogConfig":
-        """Create a new configuration with updated error handling settings.
+        """Create a configuration with updated error handling settings.
 
         Args:
             **kwargs: Error handling options to update
@@ -512,7 +680,7 @@ class TransmogConfig:
     def disable_arrays(self) -> "TransmogConfig":
         """Configure to skip array processing and keep arrays as JSON strings.
 
-        This is useful when you want to keep arrays as single fields rather
+        This setting is useful when arrays should be kept as single fields rather
         than creating child tables.
 
         Returns:

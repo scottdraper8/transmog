@@ -107,7 +107,7 @@ _process_value_cached = _get_cached_process_value()
 
 
 def refresh_cache_config() -> None:
-    """Refresh the cache configuration based on current settings."""
+    """Refresh the cache configuration based on settings."""
     global _process_value_cached
     clear_caches()
     _process_value_cached = _get_cached_process_value()
@@ -219,7 +219,7 @@ def _flatten_json_core(
     if data is None:
         return {}
 
-    # Use data in place or create a new dictionary
+    # Use data in place or create a dictionary
     result = data if in_place else {}
 
     # Prevent excessive recursion
@@ -242,7 +242,7 @@ def _flatten_json_core(
                 result[key] = value
             continue
 
-        # Build the current path for this field
+        # Build the path for this field
         if path_parts_optimization and path_parts is not None:
             # Efficient path building without string concatenation
             current_parts = path_parts + [key]
@@ -289,7 +289,7 @@ def _flatten_json_core(
                     max_depth=max_depth,
                     deeply_nested_threshold=deeply_nested_threshold,
                     current_depth=current_depth + 1,
-                    in_place=False,  # Always create new dict for nested objects
+                    in_place=False,  # Always create dict for nested objects
                     context=context,
                     recovery_strategy=recovery_strategy,
                 )

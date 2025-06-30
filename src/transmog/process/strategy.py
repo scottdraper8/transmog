@@ -421,8 +421,7 @@ class FileStrategy(ProcessingStrategy):
                     result,
                 )
             elif file_ext == ".csv":
-                # This shouldn't typically happen as CSV files should be handled by
-                # CSVStrategy, but we'll provide a fallback to avoid errors
+                # CSVStrategy, but provide a fallback to avoid errors
                 logger.warning(
                     f"CSV file {file_path} being processed by FileStrategy "
                     f"instead of CSVStrategy"
@@ -806,14 +805,8 @@ class FileStrategy(ProcessingStrategy):
                 )
                 continue
 
-            # Skip null or empty records
-            if record is None:
-                logger.debug(f"Skipping null record at index {i}")
-                continue
-
-            # Get parent ID for this record
-            parent_id = main_ids[i]
-            if parent_id is None:
+            # Skip if valid parent ID unavailable
+            if main_ids[i] is None:
                 logger.warning(
                     f"Null parent ID for record at index {i}, skipping arrays"
                 )
@@ -825,6 +818,7 @@ class FileStrategy(ProcessingStrategy):
             # Extract arrays for this record
             arrays = extract_arrays(
                 record_copy,
+                parent_id=main_ids[i],
                 parent_id=parent_id,
                 entity_name=entity_name,
                 separator=params["separator"],
@@ -1276,7 +1270,7 @@ class ChunkedStrategy(ProcessingStrategy):
             if not isinstance(record, dict):
                 continue
 
-            # Add to current chunk
+            # Add to chunk
             accumulated_chunk.append(record)
 
             # Process chunk when it reaches the desired size
@@ -1392,12 +1386,13 @@ class ChunkedStrategy(ProcessingStrategy):
         """
         from ..core.hierarchy import process_structure
 
-        # Ensure we have valid parameters
+        # Use only as many IDs as available records
+        # Ensure valid parameters
         if len(batch) != len(main_ids):
             logger.warning(
                 f"Batch size mismatch: records={len(batch)}, ids={len(main_ids)}"
             )
-            # Use only as many IDs as we have records
+            # Use only as many IDs as available records
             main_ids = main_ids[: len(batch)]
 
         # Get processing parameters

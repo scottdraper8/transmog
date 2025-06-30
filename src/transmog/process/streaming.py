@@ -107,7 +107,7 @@ def _stream_process_batch(
 
     # Process child tables
     for table_name, records in child_tables_gen:
-        # Initialize table if we haven't seen it before
+        # Initialize table if not seen before
         if table_name not in child_tables_registry:
             writer.initialize_child_table(table_name)
             child_tables_registry[table_name] = True
