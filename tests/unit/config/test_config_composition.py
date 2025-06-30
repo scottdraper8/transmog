@@ -8,13 +8,13 @@ and composed to create complex configurations.
 import pytest
 
 from transmog.config import (
-    TransmogConfig,
+    CacheConfig,
+    ErrorHandlingConfig,
+    MetadataConfig,
     NamingConfig,
     ProcessingConfig,
-    MetadataConfig,
-    ErrorHandlingConfig,
-    CacheConfig,
     ProcessingMode,
+    TransmogConfig,
 )
 from transmog.error import ConfigurationError
 

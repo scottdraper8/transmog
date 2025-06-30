@@ -8,8 +8,8 @@ import pytest
 
 import transmog as tm
 from transmog.core.hierarchy import (
-    process_structure,
     process_record_batch,
+    process_structure,
     stream_process_records,
 )
 

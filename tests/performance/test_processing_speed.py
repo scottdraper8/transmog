@@ -4,9 +4,9 @@ Performance tests for processing speed.
 Tests processing speed benchmarks and performance optimization.
 """
 
-import time
 import json
 import tempfile
+import time
 from pathlib import Path
 
 import pytest

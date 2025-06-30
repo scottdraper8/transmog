@@ -8,13 +8,14 @@ memory optimization, and direct output to various formats.
 import json
 import os
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Dict, Iterator, List
+from typing import Any, Dict, List
 
 import pytest
 
 from transmog.config import ProcessingMode, TransmogConfig
-from transmog.error import FileError, ProcessingError, ConfigurationError
+from transmog.error import ConfigurationError, FileError, ProcessingError
 from transmog.process import Processor
 from transmog.process.streaming import (
     stream_process,

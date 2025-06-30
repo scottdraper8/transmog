@@ -4,16 +4,17 @@ Tests for CSV writer functionality.
 Tests CSV output, formatting, and writer interface implementation.
 """
 
-import pytest
 import csv
 import tempfile
-from pathlib import Path
-from typing import List, Dict, Any
 from io import StringIO
+from pathlib import Path
+from typing import Any, Dict, List
 
-from transmog.io.writers.csv import CsvWriter
-from transmog.io.writer_interface import DataWriter
+import pytest
+
 from transmog.error import OutputError
+from transmog.io.writer_interface import DataWriter
+from transmog.io.writers.csv import CsvWriter
 
 
 class TestCsvWriter:
@@ -66,7 +67,7 @@ class TestCsvWriter:
             assert Path(tmp_path).exists()
 
             # Verify content
-            with open(tmp_path, "r", newline="") as f:
+            with open(tmp_path, newline="") as f:
                 reader = csv.DictReader(f)
                 written_data = list(reader)
 
@@ -88,7 +89,7 @@ class TestCsvWriter:
             writer.write(sample_data, tmp_path)
 
             # Read raw content to check header
-            with open(tmp_path, "r") as f:
+            with open(tmp_path) as f:
                 lines = f.readlines()
 
             # First line should be header
@@ -112,7 +113,7 @@ class TestCsvWriter:
             writer.write(mixed_data, tmp_path)
 
             # Verify content
-            with open(tmp_path, "r", newline="") as f:
+            with open(tmp_path, newline="") as f:
                 reader = csv.DictReader(f)
                 written_data = list(reader)
 
@@ -136,7 +137,7 @@ class TestCsvWriter:
             writer.write(sparse_data, tmp_path)
 
             # Verify content
-            with open(tmp_path, "r", newline="") as f:
+            with open(tmp_path, newline="") as f:
                 reader = csv.DictReader(f)
                 written_data = list(reader)
 
@@ -168,7 +169,7 @@ class TestCsvWriter:
             # Verify file was created but is empty or has only header
             assert Path(tmp_path).exists()
 
-            with open(tmp_path, "r") as f:
+            with open(tmp_path) as f:
                 content = f.read().strip()
 
             # Should be empty or just contain empty header
@@ -188,7 +189,7 @@ class TestCsvWriter:
             writer.write(sample_data, tmp_path)
 
             # Read raw content to check delimiter
-            with open(tmp_path, "r") as f:
+            with open(tmp_path) as f:
                 content = f.read()
 
             # Should use semicolon delimiter
@@ -196,7 +197,7 @@ class TestCsvWriter:
             assert content.count(";") > content.count(",")
 
             # Verify content can be read back
-            with open(tmp_path, "r", newline="") as f:
+            with open(tmp_path, newline="") as f:
                 reader = csv.DictReader(f, delimiter=";")
                 written_data = list(reader)
 
@@ -216,7 +217,7 @@ class TestCsvWriter:
             writer.write(sample_data, tmp_path)
 
             # Verify content can be read back
-            with open(tmp_path, "r", newline="") as f:
+            with open(tmp_path, newline="") as f:
                 reader = csv.DictReader(f, quotechar="'")
                 written_data = list(reader)
 
@@ -244,7 +245,7 @@ class TestCsvWriter:
             writer.write(special_data, tmp_path)
 
             # Verify content can be read back correctly
-            with open(tmp_path, "r", newline="") as f:
+            with open(tmp_path, newline="") as f:
                 reader = csv.DictReader(f)
                 written_data = list(reader)
 
@@ -275,7 +276,7 @@ class TestCsvWriter:
             writer.write(unicode_data, tmp_path)
 
             # Verify content
-            with open(tmp_path, "r", newline="", encoding="utf-8") as f:
+            with open(tmp_path, newline="", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 written_data = list(reader)
 
@@ -304,7 +305,7 @@ class TestCsvWriter:
             writer.write(null_data, tmp_path)
 
             # Verify content
-            with open(tmp_path, "r", newline="") as f:
+            with open(tmp_path, newline="") as f:
                 reader = csv.DictReader(f)
                 written_data = list(reader)
 
@@ -338,7 +339,7 @@ class TestCsvWriter:
             assert file_size > 500000  # Should be substantial
 
             # Verify first and last records
-            with open(tmp_path, "r", newline="") as f:
+            with open(tmp_path, newline="") as f:
                 reader = csv.DictReader(f)
                 written_data = list(reader)
 
@@ -363,7 +364,7 @@ class TestCsvWriter:
             tmp_path = tmp.name
 
         try:
-            with open(tmp_path, "r", encoding="utf-8") as f:
+            with open(tmp_path, encoding="utf-8") as f:
                 content = f.read()
                 lines = content.strip().split("\n")
                 header_line = lines[0]
@@ -390,7 +391,7 @@ class TestCsvWriter:
             writer.write(sample_data, tmp_path)
 
             # Check that first line is data, not header
-            with open(tmp_path, "r") as f:
+            with open(tmp_path) as f:
                 first_line = f.readline().strip()
 
             # Should be data values, not field names
@@ -444,7 +445,7 @@ class TestCsvWriter:
             writer.write(sample_data, tmp_path)
 
             # Verify final content
-            with open(tmp_path, "r", newline="") as f:
+            with open(tmp_path, newline="") as f:
                 reader = csv.DictReader(f)
                 written_data = list(reader)
 
@@ -478,7 +479,7 @@ class TestCsvWriter:
                     assert Path(tmp_path).exists()
 
                     # Verify content can be read back
-                    with open(tmp_path, "r", newline="") as f:
+                    with open(tmp_path, newline="") as f:
                         reader = csv.DictReader(f, quoting=quoting)
                         written_data = list(reader)
 
@@ -507,7 +508,7 @@ class TestCsvWriter:
             writer.write(escape_data, tmp_path)
 
             # Verify content can be read back
-            with open(tmp_path, "r", newline="") as f:
+            with open(tmp_path, newline="") as f:
                 reader = csv.DictReader(f, quoting=csv.QUOTE_NONE, escapechar="\\")
                 written_data = list(reader)
 
@@ -570,7 +571,7 @@ class TestCsvWriter:
                 writer.write(thread_data, tmp_path)
 
                 # Verify written data
-                with open(tmp_path, "r", newline="") as f:
+                with open(tmp_path, newline="") as f:
                     reader = csv.DictReader(f)
                     written_data = list(reader)
 

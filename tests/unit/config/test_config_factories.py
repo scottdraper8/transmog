@@ -5,7 +5,8 @@ Tests pre-built configurations, factory methods, and configuration profiles.
 """
 
 import pytest
-from transmog.config import TransmogConfig, ProcessingMode
+
+from transmog.config import ProcessingMode, TransmogConfig
 from transmog.config.settings import TransmogSettings
 
 

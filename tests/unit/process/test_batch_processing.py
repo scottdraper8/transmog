@@ -4,12 +4,13 @@ Tests for batch processing functionality.
 Tests batch processing of records with different configurations and sizes.
 """
 
+from typing import Any, Dict, List
+
 import pytest
-from typing import List, Dict, Any
 
 from transmog.config import TransmogConfig
-from transmog.process import Processor
 from transmog.core.hierarchy import process_record_batch
+from transmog.process import Processor
 
 
 class TestBatchProcessing:

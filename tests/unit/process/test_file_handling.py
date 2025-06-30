@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from transmog.config import TransmogConfig
-from transmog.error import FileError, ProcessingError, ParsingError
+from transmog.error import FileError, ParsingError, ProcessingError
 from transmog.process import Processor
 from transmog.process.file_handling import (
     detect_input_format,
@@ -274,9 +274,9 @@ class TestFileHandlingEdgeCases:
     def test_csv_with_special_characters(self, processor):
         """Test CSV processing with special characters."""
         with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-            tmp.write("name,description\n".encode("utf-8"))
-            tmp.write('Test,"Hello, world!"\n'.encode("utf-8"))
-            tmp.write('Unicode,"测试 🌍"\n'.encode("utf-8"))
+            tmp.write(b"name,description\n")
+            tmp.write(b'Test,"Hello, world!"\n')
+            tmp.write('Unicode,"测试 🌍"\n'.encode())
             tmp_path = tmp.name
 
         try:

@@ -4,9 +4,10 @@ Tests for metadata generation and ID handling.
 Tests ID generation, timestamp handling, and metadata annotation.
 """
 
-import pytest
 import uuid
 from datetime import datetime
+
+import pytest
 
 from transmog.core.metadata import (
     TRANSMOG_NAMESPACE,

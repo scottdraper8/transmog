@@ -7,7 +7,7 @@ available in Transmog.
 
 import pytest
 
-from transmog.config import TransmogConfig, ProcessingMode
+from transmog.config import ProcessingMode, TransmogConfig
 from transmog.error import ConfigurationError
 
 

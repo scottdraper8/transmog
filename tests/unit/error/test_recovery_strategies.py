@@ -4,23 +4,24 @@ Tests for error recovery strategies.
 Tests different error recovery strategies and their behavior.
 """
 
-import pytest
 import logging
 import threading
 import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from transmog.error import (
-    ProcessingError,
-    ParsingError,
     FileError,
+    ParsingError,
+    ProcessingError,
     TransmogError,
 )
 from transmog.error.recovery import (
-    RecoveryStrategy,
-    StrictRecovery,
-    SkipAndLogRecovery,
     PartialProcessingRecovery,
+    RecoveryStrategy,
+    SkipAndLogRecovery,
+    StrictRecovery,
     with_recovery,
 )
 

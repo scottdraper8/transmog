@@ -10,7 +10,8 @@ from pathlib import Path
 import pytest
 
 import transmog as tm
-from ...conftest import assert_files_created, load_json_file, count_files_in_dir
+
+from ...conftest import assert_files_created, count_files_in_dir, load_json_file
 
 
 class TestFlattenResultBasics:

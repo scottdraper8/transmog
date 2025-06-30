@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from transmog.config import TransmogConfig
-from transmog.error import FileError, ParsingError, ValidationError, ProcessingError
+from transmog.error import FileError, ParsingError, ProcessingError, ValidationError
 from transmog.process import Processor
 from transmog.process.data_iterators import (
     get_data_iterator,

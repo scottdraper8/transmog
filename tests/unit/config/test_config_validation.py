@@ -7,14 +7,14 @@ Tests validation of configuration parameters, type checking, and error handling.
 import pytest
 
 from transmog.config import (
-    TransmogConfig,
+    MetadataConfig,
     NamingConfig,
     ProcessingConfig,
-    MetadataConfig,
+    TransmogConfig,
 )
 from transmog.config.naming import NamingOptions
 from transmog.config.process import ProcessingConfig as ProcessingConfigClass
-from transmog.error import ValidationError, ConfigurationError
+from transmog.error import ConfigurationError, ValidationError
 
 
 class TestTransmogConfigValidation:

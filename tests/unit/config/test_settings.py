@@ -5,6 +5,7 @@ Tests settings configuration, environment variables, and global options.
 """
 
 import os
+
 import pytest
 
 from transmog.config import settings

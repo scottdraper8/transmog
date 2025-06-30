@@ -11,8 +11,8 @@ from pathlib import Path
 import pytest
 
 from transmog.io.readers.json import (
-    JsonReader,
     JsonlReader,
+    JsonReader,
     read_json_file,
     read_jsonl_file,
 )

@@ -4,15 +4,16 @@ Tests for JSON writer functionality.
 Tests JSON output, formatting, and writer interface implementation.
 """
 
-import pytest
 import json
 import tempfile
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
-from transmog.io.writers.json import JsonWriter
-from transmog.io.writer_interface import DataWriter
+import pytest
+
 from transmog.error import OutputError
+from transmog.io.writer_interface import DataWriter
+from transmog.io.writers.json import JsonWriter
 
 
 class TestJsonWriter:
@@ -68,7 +69,7 @@ class TestJsonWriter:
             assert Path(tmp_path).exists()
 
             # Verify content
-            with open(tmp_path, "r") as f:
+            with open(tmp_path) as f:
                 written_data = json.load(f)
 
             assert written_data == sample_data
@@ -87,7 +88,7 @@ class TestJsonWriter:
             writer.write(sample_data, tmp_path)
 
             # Read raw content to check formatting
-            with open(tmp_path, "r") as f:
+            with open(tmp_path) as f:
                 content = f.read()
 
             # Should have indentation
@@ -112,7 +113,7 @@ class TestJsonWriter:
             writer.write(sample_data, tmp_path)
 
             # Read raw content
-            with open(tmp_path, "r") as f:
+            with open(tmp_path) as f:
                 content = f.read()
 
             # Should be compact (no extra spaces)
@@ -137,7 +138,7 @@ class TestJsonWriter:
             writer.write(complex_data, tmp_path)
 
             # Verify content
-            with open(tmp_path, "r") as f:
+            with open(tmp_path) as f:
                 written_data = json.load(f)
 
             assert written_data == complex_data
@@ -159,7 +160,7 @@ class TestJsonWriter:
             writer.write([], tmp_path)
 
             # Verify content
-            with open(tmp_path, "r") as f:
+            with open(tmp_path) as f:
                 written_data = json.load(f)
 
             assert written_data == []
@@ -179,7 +180,7 @@ class TestJsonWriter:
             writer.write([single_record], tmp_path)
 
             # Verify content
-            with open(tmp_path, "r") as f:
+            with open(tmp_path) as f:
                 written_data = json.load(f)
 
             assert written_data == [single_record]
@@ -206,7 +207,7 @@ class TestJsonWriter:
             writer.write(unicode_data, tmp_path)
 
             # Verify content
-            with open(tmp_path, "r", encoding="utf-8") as f:
+            with open(tmp_path, encoding="utf-8") as f:
                 written_data = json.load(f)
 
             assert written_data == unicode_data
@@ -232,7 +233,7 @@ class TestJsonWriter:
             writer.write(special_data, tmp_path)
 
             # Verify content
-            with open(tmp_path, "r") as f:
+            with open(tmp_path) as f:
                 written_data = json.load(f)
 
             assert written_data == special_data
@@ -298,7 +299,7 @@ class TestJsonWriter:
             assert file_size > 1000000  # Should be > 1MB
 
             # Verify first and last records
-            with open(tmp_path, "r") as f:
+            with open(tmp_path) as f:
                 written_data = json.load(f)
 
             assert len(written_data) == 10000
@@ -333,7 +334,7 @@ class TestJsonWriter:
             writer.write(data_with_datetime, tmp_path)
 
             # Verify content
-            with open(tmp_path, "r") as f:
+            with open(tmp_path) as f:
                 content = f.read()
                 assert "2023-01-01T12:00:00" in content
                 assert "2023-01-02T13:30:00" in content
@@ -372,7 +373,7 @@ class TestJsonWriter:
             writer.write(sample_data, tmp_path)
 
             # Verify final content
-            with open(tmp_path, "r") as f:
+            with open(tmp_path) as f:
                 written_data = json.load(f)
 
             assert written_data == sample_data
@@ -404,7 +405,7 @@ class TestJsonWriter:
                 # Verify file was created and is valid JSON
                 assert Path(tmp_path).exists()
 
-                with open(tmp_path, "r") as f:
+                with open(tmp_path) as f:
                     written_data = json.load(f)
 
                 assert written_data == sample_data
@@ -484,7 +485,7 @@ class TestJsonWriter:
                 writer.write(thread_data, tmp_path)
 
                 # Verify written data
-                with open(tmp_path, "r") as f:
+                with open(tmp_path) as f:
                     written_data = json.load(f)
 
                 results.append((thread_id, len(written_data)))

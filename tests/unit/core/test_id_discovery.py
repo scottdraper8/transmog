@@ -4,15 +4,16 @@ Tests for ID discovery functionality.
 Tests natural ID field discovery and ID extraction from records.
 """
 
+from typing import Any, Dict, List, Optional
+
 import pytest
-from typing import Dict, Any, Optional, List
 
 from transmog.core.id_discovery import (
     DEFAULT_ID_FIELD_PATTERNS,
+    build_id_field_mapping,
     discover_id_field,
     get_record_id,
     should_add_transmog_id,
-    build_id_field_mapping,
 )
 
 

@@ -4,8 +4,9 @@ Tests for array extraction functionality.
 Tests the core array extraction logic, array processing modes, and nested array handling.
 """
 
-import pytest
 from datetime import datetime
+
+import pytest
 
 import transmog as tm
 from transmog.core.extractor import extract_arrays, stream_extract_arrays

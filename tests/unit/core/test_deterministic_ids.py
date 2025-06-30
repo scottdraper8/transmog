@@ -4,13 +4,14 @@ Tests for deterministic ID generation.
 Tests deterministic ID generation, composite IDs, and reproducible behavior.
 """
 
-import pytest
 import hashlib
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+
+import pytest
 
 from transmog.core.metadata import (
-    generate_deterministic_id,
     generate_composite_id,
+    generate_deterministic_id,
 )
 
 

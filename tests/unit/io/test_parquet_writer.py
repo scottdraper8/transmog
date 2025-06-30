@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from transmog.io.writers.parquet import ParquetWriter
 from transmog.error import OutputError
+from transmog.io.writers.parquet import ParquetWriter
 
 
 class TestParquetWriter:

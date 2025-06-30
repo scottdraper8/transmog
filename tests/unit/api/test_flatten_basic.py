@@ -10,7 +10,8 @@ from pathlib import Path
 import pytest
 
 import transmog as tm
-from ...conftest import assert_valid_result, assert_files_created, load_json_file
+
+from ...conftest import assert_files_created, assert_valid_result, load_json_file
 
 
 class TestFlattenFunction:

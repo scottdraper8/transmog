@@ -40,7 +40,7 @@ class TestJsonToCsvConversion:
         # Read and verify CSV content
         import csv
 
-        with open(main_csv, "r") as f:
+        with open(main_csv) as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 
@@ -108,7 +108,7 @@ class TestJsonToCsvConversion:
 
                 import csv
 
-                with open(company_csv, "r") as f:
+                with open(company_csv) as f:
                     reader = csv.DictReader(f)
                     rows = list(reader)
                     assert len(rows) == 1
@@ -120,7 +120,7 @@ class TestJsonToCsvConversion:
 
                 import csv
 
-                with open(employees_csv, "r") as f:
+                with open(employees_csv) as f:
                     reader = csv.DictReader(f)
                     rows = list(reader)
                     assert len(rows) == 2  # Alice and Bob
@@ -143,7 +143,7 @@ class TestJsonToCsvConversion:
 
         import csv
 
-        with open(main_csv, "r") as f:
+        with open(main_csv) as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 
@@ -169,7 +169,7 @@ class TestJsonToCsvConversion:
 
         import csv
 
-        with open(main_csv, "r") as f:
+        with open(main_csv) as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 
@@ -196,7 +196,7 @@ class TestJsonToCsvConversion:
         # Verify record count
         import csv
 
-        with open(main_csv, "r") as f:
+        with open(main_csv) as f:
             reader = csv.DictReader(f)
             row_count = sum(1 for _ in reader)
 
@@ -222,7 +222,7 @@ class TestJsonToCsvOptions:
 
         import csv
 
-        with open(main_csv, "r") as f:
+        with open(main_csv) as f:
             reader = csv.DictReader(f)
             headers = reader.fieldnames
 
@@ -247,7 +247,7 @@ class TestJsonToCsvOptions:
 
         import csv
 
-        with open(main_csv, "r") as f:
+        with open(main_csv) as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 
@@ -272,7 +272,7 @@ class TestJsonToCsvOptions:
 
         import csv
 
-        with open(main_csv, "r") as f:
+        with open(main_csv) as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 
@@ -296,7 +296,7 @@ class TestJsonToCsvOptions:
 
         import csv
 
-        with open(main_csv, "r") as f:
+        with open(main_csv) as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 
@@ -350,7 +350,7 @@ class TestJsonToCsvEdgeCases:
 
         import csv
 
-        with open(main_csv, "r", encoding="utf-8") as f:
+        with open(main_csv, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 
@@ -384,7 +384,7 @@ class TestJsonToCsvEdgeCases:
 
         import csv
 
-        with open(main_csv, "r") as f:
+        with open(main_csv) as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 
@@ -420,7 +420,7 @@ class TestJsonToCsvEdgeCases:
 
         import csv
 
-        with open(main_csv, "r") as f:
+        with open(main_csv) as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 

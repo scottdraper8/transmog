@@ -4,19 +4,20 @@ Tests for FlattenResult edge cases and error conditions.
 Tests edge cases, error conditions, and boundary conditions specific to FlattenResult.
 """
 
-import pytest
-import tempfile
 import json
 import os
+import tempfile
 from pathlib import Path
-from unittest.mock import patch, mock_open
+from unittest.mock import mock_open, patch
+
+import pytest
 
 import transmog as tm
 from transmog.error import (
-    ProcessingError,
-    ValidationError,
     FileError,
     OutputError,
+    ProcessingError,
+    ValidationError,
 )
 
 

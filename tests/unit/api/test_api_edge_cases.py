@@ -4,17 +4,18 @@ Tests for API edge cases and error conditions.
 Tests edge cases, error conditions, and boundary conditions for the main API.
 """
 
-import pytest
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 import transmog as tm
 from transmog.error import (
+    ConfigurationError,
+    FileError,
     ProcessingError,
     ValidationError,
-    FileError,
-    ConfigurationError,
 )
 
 

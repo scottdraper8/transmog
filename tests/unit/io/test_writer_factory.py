@@ -4,21 +4,22 @@ Tests for writer factory functionality.
 Tests the factory functions for creating writers for different formats.
 """
 
-import pytest
 import threading
 import time
 from io import StringIO
 from pathlib import Path
 
+import pytest
+
+from transmog.error.exceptions import ConfigurationError, MissingDependencyError
 from transmog.io.writer_factory import (
-    create_writer,
     create_streaming_writer,
+    create_writer,
     get_supported_formats,
+    get_supported_streaming_formats,
     is_format_available,
     is_streaming_format_available,
-    get_supported_streaming_formats,
 )
-from transmog.error.exceptions import ConfigurationError, MissingDependencyError
 
 
 class TestWriterFactory:
@@ -111,7 +112,7 @@ class TestWriterFactoryIntegration:
         # Verify content
         import json
 
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             loaded_data = json.load(f)
 
         assert len(loaded_data) == 2
@@ -134,7 +135,7 @@ class TestWriterFactoryIntegration:
         # Verify content
         import csv
 
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter=";")
             rows = list(reader)
 
