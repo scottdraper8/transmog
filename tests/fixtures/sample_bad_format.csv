@@ -1,6 +1,0 @@
-id,name,age,active,score
-1,"John Doe,33,true,85.5
-2,Jane Smith,28,maybe,92.3
-3,Bob Johnson,45,false,not_a_number
-4,Alice Brown,thirty-nine,true,88.7
-5,Charlie Wilson,51,false,73.1,extra_column
