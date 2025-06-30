@@ -180,7 +180,7 @@ For detailed explanation of each example, see the inline comments in each exampl
 
 ### Primitive Arrays
 
-Transmog now processes arrays of primitive values (strings, numbers, booleans) as child tables,
+Transmog processes arrays of primitive values (strings, numbers, booleans) as child tables,
 similar to how it processes arrays of objects. Each primitive value in an array becomes a record
 in a child table with a `value` field containing the primitive value.
 
@@ -213,7 +213,7 @@ result = processor.process(data, entity_name="example")
 tags_table = result.get_child_table("example_tags")
 scores_table = result.get_child_table("example_scores")
 
-# Each tag is now a record with a "value" field
+# Each tag is a record with a "value" field
 for tag in tags_table:
     print(f"Tag: {tag['value']}")
 ```

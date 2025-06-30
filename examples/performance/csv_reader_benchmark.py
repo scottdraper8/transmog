@@ -1,6 +1,6 @@
 """Example Name: CSV Reader Performance Benchmark.
 
-Demonstrates: Benchmarking different CSV reader implementations in Transmog.
+Demonstrates: Benchmarking different CSV reader implementations in Transmog v1.1.0.
 
 Related Documentation:
 - https://transmog.readthedocs.io/en/latest/user/processing/csv-processing.html
@@ -11,6 +11,7 @@ Learning Objectives:
 - Understand when to use each reader
 - Learn about performance optimization techniques
 - See the impact of file size on reader selection
+- Show both simple API and advanced Processor usage for benchmarking
 """
 
 import csv
@@ -59,15 +60,53 @@ def create_csv_file(num_records: int, num_columns: int = 10) -> str:
     return filepath
 
 
-def benchmark_csv_reader(filepath: str, force_native: bool = False) -> dict[str, Any]:
-    """Benchmark CSV reader performance."""
+def benchmark_csv_simple_api(
+    filepath: str, force_native: bool = False
+) -> dict[str, Any]:
+    """Benchmark CSV reader performance using the simple API."""
     # Set environment variable if forcing native reader
     if force_native:
         os.environ["TRANSMOG_FORCE_NATIVE_CSV"] = "true"
 
     try:
-        # Create processor
-        processor = tm.Processor()
+        # Time the processing using simple API
+        start_time = time.perf_counter()
+        result = tm.flatten_file(filepath, name="benchmark_data")
+        end_time = time.perf_counter()
+
+        # Calculate metrics
+        elapsed_time = end_time - start_time
+        records = result.main
+        num_records = len(records)
+        records_per_second = num_records / elapsed_time if elapsed_time > 0 else 0
+
+        return {
+            "time": elapsed_time,
+            "records": num_records,
+            "records_per_second": records_per_second,
+            "reader": "native" if force_native else "adaptive",
+            "api": "simple",
+        }
+
+    finally:
+        # Clean up environment variable
+        if force_native:
+            os.environ.pop("TRANSMOG_FORCE_NATIVE_CSV", None)
+
+
+def benchmark_csv_advanced_api(
+    filepath: str, force_native: bool = False
+) -> dict[str, Any]:
+    """Benchmark CSV reader performance using the advanced Processor API."""
+    # Set environment variable if forcing native reader
+    if force_native:
+        os.environ["TRANSMOG_FORCE_NATIVE_CSV"] = "true"
+
+    try:
+        # For advanced benchmarking, use the Processor directly
+        from transmog.process import Processor
+
+        processor = Processor()
 
         # Time the processing
         start_time = time.perf_counter()
@@ -87,6 +126,7 @@ def benchmark_csv_reader(filepath: str, force_native: bool = False) -> dict[str,
             "records": num_records,
             "records_per_second": records_per_second,
             "reader": "native" if force_native else "adaptive",
+            "api": "advanced",
         }
 
     finally:
@@ -102,11 +142,12 @@ def format_number(num: float) -> str:
 
 def main():
     """Run the CSV reader performance benchmark."""
-    print("=== CSV Reader Performance Benchmark ===")
+    print("=== CSV Reader Performance Benchmark (Transmog v1.1.0) ===")
     print(
-        "\nThis benchmark compares CSV reader performance across different file sizes."
+        "\nThis benchmark compares CSV reader performance across different file sizes"
     )
-    print("Testing adaptive reader selection vs forced native reader.\n")
+    print("and APIs. Testing adaptive reader selection vs forced native reader.")
+    print("Also comparing the new simple API vs advanced Processor API.\n")
 
     # Test different file sizes
     test_sizes = [
@@ -128,28 +169,52 @@ def main():
         print(f"File size: {file_size:.2f} MB")
 
         try:
-            # Test with adaptive reader selection
-            print("\nTesting with adaptive reader selection...")
-            adaptive_result = benchmark_csv_reader(filepath, force_native=False)
-            print(f"  Time: {adaptive_result['time']:.4f}s")
+            # Test simple API with adaptive reader selection
+            print("\nTesting simple API with adaptive reader...")
+            simple_adaptive = benchmark_csv_simple_api(filepath, force_native=False)
+            print(f"  Time: {simple_adaptive['time']:.4f}s")
             print(
-                f"  Records/sec: {format_number(adaptive_result['records_per_second'])}"
+                f"  Records/sec: {format_number(simple_adaptive['records_per_second'])}"
             )
 
-            # Test with forced native reader
-            print("\nTesting with forced native reader...")
-            native_result = benchmark_csv_reader(filepath, force_native=True)
-            print(f"  Time: {native_result['time']:.4f}s")
+            # Test simple API with forced native reader
+            print("\nTesting simple API with native reader...")
+            simple_native = benchmark_csv_simple_api(filepath, force_native=True)
+            print(f"  Time: {simple_native['time']:.4f}s")
             print(
-                f"  Records/sec: {format_number(native_result['records_per_second'])}"
+                f"  Records/sec: {format_number(simple_native['records_per_second'])}"
             )
 
-            # Calculate speedup
-            speedup = native_result["time"] / adaptive_result["time"]
-            if speedup > 1:
-                print(f"\n  → Adaptive is {speedup:.2f}x faster")
-            else:
-                print(f"\n  → Native is {1 / speedup:.2f}x faster")
+            # Test advanced API with adaptive reader selection
+            print("\nTesting advanced API with adaptive reader...")
+            advanced_adaptive = benchmark_csv_advanced_api(filepath, force_native=False)
+            print(f"  Time: {advanced_adaptive['time']:.4f}s")
+            print(
+                f"  Records/sec: {format_number(advanced_adaptive['records_per_second'])}"
+            )
+
+            # Test advanced API with forced native reader
+            print("\nTesting advanced API with native reader...")
+            advanced_native = benchmark_csv_advanced_api(filepath, force_native=True)
+            print(f"  Time: {advanced_native['time']:.4f}s")
+            print(
+                f"  Records/sec: {format_number(advanced_native['records_per_second'])}"
+            )
+
+            # Calculate speedups
+            simple_speedup = simple_native["time"] / simple_adaptive["time"]
+            advanced_speedup = advanced_native["time"] / advanced_adaptive["time"]
+            api_speedup = advanced_adaptive["time"] / simple_adaptive["time"]
+
+            print(
+                f"\n  → Simple API: {'Adaptive' if simple_speedup > 1 else 'Native'} is {max(simple_speedup, 1 / simple_speedup):.2f}x faster"
+            )
+            print(
+                f"  → Advanced API: {'Adaptive' if advanced_speedup > 1 else 'Native'} is {max(advanced_speedup, 1 / advanced_speedup):.2f}x faster"
+            )
+            print(
+                f"  → API Comparison: {'Advanced' if api_speedup > 1 else 'Simple'} API is {max(api_speedup, 1 / api_speedup):.2f}x faster"
+            )
 
             # Store results
             results.append(
@@ -157,9 +222,13 @@ def main():
                     "size": num_records,
                     "description": description,
                     "file_size_mb": file_size,
-                    "adaptive": adaptive_result,
-                    "native": native_result,
-                    "speedup": speedup,
+                    "simple_adaptive": simple_adaptive,
+                    "simple_native": simple_native,
+                    "advanced_adaptive": advanced_adaptive,
+                    "advanced_native": advanced_native,
+                    "simple_speedup": simple_speedup,
+                    "advanced_speedup": advanced_speedup,
+                    "api_speedup": api_speedup,
                 }
             )
 
@@ -168,55 +237,72 @@ def main():
             os.unlink(filepath)
 
     # Summary
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 80)
     print("PERFORMANCE SUMMARY")
-    print("=" * 60)
+    print("=" * 80)
 
     print(
-        "\n{:<20} {:<15} {:<15} {:<15}".format(
-            "File Size", "Adaptive (s)", "Native (s)", "Winner"
+        "\n{:<20} {:<12} {:<12} {:<12} {:<12} {:<10}".format(
+            "File Size", "Simple-A", "Simple-N", "Adv-A", "Adv-N", "Best"
         )
     )
-    print("-" * 65)
+    print("-" * 78)
 
     for result in results:
-        adaptive_time = result["adaptive"]["time"]
-        native_time = result["native"]["time"]
-        winner = "Adaptive" if result["speedup"] > 1 else "Native"
+        simple_a = result["simple_adaptive"]["time"]
+        simple_n = result["simple_native"]["time"]
+        adv_a = result["advanced_adaptive"]["time"]
+        adv_n = result["advanced_native"]["time"]
+
+        times = [
+            ("Simple-A", simple_a),
+            ("Simple-N", simple_n),
+            ("Adv-A", adv_a),
+            ("Adv-N", adv_n),
+        ]
+        best = min(times, key=lambda x: x[1])[0]
 
         print(
-            "{:<20} {:<15.4f} {:<15.4f} {:<15}".format(
-                result["description"], adaptive_time, native_time, winner
+            "{:<20} {:<12.4f} {:<12.4f} {:<12.4f} {:<12.4f} {:<10}".format(
+                result["description"], simple_a, simple_n, adv_a, adv_n, best
             )
         )
 
     # Performance recommendations
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 80)
     print("PERFORMANCE RECOMMENDATIONS")
-    print("=" * 60)
-    print("\n1. Small files (<10K rows):")
-    print("   - Native CSV reader is typically fastest")
+    print("=" * 80)
+    print("\n1. API Selection:")
+    print("   - Simple API (tm.flatten_file): Use for most applications")
+    print("   - Advanced API (Processor): Use when you need custom configuration")
+    print("   - Performance difference is typically minimal")
+
+    print("\n2. Reader Selection by File Size:")
+    print("   - Small files (<10K rows): Native CSV reader is typically fastest")
+    print(
+        "   - Medium files (10K-100K rows): Performance depends on available libraries"
+    )
+    print(
+        "   - Large files (>100K rows): Polars/PyArrow can provide better performance"
+    )
+
+    print("\n3. Environment Optimization:")
     print("   - Use TRANSMOG_FORCE_NATIVE_CSV=true for consistent performance")
+    print("   - Test with your actual data patterns and sizes")
 
-    print("\n2. Medium files (10K-100K rows):")
-    print("   - Performance depends on available libraries")
-    print("   - Native often wins due to lower overhead")
+    print("\n4. Memory Considerations:")
+    print("   - For very large files, consider streaming:")
+    print("     tm.flatten_stream(data, output_dir, format='csv')")
 
-    print("\n3. Large files (>100K rows):")
-    print("   - Polars provides best performance")
-    print("   - PyArrow is optimized but has columnar-to-row overhead")
-
-    print("\n4. Environment variable for immediate optimization:")
-    print("   export TRANSMOG_FORCE_NATIVE_CSV=true")
-
-    print("\n5. For production workloads:")
-    print("   - Test with your actual data sizes")
-    print("   - Use chunk_size parameter for very large files")
+    print("\n5. Production Recommendations:")
+    print("   - Use the simple API unless you need advanced features")
+    print("   - Profile with your actual data before optimizing")
+    print("   - Consider chunked processing for memory efficiency")
 
     # Show current reader availability
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 80)
     print("READER AVAILABILITY")
-    print("=" * 60)
+    print("=" * 80)
 
     try:
         import pyarrow
@@ -232,7 +318,26 @@ def main():
     except ImportError:
         print("✗ Polars is not available")
 
-    print("\nNative CSV reader is always available (Python stdlib)")
+    print("✓ Native CSV reader is always available (Python stdlib)")
+
+    # Example usage patterns
+    print("\n" + "=" * 80)
+    print("EXAMPLE USAGE PATTERNS")
+    print("=" * 80)
+    print("\n# Simple API (recommended for most use cases):")
+    print("import transmog as tm")
+    print("result = tm.flatten_file('data.csv', name='my_data')")
+    print("result.save('output.json')")
+
+    print("\n# Advanced API (for custom configuration):")
+    print("from transmog.process import Processor")
+    print("from transmog.config import TransmogConfig")
+    print("config = TransmogConfig.default().with_processing(cast_to_string=False)")
+    print("processor = Processor(config)")
+    print("result = processor.process_file('data.csv', entity_name='my_data')")
+
+    print("\n# Streaming (for very large files):")
+    print("tm.flatten_stream(data, 'output/', name='big_data', format='parquet')")
 
 
 if __name__ == "__main__":

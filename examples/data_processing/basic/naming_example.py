@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-"""Example demonstrating Transmog's simplified naming system.
+"""Example demonstrating Transmog's simplified naming system v1.1.0.
 
 This example shows how the naming system handles regular and deeply nested paths.
 """
 
-from transmog import Processor, TransmogConfig
+import transmog as tm
 
 
 def main():
@@ -67,15 +67,12 @@ def main():
 
     print("=== Standard Naming Example ===\n")
 
-    # Create a processor with default naming settings (deeply_nested_threshold=4)
-    processor = Processor()
-
-    # Process the data with the entity name
-    result = processor.process(deeply_nested_data, entity_name="customer_data")
+    # Use the simple API with default naming settings (nested_threshold=4)
+    result = tm.flatten(deeply_nested_data, name="customer_data")
 
     # Print the main record
     print("Main table fields:")
-    main_record = result.get_main_table()[0]
+    main_record = result.main[0]
     for key, value in sorted(main_record.items()):
         # Only show a few example fields
         if "address" in key and "geo" in key and "coordinates" in key and len(key) > 60:
@@ -83,14 +80,12 @@ def main():
 
     # Show tables
     print("\nGenerated tables:")
-    for table_name in sorted(result.get_table_names()):
-        table = result.get_child_table(table_name)
+    for table_name in sorted(result.tables.keys()):
+        table = result.tables[table_name]
         print(f"  {table_name}: {len(table)} records")
 
     # Find and print a deeply nested table name
-    deeply_nested_tables = [
-        name for name in result.get_table_names() if "nested" in name
-    ]
+    deeply_nested_tables = [name for name in result.tables.keys() if "nested" in name]
 
     print("\nDeeply nested tables:")
     for table in deeply_nested_tables:
@@ -99,33 +94,43 @@ def main():
     # Example 2: Custom deeply nested threshold
     print("\n=== Custom Deeply Nested Threshold Example ===\n")
 
-    # Create a processor with a very high deeply nested threshold (no simplification)
-    config = TransmogConfig.default().with_naming(deeply_nested_threshold=20)
-    processor = Processor(config=config)
-
-    # Process the data
-    result = processor.process(deeply_nested_data, entity_name="customer_data")
+    # Use a very high deeply nested threshold (no simplification)
+    result = tm.flatten(deeply_nested_data, name="customer_data", nested_threshold=20)
 
     # Show tables
     print("Generated tables with high threshold (no simplification):")
-    for table_name in sorted(result.get_table_names()):
+    for table_name in sorted(result.tables.keys()):
         if "coordinates" in table_name or "dimensions" in table_name:
-            print(f"  {table_name}: {len(result.get_child_table(table_name))} records")
+            print(f"  {table_name}: {len(result.tables[table_name])} records")
 
     # Example 3: Very low deeply nested threshold
     print("\n=== Low Deeply Nested Threshold Example ===\n")
 
-    # Create a processor with a low deeply nested threshold
-    config = TransmogConfig.default().with_naming(deeply_nested_threshold=2)
-    processor = Processor(config=config)
-
-    # Process the data
-    result = processor.process(deeply_nested_data, entity_name="customer_data")
+    # Use a low deeply nested threshold
+    result = tm.flatten(deeply_nested_data, name="customer_data", nested_threshold=2)
 
     # Show tables
     print("Generated tables with low threshold (more simplification):")
-    for table_name in sorted(result.get_table_names()):
-        print(f"  {table_name}: {len(result.get_child_table(table_name))} records")
+    for table_name in sorted(result.tables.keys()):
+        print(f"  {table_name}: {len(result.tables[table_name])} records")
+
+    # Example 4: Custom separator
+    print("\n=== Custom Separator Example ===\n")
+
+    # Use a dot separator instead of underscore
+    result = tm.flatten(deeply_nested_data, name="customer_data", separator=".")
+
+    # Show tables
+    print("Generated tables with dot separator:")
+    for table_name in sorted(result.tables.keys()):
+        print(f"  {table_name}: {len(result.tables[table_name])} records")
+
+    # Show some field names with dot separator
+    print("\nSample field names with dot separator:")
+    main_record = result.main[0]
+    for key in sorted(main_record.keys())[:5]:
+        if "." in key:
+            print(f"  {key}")
 
 
 if __name__ == "__main__":

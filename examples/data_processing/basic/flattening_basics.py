@@ -1,23 +1,15 @@
-"""Example Name: Flattening Basics.
+"""Flattening Basics.
 
-Demonstrates: Core functionality for flattening nested JSON structures
-
-Related Documentation:
-- https://transmog.readthedocs.io/en/latest/user/essentials/basic-concepts.html
-- https://transmog.readthedocs.io/en/latest/user/processing/data-transformation.html
+Demonstrates core functionality for flattening nested JSON structures.
 
 Learning Objectives:
-- How to flatten a nested JSON structure
-- How to extract arrays into separate tables
-- How to access main and child tables
-- How to output data in different formats
+- How to flatten nested data with one function call
+- How to access flattened tables intuitively
+- How to save data in different formats easily
 """
 
-import os
-from pprint import pprint
-
-# Import from transmog package
 import transmog as tm
+from pprint import pprint
 
 
 def main():
@@ -74,95 +66,72 @@ def main():
         ],
     }
 
-    # Create output directory
-    output_dir = os.path.join(os.path.dirname(__file__), "..", "..", "output")
-    os.makedirs(output_dir, exist_ok=True)
+    # Example 1: Basic flattening - ONE LINE!
+    print("=== Basic Flattening ===")
+    result = tm.flatten(data, name="company")
 
-    # Example 1: Basic usage with default configuration
-    print("\n=== Basic Flattening ===")
-    processor = tm.Processor()
-    result = processor.process(data=data, entity_name="company")
+    # Display the result
+    print(f"\nCreated {len(result.all_tables)} tables:")
+    print(result)
 
-    # Print main table
-    print("\nMain Table:")
-    pprint(result.get_main_table())
+    # Access main table easily
+    print("\nMain Table (first record):")
+    pprint(result.main[0])
 
-    # Print all child tables
-    print("\nChild Tables:")
-    for table_name in result.get_table_names():
-        formatted_name = result.get_formatted_table_name(table_name)
-        table_data = result.get_child_table(table_name)
-        print(f"\n-- {formatted_name} ({table_name}) --")
-        if table_data:
-            pprint(table_data[0])  # Print just the first record
-            print(f"...and {len(table_data) - 1} more records")
+    # Access child tables intuitively
+    print("\nContacts Table:")
+    for contact in result.tables["company_contacts"]:
+        print(f"  - {contact['name']} ({contact['type']})")
 
-    # Example 2: Different processing modes
-    print("\n=== Different Processing Modes ===")
+    # Example 2: Custom options
+    print("\n\n=== Custom Options ===")
 
-    # Memory-optimized processing
-    processor = tm.Processor.memory_optimized()
-    memory_result = processor.process(data=data, entity_name="company")
-    print(
-        f"Memory-optimized processing created "
-        f"{len(memory_result.get_table_names()) + 1} tables"
-    )
+    # Use dot notation and preserve types
+    result = tm.flatten(data, name="company", separator=".", preserve_types=True)
 
-    # Performance-optimized processing
-    processor = tm.Processor.performance_optimized()
-    perf_result = processor.process(data=data, entity_name="company")
-    print(
-        f"Performance-optimized processing created "
-        f"{len(perf_result.get_table_names()) + 1} tables"
-    )
+    print("Fields with dot notation:")
+    for key in list(result.main[0].keys())[:5]:
+        print(f"  - {key}")
 
-    # Example 3: Output formats
-    print("\n=== Output Formats ===")
+    # Example 3: Saving is simple
+    print("\n\n=== Saving Data ===")
 
-    # To Python dictionaries
-    dict_output = result.to_dict()
-    print(f"Dictionary output has {len(dict_output)} tables")
+    # Save to JSON
+    files = result.save("output/company.json")
+    print(f"Saved to JSON: {len(files)} files")
 
-    # To JSON and CSV bytes
-    json_bytes = result.to_json_bytes(indent=2)
-    csv_bytes = result.to_csv_bytes()
-    print(f"JSON bytes size: {sum(len(v) for v in json_bytes.values())} bytes")
-    print(f"CSV bytes size: {sum(len(v) for v in csv_bytes.values())} bytes")
+    # Save to CSV
+    files = result.save("output/company.csv")
+    print(f"Saved to CSV: {len(files)} files")
 
-    # Try PyArrow and Parquet if available
+    # Save to Parquet (if available)
     try:
-        # PyArrow tables
-        pa_tables = result.to_pyarrow_tables()
-        print(f"PyArrow tables created: {len(pa_tables)} tables")
-
-        # Parquet bytes
-        parquet_bytes = result.to_parquet_bytes(compression="snappy")
-        print(
-            f"Parquet bytes size: {sum(len(v) for v in parquet_bytes.values())} bytes"
-        )
+        files = result.save("output/company.parquet")
+        print(f"Saved to Parquet: {len(files)} files")
     except ImportError:
-        print("PyArrow not available. Install with: pip install pyarrow")
+        print("Parquet requires pyarrow: pip install pyarrow")
 
-    # Write to files
-    print("\n=== Writing to Files ===")
+    # Example 4: Working with arrays
+    print("\n\n=== Array Handling ===")
 
-    # Write to JSON
-    json_dir = os.path.join(output_dir, "json")
-    json_outputs = result.write_all_json(base_path=json_dir)
-    print(f"Wrote {len(json_outputs)} JSON files to {json_dir}")
+    # Keep arrays inline instead of separate tables
+    result_inline = tm.flatten(data, name="company", arrays="inline")
+    print(f"\nWith arrays='inline': {len(result_inline.tables)} child tables")
 
-    # Write to CSV
-    csv_dir = os.path.join(output_dir, "csv")
-    csv_outputs = result.write_all_csv(base_path=csv_dir)
-    print(f"Wrote {len(csv_outputs)} CSV files to {csv_dir}")
+    # Skip arrays entirely
+    result_skip = tm.flatten(data, name="company", arrays="skip")
+    print(f"With arrays='skip': {len(result_skip.tables)} child tables")
 
-    # Try to write to Parquet
-    try:
-        parquet_dir = os.path.join(output_dir, "parquet")
-        parquet_outputs = result.write_all_parquet(base_path=parquet_dir)
-        print(f"Wrote {len(parquet_outputs)} Parquet files to {parquet_dir}")
-    except ImportError:
-        print("PyArrow not available. Install with: pip install pyarrow")
+    # Example 5: Performance options
+    print("\n\n=== Performance Options ===")
+
+    # Low memory mode for large datasets
+    result = tm.flatten(data, name="company", low_memory=True)
+    print(f"Low memory mode: {len(result.main)} records processed")
+
+    # Custom batch size
+    result = tm.flatten(data, name="company", batch_size=5000)
+    print(f"Custom batch size: {len(result.main)} records processed")
 
 
 if __name__ == "__main__":

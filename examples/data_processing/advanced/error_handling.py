@@ -117,12 +117,10 @@ def main():
     print("Description: Raises exceptions for any errors encountered")
 
     try:
-        # Create processor with default (strict) error handling
-        processor = tm.Processor()
-
-        # This will fail on the first problematic record
-        _ = processor.process(data=data, entity_name="records")
+        # Default behavior - raises on errors
+        result = tm.flatten(data, name="records")
         print("Processing completed successfully")
+        print(f"Processed {len(result.main)} records")
 
     except Exception as e:
         print(f"Error encountered: {type(e).__name__}: {e}")
@@ -131,94 +129,49 @@ def main():
     print("\n=== Skip Strategy ===")
     print("Description: Skip problematic records, process valid ones")
 
-    # Create configuration with skip strategy
-    skip_config = tm.TransmogConfig.default().with_error_handling(
-        allow_malformed_data=True, recovery_strategy="skip"
-    )
-
-    processor = tm.Processor(config=skip_config)
-
     # Process with skip strategy
-    skip_result = processor.process(data=data, entity_name="records")
+    skip_result = tm.flatten(data, name="records", on_error="skip")
 
     # Print processing results
     print("\nProcessing completed with skip strategy")
-    main_table = skip_result.get_main_table()
-    print(f"Processed {len(main_table)} records successfully")
-    print("Processed record IDs:", [record.get("id") for record in main_table])
+    print(f"Processed {len(skip_result.main)} records successfully")
+    print("Processed record IDs:", [record.get("id") for record in skip_result.main])
 
-    # Example 3: Partial strategy - Extract valid parts of records
-    print("\n=== Partial Strategy ===")
-    print("Description: Extract valid portions of records, skip problematic parts")
+    # Example 3: Warn strategy - Log warnings but continue processing
+    print("\n=== Warn Strategy ===")
+    print("Description: Log warnings for problematic data but continue processing")
 
-    # Create configuration with partial strategy
-    partial_config = tm.TransmogConfig.default().with_error_handling(
-        allow_malformed_data=True, recovery_strategy="partial"
-    )
-
-    processor = tm.Processor(config=partial_config)
-
-    # Process with partial strategy
-    partial_result = processor.process(data=data, entity_name="records")
+    # Process with warn strategy
+    warn_result = tm.flatten(data, name="records", on_error="warn")
 
     # Print processing results
-    print("\nProcessing completed with partial strategy")
-    main_table = partial_result.get_main_table()
-    print(f"Processed {len(main_table)} records (including partial records)")
+    print("\nProcessing completed with warn strategy")
+    print(f"Processed {len(warn_result.main)} records (including partial records)")
 
     # Print details of a record with partially extracted data
     print("\nPartial extraction example:")
-    for record in main_table:
+    for record in warn_result.main:
         if record.get("id") in [3, 5, 6]:  # Records with known issues
             print(f"Record {record.get('id')} was partially processed:")
             pprint(record)
             break
 
-    # Example 4: Lenient strategy - Maximum recovery effort
-    print("\n=== Lenient Strategy ===")
-    print("Description: Apply multiple recovery methods to salvage data")
-
-    # Create configuration with lenient strategy
-    lenient_config = tm.TransmogConfig.default().with_error_handling(
-        allow_malformed_data=True, recovery_strategy="partial"
-    )
-
-    processor = tm.Processor(config=lenient_config)
-
-    # Process with lenient strategy
-    lenient_result = processor.process(data=data, entity_name="records")
-
-    # Print processing results
-    print("\nProcessing completed with lenient strategy")
-    main_table = lenient_result.get_main_table()
-    print(f"Processed {len(main_table)} records with lenient recovery")
-
-    # Count how many records include each field to demonstrate recovery effectiveness
-    field_counts = {}
-    for record in main_table:
-        for field in record:
-            if field not in field_counts:
-                field_counts[field] = 0
-            field_counts[field] += 1
-
-    print("\nField extraction statistics:")
-    for field, count in field_counts.items():
-        if not field.startswith("__"):  # Skip metadata fields
-            print(f"- {field}: {count}/{len(main_table)} records")
-
-    # Example 5: Custom error handling configuration
-    print("\n=== Custom Error Handling Configuration ===")
+    # Example 4: Advanced error handling with Processor class
+    print("\n=== Advanced Error Handling Configuration ===")
     print("Description: Tailored error handling for specific requirements")
 
+    # For advanced error handling, access the Processor class directly
+    from transmog.process import Processor
+    from transmog.config import TransmogConfig
+
     # Create custom error handling configuration
-    custom_config = tm.TransmogConfig.default().with_error_handling(
+    custom_config = TransmogConfig.default().with_error_handling(
         allow_malformed_data=True,  # Allow processing problematic data
         recovery_strategy="partial",  # Use partial recovery strategy
         max_retries=10,  # Try recovery operations up to 10 times
-        error_log_path="error.log",  # Log errors to this file
     )
 
-    processor = tm.Processor(config=custom_config)
+    processor = Processor(config=custom_config)
 
     # Process with custom error handling
     custom_result = processor.process(data=data, entity_name="records")
@@ -228,31 +181,95 @@ def main():
     main_table = custom_result.get_main_table()
     print(f"Processed {len(main_table)} records with custom configuration")
 
-    # Look for circular reference placeholder
+    # Look for circular reference handling
     for record in main_table:
         if record.get("id") in [2, 6]:  # Records with circular references
-            # Flatten the record to search for placeholders
-            json_str = json.dumps(record)
-            if "[CIRCULAR]" in json_str:
-                print(
-                    f"\nFound circular reference placeholders in record "
-                    f"{record.get('id')}"
-                )
+            print(f"\nRecord {record.get('id')} with circular reference was processed:")
+            pprint(record)
+            break
+
+    # Example 5: Comparison of different strategies
+    print("\n=== Strategy Comparison ===")
+    print("Description: Compare results from different error handling strategies")
+
+    strategies = [
+        ("skip", skip_result),
+        ("warn", warn_result),
+    ]
+
+    print("\nComparison of error handling strategies:")
+    print(f"{'Strategy':<10} {'Records':<8} {'Tables':<8} {'Description'}")
+    print("-" * 60)
+
+    for strategy_name, result in strategies:
+        num_records = len(result.main)
+        num_tables = len(result.tables) + 1  # +1 for main table
+
+        if strategy_name == "skip":
+            description = "Only valid records"
+        elif strategy_name == "warn":
+            description = "All records, partial data"
+        else:
+            description = "Custom recovery"
+
+        print(f"{strategy_name:<10} {num_records:<8} {num_tables:<8} {description}")
+
+    # Count how many records include each field to demonstrate recovery effectiveness
+    print("\nField extraction statistics (warn strategy):")
+    field_counts = {}
+    for record in warn_result.main:
+        for field in record:
+            if field not in field_counts:
+                field_counts[field] = 0
+            field_counts[field] += 1
+
+    for field, count in field_counts.items():
+        if not field.startswith("_"):  # Skip metadata fields
+            print(f"- {field}: {count}/{len(warn_result.main)} records")
 
     # Write results from different strategies to files
-    lenient_result.write_all_json(
-        base_path=os.path.join(output_dir, "lenient"), indent=2
-    )
+    print("\n=== Saving Results ===")
 
-    skip_result.write_all_json(base_path=os.path.join(output_dir, "skip"), indent=2)
+    # Save with different strategies
+    skip_result.save(os.path.join(output_dir, "skip", "main.json"))
+    warn_result.save(os.path.join(output_dir, "lenient", "main.json"))
 
-    partial_result.write_all_json(
-        base_path=os.path.join(output_dir, "partial"), indent=2
-    )
+    # Save individual tables for detailed analysis
+    for table_name, table_data in skip_result.tables.items():
+        skip_result.save(
+            os.path.join(output_dir, "skip", f"{table_name}.json"), table=table_name
+        )
 
-    custom_result.write_all_json(base_path=os.path.join(output_dir, "custom"), indent=2)
+    for table_name, table_data in warn_result.tables.items():
+        warn_result.save(
+            os.path.join(output_dir, "lenient", f"{table_name}.json"), table=table_name
+        )
 
-    print(f"\nOutput files written to: {output_dir}")
+    print("Results saved to output directory")
+    print(f"- Skip strategy results: {os.path.join(output_dir, 'skip')}")
+    print(f"- Warn strategy results: {os.path.join(output_dir, 'lenient')}")
+
+    # Example 6: Error handling with different data types
+    print("\n=== Error Handling with Different Data Types ===")
+
+    # Create data with different problematic types
+    mixed_data = [
+        {"id": 1, "data": [1, 2, 3]},  # Valid array
+        {"id": 2, "data": "not_an_array"},  # String instead of array
+        {"id": 3, "data": {"nested": "object"}},  # Object instead of array
+        {"id": 4, "data": None},  # Null value
+        {"id": 5},  # Missing field entirely
+    ]
+
+    # Process with different strategies
+    mixed_skip = tm.flatten(mixed_data, name="mixed", on_error="skip")
+    mixed_warn = tm.flatten(mixed_data, name="mixed", on_error="warn")
+
+    print(f"Mixed data - Skip strategy: {len(mixed_skip.main)} records")
+    print(f"Mixed data - Warn strategy: {len(mixed_warn.main)} records")
+
+    print("\nExample completed successfully!")
+    print("Check the output directory for detailed results from each strategy.")
 
 
 if __name__ == "__main__":

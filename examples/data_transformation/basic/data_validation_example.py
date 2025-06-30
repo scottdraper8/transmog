@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Example script demonstrating data validation with Transmog.
 
-This example shows how to validate data against defined rules and constraints.
+This example shows how to validate data against defined rules and constraints
+before flattening with Transmog.
 """
 
 import csv
 import os
 import re
 from datetime import datetime
+
+import transmog as tm
 
 
 # Define severity levels
@@ -201,233 +204,358 @@ class DataValidator:
         return valid_records, invalid_records
 
     def count_by_severity(self, severity):
-        """Count issues of a specific severity level.
+        """Count the number of issues by severity level.
 
         Args:
             severity: Severity level to count
 
         Returns:
-            Number of issues with the specified severity
+            Number of issues with the given severity level
         """
         return sum(1 for issue in self.issues if issue.severity == severity)
 
     def write_report(self, filename):
-        """Write validation report to a file.
+        """Write a validation report to a file.
 
         Args:
-            filename: Path to write the report
+            filename: Path to the output file
         """
-        with open(filename, "w") as f:
-            f.write("Validation Report\n")
-            f.write("=================\n\n")
+        with open(filename, "w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["Row", "Field", "Severity", "Message"])
 
-            # Group issues by severity
-            errors = [
-                issue for issue in self.issues if issue.severity == Severity.ERROR
-            ]
-            warnings = [
-                issue for issue in self.issues if issue.severity == Severity.WARNING
-            ]
-            infos = [issue for issue in self.issues if issue.severity == Severity.INFO]
-
-            # Write summary with line length fixed
-            summary = (
-                f"Summary: {len(errors)} errors, "
-                f"{len(warnings)} warnings, "
-                f"{len(infos)} info\n\n"
-            )
-            f.write(summary)
-
-            if errors:
-                f.write("ERRORS\n------\n")
-                for issue in errors:
-                    f.write(f"Row {issue.row}, {issue.field}: {issue.message}\n")
-                f.write("\n")
-
-            if warnings:
-                f.write("WARNINGS\n--------\n")
-                for issue in warnings:
-                    f.write(f"Row {issue.row}, {issue.field}: {issue.message}\n")
-                f.write("\n")
-
-            if infos:
-                f.write("INFO\n----\n")
-                for issue in infos:
-                    f.write(f"Row {issue.row}, {issue.field}: {issue.message}\n")
+            for issue in self.issues:
+                writer.writerow([issue.row, issue.field, issue.severity, issue.message])
 
 
-def main():
-    """Main function to demonstrate data validation operations."""
-    # Create a validator
-    validator = DataValidator()
-
-    # Sample data with various validation issues
-    employee_data = [
+def create_sample_data():
+    """Create sample data with various validation issues."""
+    return [
+        # Valid record
         {
             "id": 1,
-            "name": "John Smith",
-            "email": "john@example.com",
+            "name": "Alice Johnson",
+            "email": "alice@example.com",
+            "age": 28,
+            "salary": 75000,
             "department": "Engineering",
-            "salary": 85000,
-            "hire_date": "2021-03-15",
+            "start_date": "2020-01-15",
+            "skills": ["Python", "JavaScript", "SQL"],
+            "projects": [
+                {"name": "Project Alpha", "status": "completed", "budget": 50000},
+                {"name": "Project Beta", "status": "in-progress", "budget": 75000},
+            ],
         },
+        # Record with missing required field
         {
             "id": 2,
-            "name": "Jane Doe",
-            "email": "jane@example.com",
+            # "name" is missing
+            "email": "bob@example.com",
+            "age": 32,
+            "salary": 80000,
             "department": "Marketing",
-            "salary": 78000,
-            "hire_date": "2020-07-22",
+            "start_date": "2019-06-01",
+            "skills": ["Marketing", "Analytics"],
+            "projects": [
+                {"name": "Campaign X", "status": "completed", "budget": 25000},
+            ],
         },
+        # Record with invalid email format
         {
             "id": 3,
-            "name": "",
-            "email": "missing.name@example.com",
+            "name": "Carol Williams",
+            "email": "invalid-email",  # Invalid email format
+            "age": 35,
+            "salary": 90000,
             "department": "Sales",
-            "salary": 92000,
-            "hire_date": "2019-11-30",
+            "start_date": "2018-03-15",
+            "skills": ["Sales", "Negotiation"],
+            "projects": [],
         },
+        # Record with age out of range
         {
             "id": 4,
-            "name": "Alice Brown",
-            "email": "not-an-email",
-            "department": "Finance",
-            "salary": 105000,
-            "hire_date": "2022-01-10",
+            "name": "David Brown",
+            "email": "david@example.com",
+            "age": 150,  # Age out of range
+            "salary": 65000,
+            "department": "HR",
+            "start_date": "2021-09-01",
+            "skills": ["Recruiting", "Training"],
+            "projects": [
+                {"name": "Onboarding System", "status": "in-progress", "budget": 30000},
+            ],
         },
+        # Record with invalid department
         {
             "id": 5,
-            "name": "Bob Johnson",
-            "email": "bob@example.com",
-            "department": "Unknown",
-            "salary": -5000,
-            "hire_date": "2021-06-05",
+            "name": "Eva Martinez",
+            "email": "eva@example.com",
+            "age": 29,
+            "salary": 70000,
+            "department": "InvalidDept",  # Invalid department
+            "start_date": "2020-11-15",
+            "skills": ["Design", "UX"],
+            "projects": [
+                {"name": "UI Redesign", "status": "completed", "budget": 40000},
+            ],
         },
+        # Record with invalid date format
         {
             "id": 6,
-            "name": "Charlie Wilson",
-            "email": "charlie@example.com",
+            "name": "Frank Wilson",
+            "email": "frank@example.com",
+            "age": 31,
+            "salary": 85000,
             "department": "Engineering",
-            "salary": 88000,
-            "hire_date": "invalid-date",
-        },
-        {
-            "id": "not-a-number",
-            "name": "David Miller",
-            "email": "david@example.com",
-            "department": "Sales",
-            "salary": 79500,
-            "hire_date": "2020-09-15",
+            "start_date": "invalid-date",  # Invalid date format
+            "skills": ["Java", "Spring"],
+            "projects": [
+                {"name": "Backend Refactor", "status": "pending", "budget": 60000},
+            ],
         },
     ]
 
-    # Create a temporary CSV file with the employee data
-    os.makedirs("output", exist_ok=True)
-    temp_csv = "output/employee_data.csv"
 
-    # Write the employee data to CSV
-    with open(temp_csv, "w", newline="") as csvfile:
-        if employee_data:
-            fieldnames = employee_data[0].keys()
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(employee_data)
-
-    print(f"Created sample employee data in {temp_csv}")
-    print("Validating data against defined rules...")
-
-    # Required fields
-    validator.add_rule(
-        "name", "required", message="Employee name is required", severity=Severity.ERROR
+def main():
+    """Main function to demonstrate data validation."""
+    # Create output directory
+    output_dir = os.path.join(
+        os.path.dirname(__file__), "..", "data", "output", "data_validation"
     )
+    os.makedirs(output_dir, exist_ok=True)
 
-    # Email format validation
+    print("=== Data Validation Example ===")
+
+    # Step 1: Create sample data with validation issues
+    print("\n=== Step 1: Creating Sample Data ===")
+    sample_data = create_sample_data()
+    print(f"Created {len(sample_data)} sample records")
+
+    # Step 2: Set up validation rules
+    print("\n=== Step 2: Setting Up Validation Rules ===")
+    validator = DataValidator()
+
+    # Add validation rules
+    validator.add_rule("id", "required", message="ID is required")
+    validator.add_rule(
+        "id", "type", expected_type="int", message="ID must be an integer"
+    )
+    validator.add_rule("name", "required", message="Name is required")
     validator.add_rule(
         "email",
         "regex",
-        pattern=r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$",
-        message="Invalid email format",
-        severity=Severity.ERROR,
+        pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
+        message="Email must be in valid format",
     )
-
-    # Department validation (whitelist)
     validator.add_rule(
-        "department",
-        "in_list",
-        valid_values=["Engineering", "Marketing", "Sales", "Finance", "HR"],
-        message="Unknown department",
-        severity=Severity.WARNING,
+        "age",
+        "range",
+        min_value=18,
+        max_value=100,
+        message="Age must be between 18 and 100",
     )
-
-    # Salary range validation
     validator.add_rule(
         "salary",
         "range",
         min_value=30000,
         max_value=200000,
-        message="Salary out of acceptable range",
-        severity=Severity.ERROR,
+        message="Salary must be between $30,000 and $200,000",
     )
-
-    # Date format validation
     validator.add_rule(
-        "hire_date",
+        "department",
+        "in_list",
+        valid_values=["Engineering", "Marketing", "Sales", "HR", "Finance"],
+        message="Department must be one of the valid departments",
+        severity=Severity.WARNING,
+    )
+    validator.add_rule(
+        "start_date",
         "date_format",
         format="%Y-%m-%d",
-        message="Invalid hire date format",
-        severity=Severity.ERROR,
+        message="Start date must be in YYYY-MM-DD format",
     )
 
-    # ID must be numeric
-    validator.add_rule(
-        "id",
-        "type",
-        expected_type="int",
-        message="Employee ID must be a number",
-        severity=Severity.ERROR,
+    print("Validation rules configured:")
+    print("- ID: Required, must be integer")
+    print("- Name: Required")
+    print("- Email: Must match valid email pattern")
+    print("- Age: Must be between 18 and 100")
+    print("- Salary: Must be between $30,000 and $200,000")
+    print("- Department: Must be valid department (warning)")
+    print("- Start Date: Must be in YYYY-MM-DD format")
+
+    # Step 3: Validate the data
+    print("\n=== Step 3: Validating Data ===")
+    valid_records, invalid_records = validator.validate_records(sample_data)
+
+    print(f"Validation completed:")
+    print(f"- Valid records: {len(valid_records)}")
+    print(f"- Invalid records: {len(invalid_records)}")
+    print(f"- Total issues found: {len(validator.issues)}")
+    print(f"- Errors: {validator.count_by_severity(Severity.ERROR)}")
+    print(f"- Warnings: {validator.count_by_severity(Severity.WARNING)}")
+
+    # Step 4: Show validation issues
+    print("\n=== Step 4: Validation Issues ===")
+    if validator.issues:
+        print("Issues found:")
+        for issue in validator.issues:
+            print(
+                f"  Row {issue.row}, Field '{issue.field}' [{issue.severity}]: {issue.message}"
+            )
+    else:
+        print("No validation issues found!")
+
+    # Step 5: Process valid records with Transmog
+    print("\n=== Step 5: Processing Valid Records with Transmog ===")
+    if valid_records:
+        # Flatten the valid records
+        valid_result = tm.flatten(valid_records, name="employees")
+
+        print(f"Valid records processed:")
+        print(f"- Main table: {len(valid_result.main)} records")
+        print(f"- Child tables: {len(valid_result.tables)}")
+
+        for table_name, table_data in valid_result.tables.items():
+            print(f"  - {table_name}: {len(table_data)} records")
+
+        # Save valid results
+        valid_output = os.path.join(output_dir, "valid_employees.json")
+        valid_result.save(valid_output)
+        print(f"Valid records saved to: {valid_output}")
+
+    # Step 6: Process invalid records with error handling
+    print("\n=== Step 6: Processing Invalid Records with Error Handling ===")
+    if invalid_records:
+        print(
+            f"Attempting to process {len(invalid_records)} invalid records with error handling..."
+        )
+
+        # Process invalid records with warning mode
+        try:
+            invalid_result = tm.flatten(
+                invalid_records, name="employees", on_error="warn"
+            )
+
+            print(f"Invalid records processed with warnings:")
+            print(f"- Main table: {len(invalid_result.main)} records")
+            print(f"- Child tables: {len(invalid_result.tables)}")
+
+            # Save invalid results
+            invalid_output = os.path.join(output_dir, "invalid_employees.json")
+            invalid_result.save(invalid_output)
+            print(f"Invalid records saved to: {invalid_output}")
+
+        except Exception as e:
+            print(f"Error processing invalid records: {e}")
+
+    # Step 7: Generate validation report
+    print("\n=== Step 7: Generating Validation Report ===")
+    report_path = os.path.join(output_dir, "validation_report.csv")
+    validator.write_report(report_path)
+    print(f"Validation report saved to: {report_path}")
+
+    # Step 8: Demonstrate validation with corrected data
+    print("\n=== Step 8: Processing Corrected Data ===")
+
+    # Create corrected version of the data
+    corrected_data = []
+    for record in sample_data:
+        corrected_record = record.copy()
+
+        # Fix missing name
+        if not corrected_record.get("name"):
+            corrected_record["name"] = (
+                f"Employee {corrected_record.get('id', 'Unknown')}"
+            )
+
+        # Fix invalid email
+        if corrected_record.get("email") == "invalid-email":
+            corrected_record["email"] = "corrected@example.com"
+
+        # Fix age out of range
+        if corrected_record.get("age", 0) > 100:
+            corrected_record["age"] = 35
+
+        # Fix invalid department
+        if corrected_record.get("department") == "InvalidDept":
+            corrected_record["department"] = "Engineering"
+
+        # Fix invalid date
+        if corrected_record.get("start_date") == "invalid-date":
+            corrected_record["start_date"] = "2020-01-01"
+
+        corrected_data.append(corrected_record)
+
+    # Validate corrected data
+    corrected_validator = DataValidator()
+    # Add the same rules
+    corrected_validator.add_rule("id", "required")
+    corrected_validator.add_rule("name", "required")
+    corrected_validator.add_rule(
+        "email",
+        "regex",
+        pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
+    )
+    corrected_validator.add_rule("age", "range", min_value=18, max_value=100)
+    corrected_validator.add_rule("salary", "range", min_value=30000, max_value=200000)
+    corrected_validator.add_rule(
+        "department",
+        "in_list",
+        valid_values=["Engineering", "Marketing", "Sales", "HR", "Finance"],
+        severity=Severity.WARNING,
+    )
+    corrected_validator.add_rule("start_date", "date_format", format="%Y-%m-%d")
+
+    corrected_valid, corrected_invalid = corrected_validator.validate_records(
+        corrected_data
     )
 
-    # Perform validation
-    valid_records, invalid_records = validator.validate_records(employee_data)
+    print(f"Corrected data validation:")
+    print(f"- Valid records: {len(corrected_valid)}")
+    print(f"- Invalid records: {len(corrected_invalid)}")
+    print(f"- Total issues: {len(corrected_validator.issues)}")
 
-    # Write validation report to a file
-    validator.write_report("output/validation_report.txt")
+    # Process corrected data
+    if corrected_valid:
+        corrected_result = tm.flatten(corrected_valid, name="employees")
+        corrected_output = os.path.join(output_dir, "corrected_employees.json")
+        corrected_result.save(corrected_output)
+        print(f"Corrected records saved to: {corrected_output}")
 
-    # Get counts of errors and warnings
-    error_count = validator.count_by_severity(Severity.ERROR)
-    warning_count = validator.count_by_severity(Severity.WARNING)
+    # Step 9: Data quality comparison
+    print("\n=== Step 9: Data Quality Comparison ===")
 
-    # Print summary
+    print("Data Quality Summary:")
+    print(f"Original data:")
+    print(f"  - Total records: {len(sample_data)}")
     print(
-        f"\nValidation complete. Found {error_count} errors and "
-        f"{warning_count} warnings."
+        f"  - Valid records: {len(valid_records)} ({len(valid_records) / len(sample_data) * 100:.1f}%)"
     )
-    print("Detailed validation report saved to output/validation_report.txt")
+    print(f"  - Validation errors: {validator.count_by_severity(Severity.ERROR)}")
+    print(f"  - Validation warnings: {validator.count_by_severity(Severity.WARNING)}")
 
-    # Print some of the validation issues
-    print("\nSample validation issues:")
-    for issue in validator.issues[:5]:  # Show first 5 issues
-        print(f"  {issue.severity}: Row {issue.row}, {issue.field}: {issue.message}")
-
-    # Save valid and invalid records separately
-    with open("output/valid_employees.csv", "w", newline="") as csvfile:
-        if valid_records:
-            fieldnames = valid_records[0].keys()
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(valid_records)
-
-    with open("output/invalid_employees.csv", "w", newline="") as csvfile:
-        if invalid_records:
-            fieldnames = invalid_records[0].keys()
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(invalid_records)
-
-    print(f"\n{len(valid_records)} valid records saved to output/valid_employees.csv")
+    print(f"Corrected data:")
+    print(f"  - Total records: {len(corrected_data)}")
     print(
-        f"{len(invalid_records)} invalid records saved to output/invalid_employees.csv"
+        f"  - Valid records: {len(corrected_valid)} ({len(corrected_valid) / len(corrected_data) * 100:.1f}%)"
     )
+    print(
+        f"  - Validation errors: {corrected_validator.count_by_severity(Severity.ERROR)}"
+    )
+    print(
+        f"  - Validation warnings: {corrected_validator.count_by_severity(Severity.WARNING)}"
+    )
+
+    print("\n=== Example Completed Successfully ===")
+    print("Key takeaways:")
+    print("1. Validate data before processing to catch issues early")
+    print("2. Use different severity levels (ERROR vs WARNING) appropriately")
+    print("3. Transmog can handle invalid data with error handling modes")
+    print("4. Data correction improves processing success rates")
+    print("5. Validation reports help track data quality over time")
+    print(f"\nAll outputs saved to: {output_dir}")
 
 
 if __name__ == "__main__":

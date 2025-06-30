@@ -1,4 +1,4 @@
-"""Primitive Arrays Example.
+"""Primitive Arrays Example v1.1.0.
 
 This example demonstrates the handling of primitive arrays in Transmog.
 Arrays of primitive values (strings, numbers, booleans) are
@@ -33,30 +33,30 @@ def main():
     }
 
     print("\n=== Processing Data with Primitive Arrays ===")
-    # Process the data
-    processor = tm.Processor()
-    result = processor.process(data, entity_name="example")
+
+    # Process the data using the simple API
+    result = tm.flatten(data, name="example")
 
     # Get all tables
-    table_names = result.get_table_names()
+    table_names = list(result.tables.keys())
     print(f"Generated tables: {table_names}")
 
     # Examine the main table
-    main_table = result.get_main_table()
+    main_table = result.main
     print("\nMain table fields:")
-    for field in sorted([f for f in main_table[0].keys() if not f.startswith("__")]):
+    for field in sorted([f for f in main_table[0].keys() if not f.startswith("_")]):
         print(f"  {field}: {main_table[0][field]}")
 
     # Examine primitive array tables
     for table_name in table_names:
-        table = result.get_child_table(table_name)
+        table = result.tables[table_name]
         print(f"\nTable '{table_name}' ({len(table)} records):")
 
         # Print sample records
         for i, record in enumerate(table):
             print(f"  Record {i}:")
             for key, value in record.items():
-                if key.startswith("__"):
+                if key.startswith("_"):
                     continue
                 print(f"    {key}: {value}")
 
@@ -67,17 +67,59 @@ def main():
                     print(f"  ... and {remaining} more records")
                 break
 
-    print("\n=== Primitive Arrays and Object Arrays ===")
+    print("\n=== Array Handling Options ===")
+
+    # Example 2: Keep arrays inline instead of extracting
+    print("\nExample 2: Keep arrays inline")
+    result_inline = tm.flatten(data, name="example", arrays="inline")
+
+    print("With arrays='inline', arrays are kept in the main record:")
+    main_record = result_inline.main[0]
+    for field in ["tags", "scores", "flags"]:
+        if field in main_record:
+            print(
+                f"  {field}: {main_record[field]} (type: {type(main_record[field]).__name__})"
+            )
+
+    print(f"Child tables created: {len(result_inline.tables)}")
+
+    # Example 3: Skip arrays entirely
+    print("\nExample 3: Skip arrays")
+    result_skip = tm.flatten(data, name="example", arrays="skip")
+
+    print("With arrays='skip', arrays are ignored:")
+    main_record = result_skip.main[0]
+    print("Fields in main table:")
+    for field in sorted(main_record.keys()):
+        if not field.startswith("_"):
+            print(f"  {field}: {main_record[field]}")
+
+    print(f"Child tables created: {len(result_skip.tables)}")
+
+    print("\n=== Null Value Handling ===")
+
+    # Example 4: Include null values
+    print("\nExample 4: Include null values")
+    result_with_nulls = tm.flatten(data, name="example", skip_null=False)
+
+    mixed_table = result_with_nulls.tables.get("example_mixed", [])
+    print(f"Mixed array table with nulls included ({len(mixed_table)} records):")
+    for i, record in enumerate(mixed_table):
+        value = record.get("value")
+        print(f"  Record {i}: {value} (type: {type(value).__name__})")
+
+    print("\n=== Summary ===")
     print("Primitive arrays and object arrays are processed similarly.")
     print("Each item becomes a record in a child table. Primitive values")
     print("are stored in a 'value' field, while object values are stored")
     print("with their original field names.")
-
-    print("\n=== Null Value Handling ===")
-    print("Null values in arrays are skipped by default.")
-    print("The 'mixed' array contains 4 elements but only 3 are processed.")
-    print("The skip_null parameter controls this behavior:")
-    print("  processor.process(data, skip_null=False)")
+    print("\nArray handling options:")
+    print("  arrays='separate' (default): Extract to child tables")
+    print("  arrays='inline': Keep as JSON in main record")
+    print("  arrays='skip': Ignore arrays completely")
+    print("\nNull handling:")
+    print("  skip_null=True (default): Skip null values")
+    print("  skip_null=False: Include null values in output")
 
 
 if __name__ == "__main__":

@@ -1,127 +1,29 @@
-"""Example Name: CSV Processing.
+"""CSV Processing Example.
 
-Demonstrates: Working with CSV data in Transmog.
-
-Related Documentation:
-- https://transmog.readthedocs.io/en/latest/user/processing/csv-processing.html
-- https://transmog.readthedocs.io/en/latest/api/csv-reader.html
+Demonstrates how to work with CSV files using Transmog.
 
 Learning Objectives:
-- How to read data from CSV files
-- How to handle CSV-specific processing options
-- How to configure CSV reading behavior
-- How to process and transform CSV data
+- Processing CSV files with automatic type inference
+- Handling CSV-specific options
+- Working with different output formats
 """
 
-import csv
 import os
 
-# Import from transmog package
 import transmog as tm
 
 
 def create_sample_csv(filepath):
-    """Create a sample CSV file for demonstration."""
-    with open(filepath, "w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        # Write header
-        writer.writerow(
-            [
-                "id",
-                "name",
-                "department",
-                "salary",
-                "hire_date",
-                "manager_id",
-                "address_city",
-                "address_state",
-                "skills",
-            ]
-        )
-        # Write data rows
-        writer.writerows(
-            [
-                [
-                    "1",
-                    "John Smith",
-                    "Engineering",
-                    "85000",
-                    "2020-01-15",
-                    "5",
-                    "San Francisco",
-                    "CA",
-                    "Python,Java,SQL",
-                ],
-                [
-                    "2",
-                    "Alice Johnson",
-                    "Marketing",
-                    "75000",
-                    "2019-05-20",
-                    "6",
-                    "New York",
-                    "NY",
-                    "SEO,Content,Analytics",
-                ],
-                [
-                    "3",
-                    "Robert Davis",
-                    "Engineering",
-                    "90000",
-                    "2018-11-10",
-                    "5",
-                    "Austin",
-                    "TX",
-                    "C++,Go,Rust",
-                ],
-                [
-                    "4",
-                    "Maria Garcia",
-                    "Finance",
-                    "95000",
-                    "2021-03-22",
-                    "7",
-                    "Chicago",
-                    "IL",
-                    "Accounting,Excel,Tableau",
-                ],
-                [
-                    "5",
-                    "David Wilson",
-                    "Engineering",
-                    "120000",
-                    "2015-08-05",
-                    "",
-                    "Seattle",
-                    "WA",
-                    "Python,Management,Architecture",
-                ],
-                [
-                    "6",
-                    "Susan Lee",
-                    "Marketing",
-                    "110000",
-                    "2016-02-28",
-                    "",
-                    "Boston",
-                    "MA",
-                    "Strategy,Leadership,Analytics",
-                ],
-                [
-                    "7",
-                    "James Brown",
-                    "Finance",
-                    "115000",
-                    "2017-10-15",
-                    "",
-                    "Denver",
-                    "CO",
-                    "Budgeting,Forecasting,Investment",
-                ],
-            ]
-        )
-
-    return filepath
+    """Create a sample CSV file for testing."""
+    csv_content = """id,name,department,salary,hire_date,address_street,address_city,address_state,skills
+1,John Doe,Engineering,75000,2020-01-15,123 Tech St,San Francisco,CA,"Python,JavaScript,SQL"
+2,Jane Smith,Marketing,65000,2019-03-22,456 Market Ave,New York,NY,"Marketing,Analytics,Excel"
+3,Bob Johnson,Engineering,80000,2018-11-08,789 Dev Rd,Seattle,WA,"Java,Python,Docker"
+4,Alice Williams,HR,70000,2021-02-01,321 People Ln,Chicago,IL,"Recruiting,HRIS,Communication"
+5,Charlie Brown,Sales,72000,2020-06-15,654 Sales Blvd,Boston,MA,"CRM,Negotiation,Presentation"
+"""
+    with open(filepath, "w") as f:
+        f.write(csv_content)
 
 
 def main():
@@ -141,215 +43,109 @@ def main():
     print("=== CSV Processing Example ===")
     print(f"Created sample CSV file: {csv_filepath}")
 
-    # Example 1: Basic CSV Reading
-    print("\n=== Basic CSV Reading ===")
+    # Example 1: Basic CSV Processing
+    print("\n=== Basic CSV Processing ===")
 
-    # Create a processor with default configuration
-    processor = tm.Processor()
-
-    # Process the CSV file with default settings
-    csv_result = processor.process_file(file_path=csv_filepath, entity_name="employees")
+    # Process CSV file - it's this simple!
+    result = tm.flatten(csv_filepath, name="employees")
 
     # Print the main table
     print("\nMain Table (First 3 rows):")
-    main_table = csv_result.get_main_table()
-    for i, record in enumerate(main_table[:3]):
+    for i, record in enumerate(result.main[:3]):
         print(
             f"Row {i + 1}: id={record.get('id', 'N/A')}, "
             f"name={record.get('name', 'N/A')}, "
             f"department={record.get('department', 'N/A')}"
         )
 
-    print(f"\nTotal records processed: {len(main_table)}")
+    print(f"\nTotal records processed: {len(result.main)}")
+    print(f"Fields detected: {list(result.main[0].keys())[:5]}...")
 
-    # Example 2: CSV With Custom Configuration
-    print("\n=== CSV With Custom Configuration ===")
+    # Example 2: Processing with Type Preservation
+    print("\n=== Processing with Type Preservation ===")
 
-    # Create a custom configuration for CSV processing
-    csv_config = tm.TransmogConfig.default().with_processing(
-        skip_null=False,  # Include null values
-        include_empty=True,  # Include empty values
-        cast_to_string=False,  # Maintain original types
-    )
+    # Process with original types preserved
+    result = tm.flatten(csv_filepath, name="employees", preserve_types=True)
 
-    # Create processor with custom configuration
-    csv_processor = tm.Processor(config=csv_config)
+    # Show data types
+    if result.main:
+        record = result.main[0]
+        print("\nData types:")
+        print(f"  id: {type(record.get('id'))}")
+        print(f"  name: {type(record.get('name'))}")
+        print(f"  salary: {type(record.get('salary'))}")
+        print(f"  hire_date: {type(record.get('hire_date'))}")
 
-    # Process the CSV file with custom configuration
-    custom_csv_result = csv_processor.process_file(
-        file_path=csv_filepath, entity_name="employees"
-    )
+    # Example 3: Custom Separator for Nested Fields
+    print("\n=== Custom Separator ===")
 
-    # Print results with custom configuration
-    main_table = custom_csv_result.get_main_table()
-    print("\nProcessed with custom configuration:")
-    if main_table:
-        # Show a sample record with field types
-        record = main_table[0]
-        print("Sample record with types:")
-        for key in ["id", "name", "salary", "hire_date"]:
-            if key in record:
-                print(f"{key} ({type(record[key]).__name__}): {record[key]}")
+    # Process with dot notation
+    result = tm.flatten(csv_filepath, name="employees", separator=".")
 
-    # Example 3: CSV Transformation with Nested Structure
-    print("\n=== CSV Transformation with Nested Structure ===")
+    # Show nested field names
+    print("\nAddress fields with dot notation:")
+    address_fields = [k for k in result.main[0].keys() if "address" in k]
+    for field in address_fields:
+        print(f"  {field}: {result.main[0][field]}")
 
-    # Transform flat CSV structure into a nested JSON structure
-    # using a processor that recognizes prefixes
+    # Example 4: Handling Skills as Arrays
+    print("\n=== Skills Array Handling ===")
 
-    # Create nested structure interpretation configuration
-    nested_config = (
-        tm.TransmogConfig.default()
-        .with_naming(
-            separator="_"  # Use underscore as separator for nested path components
-        )
-        .with_processing(
-            cast_to_string=False,  # Keep original types
-        )
-    )
+    # Note: CSV doesn't have native array support, but we can demonstrate
+    # how the data is handled
+    print("\nSkills field handling:")
+    for i, record in enumerate(result.main[:3]):
+        skills = record.get("skills", "")
+        print(f"Employee {record.get('name')}: skills = '{skills}'")
 
-    nested_processor = tm.Processor(config=nested_config)
+    # Example 5: Output to Different Formats
+    print("\n=== Output to Different Formats ===")
 
-    # Process CSV with nested structure interpretation
-    nested_result = nested_processor.process_file(
-        file_path=csv_filepath, entity_name="employees"
-    )
+    # Save to JSON
+    json_path = os.path.join(csv_processing_dir, "employees.json")
+    result.save(json_path)
+    print(f"Saved to JSON: {json_path}")
 
-    # Print the nested structure
-    print("\nCSV interpreted with nested structure:")
-    main_table = nested_result.get_main_table()
-    if main_table:
-        # Show how the address fields are grouped
-        record = main_table[0]
-        nested_fields = [k for k in record.keys() if "address" in k]
-        print("Address fields after nesting interpretation:")
-        for field in nested_fields:
-            print(f"  {field}: {record[field]}")
+    # Save back to CSV
+    csv_output = os.path.join(csv_processing_dir, "employees_processed.csv")
+    result.save(csv_output)
+    print(f"Saved to CSV: {csv_output}")
 
-    # Example 4: CSV Processing with Skills Array
-    print("\n=== CSV Processing with Skills Array ===")
-
-    # Create configuration for array splitting
-    # Note: This is a workaround as array splitting might need to be
-    # implemented differently in the latest version
-    array_config = tm.TransmogConfig.default().with_processing(
-        visit_arrays=True,  # Process arrays into child tables
-        cast_to_string=False,  # Keep original types
-    )
-
-    array_processor = tm.Processor(config=array_config)
-
-    # Process CSV with array splitting
-    array_result = array_processor.process_file(
-        file_path=csv_filepath, entity_name="employees"
-    )
-
-    # Print the skills arrays
-    print("\nSkills processed as arrays:")
-    main_table = array_result.get_main_table()
-    if main_table:
-        for _i, record in enumerate(main_table[:3]):
-            skills = record.get("skills", [])
-            if isinstance(skills, list):
-                print(
-                    f"Employee {record.get('name')}: {len(skills)} skills - "
-                    f"{', '.join(skills)}"
-                )
-            else:
-                print(f"Employee {record.get('name')}: skills not processed as array")
-
-    # Example 5: Output Processed CSV to Different Formats
-    print("\n=== Output Processed CSV to Different Formats ===")
-
-    # Write to JSON
-    json_dir = os.path.join(csv_processing_dir, "json")
-    json_outputs = csv_result.write_all_json(base_path=json_dir)
-    print(f"Wrote {len(json_outputs)} JSON files to {json_dir}")
-
-    # Write to CSV (re-export)
-    csv_dir = os.path.join(csv_processing_dir, "csv_export")
-    csv_outputs = csv_result.write_all_csv(base_path=csv_dir)
-    print(f"Wrote {len(csv_outputs)} CSV files to {csv_dir}")
-
-    # Try to write to Parquet if available
+    # Save to Parquet (if available)
     try:
-        parquet_dir = os.path.join(csv_processing_dir, "parquet")
-        parquet_outputs = csv_result.write_all_parquet(base_path=parquet_dir)
-        print(f"Wrote {len(parquet_outputs)} Parquet files to {parquet_dir}")
+        parquet_path = os.path.join(csv_processing_dir, "employees.parquet")
+        result.save(parquet_path)
+        print(f"Saved to Parquet: {parquet_path}")
     except ImportError:
-        print("PyArrow not available. Parquet output skipped.")
+        print("Parquet requires pyarrow: pip install pyarrow")
+
+    # Example 6: Error Handling with Bad Data
+    print("\n=== Error Handling ===")
+
+    # Create a CSV with some problematic data
+    bad_csv = os.path.join(csv_processing_dir, "bad_data.csv")
+    with open(bad_csv, "w") as f:
+        f.write("id,name,age\n")
+        f.write("1,Alice,25\n")
+        f.write("bad_id,Bob,thirty\n")  # Bad data
+        f.write("3,Charlie,30\n")
+
+    # Process with error skipping
+    result = tm.flatten(bad_csv, name="people", errors="skip")
+    print(f"\nWith errors='skip': Processed {len(result.main)} records")
+
+    # Example 7: Performance Optimization
+    print("\n=== Performance Optimization ===")
+
+    # For large CSV files, use low memory mode
+    result = tm.flatten(csv_filepath, name="employees", low_memory=True)
+    print("\nProcessed in low memory mode")
+
+    # Or use custom batch size
+    result = tm.flatten(csv_filepath, name="employees", batch_size=2)
+    print("Processed with custom batch size")
 
     print(f"\nAll output files written to: {csv_processing_dir}")
-
-    # Example 6: Performance Optimization with Environment Variable
-    print("\n=== Performance Optimization with Environment Variable ===")
-
-    # Force native CSV reader for better performance on small/medium files
-    os.environ["TRANSMOG_FORCE_NATIVE_CSV"] = "true"
-
-    print("Processing with TRANSMOG_FORCE_NATIVE_CSV=true...")
-
-    # Time the processing with native reader
-    import time
-
-    start_time = time.time()
-
-    native_result = processor.process_file(
-        file_path=csv_filepath, entity_name="employees_native"
-    )
-
-    native_time = time.time() - start_time
-    print(f"Native CSV reader processing time: {native_time:.4f} seconds")
-    print(f"Records processed: {len(native_result.get_main_table())}")
-
-    # Clean up environment variable
-    os.environ.pop("TRANSMOG_FORCE_NATIVE_CSV", None)
-
-    # Example 7: Creating Large CSV for Performance Testing
-    print("\n=== Large CSV Performance Test ===")
-
-    # Create a larger CSV file for performance testing
-    large_csv_filepath = os.path.join(csv_processing_dir, "large_employees.csv")
-
-    with open(large_csv_filepath, "w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        # Write header
-        writer.writerow(["id", "name", "department", "salary", "hire_date"])
-
-        # Generate 10,000 records
-        print("Generating 10,000 record CSV file...")
-        for i in range(10000):
-            writer.writerow(
-                [
-                    str(i + 1),
-                    f"Employee_{i + 1}",
-                    ["Engineering", "Marketing", "Finance", "HR"][i % 4],
-                    str(50000 + (i * 100)),
-                    f"20{15 + (i % 10)}-{(i % 12) + 1:02d}-{(i % 28) + 1:02d}",
-                ]
-            )
-
-    print(f"Created large CSV file: {large_csv_filepath}")
-
-    # Process the large file - adaptive selection will choose optimal reader
-    print("\nProcessing large file with adaptive reader selection...")
-    start_time = time.time()
-
-    large_result = processor.process_file(
-        file_path=large_csv_filepath, entity_name="large_employees"
-    )
-
-    adaptive_time = time.time() - start_time
-    print(f"Adaptive reader processing time: {adaptive_time:.4f} seconds")
-    print(f"Records processed: {len(large_result.get_main_table())}")
-
-    # Performance tips
-    print("\n=== Performance Tips ===")
-    print("1. For files <100K rows: Native CSV reader is usually fastest")
-    print("2. For files >100K rows: Polars provides best performance")
-    print("3. Use TRANSMOG_FORCE_NATIVE_CSV=true for immediate performance boost")
-    print("4. PyArrow is optimized but best for specific use cases (Arrow ecosystem)")
-    print("5. Use chunk_size parameter for very large files to control memory usage")
 
 
 if __name__ == "__main__":
