@@ -1,87 +1,123 @@
 # Performance Optimization
 
 This guide covers techniques for optimizing Transmog's performance when processing large datasets, including
-caching strategies and parallel processing.
+memory optimization, chunking strategies, and parallel processing.
 
-## Part 1: Value Processing Cache
+## Memory Optimization
 
-Transmog includes a value processing cache to improve performance when processing large datasets with
-repeated values.
+Transmog provides several options to optimize memory usage when processing large datasets.
 
-### Cache Configuration
+### Low Memory Mode
 
-The cache system can be configured through the `TransmogConfig` object:
+The `low_memory` parameter enables memory-optimized processing:
 
 ```python
 import transmog as tm
 
-# Default configuration (enabled with default settings)
-processor = tm.Processor()
-
-# Configure with disabled cache for memory-sensitive applications
-processor = tm.Processor(
-    tm.TransmogConfig.default().with_caching(enabled=False)
-)
-
-# Configure with larger cache for performance-critical applications
-processor = tm.Processor(
-    tm.TransmogConfig.default().with_caching(maxsize=50000)
-)
-
-# Configure to clear cache after batch processing to prevent memory growth
-processor = tm.Processor(
-    tm.TransmogConfig.default().with_caching(clear_after_batch=True)
+# Process with low memory usage
+result = tm.flatten(
+    data,
+    name="records",
+    low_memory=True
 )
 ```
 
-### Configuration Options
+When `low_memory=True` is enabled:
 
-The cache configuration has the following options:
+1. Internal caching is minimized
+2. Intermediate data structures are optimized for memory usage
+3. Garbage collection is more aggressive
+4. Batch sizes are optimized for memory efficiency
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enabled` | bool | `True` | Whether caching is enabled |
-| `maxsize` | int | `10000` | Maximum number of entries in the LRU cache |
-| `clear_after_batch` | bool | `False` | Whether to clear cache after batch processing |
+### Chunked Processing
 
-### Predefined Configurations
-
-Transmog provides predefined configurations for common use cases:
-
-- **Default Configuration**:
-  - Cache enabled
-  - Cache size: 10,000 entries
-  - No automatic clearing
-
-- **Memory-Optimized Configuration** (`Processor.memory_optimized()`):
-  - Cache enabled
-  - Cache size: 1,000 entries (smaller to save memory)
-  - Automatic clearing after batch processing
-
-- **Performance-Optimized Configuration** (`Processor.performance_optimized()`):
-  - Cache enabled
-  - Cache size: 50,000 entries (larger for better hit rate)
-  - No automatic clearing
-
-### Manual Cache Management
-
-You can manually clear the cache at any point:
+For large datasets, you can process data in chunks to reduce memory usage:
 
 ```python
-# Clear cache manually
-processor.clear_cache()
+import transmog as tm
+
+# Process data in chunks
+result = tm.flatten(
+    large_data,
+    name="records",
+    chunk_size=1000  # Process 1000 records at a time
+)
 ```
 
-### When to Adjust Cache Settings
+The `chunk_size` parameter controls:
+- How many records are processed at a time
+- Memory usage during processing
+- Processing efficiency
 
-Consider adjusting cache settings in these scenarios:
+### Streaming Processing
 
-- **Large Datasets with High Value Diversity**: Increase cache size to improve hit rate
-- **Limited Memory Environments**: Reduce cache size or disable caching
-- **Long-Running Processes**: Enable `clear_after_batch` to prevent memory accumulation
-- **High Value Repetition**: Increase cache size to maximize performance benefit
+For very large datasets that don't fit in memory, use streaming processing:
 
-## Part 2: Concurrency and Parallel Processing
+```python
+import transmog as tm
+
+# Stream process a large file
+tm.flatten_stream(
+    file_path="very_large_dataset.json",
+    name="records",
+    output_path="output_dir",
+    output_format="parquet",
+    chunk_size=500,  # Process 500 records at a time
+    low_memory=True  # Enable memory optimization
+)
+```
+
+## Performance Optimization Techniques
+
+### Optimizing for Speed
+
+To optimize for processing speed:
+
+```python
+import transmog as tm
+
+# Process with performance optimization
+result = tm.flatten(
+    data,
+    name="records",
+    chunk_size=5000,  # Larger chunks for better performance
+    low_memory=False  # Disable memory optimization for better speed
+)
+```
+
+### Optimizing for Memory Usage
+
+To optimize for minimal memory usage:
+
+```python
+import transmog as tm
+
+# Process with memory optimization
+result = tm.flatten(
+    data,
+    name="records",
+    chunk_size=500,    # Smaller chunks for lower memory usage
+    low_memory=True    # Enable memory optimization
+)
+```
+
+### Balancing Speed and Memory Usage
+
+For a balance between speed and memory usage:
+
+```python
+import transmog as tm
+
+# Process with balanced optimization
+result = tm.flatten(
+    data,
+    name="records",
+    chunk_size=2000,   # Medium chunk size
+    low_memory=True    # Enable memory optimization
+)
+```
+
+## Parallel Processing
 
 Transmog can be used with various concurrency methods to effectively process large datasets in parallel.
 
@@ -106,15 +142,15 @@ def split_into_chunks(data, chunk_size=1000):
 chunks = split_into_chunks(data, chunk_size=1000)
 
 # Process in parallel
-processor = tm.Processor()
+results = []
 
 with ThreadPoolExecutor(max_workers=4) as executor:
     # Submit processing jobs
     futures = [
         executor.submit(
-            processor.process_batch,
-            batch_data=chunk,
-            entity_name="customers"
+            tm.flatten,
+            data=chunk,
+            name="customers"
         )
         for chunk in chunks
     ]
@@ -122,30 +158,65 @@ with ThreadPoolExecutor(max_workers=4) as executor:
     # Collect results
     results = [future.result() for future in futures]
 
-# Combine results
-combined_result = tm.ProcessingResult.combine_results(results)
+# Combine results manually
+main_records = []
+child_tables = {}
 
-# Write to Parquet
-combined_result.write_all_parquet(base_path="output/data")
+for result in results:
+    # Combine main table records
+    main_records.extend(result.main)
+    
+    # Combine child table records
+    for table_name, records in result.tables.items():
+        if table_name not in child_tables:
+            child_tables[table_name] = []
+        child_tables[table_name].extend(records)
+
+# Create a combined result (for demonstration - in practice you might write directly to files)
+print(f"Total main records: {len(main_records)}")
+for table_name, records in child_tables.items():
+    print(f"Total {table_name} records: {len(records)}")
 ```
 
-### Chunked Processing
+### Parallel File Processing
 
-For very large datasets that don't fit in memory, use chunked processing:
+For processing multiple files in parallel:
 
 ```python
 import transmog as tm
-import json
+from concurrent.futures import ProcessPoolExecutor
+import os
 
-# Initialize processor
-processor = tm.Processor.memory_optimized()
+# Function to process a single file
+def process_file(file_path, output_dir):
+    file_name = os.path.basename(file_path)
+    output_name = os.path.splitext(file_name)[0]
+    
+    # Process file
+    result = tm.flatten_file(
+        file_path,
+        name=output_name,
+        low_memory=True
+    )
+    
+    # Save result
+    result.save(os.path.join(output_dir, output_name))
+    
+    return f"Processed {file_name}"
 
-# Process a large file in chunks
-result = processor.process_chunked(
-    "very_large_dataset.json",
-    entity_name="records",
-    chunk_size=500  # Process 500 records at a time
-)
+# Process multiple files in parallel
+file_paths = ["data1.json", "data2.json", "data3.json"]
+output_dir = "output"
+
+with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
+    futures = [
+        executor.submit(process_file, file_path, output_dir)
+        for file_path in file_paths
+    ]
+    
+    # Print results as they complete
+    for future in concurrent.futures.as_completed(futures):
+        print(future.result())
 ```
 
 ### Hybrid Approach: Parallel Chunked Processing
@@ -159,7 +230,7 @@ from concurrent.futures import ProcessPoolExecutor
 import os
 
 # Function to process a file chunk
-def process_file_chunk(file_path, start_line, num_lines, entity_name):
+def process_file_chunk(file_path, start_line, num_lines, name):
     # Read specific chunk from file
     records = []
     with open(file_path, 'r') as f:
@@ -176,8 +247,7 @@ def process_file_chunk(file_path, start_line, num_lines, entity_name):
                 break
 
     # Process chunk
-    processor = tm.Processor()
-    return processor.process_batch(records, entity_name=entity_name)
+    return tm.flatten(records, name=name, low_memory=True)
 
 # Count total lines in file
 def count_lines(file_path):
@@ -185,11 +255,13 @@ def count_lines(file_path):
         return sum(1 for _ in f)
 
 # Process large file in parallel chunks
-def process_large_file(file_path, entity_name, chunk_size=10000, workers=4):
+def process_large_file(file_path, name, output_dir, chunk_size=10000, workers=4):
     total_lines = count_lines(file_path)
     chunks = [(i, min(chunk_size, total_lines - i))
               for i in range(0, total_lines, chunk_size)]
 
+    os.makedirs(output_dir, exist_ok=True)
+    
     with ProcessPoolExecutor(max_workers=workers) as executor:
         futures = [
             executor.submit(
@@ -197,21 +269,23 @@ def process_large_file(file_path, entity_name, chunk_size=10000, workers=4):
                 file_path,
                 start_line,
                 num_lines,
-                entity_name
+                name
             )
             for start_line, num_lines in chunks
         ]
 
-        # Collect results
-        results = [future.result() for future in futures]
-
-    # Combine results
-    return tm.ProcessingResult.combine_results(results, entity_name=entity_name)
+        # Save results as they complete
+        for i, future in enumerate(concurrent.futures.as_completed(futures)):
+            result = future.result()
+            chunk_dir = os.path.join(output_dir, f"chunk_{i}")
+            result.save(chunk_dir)
+            print(f"Saved chunk {i} to {chunk_dir}")
 
 # Usage
-result = process_large_file(
+process_large_file(
     "huge_dataset.jsonl",
-    entity_name="events",
+    name="events",
+    output_dir="output/events",
     chunk_size=50000,
     workers=os.cpu_count()
 )
@@ -222,14 +296,18 @@ result = process_large_file(
 When using parallel processing, handle errors properly:
 
 ```python
+import transmog as tm
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# Split data into chunks
+chunks = split_into_chunks(data, chunk_size=1000)
 
 results = []
 failed_chunks = []
 
 with ThreadPoolExecutor(max_workers=4) as executor:
     futures = {
-        executor.submit(processor.process_batch, chunk, "records"): i
+        executor.submit(tm.flatten, data=chunk, name="records"): i
         for i, chunk in enumerate(chunks)
     }
 
@@ -245,118 +323,72 @@ with ThreadPoolExecutor(max_workers=4) as executor:
 # Handle any failed chunks
 if failed_chunks:
     print(f"Failed chunks: {failed_chunks}")
-
-# Combine successful results
-if results:
-    combined_result = tm.ProcessingResult.combine_results(results)
-else:
-    print("All chunks failed")
+    # Optionally retry with different settings
+    for i in failed_chunks:
+        try:
+            # Try again with more lenient error handling
+            result = tm.flatten(
+                chunks[i], 
+                name="records",
+                error_handling="skip"
+            )
+            results.append(result)
+            print(f"Successfully reprocessed chunk {i}")
+        except Exception as e:
+            print(f"Chunk {i} failed again: {str(e)}")
 ```
 
-## Part 3: Performance Tuning Best Practices
+## Performance Tuning Guidelines
 
-When optimizing Transmog for large-scale data processing, consider these best practices:
+### Optimizing for Different Scenarios
 
-### Memory Optimization
+| Scenario | Recommended Configuration |
+|----------|---------------------------|
+| **Large dataset, limited memory** | `low_memory=True`, small `chunk_size` (500-1000) |
+| **Large dataset, fast processing** | Larger `chunk_size` (5000+), parallel processing |
+| **Streaming large files** | `flatten_stream()` with `low_memory=True` |
+| **Many small files** | Parallel processing with `ProcessPoolExecutor` |
+| **Complex nested structures** | Medium `chunk_size` (1000-2000), `low_memory=True` |
 
-1. **Use Appropriate Processing Mode**:
-   - `processor = tm.Processor.memory_optimized()` for memory-constrained environments
-   - `processor = tm.Processor.performance_optimized()` for speed-critical applications
+### Memory Usage Monitoring
 
-2. **Configure Cache Appropriately**:
-   - Increase cache size for high repeat value datasets
-   - Disable cache for low repeat, high variety datasets
-   - Enable `clear_after_batch` for long-running processes
-
-3. **Process in Chunks**:
-   - Use `process_chunked()` for datasets larger than available memory
-   - Choose an appropriate chunk size (typically 500-5000 records)
-
-### Parallel Processing Optimization
-
-1. **Select Appropriate Concurrency Method**:
-   - ThreadPoolExecutor for I/O-bound operations
-   - ProcessPoolExecutor for CPU-bound operations
-
-2. **Choose Worker Count Wisely**:
-   - Start with `os.cpu_count()` for CPU-bound work
-   - Use 2-4× `os.cpu_count()` for I/O-bound work
-   - Benchmark to find optimal worker count for your specific hardware
-
-3. **Balance Chunk Size**:
-   - Too small: excessive overhead from worker management
-   - Too large: poor load balancing and memory pressure
-   - Aim for chunks that process in 0.5-2 seconds for good balance
-
-### Output Format Selection
-
-1. **In-Memory Processing**:
-   - Use `to_dict()` or `to_json_objects()` for fastest in-memory processing
-   - Use `conversion_mode=ConversionMode.LAZY` to defer conversions until needed
-
-2. **File Output**:
-   - Use Parquet for most efficient storage and fastest reading
-   - Use CSV for widest compatibility
-   - Use JSON for human readability and preservation of types
-
-3. **Streaming Output**:
-   - Use streaming writers for very large outputs
-   - `stream_process_file()` for direct file-to-file processing
-
-### Combining Strategies
-
-For optimal performance with very large datasets:
-
-1. Use memory-optimized configuration
-2. Process in parallel with appropriate worker count
-3. Use chunked processing with reasonable chunk size
-4. Stream directly to output when possible
-5. Use Parquet output format with compression
+Monitor memory usage to find the optimal configuration:
 
 ```python
-import transmog as tm
+import psutil
 import os
+from memory_profiler import memory_usage
 
-# Create optimized processor
-processor = tm.Processor.memory_optimized()
-
-# Stream process directly to parquet with parallel workers
-from concurrent.futures import ProcessPoolExecutor
-
-def process_chunk(file_path, start_idx, end_idx, output_dir):
-    # Create a processor for this worker
-    proc = tm.Processor.memory_optimized()
-
-    # Process chunk and write directly to parquet
-    proc.stream_process_file(
-        file_path,
-        entity_name="records",
-        output_format="parquet",
-        output_destination=f"{output_dir}/chunk_{start_idx}_{end_idx}",
-        start_line=start_idx,
-        end_line=end_idx,
-        compression="snappy"
+# Function to monitor
+def process_with_settings(chunk_size, low_memory):
+    tm.flatten(
+        large_data,
+        name="records",
+        chunk_size=chunk_size,
+        low_memory=low_memory
     )
 
-    return f"Processed lines {start_idx}-{end_idx}"
+# Test different configurations
+settings = [
+    (500, True),   # Small chunks with memory optimization
+    (2000, True),  # Medium chunks with memory optimization
+    (5000, False), # Large chunks without memory optimization
+]
 
-# Split file processing across workers
-file_size = 1000000  # Assume 1M lines
-chunk_size = 100000  # 100K per chunk
-chunks = [(i, min(i + chunk_size, file_size))
-          for i in range(0, file_size, chunk_size)]
-
-# Process in parallel
-with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
-    futures = [
-        executor.submit(process_chunk,
-                       "huge_file.jsonl",
-                       start,
-                       end,
-                       "output/data")
-        for start, end in chunks
-    ]
-
-    for future in futures:
-        print(future.result())
+for chunk_size, low_memory in settings:
+    print(f"Testing chunk_size={chunk_size}, low_memory={low_memory}")
+    mem_usage = memory_usage(
+        lambda: process_with_settings(chunk_size, low_memory)
+    )
+    print(f"Peak memory usage: {max(mem_usage)} MiB")
 ```
+
+## Best Practices
+
+1. **Start with default settings** and adjust based on performance monitoring
+2. **For very large datasets**, use `flatten_stream()` with `low_memory=True`
+3. **For parallel processing**, use appropriate chunk sizes to balance memory and CPU usage
+4. **Monitor memory usage** to find optimal settings for your specific data
+5. **Consider data characteristics** - deeply nested data may require different settings than flat data
+6. **Use appropriate error handling** in parallel processing scenarios
+7. **Balance workers** with available CPU cores - too many workers can cause thrashing

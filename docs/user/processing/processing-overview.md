@@ -1,8 +1,8 @@
 # Processing Guide
 
 > **API Reference**: For detailed API documentation, see the
-> [Processor API Reference](../../api/processor.md) and
-> [Process API Reference](../../api/process.md).
+> [Core API Reference](../../api/core.md) and
+> [Processing Result API Reference](../../api/processing-result.md).
 >
 > **Related Guides**:
 >
@@ -14,40 +14,37 @@ from various processing approaches and memory optimization techniques.
 
 ## Overview of Processing Methods
 
-Transmog offers several methods for processing data, each optimized for different scenarios:
+Transmog v1.1.0 offers several methods for processing data, each optimized for different scenarios:
 
-| Processing Method | Best For | Memory Usage | Performance |
-|-------------------|----------|--------------|-------------|
-| Standard Processing | Medium datasets, balanced approach | Medium | Medium |
-| Batch Processing | Collections of similar records | Medium | High |
-| Chunked Processing | Large datasets | Low | Medium |
-| Streaming Processing | Very large datasets, direct output | Lowest | Medium |
-| In-Memory Processing | Small datasets, fast processing | High | Highest |
+| Processing Method | Best For | Memory Usage | Performance | API Function |
+|-------------------|----------|--------------|-------------|--------------|
+| Standard Processing | Medium datasets, balanced approach | Medium | Medium | `tm.flatten()` |
+| File Processing | Processing files directly | Medium | Medium | `tm.flatten_file()` |
+| Streaming Processing | Very large datasets, direct output | Lowest | Medium | `tm.flatten_stream()` |
+| Memory-Optimized Processing | Large datasets | Low | Medium | `tm.flatten(..., low_memory=True)` |
 
 ## Decision Tree for Choosing the Right Approach
 
 Use this decision tree to determine which processing approach is best for your scenario:
 
-1. **Is your dataset small enough to fit in memory?**
-   - Yes → Use standard in-memory processing
+1. **Are you processing a file?**
+   - Yes → Use `tm.flatten_file(path)`
    - No → Continue to next question
 
-2. **Do you need to keep the entire result in memory after processing?**
-   - Yes → Use chunked processing
+2. **Is your dataset small enough to fit in memory?**
+   - Yes → Use standard processing with `tm.flatten(data)`
    - No → Continue to next question
 
-3. **Do you need to write directly to an output format?**
-   - Yes → Use streaming processing
-   - No → Use chunked processing with a memory-optimized configuration
+3. **Do you need to keep the entire result in memory after processing?**
+   - Yes → Use `tm.flatten(data, low_memory=True)`
+   - No → Use `tm.flatten_stream(data, output_path)`
 
 ## Standard Processing
 
-For datasets that fit comfortably in memory, use the standard `process` method:
+For datasets that fit comfortably in memory, use the standard `flatten` function:
 
 ```python
-from transmog import Processor
-
-processor = Processor()
+import transmog as tm
 
 # Process a single JSON object
 data = {
@@ -60,7 +57,7 @@ data = {
     }
 }
 
-result = processor.process(data, entity_name="customers")
+result = tm.flatten(data, name="customers")
 
 # Process a list of JSON objects
 data_list = [
@@ -68,104 +65,111 @@ data_list = [
     {"id": 2, "name": "Jane Doe"}
 ]
 
-result = processor.process(data_list, entity_name="customers")
+result = tm.flatten(data_list, name="customers")
 ```
 
-## Batch Processing
+## File Processing
 
-For processing collections of similar records:
+For processing files directly:
 
 ```python
-from transmog import Processor
+import transmog as tm
 
-processor = Processor()
+# Process a JSON file
+result = tm.flatten_file("data.json", name="records")
 
-# Process a batch of records
-batch_data = [
-    {"id": 1, "name": "Record 1"},
-    {"id": 2, "name": "Record 2"},
-    {"id": 3, "name": "Record 3"}
-]
+# Process a CSV file
+result = tm.flatten_file("data.csv", name="records")
 
-result = processor.process_batch(
-    batch_data=batch_data,
-    entity_name="records"
-)
+# Specify format explicitly if needed
+result = tm.flatten_file("data.txt", name="records", format="json")
 ```
 
-## Chunked Processing
+## Streaming Processing
 
-For large datasets that may not fit entirely in memory:
+For very large datasets that should be processed directly to output files:
 
 ```python
-from transmog import Processor
+import transmog as tm
 
-processor = Processor()
-
-# Process a large list of records in chunks
-large_list = [{"id": i, "data": f"data_{i}"} for i in range(10000)]
-
-result = processor.process_chunked(
-    large_list,
-    entity_name="large_dataset",
-    chunk_size=1000  # Process 1000 records at a time
+# Stream process directly to output files
+tm.flatten_stream(
+    large_data,  # Can be a list, generator, or file path
+    output_path="output/",
+    name="records",
+    format="json",
+    batch_size=1000  # Process 1000 records at a time
 )
 
-# Process a generator of records
+# Stream from a file to output files
+tm.flatten_stream(
+    "large_data.json",
+    output_path="output/",
+    name="records",
+    format="parquet",
+    compression="snappy"  # Format-specific options
+)
+
+# Stream from a generator
 def record_generator(count):
     for i in range(count):
         yield {"id": i, "value": f"Item {i}"}
 
-result = processor.process_chunked(
+tm.flatten_stream(
     record_generator(100000),  # Generator that yields 100,000 records
-    entity_name="streamed_data",
-    chunk_size=500
+    output_path="output/",
+    name="streamed_data",
+    format="csv",
+    batch_size=500
 )
 ```
 
 ## Memory Optimization Techniques
 
-### Memory Optimization Modes
+### Low Memory Mode
 
-Transmog supports different processing modes to optimize memory usage and performance:
+For processing larger datasets that still need to be kept in memory:
 
 ```python
-from transmog import Processor
+import transmog as tm
 
-# Create a processor optimized for memory usage
-processor = Processor.memory_optimized()
-
-# Create a processor optimized for performance
-processor = Processor.performance_optimized()
-
-# Process data with the optimized processor
-result = processor.process(data, entity_name="customers")
+# Process with low memory optimization
+result = tm.flatten(
+    large_data,
+    name="customers",
+    low_memory=True,
+    batch_size=1000  # Process in batches of 1000
+)
 ```
 
-### Customize Batch and Chunk Sizes
+### Customize Batch Sizes
 
-Adjust batch and chunk sizes based on your data characteristics:
+Adjust batch sizes based on your data characteristics:
 
 ```python
-# For batch processing
-processor.with_processing(batch_size=1000)
+# For standard processing with memory optimization
+result = tm.flatten(data, name="records", batch_size=500)
 
-# For chunked processing
-result = processor.process_chunked(data, entity_name="records", chunk_size=500)
+# For streaming processing
+tm.flatten_stream(data, output_path="output/", name="records", batch_size=1000)
 ```
 
-### Use Lazy Conversion Mode
+### Iterative Processing with Result Objects
 
-Use the lazy conversion mode to delay data conversions until needed:
+Process results iteratively to reduce memory pressure:
 
 ```python
-from transmog import ConversionMode
-
 # Process data
-result = processor.process(data, entity_name="customers")
+result = tm.flatten(large_data, name="customers")
 
-# Use lazy conversion mode for output
-tables = result.to_dict(conversion_mode=ConversionMode.LAZY)
+# Iterate through main table records one at a time
+for record in result:  # FlattenResult is iterable
+    process_record(record)
+
+# Iterate through all tables
+for table_name, records in result.items():
+    for record in records:
+        process_record(record, table_name)
 ```
 
 ### Stream Directly to Output
@@ -174,11 +178,12 @@ For very large datasets, stream directly to output formats:
 
 ```python
 # Stream process to output format
-processor.stream_process(
-    data=large_data_source,
-    entity_name="records",
-    output_format="parquet",
-    output_destination="output_dir"
+tm.flatten_stream(
+    large_data_source,
+    output_path="output/",
+    name="records",
+    format="parquet",
+    compression="snappy"
 )
 ```
 
@@ -186,75 +191,104 @@ processor.stream_process(
 
 When working with extremely large datasets:
 
-1. **Use Chunked Processing**: Process data in manageable chunks
-2. **Release Processed Results**: Set processed results to `None` after use
-3. **Free Unused Resources**: Call `gc.collect()` after processing large batches
-4. **Monitor Memory Usage**: Use tools like `psutil` to monitor memory consumption
+1. **Use Streaming Processing**: Process data directly to output files
+2. **Use Low Memory Mode**: Enable memory optimization with `low_memory=True`
+3. **Release Processed Results**: Set processed results to `None` after use
+4. **Free Unused Resources**: Call `gc.collect()` after processing large batches
+5. **Monitor Memory Usage**: Use tools like `psutil` to monitor memory consumption
 
 ```python
 import gc
 import psutil
-from transmog import Processor
-
-processor = Processor.memory_optimized()
+import transmog as tm
 
 def print_memory_usage():
     process = psutil.Process()
     print(f"Memory usage: {process.memory_info().rss / 1024 / 1024:.2f} MB")
 
-# Process large dataset in chunks with memory monitoring
+# Process large dataset with memory monitoring
 print_memory_usage()  # Before processing
 
-for i, chunk in enumerate(data_chunks):
-    # Process chunk
-    result = processor.process_batch(chunk, entity_name="records")
+# Stream directly to output (lowest memory usage)
+tm.flatten_stream(
+    large_data,
+    output_path="output/",
+    name="records",
+    format="json",
+    batch_size=1000
+)
 
-    # Use the result
-    output = result.to_dict()
+print_memory_usage()  # After processing
 
-    # Free memory
-    del result
-    gc.collect()
+# Or process with low memory mode if you need the result in memory
+result = tm.flatten(
+    large_data,
+    name="records",
+    low_memory=True,
+    batch_size=1000
+)
 
-    print(f"Chunk {i} completed")
-    print_memory_usage()  # After processing chunk
+# Use the result
+
+
+# Free memory
+del result
+gc.collect()
+
+print_memory_usage()  # After processing and cleanup
 ```
 
-## Combining Multiple Processing Results
+## Converting Results to Different Formats
 
-For scenarios where you process data in parts:
+The `FlattenResult` class provides convenient methods for converting to different formats:
 
 ```python
-from transmog import ProcessingResult
+# Process data
+result = tm.flatten(data, name="customers")
 
-# Process multiple batches
-results = []
-for batch in data_batches:
-    result = processor.process_batch(batch, entity_name="records")
-    results.append(result)
+# Save to different formats
+result.save("output.json")  # Save as JSON
+result.save("output.csv")   # Save as CSV
+result.save("output.parquet")  # Save as Parquet
 
-# Combine all results
-combined_result = ProcessingResult.combine_results(results)
 
-# Access the combined data
-all_records = combined_result.get_main_table()
+
+# Access tables directly
+main_table = result.main  # Get main table
+child_tables = result.tables  # Get all child tables
+```
+
+## Advanced Processing (Internal API)
+
+For advanced use cases, Transmog still provides access to the full processing API through the internal interface:
+
+```python
+from transmog.process import Processor
+from transmog.config import TransmogConfig
+
+# Create a custom configuration
+config = (
+    TransmogConfig.default()
+    .with_naming(separator=".")
+    .with_processing(batch_size=1000)
+    .with_error_handling(recovery_strategy="skip")
+)
+
+# Create a processor with custom configuration
+processor = Processor(config=config)
+
+# Use advanced processing methods
+result = processor.process(data, entity_name="records")
 ```
 
 ## Processing Strategy Selection
 
-Transmog uses the Strategy pattern to handle different data processing scenarios. The library automatically
+Internally, Transmog uses the Strategy pattern to handle different data processing scenarios. The library automatically
 selects the appropriate strategy based on the method called and the input data type:
 
-| Method | Strategy Used |
-|--------|--------------|
-| `process()` | InMemoryStrategy for dict/list, FileStrategy for str paths |
-| `process_file()` | FileStrategy |
-| `process_batch()` | BatchStrategy |
-| `process_chunked()` | ChunkedStrategy |
-| `process_csv()` | CSVStrategy |
-
-## Conclusion
-
-Choosing the right processing approach in Transmog depends on your dataset size, memory constraints,
-and processing needs. By following the guidelines in this document, you can optimize your data processing
-workflow for both performance and memory efficiency.
+| Input Type | Strategy Used |
+|------------|--------------|
+| Dict/List in memory | InMemoryStrategy |
+| File path | FileStrategy |
+| Generator | ChunkedStrategy |
+| CSV file | CSVStrategy |

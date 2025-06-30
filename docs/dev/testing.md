@@ -17,76 +17,61 @@ Transmog uses these testing practices:
 
 ## Test Structure
 
-The test suite is organized with an interface-based approach that focuses on behavior rather than implementation
-details:
+The test suite is organized by functionality, with each directory containing tests for specific components:
 
 ```text
 tests/
-├── benchmarks/           # Performance benchmark tests
-│   ├── test_csv_reader_benchmarks.py
-│   └── test_output_format_benchmarks.py
+├── advanced/             # Advanced feature tests
+│   └── test_natural_ids.py
+├── api/                  # Core API tests
+│   ├── test_flatten_basic.py
+│   └── test_flatten_result_core.py
+├── arrays/               # Array processing tests
+│   └── test_array_extraction.py
 ├── config/               # Configuration tests
-│   ├── test_config_propagation.py
-│   └── test_settings.py
+│   └── test_transmog_config.py
 ├── core/                 # Core functionality tests
-│   ├── test_extractor.py
 │   ├── test_flattener.py
-│   ├── test_hierarchy.py
-│   ├── test_metadata.py
-│   ├── test_processor.py
-│   └── test_*_strategy.py
-├── dependencies/         # Dependency management tests
-│   └── test_dependency_manager.py
+│   └── test_metadata.py
 ├── error/                # Error handling tests
-│   └── test_error_handling.py
+│   └── test_error_modes.py
 ├── fixtures/             # Test data files
 │   ├── sample.csv
 │   ├── sample_bad_format.csv
 │   ├── sample_empty.csv
 │   └── sample_with_nulls.csv
-├── formats/              # Format conversion tests
-│   └── test_native_formats.py
-├── helpers/              # Shared test utilities and mixins
 ├── integration/          # End-to-end integration tests
-│   ├── test_csv_integration.py
-│   ├── test_json_integration.py
-│   ├── test_end_to_end.py
-│   └── test_*_integration.py
-├── interfaces/           # Interface contracts definitions
-│   ├── test_flattener_interface.py
-│   ├── test_processor_interface.py
-│   ├── test_strategy_interface.py
-│   └── test_*_interface.py
-├── process/              # Process tests
-│   └── test_streaming_result.py
-├── readers/              # Input format reader tests
-│   ├── test_csv_reader.py
-│   └── test_json_reader.py
-└── writers/              # Output format writer tests
-    ├── test_csv_writer.py
-    ├── test_json_writer.py
-    ├── test_parquet_writer.py
-    └── test_*_streaming_writer.py
+│   ├── conftest.py
+│   └── test_complete_workflows.py
+├── writers/              # Writer and I/O tests
+│   └── test_writer_factory.py
+├── naming/               # Naming convention tests
+│   └── test_naming_conventions.py
+└── conftest.py           # Shared test configuration
 ```
 
 ### Test Organization Philosophy
 
-Tests are organized based on the component they test, not by test type. Each component has its own directory
-with tests that verify its behavior.
+Tests are organized by functionality, with each directory containing tests for specific components or features:
 
-The `interfaces/` directory contains abstract test classes that define the expected behavior for each
-component. The concrete test implementations in other directories inherit from these interfaces.
-
-This approach ensures that components are tested against their interfaces rather than implementation
-details, making the tests more resilient to refactoring.
+- **`api/`**: Tests for the main public API functions (`flatten`, `flatten_file`, etc.) and result objects
+- **`core/`**: Tests for core processing logic (flattening, metadata generation)
+- **`config/`**: Tests for configuration management and validation
+- **`writers/`**: Tests for output writers and format detection
+- **`error/`**: Tests for error handling strategies and recovery mechanisms
+- **`arrays/`**: Tests for array processing and extraction logic
+- **`naming/`**: Tests for field and table naming conventions
+- **`advanced/`**: Tests for advanced features like natural ID discovery
+- **`integration/`**: End-to-end tests that verify complete workflows
+- **`fixtures/`**: Test data files used across multiple test modules
 
 The test suite follows these key principles:
 
-1. **Interface-First Testing**: Tests define the expected behavior through interfaces
-2. **Component Separation**: Each component has its own dedicated test modules
-3. **Integration Tests**: End-to-end tests ensure components work together correctly
-4. **Benchmarks**: Performance tests are separated to avoid slowing down the regular test suite
-5. **Fixtures**: Common test data is shared through fixtures
+1. **Component Separation**: Each component has its own dedicated test modules
+2. **Integration Coverage**: End-to-end tests ensure components work together correctly
+3. **Realistic Data**: Tests use realistic examples and edge cases
+4. **Shared Fixtures**: Common test data and utilities are shared through fixtures
+5. **Clear Organization**: Test structure mirrors the package structure for easy navigation
 
 ## Running Tests
 
@@ -119,11 +104,11 @@ pytest -k "flattener"
 Some tests are tagged with markers for selective execution:
 
 ```bash
-# Run benchmark tests only
-pytest -m benchmark
+# Run integration tests only
+pytest tests/integration/
 
-# Run memory usage tests only
-pytest -m memory
+# Run core functionality tests only
+pytest tests/core/
 ```
 
 ### Test Coverage
@@ -145,30 +130,33 @@ start htmlcov/index.html  # On Windows
 xdg-open htmlcov/index.html  # On Linux
 ```
 
-### Running Performance Tests
+### Running Specific Test Categories
 
-Performance tests are separate from regular tests to avoid increasing the duration of the normal test suite:
+You can run specific categories of tests:
 
 ```bash
-# Run performance tests
-pytest tests/benchmarks/
+# Run API tests
+pytest tests/api/
 
-# Run a specific performance test
-pytest tests/benchmarks/test_output_format_benchmarks.py
+# Run error handling tests
+pytest tests/error/
+
+# Run array processing tests
+pytest tests/arrays/
+
+# Run writer tests
+pytest tests/writers/
 ```
 
 ## Writing Tests
 
 ### Unit Tests
 
-Unit tests focus on testing individual components in isolation. Here's an example that shows interface-based
-testing from `tests/core/test_flattener.py`:
+Unit tests focus on testing individual components in isolation. Here's an example from `tests/core/test_flattener.py`:
 
 ```python
 """
-Tests for the flattener implementation.
-
-This module tests the core flattener functionality using the interface-based approach.
+Tests for the core flattener functionality.
 """
 
 import pytest
@@ -178,25 +166,32 @@ from transmog.core.flattener import flatten_json
 from transmog.error import ProcessingError
 from transmog.config import TransmogConfig
 
-# Import and inherit from the interface
-from tests.interfaces.test_flattener_interface import AbstractFlattenerTest
 
+class TestFlattener:
+    """Tests for the flattener module."""
 
-class TestFlattener(AbstractFlattenerTest):
-    """
-    Tests for the flattener module.
+    def test_basic_flattening(self):
+        """Test basic JSON flattening functionality."""
+        data = {"name": "John", "address": {"city": "NYC", "zip": "10001"}}
+        result = flatten_json(data)
+        
+        expected = {
+            "name": "John",
+            "address_city": "NYC", 
+            "address_zip": "10001"
+        }
+        assert result == expected
 
-    Inherits from AbstractFlattenerTest to ensure it follows the interface-based testing pattern.
-    """
-
-    def test_flattener_with_config(self, simple_data):
-        """Test flattening with a TransmogConfig object."""
-        # Create processor with explicit configuration
-        proc_config = (
-            TransmogConfig.default()
-            .with_naming(separator="_", deep_nesting_threshold=4)
-            .with_processing(cast_to_string=False)
-        )
+    def test_flattening_with_custom_separator(self):
+        """Test flattening with custom field separator."""
+        data = {"user": {"name": "Alice", "age": 30}}
+        result = flatten_json(data, separator=".")
+        
+        expected = {
+            "user.name": "Alice",
+            "user.age": 30
+        }
+        assert result == expected
 
         # Use the TransmogConfig to get the parameters
         flattened = flatten_json(

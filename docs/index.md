@@ -6,32 +6,47 @@ hide-toc: false
 
 Transmog is a Python library for transforming nested JSON data into flat, structured formats.
 
-:::info Version Note
-**Transmog 1.1.0 - Current Release**
+:::info API Overview
+**Transmog 1.1.0 - Simple API**
 
-Features include:
+Transmog provides a simplified API while preserving all advanced functionality:
 
-- `TransmogConfig` system with a fluent API
-- Processing strategies for different data sources
-- Streaming capabilities
-- Memory efficiency options
-- Error handling strategies
-- Multiple output format options
-- Natural ID discovery
+- **Simple API**: `tm.flatten()` for easy data transformation
+- **Streaming Support**: `tm.flatten_stream()` for memory-efficient processing  
+- **File Processing**: `tm.flatten_file()` for direct file handling
+- **Advanced Features**: Full `Processor` API available for complex use cases
+- **Intuitive Results**: `FlattenResult` with `.main`, `.tables`, and `.save()` methods
 :::
+
+## Quick Start
+
+```python
+import transmog as tm
+
+# Basic usage - transform nested data
+result = tm.flatten({"name": "Product", "tags": ["sale", "clearance"]})
+print(result.main)      # Main table
+print(result.tables)    # Child tables
+result.save("output.json")  # Save to file
+
+# Stream large datasets
+tm.flatten_stream(large_data, "output/", format="parquet")
+
+# Process files directly  
+result = tm.flatten_file("data.json", name="products")
+```
 
 ## Overview
 
 Transmog features:
 
-- Flattening nested JSON/dict structures
-- Extracting arrays into separate tables with parent-child relationships
-- Transforming values during processing
-- Generating IDs for records
-- Converting to various output formats
-- Processing large datasets
-- Configuring memory usage
-- Using existing natural IDs in data
+- **Simple API**: Easy-to-use functions for 90% of use cases
+- **Powerful Processing**: Flattens nested JSON/dict structures into relational tables
+- **Array Extraction**: Converts arrays into separate tables with parent-child relationships  
+- **Multiple Formats**: Output to JSON, CSV, Parquet, and more
+- **Memory Efficient**: Streaming support for datasets that don't fit in memory
+- **Flexible IDs**: Auto-generate IDs or use existing natural ID fields
+- **Error Handling**: Robust error recovery for real-world data
 
 ## Quick Links
 
@@ -39,6 +54,44 @@ Transmog features:
 - [Getting Started Guide](user/essentials/getting-started.md)
 - [Basic Concepts](user/essentials/basic-concepts.md)
 - [Data Structures](user/essentials/data-structures.md)
+
+## API Overview
+
+### Simple API (v1.1.0) - Recommended
+
+For most use cases, the simple API is recommended:
+
+```python
+import transmog as tm
+
+# Main functions
+result = tm.flatten(data, name="products")           # Basic flattening
+result = tm.flatten_file("data.json")                # Process files
+tm.flatten_stream(data, "output/", format="json")    # Memory-efficient streaming
+
+# Result manipulation
+result.main              # Main table
+result.tables           # Child tables dictionary  
+result.save("out.csv")  # Save to file
+
+```
+
+### Advanced API - For Complex Use Cases
+
+For advanced features, import the Processor directly:
+
+```python
+from transmog.process import Processor
+from transmog.config import TransmogConfig
+
+# Full control over processing
+config = TransmogConfig.default().with_naming(separator=".")
+processor = Processor(config)
+result = processor.process(data, entity_name="products")
+
+# Advanced streaming
+processor.stream_process(data, entity_name="products", output_format="parquet")
+```
 
 ## Documentation Structure
 
@@ -53,7 +106,7 @@ User guides provide conceptual overviews, practical examples, and best practices
 - [Getting Started](user/essentials/getting-started.md) - First steps with Transmog
 - [Basic Concepts](user/essentials/basic-concepts.md) - Fundamental concepts
 - [Data Structures](user/essentials/data-structures.md) - Input and output data structures
-- [Configuration](user/essentials/configuration.md) - Options for customizing Transmog
+- [Configuration](user/essentials/configuration.md) - Simple and advanced configuration options
 - [Dependencies and Features](user/essentials/dependencies-and-features.md) - Optional dependencies and features
 
 #### Processing
@@ -71,7 +124,7 @@ User guides provide conceptual overviews, practical examples, and best practices
 
 #### Advanced Topics
 
-- [Streaming](user/advanced/streaming.md) - Processing large datasets
+- [Streaming](user/advanced/streaming.md) - Processing large datasets with memory efficiency
 - [Performance Optimization](user/advanced/performance-optimization.md) - Optimizing for speed and memory
 - [Error Handling](user/advanced/error-handling.md) - Dealing with problematic data
 - [Deterministic IDs](user/advanced/deterministic-ids.md) - Generating consistent IDs
@@ -103,7 +156,7 @@ Step-by-step guides to accomplish specific tasks with Transmog:
 
 ## Where to Start
 
-- **New to Transmog?** Start with [Getting Started](user/essentials/getting-started.md) and [Basic Concepts](user/essentials/basic-concepts.md)
+- **Starting with Transmog?** Begin with [Getting Started](user/essentials/getting-started.md) and [Basic Concepts](user/essentials/basic-concepts.md)
 - **Need to solve a specific problem?** Try the tutorials section
 - **Looking for detailed API information?** Check the API reference section
 

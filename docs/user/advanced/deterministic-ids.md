@@ -38,30 +38,26 @@ By default, each record gets a random UUID:
 
 ```python
 # Default - uses random UUIDs
-processor = tm.Processor()
+result = tm.flatten(data, name="entity")
 ```
 
 This is suitable for one-time processing but can create issues in incremental loading scenarios.
 
 ### 2. Field-based Deterministic IDs
 
-You can specify which field to use for generating deterministic IDs at different paths in your data:
+You can specify which field to use for generating deterministic IDs at different tables in your data:
 
 ```python
 # Configure deterministic IDs based on specific fields for different tables
-config = tm.TransmogConfig.with_deterministic_ids({
-    "": "id",                     # Root level uses "id" field
-    "customers": "customer_id",   # Customer records use "customer_id" field
-    "orders": "order_number"      # Order records use "order_number" field
-})
-processor = tm.Processor(config=config)
-
-# Or use the factory method
-processor = tm.Processor.with_deterministic_ids({
-    "": "id",                     # Root level uses "id" field
-    "customers": "customer_id",   # Customer records use "customer_id" field
-    "orders": "order_number"      # Order records use "order_number" field
-})
+result = tm.flatten(
+    data, 
+    name="store",
+    id_field={
+        "": "id",                     # Main table uses "id" field
+        "store_customers": "customer_id",   # Customer records use "customer_id" field
+        "store_orders": "order_number"      # Order records use "order_number" field
+    }
+)
 ```
 
 This ensures that as long as the specified field values stay the same, the generated IDs will also remain consistent.
@@ -70,101 +66,66 @@ You can also use a single field for all tables:
 
 ```python
 # Use "id" field for all tables
-processor = tm.Processor.with_deterministic_ids("id")
+result = tm.flatten(data, name="entity", id_field="id")
 ```
-
-> **Note**: The `with_deterministic_ids` method only supports using a single field per table path.
-> To generate IDs based on multiple fields, you must use the custom ID generation approach described below.
 
 ### 3. Custom ID Generation
 
-For complex requirements, such as combining multiple fields for a single table, you can provide a custom function
-to generate IDs:
+For complex requirements, such as combining multiple fields for a single table, you can provide custom transformation functions:
 
 ```python
-def custom_id_strategy(record):
-    # Generate ID based on multiple fields or complex logic
-    company = record.get("company", "")
-    record_id = record.get("id", "")
-    record_type = record.get("type", "")
+# Define transformations that generate custom IDs
+def generate_customer_id(record):
+    # Generate ID based on multiple fields
+    return f"{record.get('company', '')}-{record.get('customer_id', '')}"
 
-    return f"{company}-{record_type}-{record_id}"
-
-# Configure with custom ID generation through config
-config = tm.TransmogConfig.with_custom_id_generation(custom_id_strategy)
-processor = tm.Processor(config=config)
-
-# Or use the factory method
-processor = tm.Processor.with_custom_id_generation(custom_id_strategy)
+# Apply transformations during flattening
+result = tm.flatten(
+    data, 
+    name="store",
+    transforms={
+        "customer_id": generate_customer_id  # Transform customer_id field
+    },
+    id_field="customer_id"  # Use the transformed field as ID
+)
 ```
 
-## Path Patterns in Deterministic ID Configuration
+## Table Names in Deterministic ID Configuration
 
-When configuring deterministic IDs, you need to specify the paths where each field should be used. Paths
-are expressed using the separator character (typically underscore `_`).
+When configuring deterministic IDs with a dictionary, you need to specify which tables should use which fields:
 
-### Path Examples
+### Table Name Examples
 
-- `""` (empty string): Matches root-level records
-- `"customers"`: Matches records in the "customers" array
-- `"customers_orders"`: Matches order records nested within customers
-- `"*"`: Wildcard that matches any path
+- `""` (empty string): Represents the main table
+- `"store_customers"`: Matches records in the customers table
+- `"store_customers_orders"`: Matches order records nested within customers
 
-### Path Matching Rules
+### Table Matching Rules
 
-Paths are matched based on the nested structure of your data:
+Tables are matched based on the generated table names:
 
-1. The most specific matching path is used
-2. If no specific path matches, the processor looks for a wildcard pattern
-3. If no path matches, random UUIDs are used as a fallback
+1. The main table is represented by an empty string `""`
+2. Child tables follow the naming convention `parent_name_array_field`
+3. If a table isn't specified in the mapping, random UUIDs are used
 
 ## Metadata Fields
 
-Transmog adds several metadata fields during processing, which can be configured:
+Transmog adds several metadata fields during processing:
 
-- `__transmog_id`: The unique identifier for each record
-- `__parent_transmog_id`: A reference to the parent record's ID
-- `__transmog_datetime`: The timestamp when the extraction occurred
-- `__array_field`: The name of the original array field (for child tables)
-- `__array_index`: The original index in the array (for child tables)
+- `_id`: The unique identifier for each record
+- `_parent_id`: A reference to the parent record's ID
+- `_datetime`: The timestamp when the extraction occurred (if enabled)
+- `_array_field`: The name of the original array field (for child tables)
+- `_array_index`: The original index in the array (for child tables)
 
-You can customize these field names through configuration:
-
-```python
-config = (
-    tm.TransmogConfig.default()
-    .with_metadata(
-        id_field="record_id",
-        parent_field="parent_record_id",
-        time_field="processed_at"
-    )
-)
-processor = tm.Processor(config=config)
-```
-
-## Using with Configuration Methods
-
-You can also configure deterministic IDs after creating a processor:
+You can customize the metadata behavior:
 
 ```python
-# Start with a default processor
-processor = tm.Processor()
+# Disable timestamp generation
+result = tm.flatten(data, name="entity", add_metadata_timestamp=False)
 
-# Update metadata configuration with deterministic IDs
-processor = processor.with_metadata(
-    deterministic_id_fields={
-        "": "id",
-        "customers": "customer_id"
-    }
-)
-
-# Or directly with the ID generation strategy for multiple fields
-def custom_strategy(record):
-    return f"CUSTOM-{record.get('id', 'unknown')}"
-
-processor = processor.with_metadata(
-    id_generation_strategy=custom_strategy
-)
+# Customize ID field name
+result = tm.flatten(data, name="entity", metadata_field_names={"id": "record_id"})
 ```
 
 ## Examples
@@ -174,30 +135,19 @@ processor = processor.with_metadata(
 ```python
 import transmog as tm
 
-# Configure for deterministic IDs at the root level
-processor = tm.Processor.with_deterministic_ids({"": "id"})
-
-# Process data - the root record will use "id" field for deterministic ID
+# Process data with deterministic IDs at the root level
 data = {"id": "12345", "name": "Example", "value": 100}
-result = processor.process(data, entity_name="test")
+result = tm.flatten(data, name="test", id_field="id")
 
 # The same data processed again will have the same ID
-result2 = processor.process(data, entity_name="test")
-assert result.get_main_table()[0]["__transmog_id"] == result2.get_main_table()[0]["__transmog_id"]
+result2 = tm.flatten(data, name="test", id_field="id")
+assert result.main[0]["_id"] == result2.main[0]["_id"]
 ```
 
 ### Example: Nested Structure with Different ID Fields
 
 ```python
 import transmog as tm
-
-# Configure for deterministic IDs at multiple levels
-processor = tm.Processor.with_deterministic_ids({
-    "": "id",                        # Root uses "id" field
-    "customers": "customer_id",      # Customers use "customer_id" field
-    "customers_orders": "order_id",  # Orders use "order_id" field
-    "products": "sku"                # Products use "sku" field
-})
 
 # Complex nested data
 data = {
@@ -219,15 +169,23 @@ data = {
     ]
 }
 
-# Process the data
-result = processor.process(data, entity_name="store")
+# Process with deterministic IDs for different tables
+result = tm.flatten(
+    data, 
+    name="store",
+    id_field={
+        "": "id",                        # Main table uses "id" field
+        "store_customers": "customer_id",      # Customers use "customer_id" field
+        "store_customers_orders": "order_id",  # Orders use "order_id" field
+        "store_products": "sku"                # Products use "sku" field
+    }
+)
 
 # Access tables
-tables = result.to_dict()
-main_table = result.get_main_table()
-customers_table = result.get_child_table("store_customers")
-orders_table = result.get_child_table("store_customers_orders")
-products_table = result.get_child_table("store_products")
+main_table = result.main
+customers_table = result.tables["store_customers"]
+orders_table = result.tables["store_customers_orders"]
+products_table = result.tables["store_products"]
 
 # The IDs will be consistent if the same data is processed again
 ```
@@ -236,52 +194,69 @@ products_table = result.get_child_table("store_products")
 
 ```python
 import transmog as tm
-import uuid
 
-# Define a custom ID generation strategy that combines multiple fields
-def custom_id_strategy(record):
+# Define custom transformation functions for ID generation
+def customer_id_generator(record):
     # For customer records with multiple fields
     if "customer_id" in record and "email" in record:
         return f"CUST-{record['customer_id']}-{hash(record['email'])}"
+    return record.get("customer_id", "")
 
+def order_id_generator(record):
     # For order records with multiple fields
-    elif "order_id" in record and "total" in record:
+    if "order_id" in record and "total" in record:
         return f"ORD-{record['order_id']}-{int(record['total'])}"
+    return record.get("order_id", "")
 
-    # For product records
-    elif "sku" in record:
-        return f"PROD-{record['sku']}"
-
-    # Default fallback for other records
-    else:
-        # Generate a random UUID if no identifying field is found
-        return f"GEN-{uuid.uuid4()}"
-
-# Configure processor with the custom strategy
-processor = tm.Processor.with_custom_id_generation(custom_id_strategy)
-
-# Process data
-result = processor.process(data, entity_name="store")
+# Process with custom ID generation through transforms
+result = tm.flatten(
+    data, 
+    name="store",
+    transforms={
+        "customer_id": customer_id_generator,
+        "order_id": order_id_generator
+    },
+    id_field={
+        "store_customers": "customer_id",
+        "store_customers_orders": "order_id"
+    }
+)
 ```
 
-## Technical Details
+### Example: Incremental Processing with Deterministic IDs
 
-### ID Generation Algorithm
+```python
+import transmog as tm
 
-When using field-based deterministic IDs, Transmog:
+# First batch of data
+batch1 = [
+    {"id": "1001", "name": "Product A", "category": "Electronics"},
+    {"id": "1002", "name": "Product B", "category": "Home"}
+]
 
-1. Looks for the configured field in the record
-2. If found, hashes the value to create a consistent ID
-3. If not found, falls back to a random UUID
+# Process first batch with deterministic IDs
+result1 = tm.flatten(batch1, name="products", id_field="id")
+result1.save("output/batch1")
 
-### Consistency Guarantees
+# Second batch with updates and new records
+batch2 = [
+    {"id": "1002", "name": "Product B", "category": "Home", "price": 29.99},  # Updated
+    {"id": "1003", "name": "Product C", "category": "Electronics"}  # New
+]
 
-Deterministic IDs guarantee that:
+# Process second batch with the same ID field
+result2 = tm.flatten(batch2, name="products", id_field="id")
+result2.save("output/batch2")
 
-- The same record processed multiple times will have the same ID
-- Different records with different values in the ID field will have different IDs
-- The algorithm is stable across versions of Transmog
+# The record with id=1002 will have the same _id in both batches
+```
 
-### Performance Implications
+## Best Practices
 
-Using deterministic IDs has minimal performance impact compared to random UUIDs.
+1. **Choose appropriate ID fields**: Select fields that are truly unique and stable over time
+2. **Be consistent**: Use the same ID field configuration for all processing runs of the same data
+3. **Consider composite keys**: For complex data, use transforms to combine multiple fields into a single ID
+4. **Test with sample data**: Verify that your ID strategy produces consistent results
+5. **Document your approach**: Keep track of which fields are used for ID generation
+
+By using deterministic IDs, you can ensure data consistency across multiple processing runs and simplify incremental data loading scenarios.

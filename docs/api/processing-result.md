@@ -1,277 +1,155 @@
-# ProcessingResult API Reference
+# Result API Reference
 
 > **User Guide**: For usage guidance and examples, see the [Output Formats Guide](../user/output/output-formats.md).
 
-This document describes the `ProcessingResult` class in Transmog.
+This document describes the result classes in Transmog.
 
-The `ProcessingResult` class encapsulates the result of processing data with Transmog. It provides access
-to the processed data in various formats.
+## FlattenResult
 
-## Import
+The `FlattenResult` class is the primary result type in Transmog v1.1.0. It encapsulates the result of processing data and provides intuitive access to the processed tables and convenient methods for saving and converting data.
 
-```python
-from transmog import ProcessingResult, ConversionMode
-```
-
-## Properties and Methods
-
-### Core Table Access
-
-```python
-# Get the main table (root level records)
-result.get_main_table() -> list[dict[str, Any]]
-
-# Get names of all available tables
-result.get_table_names() -> list[str]
-
-# Get a specific child table by name
-result.get_child_table(table_name: str) -> list[dict[str, Any]]
-
-# Get a formatted table name
-result.get_formatted_table_name(table_name: str) -> str
-```
-
-### Dictionary Output
-
-```python
-# Get all tables as dictionaries
-result.to_dict() -> dict[str, list[dict[str, Any]]]
-
-# Get all tables as JSON-serializable dictionaries
-result.to_json_objects() -> dict[str, list[dict[str, Any]]]
-```
-
-### PyArrow Output
-
-```python
-# Get all tables as PyArrow tables
-result.to_pyarrow_tables(
-    conversion_mode: ConversionMode = ConversionMode.EAGER
-) -> dict[str, pyarrow.Table]
-```
-
-### Bytes Output
-
-```python
-# Get all tables as JSON bytes
-result.to_json_bytes(
-    indent: Optional[int] = None,
-    ensure_ascii: bool = True,
-    sort_keys: bool = False,
-    separators: Optional[tuple[str, str]] = None,
-    conversion_mode: ConversionMode = ConversionMode.EAGER
-) -> dict[str, bytes]
-
-# Get all tables as CSV bytes
-result.to_csv_bytes(
-    dialect: str = "excel",
-    delimiter: Optional[str] = None,
-    include_header: bool = True,
-    conversion_mode: ConversionMode = ConversionMode.EAGER
-) -> dict[str, bytes]
-
-# Get all tables as Parquet bytes
-result.to_parquet_bytes(
-    compression: str = "snappy",
-    row_group_size: Optional[int] = None,
-    conversion_mode: ConversionMode = ConversionMode.EAGER
-) -> dict[str, bytes]
-```
-
-### File Output
-
-```python
-# Write all tables to JSON files
-result.write_all_json(
-    base_path: str,
-    indent: Optional[int] = None,
-    ensure_ascii: bool = True,
-    sort_keys: bool = False,
-    separators: Optional[tuple[str, str]] = None,
-    conversion_mode: ConversionMode = ConversionMode.EAGER
-) -> dict[str, str]
-
-# Write all tables to CSV files
-result.write_all_csv(
-    base_path: str,
-    dialect: str = "excel",
-    delimiter: Optional[str] = None,
-    include_header: bool = True,
-    line_terminator: Optional[str] = None,
-    quote_strategy: str = "minimal",
-    conversion_mode: ConversionMode = ConversionMode.EAGER
-) -> dict[str, str]
-
-# Write all tables to Parquet files
-result.write_all_parquet(
-    base_path: str,
-    compression: str = "snappy",
-    row_group_size: Optional[int] = None,
-    data_page_size: Optional[int] = None,
-    partition_cols: Optional[list[str]] = None,
-    conversion_mode: ConversionMode = ConversionMode.EAGER
-) -> dict[str, str]
-```
-
-### Conversion Mode
-
-```python
-# Set a conversion mode for all operations
-result.with_conversion_mode(mode: ConversionMode) -> ProcessingResult
-```
-
-### Static Methods
-
-```python
-# Combine multiple ProcessingResult objects
-@staticmethod
-def combine_results(
-    results: list[ProcessingResult]
-) -> ProcessingResult
-```
-
-## Conversion Modes
-
-The `ConversionMode` enum controls how the ProcessingResult handles memory during conversion operations:
-
-```python
-from transmog import ConversionMode
-
-# Eager mode - convert and cache immediately
-mode = ConversionMode.EAGER
-
-# Lazy mode - convert only when needed
-mode = ConversionMode.LAZY
-
-# Memory-efficient mode - discard intermediate data after conversion
-mode = ConversionMode.MEMORY_EFFICIENT
-```
-
-| Mode | Description | Best For |
-|------|-------------|----------|
-| `EAGER` | Converts data immediately and keeps all formats in memory. | Interactive analysis, smaller datasets |
-| `LAZY` | Converts data only when needed. | One-time processing |
-| `MEMORY_EFFICIENT` | Minimizes memory usage by clearing intermediate data. | Very large datasets |
-
-## Examples
-
-### Accessing Tables
+### Import
 
 ```python
 import transmog as tm
 
-# Process some data
-processor = tm.Processor()
-result = processor.process(data, entity_name="example")
-
-# Get the main table (contains root level records)
-main_table = result.get_main_table()
-print(f"Main table has {len(main_table)} records")
-
-# Get all available table names
-table_names = result.get_table_names()
-print(f"Available tables: {table_names}")
-
-# Access a specific child table
-if "example_orders" in table_names:
-    orders_table = result.get_child_table("example_orders")
-    print(f"Orders table has {len(orders_table)} records")
-
-# Get the formatted table name
-formatted_name = result.get_formatted_table_name("example_orders")
-print(f"Formatted table name: {formatted_name}")
+result = tm.flatten(data, name="customers")
 ```
 
-### Converting to Various Formats
+### Properties
 
 ```python
-# Get all tables as Python dictionaries
-tables = result.to_dict()
-main_dict = tables["main"]
-orders_dict = tables.get("example_orders", [])
+# Access the main table (root level records)
+result.main -> list[dict[str, Any]]
 
-# Get as PyArrow tables (requires pyarrow)
-pa_tables = result.to_pyarrow_tables()
-pa_main = pa_tables["main"]
-print(f"PyArrow table has {pa_main.num_rows} rows and {pa_main.num_columns} columns")
-
-# Get as JSON bytes
-json_bytes = result.to_json_bytes(indent=2)
-with open("example.json", "wb") as f:
-    f.write(json_bytes["main"])
+# Access all tables as a dictionary
+result.tables -> dict[str, list[dict[str, Any]]]
 ```
 
-### Writing to Files
+### Methods
+
+#### Saving Results
 
 ```python
-# Write all tables as JSON files
-json_paths = result.write_all_json(
-    base_path="output/json",
-    indent=2,
-    ensure_ascii=False
-)
-print(f"JSON files written to: {json_paths}")
+# Save all tables to files with automatic format detection from extension
+result.save("output.json")  # Save as JSON
+result.save("output.csv")   # Save as CSV
+result.save("output.parquet")  # Save as Parquet
 
-# Write as CSV files
-csv_paths = result.write_all_csv(
-    base_path="output/csv",
-    dialect="excel",
+# Save to a directory with specified format
+result.save("output_directory", format="json")
+result.save("output_directory", format="csv")
+result.save("output_directory", format="parquet")
+
+# Save with format-specific options
+result.save(
+    "output.csv", 
+    format="csv",
+    delimiter="|",
     include_header=True
 )
-print(f"CSV files written to: {csv_paths}")
 
-# Write as Parquet files
-parquet_paths = result.write_all_parquet(
-    base_path="output/parquet",
-    compression="snappy",
-    partition_cols=["date"]  # Optional partitioning
-)
-print(f"Parquet files written to: {parquet_paths}")
-```
-
-### Memory-Efficient Conversion
-
-```python
-from transmog import Processor, ConversionMode
-
-processor = Processor()
-result = processor.process(large_data, entity_name="records")
-
-# Use memory-efficient conversion mode
-result = result.with_conversion_mode(ConversionMode.MEMORY_EFFICIENT)
-
-# Write files with memory-efficient conversion
-result.write_all_csv("output/csv")
-
-# Or specify conversion mode for a specific operation
-json_bytes = result.to_json_bytes(
-    conversion_mode=ConversionMode.MEMORY_EFFICIENT
+result.save(
+    "output.parquet",
+    format="parquet",
+    compression="zstd",
+    row_group_size=10000
 )
 ```
 
-### Combining Multiple Results
+#### Converting to Other Formats
 
 ```python
-# Process data in batches
-processor = tm.Processor()
-results = []
-
-for batch in batches:
-    batch_result = processor.process_batch(batch, entity_name="example")
-    results.append(batch_result)
-
-# Combine the results
-combined = ProcessingResult.combine_results(results)
-print(f"Combined main table has {len(combined.get_main_table())} records")
-
-# Write the combined result
-combined.write_all_parquet("output/combined")
+# Convert to PyArrow tables
+pa_tables = result.to_pyarrow()
+main_table = pa_tables["main"]
 ```
 
-## Performance Considerations
+#### Iterating Over Results
 
-- For large datasets, use `ConversionMode.MEMORY_EFFICIENT` to minimize memory usage
-- For even larger datasets, use the streaming API instead (`stream_process`, etc.)
-- When using PyArrow, ensure you have enough memory for the conversion
-- For file output, ensure the target directories exist before writing
-- For very large results, use Parquet format with compression for efficient storage
+```python
+# Iterate over all tables (memory-efficient)
+for table_name, records in result:
+    print(f"Table {table_name} has {len(records)} records")
+
+# Iterate over specific tables
+for table_name, records in result.iter_tables(["customers_orders"]):
+    print(f"Processing {table_name}")
+    for record in records:
+        print(record)
+```
+
+### Examples
+
+#### Basic Usage
+
+```python
+import transmog as tm
+
+# Process data
+data = {
+    "id": 1,
+    "name": "John Doe",
+    "orders": [
+        {"id": 101, "product": "Laptop", "price": 999.99},
+        {"id": 102, "product": "Mouse", "price": 24.99}
+    ]
+}
+
+result = tm.flatten(data, name="customer")
+
+# Access main table
+print(f"Main table has {len(result.main)} records")
+print(result.main[0])  # {"id": 1, "name": "John Doe", "_id": "..."}
+
+# Access child tables
+orders = result.tables["customer_orders"]
+print(f"Orders table has {len(orders)} records")
+
+# Save results
+result.save("output", format="json")  # Creates output/main.json, output/customer_orders.json
+```
+
+
+
+#### Memory-Efficient Processing
+
+```python
+# Process a large file with memory optimization
+result = tm.flatten_file(
+    "large_data.json",
+    name="records",
+    low_memory=True,
+    chunk_size=1000
+)
+
+# Save directly to Parquet for efficient storage
+result.save("output", format="parquet", compression="zstd")
+```
+
+## Internal ProcessingResult (Legacy)
+
+> Note: The `ProcessingResult` class is now considered an internal implementation detail. Most users should use the new `FlattenResult` class instead.
+
+For advanced users who need direct access to the underlying result object, the legacy `ProcessingResult` class can still be imported from the internal module:
+
+```python
+from transmog.process import ProcessingResult
+```
+
+The internal `ProcessingResult` class provides the implementation for the new `FlattenResult` class and maintains backward compatibility with existing code.
+
+### Migration from ProcessingResult to FlattenResult
+
+If you're currently using the `ProcessingResult` class, here's how to migrate to the new API:
+
+| Old API (v1.0.6) | New API (v1.1.0) |
+|------------------|------------------|
+| `result.get_main_table()` | `result.main` |
+| `result.get_child_table("customers_orders")` | `result.tables["customers_orders"]` |
+| `result.get_table_names()` | `result.tables.keys()` |
+| `result.write_all_json("output")` | `result.save("output", format="json")` |
+| `result.write_all_csv("output")` | `result.save("output", format="csv")` |
+| `result.write_all_parquet("output")` | `result.save("output", format="parquet")` |
+| `result.to_dict()` | `result.tables` |
+| `result.to_pyarrow_tables()` | `result.to_pyarrow()` |

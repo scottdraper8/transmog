@@ -1,39 +1,32 @@
-# Error Recovery Strategies
+# Error Handling Strategies
 
-This tutorial explores Transmog's error recovery strategies for handling problematic data during transformation.
+This tutorial explores Transmog's error handling strategies for dealing with problematic data during transformation.
 
-## Understanding Error Recovery Strategies
+## Understanding Error Handling Strategies
 
 Transmog offers three main approaches to error handling:
 
-1. **Strict (default)** - Raises exceptions immediately, halting processing
-2. **Skip and Log** - Skips problematic records and continues processing
-3. **Partial Recovery** - Extracts valid portions of records with errors
+1. **Raise (default)** - Raises exceptions immediately, halting processing
+2. **Skip** - Skips problematic records and continues processing
+3. **Warn** - Logs warnings but continues processing with best-effort results
 
 ## When to Use Each Strategy
 
-- **Strict**: Use during development or when data integrity is critical
-- **Skip and Log**: Use in production when processing should continue despite errors
-- **Partial Recovery**: Use when extracting partial data from problematic records is better than no data
+- **Raise**: Use during development or when data integrity is critical
+- **Skip**: Use in production when processing should continue despite errors
+- **Warn**: Use when you want to see all issues but still get results
 
 ## Configuring Error Strategies
 
 Import the necessary components:
 
 ```python
-from transmog import TransmogProcessor, TransmogConfig
-from transmog.error import ErrorStrategy, RecoveryAction
+import transmog as tm
 ```
 
-### Strict Strategy Example
+### Raise Strategy Example (Default)
 
 ```python
-# Configure with strict error handling (default)
-config = TransmogConfig().with_error_handling(
-    strategy=ErrorStrategy.STRICT
-)
-processor = TransmogProcessor(config)
-
 # Sample data with errors
 problematic_data = {
     "id": "customer123",
@@ -45,128 +38,63 @@ problematic_data = {
 }
 
 try:
-    # This will raise an exception
-    result = processor.process_data(problematic_data)
+    # This will raise an exception (default behavior)
+    result = tm.flatten(
+        data=problematic_data,
+        name="customer"
+    )
 except Exception as e:
     print(f"Error encountered: {e}")
 ```
 
-### Skip and Log Strategy
+### Skip Strategy
 
 ```python
-# Configure with skip and log strategy
-config = TransmogConfig().with_error_handling(
-    strategy=ErrorStrategy.SKIP_AND_LOG
+# Process data with skip strategy
+result = tm.flatten(
+    data=problematic_data,
+    name="customer",
+    error_handling="skip"  # Skip records with errors
 )
-processor = TransmogProcessor(config)
 
-# Process data with skip and log strategy
-result = processor.process_data(problematic_data)
-
-# Check for errors
-error_count = result.error_count
-print(f"Processed with {error_count} errors")
-
-# Access error information
-for error in result.errors:
-    print(f"Error: {error.message}")
-    print(f"Record path: {error.path}")
-    print(f"Problematic value: {error.value}")
+# Check the results
+print(f"Main table record count: {len(result.main)}")
+if "customer_orders" in result.tables:
+    print(f"Orders table record count: {len(result.tables['customer_orders'])}")
+else:
+    print("No orders table was created (all orders had errors)")
 ```
 
-### Partial Recovery Strategy
+### Warn Strategy
 
 ```python
-# Configure with partial recovery
-config = TransmogConfig().with_error_handling(
-    strategy=ErrorStrategy.PARTIAL_RECOVERY
-)
-processor = TransmogProcessor(config)
+import warnings
+import logging
 
-# Process data with partial recovery
-result = processor.process_data(problematic_data)
+# Configure logging to see warnings
+logging.basicConfig(level=logging.WARNING)
 
-# Check what was recovered
-tables = result.to_dict()
-for table_name, records in tables.items():
-    print(f"\n=== {table_name} ===")
-    print(f"Record count: {len(records)}")
-    if records:
-        print(f"First record: {records[0]}")
+# Process data with warn strategy
+with warnings.catch_warnings(record=True) as w:
+    result = tm.flatten(
+        data=problematic_data,
+        name="customer",
+        error_handling="warn"  # Log warnings but continue
+    )
+    
+    # Print captured warnings
+    for warning in w:
+        print(f"Warning: {warning.message}")
+
+# Check the results (may contain partial data)
+print(f"Main table record count: {len(result.main)}")
+if "customer_orders" in result.tables:
+    print(f"Orders table record count: {len(result.tables['customer_orders'])}")
 ```
 
-## Advanced Recovery Configuration
+## Error Handling with File Processing
 
-For more control, you can configure specific recovery actions for different error types:
-
-```python
-# Configure with custom recovery actions
-config = TransmogConfig().with_error_handling(
-    strategy=ErrorStrategy.PARTIAL_RECOVERY,
-    recovery_actions={
-        "TypeError": RecoveryAction.SKIP_FIELD,      # Skip fields with type errors
-        "KeyError": RecoveryAction.USE_DEFAULT,      # Use defaults for missing keys
-        "ValueError": RecoveryAction.SKIP_RECORD     # Skip records with value errors
-    },
-    default_values={
-        "items": [],                                 # Default value for items
-        "price": 0.0,                                # Default value for price
-        "quantity": 1                                # Default value for quantity
-    }
-)
-
-processor = TransmogProcessor(config)
-result = processor.process_data(problematic_data)
-```
-
-## Error Logging and Reporting
-
-Create comprehensive error reports:
-
-```python
-# Configure with detailed error reporting
-config = TransmogConfig().with_error_handling(
-    strategy=ErrorStrategy.SKIP_AND_LOG,
-    log_level="DEBUG",                              # Set log level
-    include_record_in_errors=True                   # Include record in error report
-)
-
-processor = TransmogProcessor(config)
-result = processor.process_data(problematic_data)
-
-# Generate an error report
-def generate_error_report(result):
-    """Generate a detailed error report from processing results"""
-    report = {
-        "summary": {
-            "total_records": result.total_records,
-            "error_count": result.error_count,
-            "success_rate": f"{((result.total_records - result.error_count) / result.total_records) * 100:.2f}%"
-        },
-        "errors": []
-    }
-
-    for error in result.errors:
-        error_detail = {
-            "type": error.error_type,
-            "message": error.message,
-            "path": error.path,
-            "record_id": error.record_id,
-            "value": str(error.value)
-        }
-        report["errors"].append(error_detail)
-
-    return report
-
-# Generate and print the report
-error_report = generate_error_report(result)
-import json
-print(json.dumps(error_report, indent=2))
-```
-
-## Real-World Example: Processing a File with Errors
-
-Let's process a file containing problematic data:
+Apply error handling strategies when processing files:
 
 ```python
 import json
@@ -191,77 +119,135 @@ with open("problematic_data.json", "w") as f:
         }
     ], f)
 
-# Configure for partial recovery
-config = TransmogConfig().with_error_handling(
-    strategy=ErrorStrategy.PARTIAL_RECOVERY,
-    recovery_actions={
-        "TypeError": RecoveryAction.SKIP_FIELD
-    }
+# Process the file with skip strategy
+result = tm.flatten_file(
+    file_path="problematic_data.json",
+    name="customer",
+    error_handling="skip"
 )
 
-# Process the file with partial recovery
-processor = TransmogProcessor(config)
-result = processor.process_file("problematic_data.json")
+# Save the successfully processed data
+result.save("output_directory")
 
-# Write the successfully processed data
-result.write_all_json("output_directory")
-
-# Write error information to a separate file
-with open("output_directory/errors.json", "w") as f:
-    json.dump(generate_error_report(result), f, indent=2)
+# Print summary
+print(f"Processed {len(result.main)} customers successfully")
+for table_name, records in result.tables.items():
+    if table_name != "customer":  # Skip main table in this loop
+        print(f"Table {table_name}: {len(records)} records")
 ```
 
-## Combining Error Strategies with Streaming
+## Error Handling with Streaming
 
 For large datasets, combine error handling with streaming:
 
 ```python
-# Configure for streaming with error handling
-config = TransmogConfig().with_error_handling(
-    strategy=ErrorStrategy.SKIP_AND_LOG
-)
-processor = TransmogProcessor(config)
-
-# Function to stream records from file
-def stream_records(file_path):
-    with open(file_path, "r") as f:
-        for line in f:
-            yield json.loads(line.strip())
-
-# Process stream with error handling
-streaming_result = processor.process_stream(
-    stream_records("large_problematic_data.json"),
-    streaming_output=True
+# Stream process with error handling and logging
+tm.flatten_stream(
+    file_path="large_problematic_data.json",
+    name="customer",
+    output_path="output_directory",
+    output_format="json",
+    error_handling="skip",
+    error_log="errors.log"  # Log errors to a file
 )
 
-# Write to files
-streaming_result.write_streaming_json("output_directory")
+# Check the error log
+with open("errors.log", "r") as f:
+    error_count = sum(1 for _ in f)
+    print(f"Found {error_count} errors during processing")
+```
 
-# Report errors after processing completes
-print(f"Processed with {streaming_result.error_count} errors")
+## Custom Error Handling with Transforms
+
+You can implement custom error handling logic using transforms:
+
+```python
+def safe_process_items(items_value):
+    """Safely process items field, handling potential errors"""
+    if items_value is None:
+        return []  # Return empty list instead of None
+    elif isinstance(items_value, list):
+        return items_value
+    else:
+        # Try to convert to list if possible
+        try:
+            if isinstance(items_value, str):
+                import json
+                return json.loads(items_value)
+            else:
+                return list(items_value)
+        except:
+            return []  # Return empty list on failure
+
+# Process with custom transform for error handling
+result = tm.flatten(
+    data=problematic_data,
+    name="customer",
+    transforms={
+        "items": safe_process_items  # Apply transform to items field
+    }
+)
+```
+
+## Error Handling in Batch Processing
+
+When processing batches of records, you can handle errors for each batch:
+
+```python
+# Sample batch data with some problematic records
+batches = [
+    [{"id": 1, "name": "Good Record 1"}, {"id": 2, "name": "Good Record 2"}],
+    [{"id": 3, "name": "Good Record 3"}, {"id": None, "name": None}],  # Problem
+    [{"id": 4, "name": "Good Record 4"}]
+]
+
+all_results = []
+
+for i, batch in enumerate(batches):
+    try:
+        # Try to process each batch
+        result = tm.flatten(
+            data=batch,
+            name="record",
+            error_handling="skip"  # Skip problematic records
+        )
+        all_results.append(result)
+        print(f"Batch {i+1}: Processed {len(result.main)} records")
+    except Exception as e:
+        print(f"Batch {i+1}: Failed to process - {str(e)}")
+
+# Combine results (if needed)
+combined_records = []
+for result in all_results:
+    combined_records.extend(result.main)
+
+print(f"Total records processed: {len(combined_records)}")
 ```
 
 ## Best Practices for Error Handling
 
 1. **Match Strategy to Environment**:
-   - Use STRICT during development
-   - Use SKIP_AND_LOG or PARTIAL_RECOVERY in production
+   - Use "raise" during development
+   - Use "skip" or "warn" in production
 
-2. **Understand Recovery Actions**:
-   - SKIP_FIELD - Removes problematic fields
-   - SKIP_RECORD - Removes entire records with errors
-   - USE_DEFAULT - Substitutes default values for errors
+2. **Log Errors Appropriately**:
+   - In production, always log errors to a file
+   - Include enough context to diagnose issues
 
-3. **Monitor Error Rates**:
-   - Track error_count and total_records
-   - Set thresholds for acceptable error rates
+3. **Implement Data Validation**:
+   - Validate data before processing when possible
+   - Use transforms to clean data proactively
 
-4. **Document Error Patterns**:
-   - Keep error reports to identify recurring issues
-   - Use error patterns to improve upstream data quality
+4. **Monitor Error Rates**:
+   - Track error rates over time
+   - Investigate sudden increases in errors
+
+5. **Balance Strictness and Resilience**:
+   - Be strict with critical data
+   - Be more lenient with non-critical fields
 
 ## Next Steps
 
-- Learn about [optimizing memory usage](../../user/advanced/performance-optimization.md)
-- Explore [deterministic ID generation](../intermediate/customizing-id-generation.md)
-- Read the [error handling guide](../../user/advanced/error-handling.md) for more details
+- Learn about [performance optimization](../../user/advanced/performance-optimization.md)
+- Explore [streaming large datasets](../intermediate/streaming-large-datasets.md)
+- Try [customizing ID generation](../intermediate/customizing-id-generation.md)

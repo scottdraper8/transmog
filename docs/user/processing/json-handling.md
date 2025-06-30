@@ -4,7 +4,7 @@ title: JSON Handling and Transformation
 
 # JSON Handling and Transformation
 
-> **API Reference**: For detailed API documentation, see the [Processor API Reference](../../api/processor.md).
+> **API Reference**: For detailed API documentation, see the [Core API Reference](../../api/core.md).
 
 This document provides a comprehensive guide to working with JSON data in Transmog, including processing
 sources and customizing transformations.
@@ -25,8 +25,7 @@ data = {
     "items": [{"id": 1}, {"id": 2}]
 }
 
-processor = tm.Processor()
-result = processor.process(data, entity_name="record")
+result = tm.flatten(data, name="record")
 
 # Process a list of dictionaries
 data_list = [
@@ -34,7 +33,7 @@ data_list = [
     {"id": 2, "name": "Second"}
 ]
 
-result = processor.process(data_list, entity_name="records")
+result = tm.flatten(data_list, name="records")
 ```
 
 ### From Files
@@ -44,14 +43,12 @@ Transmog uses a unified approach to process files with automatic format detectio
 ```python
 import transmog as tm
 
-processor = tm.Processor()
-
 # Process a JSON file
-result = processor.process_file("data.json", entity_name="records")
+result = tm.flatten_file("data.json", name="records")
 
 # Process a JSONL (line-delimited JSON) file
 # Format is automatically detected based on file extension
-result = processor.process_file("data.jsonl", entity_name="records")
+result = tm.flatten_file("data.jsonl", name="records")
 ```
 
 ### From Strings or Bytes
@@ -62,12 +59,13 @@ import json
 
 # Process JSON string
 json_string = '{"id": 123, "name": "Example"}'
-processor = tm.Processor()
-result = processor.process(json_string, entity_name="record")
+data = json.loads(json_string)
+result = tm.flatten(data, name="record")
 
 # Process JSON bytes
 json_bytes = b'{"id": 123, "name": "Example"}'
-result = processor.process(json_bytes, entity_name="record")
+data = json.loads(json_bytes)
+result = tm.flatten(data, name="record")
 ```
 
 ## File Processing Options
@@ -76,20 +74,16 @@ When processing files, Transmog handles format detection automatically:
 
 ```python
 # Process a file with default settings
-result = processor.process_file("data.json", entity_name="records")
+result = tm.flatten_file("data.json", name="records")
 
-# Process and convert to a specific format
-result = processor.process_file_to_format(
-    "data.json",
-    entity_name="records",
-    output_format="csv",
-    output_path="output_dir"
-)
+# Process and save to a specific format
+result = tm.flatten_file("data.json", name="records")
+result.save("output_dir", format="csv")
 
 # Process in memory-efficient chunks
-result = processor.process_chunked(
+result = tm.flatten_file(
     "large_data.jsonl",
-    entity_name="records",
+    name="records",
     chunk_size=1000
 )
 ```
@@ -100,29 +94,34 @@ For large files, you can use streaming for memory efficiency:
 
 ```python
 # Stream process a file directly to output format
-processor.stream_process_file(
-    "large_data.json",
-    entity_name="records",
-    output_format="parquet",
-    output_destination="output_dir"
+tm.flatten_stream(
+    file_path="large_data.json",
+    name="records",
+    output_path="output_dir",
+    output_format="parquet"
 )
 ```
 
 ## Working with Results
 
-The result of processing JSON data is a `ProcessingResult` object:
+The result of processing JSON data is a `FlattenResult` object:
 
 ```python
 # Get the main table (flattened records)
-main_table = result.get_main_table()
+main_table = result.main
 
 # Get child tables (extracted arrays)
-child_tables = result.get_child_tables()
+child_tables = result.tables
 
 # Convert to different formats
-result.write_all_json("output_dir/json")
-result.write_all_csv("output_dir/csv")
-result.write_all_parquet("output_dir/parquet")
+result.save("output_dir/json", format="json")
+result.save("output_dir/csv", format="csv")
+result.save("output_dir/parquet", format="parquet")
+
+# Or let the format be detected from the file extension
+result.save("output_dir/data.json")  # JSON format
+result.save("output_dir/data.csv")   # CSV format
+result.save("output_dir/data.parquet")  # Parquet format
 ```
 
 ## Part 2: Customizing JSON Transformation
@@ -131,33 +130,23 @@ Transmog provides several ways to customize how JSON data is processed:
 
 ### Configuration-Based Transformation
 
-The primary way to customize JSON transformation is through configuration:
+The primary way to customize JSON transformation is through parameters:
 
 ```python
 import transmog as tm
 
-# Create a configuration with custom options
-config = (
-    tm.TransmogConfig.default()
-    .with_processing(
-        cast_to_string=True,      # Convert values to strings
-        include_empty=False,      # Exclude empty values
-        skip_null=True,           # Skip null values
-        visit_arrays=True,        # Process arrays as separate tables
-        keep_arrays=False         # Remove arrays from main table after processing
-    )
-    .with_naming(
-        separator=".",            # Use dots as separators
-        deep_nesting_threshold=4,     # Handle deep nesting
-        max_field_component_length=5  # Limit component length
-    )
+# Process with custom options
+result = tm.flatten(
+    data,
+    name="records",
+    cast_to_string=True,      # Convert values to strings
+    include_empty=False,      # Exclude empty values
+    skip_null=True,           # Skip null values
+    arrays="tables",          # Process arrays as separate tables
+    separator=".",            # Use dots as separators
+    deep_nesting_threshold=4, # Handle deep nesting
+    max_field_length=5        # Limit component length
 )
-
-# Create processor with this configuration
-processor = tm.Processor(config=config)
-
-# Process data with the configuration
-result = processor.process(data, entity_name="records")
 ```
 
 ### Type Handling
@@ -165,23 +154,19 @@ result = processor.process(data, entity_name="records")
 Control type conversion during processing:
 
 ```python
-# Create a processor that preserves original data types
-processor = tm.Processor(
-    config=tm.TransmogConfig.default()
-    .with_processing(cast_to_string=False)
+# Process data with original data types preserved
+result = tm.flatten(
+    data,
+    name="records",
+    cast_to_string=False  # Preserve original types
 )
 
-# Process data (numeric values will remain as numbers)
-result = processor.process(data, entity_name="records")
-
-# Create a processor that converts everything to strings
-processor = tm.Processor(
-    config=tm.TransmogConfig.default()
-    .with_processing(cast_to_string=True)
+# Process data with all values converted to strings
+result = tm.flatten(
+    data,
+    name="records",
+    cast_to_string=True  # Convert all values to strings
 )
-
-# Process data (all values will be converted to strings)
-result = processor.process(data, entity_name="records")
 ```
 
 ### Naming and Path Transformation
@@ -190,17 +175,13 @@ Customize field naming during transformation:
 
 ```python
 # Configure naming options
-processor = tm.Processor(
-    config=tm.TransmogConfig.default()
-    .with_naming(
-        separator="/",                   # Use slash as separator
-        max_field_component_length=10,   # Limit component length
-        deep_nesting_threshold=4         # Threshold for deep nesting
-    )
+result = tm.flatten(
+    data,
+    name="records",
+    separator="/",                # Use slash as separator
+    max_field_length=10,         # Limit component length
+    deep_nesting_threshold=4     # Threshold for deep nesting
 )
-
-# Process data with custom naming
-result = processor.process(data, entity_name="records")
 ```
 
 ### Custom ID Generation
@@ -209,13 +190,21 @@ Generate custom IDs during processing:
 
 ```python
 # Option 1: ID based on existing field
-processor = tm.Processor.with_deterministic_ids("user_id")
+result = tm.flatten(
+    data,
+    name="users",
+    id_field="user_id"  # Use user_id field as the ID
+)
 
 # Option 2: Different ID fields for different tables
-processor = tm.Processor.with_deterministic_ids({
-    "": "id",                  # Main table uses "id" field
-    "user_orders": "order_id"  # Orders table uses "order_id" field
-})
+result = tm.flatten(
+    data,
+    name="users",
+    id_field={
+        "": "id",                  # Main table uses "id" field
+        "user_orders": "order_id"  # Orders table uses "order_id" field
+    }
+)
 
 # Option 3: Custom ID generation function
 def generate_custom_id(record):
@@ -227,10 +216,11 @@ def generate_custom_id(record):
     else:
         return "UNKNOWN"
 
-processor = tm.Processor.with_custom_id_generation(generate_custom_id)
-
-# Process data with custom ID generation
-result = processor.process(data, entity_name="records")
+result = tm.flatten(
+    data,
+    name="records",
+    id_generator=generate_custom_id
+)
 ```
 
 ### Pre-Processing and Post-Processing
@@ -243,28 +233,24 @@ For more advanced transformations, you can pre-process data before passing it to
 import transmog as tm
 
 # Pre-process data before transformation
-def preprocess_data(data):
-    # Add derived fields
-    if "price" in data and "quantity" in data:
-        data["total"] = data["price"] * data["quantity"]
+def preprocess_data(data_list):
+    processed_data = []
+    for item in data_list:
+        # Add derived fields
+        if "price" in item and "quantity" in item:
+            item["total"] = item["price"] * item["quantity"]
+        processed_data.append(item)
+    return processed_data
 
-    # Convert date strings to a standard format
-    if "date" in data:
-        from datetime import datetime
-        try:
-            date_obj = datetime.strptime(data["date"], "%m/%d/%Y")
-            data["date"] = date_obj.strftime("%Y-%m-%d")
-        except ValueError:
-            pass
-
-    return data
-
-# Apply pre-processing to input data
-preprocessed_data = preprocess_data(original_data)
+# Apply pre-processing
+original_data = [
+    {"id": 1, "price": 10, "quantity": 2},
+    {"id": 2, "price": 15, "quantity": 3}
+]
+processed_data = preprocess_data(original_data)
 
 # Process the pre-processed data
-processor = tm.Processor()
-result = processor.process(preprocessed_data, entity_name="records")
+result = tm.flatten(processed_data, name="orders")
 ```
 
 #### Post-Processing Example
@@ -273,44 +259,116 @@ result = processor.process(preprocessed_data, entity_name="records")
 import transmog as tm
 
 # Process data
-processor = tm.Processor()
-result = processor.process(data, entity_name="records")
+result = tm.flatten(data, name="products")
 
 # Post-process the results
-main_table = result.get_main_table()
-post_processed = []
+def postprocess_results(table):
+    for record in table:
+        # Add calculated fields
+        if "price" in record:
+            record["price_with_tax"] = float(record["price"]) * 1.2
+    return table
 
-for record in main_table:
-    # Add derived fields
-    if "user_age" in record:
-        age = int(record["user_age"])
-        record["age_group"] = "senior" if age >= 65 else "adult" if age >= 18 else "minor"
+# Apply post-processing to main table
+processed_main = postprocess_results(result.main)
 
-    # Format specific fields
-    if "user_phone" in record:
-        # Format phone number
-        phone = record["user_phone"].replace("-", "").replace(" ", "")
-        if len(phone) == 10:
-            record["user_phone"] = f"({phone[0:3]}) {phone[3:6]}-{phone[6:]}"
+# Apply post-processing to child tables
+processed_children = {}
+for table_name, table_data in result.tables.items():
+    processed_children[table_name] = postprocess_results(table_data)
+```
 
-    post_processed.append(record)
+## Advanced JSON Processing
 
-# Create a new result with post-processed records
-from transmog.process.result import ProcessingResult
-post_processed_result = ProcessingResult(
-    main_table=post_processed,
-    child_tables=result.get_child_tables(),
-    entity_name=result.entity_name
+### Handling Complex Nested Structures
+
+Transmog automatically handles complex nested structures by flattening them into related tables:
+
+```python
+import transmog as tm
+
+# Complex nested structure
+data = {
+    "company": "ACME Corp",
+    "departments": [
+        {
+            "name": "Engineering",
+            "employees": [
+                {"id": 101, "name": "Alice"},
+                {"id": 102, "name": "Bob"}
+            ]
+        },
+        {
+            "name": "Marketing",
+            "employees": [
+                {"id": 201, "name": "Charlie"}
+            ]
+        }
+    ]
+}
+
+# Process with default settings
+result = tm.flatten(data, name="organization")
+
+# Access the hierarchical tables
+print(result.main)  # Main company record
+print(result.tables["organization_departments"])  # Departments
+print(result.tables["organization_departments_employees"])  # Employees
+
+# Save all tables
+result.save("output/organization")
+```
+
+### Controlling Array Handling
+
+Control how arrays are processed:
+
+```python
+# Option 1: Process arrays as separate tables (default)
+result = tm.flatten(data, name="data", arrays="tables")
+
+# Option 2: Keep arrays inline (as JSON strings)
+result = tm.flatten(data, name="data", arrays="inline")
+
+# Option 3: Expand simple arrays into columns
+result = tm.flatten(data, name="data", arrays="columns")
+```
+
+### Handling Large JSON Files
+
+For large JSON files, use chunked processing and streaming:
+
+```python
+# Process a large file in chunks
+result = tm.flatten_file(
+    "large_data.json",
+    name="records",
+    chunk_size=1000,  # Process 1000 records at a time
+    low_memory=True   # Optimize for memory usage
+)
+
+# Stream directly to output files
+tm.flatten_stream(
+    file_path="very_large.json",
+    name="records",
+    output_path="output/data",
+    output_format="parquet",
+    chunk_size=5000
 )
 ```
 
-## Best Practices
+### Converting Between Formats
 
-1. Use configuration options first for standard transformations
-2. For small data, use `process()` with Python objects
-3. For files, use `process_file()` with automatic format detection
-4. For large files, use `process_chunked()` or `stream_process_file()`
-5. For a complete processing and conversion pipeline, use `process_file_to_format()`
-6. Pre-process data when you need to modify the structure before flattening
-7. Post-process results when you need to derive fields or format data after flattening
-8. For consistent IDs across processing runs, use deterministic ID generation
+Convert JSON to other formats:
+
+```python
+# JSON to CSV
+result = tm.flatten_file("data.json", name="data")
+result.save("output/data.csv")  # Format detected from extension
+
+# JSON to Parquet
+result = tm.flatten_file("data.json", name="data")
+result.save("output/data.parquet")
+```
+
+

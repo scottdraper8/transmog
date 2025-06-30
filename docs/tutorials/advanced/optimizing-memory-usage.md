@@ -17,44 +17,26 @@ Transmog's memory usage is affected by several factors:
 
 1. **Input Size**: The size and complexity of input data
 2. **Processing Strategy**: How data is loaded and processed
-3. **Conversion Mode**: How and when data is converted to output formats
-4. **Caching Behavior**: What intermediate results are kept in memory
+3. **Chunk Size**: How many records are processed at once
+4. **Low Memory Mode**: Whether memory optimization is enabled
 5. **Output Management**: How results are stored and returned
 
 ## Basic Memory Optimization
 
-Start with the built-in memory-optimized mode:
+Start with the built-in low memory mode:
 
 ```python
-from transmog import TransmogProcessor, TransmogConfig
-
-# Configure for memory optimization
-config = TransmogConfig().memory_optimized()
-processor = TransmogProcessor(config)
+import transmog as tm
 
 # Process a file with memory optimization
-result = processor.process_file("large_file.json")
+result = tm.flatten_file(
+    file_path="large_file.json",
+    name="records",
+    low_memory=True  # Enable memory optimization
+)
 
 # Write results to files
-result.write_all_parquet("output_directory")
-```
-
-## Understanding Conversion Modes
-
-Transmog offers three conversion modes:
-
-1. **EAGER** - Converts data immediately, caches results (faster, higher memory)
-2. **LAZY** - Converts on demand, minimal caching (balanced)
-3. **MEMORY_EFFICIENT** - Minimal memory usage, may recompute (slower, lower memory)
-
-```python
-from transmog.types import ConversionMode
-
-# Configure with memory-efficient conversion mode
-config = TransmogConfig().with_conversion(
-    mode=ConversionMode.MEMORY_EFFICIENT
-)
-processor = TransmogProcessor(config)
+result.save("output_directory", format="parquet")
 ```
 
 ## Streaming for Memory Efficiency
@@ -62,55 +44,33 @@ processor = TransmogProcessor(config)
 For very large datasets, streaming is the most memory-efficient approach:
 
 ```python
-# Configure for streaming with memory optimization
-config = TransmogConfig().memory_optimized()
-processor = TransmogProcessor(config)
+import transmog as tm
+import json
 
-# Function to stream records from file
-def stream_records(file_path):
-    with open(file_path, 'r') as f:
-        # Assuming file contains one JSON object per line
-        for line in f:
-            yield json.loads(line.strip())
-
-# Process stream with direct file output
-streaming_result = processor.process_stream(
-    stream_records("very_large_file.json"),
-    streaming_output=True
-)
-
-# Write directly to files without keeping results in memory
-streaming_result.write_streaming_parquet("output_directory")
-```
-
-## Controlling Batch Size
-
-Adjust the batch size to control memory usage:
-
-```python
-# Configure with smaller batch size for lower memory usage
-config = TransmogConfig().memory_optimized().with_processing(
-    batch_size=50  # Process 50 records at a time
-)
-processor = TransmogProcessor(config)
-
-# Process stream with controlled batch size
-streaming_result = processor.process_stream(
-    stream_records("very_large_file.json"),
-    streaming_output=True
+# Stream process directly to files
+tm.flatten_stream(
+    file_path="very_large_file.json",
+    name="records",
+    output_path="output_directory",
+    output_format="parquet",
+    low_memory=True  # Enable memory optimization
 )
 ```
 
-## Disabling Caching
+## Controlling Chunk Size
 
-For extreme memory constraints, disable caching entirely:
+Adjust the chunk size to control memory usage:
 
 ```python
-# Configure with caching disabled
-config = TransmogConfig().with_processing(
-    enable_caching=False
+# Process with smaller chunk size for lower memory usage
+tm.flatten_stream(
+    file_path="very_large_file.json",
+    name="records",
+    output_path="output_directory",
+    output_format="parquet",
+    chunk_size=50,  # Process 50 records at a time
+    low_memory=True
 )
-processor = TransmogProcessor(config)
 ```
 
 ## Memory-Efficient File Processing
@@ -118,14 +78,13 @@ processor = TransmogProcessor(config)
 Process large files in chunks:
 
 ```python
-# Configure chunked file processing
-config = TransmogConfig().memory_optimized().with_processing(
-    file_chunk_size=10000  # Read 10,000 bytes at a time
-)
-processor = TransmogProcessor(config)
-
 # Process large file in chunks
-result = processor.process_file("large_file.json")
+result = tm.flatten_file(
+    file_path="large_file.json",
+    name="records",
+    chunk_size=100,  # Process 100 records at a time
+    low_memory=True
+)
 ```
 
 ## Memory Profiling and Monitoring
@@ -136,20 +95,19 @@ Here's how to monitor memory usage:
 import psutil
 import os
 import tracemalloc
+import transmog as tm
 
 # Start memory tracking
 tracemalloc.start()
 process = psutil.Process(os.getpid())
 start_memory = process.memory_info().rss / (1024 * 1024)  # MB
 
-# Configure for memory optimization
-config = TransmogConfig().memory_optimized().with_conversion(
-    mode=ConversionMode.MEMORY_EFFICIENT
+# Process a large file with memory optimization
+result = tm.flatten_file(
+    file_path="large_file.json",
+    name="records",
+    low_memory=True
 )
-processor = TransmogProcessor(config)
-
-# Process a large file
-result = processor.process_file("large_file.json")
 
 # Check memory usage
 current_memory = process.memory_info().rss / (1024 * 1024)  # MB
@@ -166,17 +124,28 @@ for stat in top_stats[:10]:
 
 ## Advanced Memory Optimization Strategies
 
-### 1. Selective Field Processing
+### 1. Selective Field Processing with Transforms
 
-Process only needed fields to reduce memory usage:
+Process only needed fields by using transforms to filter data:
 
 ```python
-# Configure to process only specific fields
-config = TransmogConfig().memory_optimized().with_flattening(
-    include_fields=["id", "name", "orders.id", "orders.total"],
-    exclude_fields=["metadata", "description", "tags"]
+# Define a transform function to filter fields
+def filter_fields(record):
+    """Keep only essential fields"""
+    return {
+        "id": record.get("id"),
+        "name": record.get("name"),
+        "order_id": record.get("orders", {}).get("id"),
+        "order_total": record.get("orders", {}).get("total")
+    }
+
+# Process with field filtering
+result = tm.flatten(
+    data=large_data,
+    name="record",
+    transforms={"": filter_fields},  # Apply to root level
+    low_memory=True
 )
-processor = TransmogProcessor(config)
 ```
 
 ### 2. Output Format Selection
@@ -186,8 +155,12 @@ Choose memory-efficient output formats:
 ```python
 # Process and output directly to Parquet
 # (Parquet is more memory-efficient than JSON)
-result = processor.process_file("large_file.json")
-result.write_all_parquet("output_directory")
+result = tm.flatten_file(
+    file_path="large_file.json",
+    name="records",
+    low_memory=True
+)
+result.save("output_directory", format="parquet", compression="snappy")
 ```
 
 ### 3. Combining Streaming with Direct Output
@@ -195,46 +168,66 @@ result.write_all_parquet("output_directory")
 For ultimate memory efficiency:
 
 ```python
-import json
+import transmog as tm
 import os
-
-# Configure for maximum memory efficiency
-config = TransmogConfig().memory_optimized().with_conversion(
-    mode=ConversionMode.MEMORY_EFFICIENT
-).with_processing(
-    batch_size=25,
-    enable_caching=False
-)
-processor = TransmogProcessor(config)
 
 # Ensure output directory exists
 os.makedirs("output_directory", exist_ok=True)
 
-# Process stream with direct file output
-def process_in_batches(input_file, output_dir):
-    def record_generator():
-        with open(input_file, 'r') as f:
-            for line in f:
-                yield json.loads(line.strip())
+# Process stream with direct file output and maximum memory efficiency
+tm.flatten_stream(
+    file_path="very_large_file.json",
+    name="records",
+    output_path="output_directory",
+    output_format="parquet",
+    chunk_size=25,
+    low_memory=True,
+    compression="snappy"  # Efficient compression for Parquet
+)
+```
 
-    # Process with streaming output
-    streaming_result = processor.process_stream(
-        record_generator(),
-        streaming_output=True
-    )
+### 4. Processing Line-Delimited JSON
 
-    # Write directly to parquet files
-    streaming_result.write_streaming_parquet(output_dir)
+For line-delimited JSON files (one JSON object per line):
 
-    # Return stats
-    return {
-        "record_count": streaming_result.total_records,
-        "error_count": streaming_result.error_count
-    }
+```python
+import transmog as tm
 
-# Process the file
-stats = process_in_batches("very_large_file.json", "output_directory")
-print(f"Processed {stats['record_count']} records with {stats['error_count']} errors")
+# Process a line-delimited JSON file
+tm.flatten_stream(
+    file_path="line_delimited.jsonl",
+    name="records",
+    output_path="output_directory",
+    output_format="parquet",
+    line_delimited=True,  # Process one JSON object per line
+    low_memory=True
+)
+```
+
+### 5. Iterative Processing with Result Iterator
+
+Use the result iterator for memory-efficient access to results:
+
+```python
+import transmog as tm
+
+# Process data with memory optimization
+result = tm.flatten_file(
+    file_path="large_file.json",
+    name="records",
+    low_memory=True
+)
+
+# Process tables one at a time without loading all into memory
+for table_name, records in result.iter_tables():
+    print(f"Processing table {table_name} with {len(records)} records")
+    
+    # Process records in batches
+    batch_size = 100
+    for i in range(0, len(records), batch_size):
+        batch = records[i:i+batch_size]
+        # Process batch...
+        print(f"  Processed batch {i//batch_size + 1}")
 ```
 
 ## Memory Usage Comparison
@@ -243,38 +236,36 @@ Here's a comparison of memory usage for different configurations:
 
 | Configuration | Relative Memory Usage | Processing Speed |
 |---------------|------------------------|-----------------|
-| Default | 100% | Fast |
-| `memory_optimized()` | 60-70% | Medium |
-| `ConversionMode.LAZY` | 50-60% | Medium |
-| `ConversionMode.MEMORY_EFFICIENT` | 30-50% | Slow |
-| Streaming + `MEMORY_EFFICIENT` | 10-20% | Slow |
-| Streaming + Direct Output | 5-10% | Slow |
+| Default (`low_memory=False`) | 100% | Fast |
+| `low_memory=True` | 60-70% | Medium |
+| `low_memory=True` with `chunk_size=100` | 30-50% | Medium-Slow |
+| `flatten_stream()` with `low_memory=True` | 10-20% | Slow |
 
 ## Best Practices for Memory Optimization
 
-1. **Start Simple**: Begin with `.memory_optimized()` before manual tuning
-2. **Measure First**: Profile memory usage to identify bottlenecks
-3. **Batch Appropriately**: Find the optimal batch size for your data
-4. **Choose Formats Wisely**: Parquet uses less memory than JSON
-5. **Stream Large Datasets**: Always use streaming for very large files
-6. **Control Field Selection**: Process only the fields you need
-7. **Consider Hardware**: Adjust strategies based on available RAM
+1. **Use `flatten_stream()` for very large datasets**
+   - Direct-to-file processing avoids keeping results in memory
 
-## Example Implementation
+2. **Enable `low_memory=True` for all large data processing**
+   - Reduces intermediate data caching
 
-For a complete implementation example, see the performance_optimization.py
-file at [GitHub](https://github.com/scottdraper8/transmog/blob/main/examples/data_processing/advanced/performance_optimization.py).
+3. **Adjust `chunk_size` based on your data**
+   - Smaller chunks use less memory but process more slowly
+   - Larger chunks use more memory but process faster
 
-Key aspects demonstrated in the example:
+4. **Choose efficient output formats**
+   - Parquet is more memory-efficient than JSON or CSV
+   - Use compression like "snappy" for a good balance of speed and size
 
-- Comparison of default, memory-optimized, and performance-optimized configurations
-- Memory usage tracking with psutil
-- Benchmarking of different configurations on various data sizes
-- Real-world performance metrics for different optimization strategies
-- Custom configuration with balanced memory and performance trade-offs
+5. **Monitor memory usage**
+   - Use tools like `tracemalloc` or `memory_profiler` to identify bottlenecks
+
+6. **Pre-filter data when possible**
+   - Use transforms to extract only needed fields
+   - Filter out unnecessary records before processing
 
 ## Next Steps
 
-- Explore [streaming large datasets](../intermediate/streaming-large-datasets.md)
-- Learn about [error recovery strategies](./error-recovery-strategies.md)
-- Read about [performance optimization](../../user/advanced/performance-optimization.md) in depth
+- Explore [error handling strategies](../../user/advanced/error-handling.md)
+- Learn about [streaming large datasets](../intermediate/streaming-large-datasets.md)
+- Try [customizing ID generation](../intermediate/customizing-id-generation.md)

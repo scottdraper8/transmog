@@ -51,7 +51,7 @@ The following nested JSON structure represents a company with departments and em
 The transformation begins with installing Transmog and importing the necessary components:
 
 ```python
-from transmog import Processor, TransmogConfig
+import transmog as tm
 import json
 ```
 
@@ -97,20 +97,26 @@ company_data = {
     ]
 }
 
-# Create a processor with default configuration
-processor = Processor()
+# Transform the data with a single line
+result = tm.flatten(data=company_data, name="company")
 
-# Process the data
-result = processor.process(data=company_data, entity_name="company")
-
-# Convert the result to a dictionary of tables
-tables = result.to_dict()
+# Access the tables directly
+main_table = result.main
+departments_table = result.tables["company_departments"]
+employees_table = result.tables["company_departments_employees"]
 
 # Display the tables
-for table_name, records in tables.items():
-    print(f"\n=== {table_name} ===")
-    for record in records:
-        print(record)
+print("\n=== company ===")
+for record in main_table:
+    print(record)
+
+print("\n=== company_departments ===")
+for record in departments_table:
+    print(record)
+
+print("\n=== company_departments_employees ===")
+for record in employees_table:
+    print(record)
 ```
 
 ## Understanding the Output
@@ -121,24 +127,39 @@ The transformation creates three separate tables:
 2. `company_departments` - A child table containing department information
 3. `company_departments_employees` - A grandchild table containing employee information
 
-Each table maintains relationships through ID fields.
+Each table maintains relationships through ID fields:
+- Each record has an `_id` field that uniquely identifies it
+- Child records have a `_parent_id` field that references their parent's ID
 
 ## Customizing the Transformation
 
-The transformation can be customized using `TransmogConfig`:
+The transformation can be customized using various parameters:
 
 ```python
-# Create a custom configuration
-config = TransmogConfig().with_naming(
-    entity_name_separator="_",
-    array_item_suffix=""
+# Transform with custom naming options
+result = tm.flatten(
+    data=company_data, 
+    name="company",
+    separator="_",       # Separator for table names
+    array_suffix=""      # Suffix for array items
 )
 
-# Create a processor with the custom configuration
-processor = Processor(config=config)
+# Save the result to files (JSON, CSV, or Parquet)
+result.save("output/company")
+```
 
-# Process the data with custom configuration
-result = processor.process(data=company_data, entity_name="company")
+## Working with Files
+
+You can also transform JSON files directly:
+
+```python
+# Transform a JSON file
+result = tm.flatten_file("company_data.json", name="company")
+
+# Save to different formats
+result.save("output/company.json")  # Save as JSON
+result.save("output/company.csv")   # Save as CSV
+result.save("output/company.parquet")  # Save as Parquet
 ```
 
 ## Example Implementation
@@ -148,10 +169,10 @@ file at [GitHub](https://github.com/scottdraper8/transmog/blob/main/examples/dat
 
 Key aspects demonstrated in the example:
 
-- Basic transformation of nested JSON data
-- Creating a processor with default configuration
-- Accessing and displaying the transformed data
-- Customizing the transformation with configuration options
+- Basic transformation of nested JSON data with a single function call
+- Accessing the transformed data through intuitive properties
+- Saving results to various output formats
+- Customizing the transformation with simple parameters
 
 ## Related Documentation
 

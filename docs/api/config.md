@@ -2,435 +2,248 @@
 
 > **User Guide**: For usage guidance and examples, see the [Configuration Guide](../user/essentials/configuration.md).
 
-This document provides a reference for the configuration classes in Transmog.
+This document provides a reference for the configuration options in Transmog.
 
-## TransmogConfig
+## Configuration Parameters
 
-`TransmogConfig` is the main configuration class that aggregates all settings for Transmog.
+In Transmog 1.1.0, configuration is done through simple parameters passed to the main API functions (`flatten()`, `flatten_file()`, and `flatten_stream()`). This section documents all available configuration parameters.
+
+### Basic Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `name` | str | Required | Name for the main entity (used for table naming) |
+| `separator` | str | "_" | Separator to use between path segments in field names |
+| `cast_to_string` | bool | False | Whether to cast all values to strings |
+| `include_empty` | bool | False | Whether to include empty values |
+| `skip_null` | bool | True | Whether to skip null values |
+
+### Metadata Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `add_metadata` | bool | True | Whether to add metadata fields (_id, _parent_id) |
+| `add_timestamps` | bool | False | Whether to add timestamp metadata |
+| `id_field` | str, dict, "auto" | None | Field(s) to use for deterministic IDs |
+
+### Processing Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `max_depth` | int | 100 | Maximum recursion depth |
+| `deep_nesting_threshold` | int | 4 | Threshold for special handling of deeply nested structures |
+| `low_memory` | bool | False | Whether to optimize for low memory usage |
+| `chunk_size` | int | None | Size of chunks for processing (enables chunked processing) |
+
+### Error Handling Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `error_handling` | str | "raise" | Error handling strategy ("raise", "skip", or "warn") |
+| `error_log` | str | None | Path to write error logs (when using `flatten_stream()`) |
+
+### Output Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `stream` | bool | False | Whether to stream results directly to output files |
+| `output_path` | str | None | Path for output files when streaming |
+| `output_format` | str | None | Format for output files when streaming ("json", "csv", "parquet") |
+
+### Format-Specific Options
+
+These options can be passed to both the main API functions and the `save()` method on `FlattenResult`.
+
+#### CSV Options
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `include_header` | bool | True | Whether to include header row in CSV |
+| `delimiter` | str | "," | Delimiter character for CSV |
+| `quotechar` | str | '"' | Character for quoting fields |
+| `encoding` | str | "utf-8" | File encoding |
+
+#### Parquet Options
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `compression` | str | None | Compression codec ("snappy", "gzip", "brotli", "zstd", etc.) |
+| `row_group_size` | int | None | Number of rows per row group |
+
+#### JSON Options
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `indent` | int | 2 | Indentation level for pretty printing |
+| `encoding` | str | "utf-8" | File encoding |
+
+## Configuration Examples
+
+### Basic Configuration
 
 ```python
-class TransmogConfig:
-    """Complete configuration for Transmog processing."""
+import transmog as tm
 
-    # Fields
-    naming: NamingConfig
-    processing: ProcessingConfig
-    metadata: MetadataConfig
-    error_handling: ErrorHandlingConfig
+# Basic configuration
+result = tm.flatten(
+    data=data,
+    name="records",
+    separator="_",
+    cast_to_string=False,
+    include_empty=False,
+    skip_null=True
+)
 ```
 
-### Class Methods
-
-#### `default()`
-
-Create a default configuration.
+### Memory Optimization
 
 ```python
-@classmethod
-def default(cls) -> "TransmogConfig":
-    """Create a default configuration."""
-    return cls()
+# Memory-optimized configuration
+result = tm.flatten(
+    data=data,
+    name="records",
+    low_memory=True,
+    chunk_size=100
+)
 ```
 
-#### `memory_optimized()`
-
-Create a memory-optimized configuration.
+### ID Field Configuration
 
 ```python
-@classmethod
-def memory_optimized(cls) -> "TransmogConfig":
-    """Create a memory-optimized configuration."""
-    return cls(
-        processing=ProcessingConfig(
-            processing_mode=ProcessingMode.LOW_MEMORY,
-            batch_size=100,
-            path_parts_optimization=True,
-        )
-    )
-```
-
-#### `performance_optimized()`
-
-Create a performance-optimized configuration.
-
-```python
-@classmethod
-def performance_optimized(cls) -> "TransmogConfig":
-    """Create a performance-optimized configuration."""
-    return cls(
-        processing=ProcessingConfig(
-            processing_mode=ProcessingMode.HIGH_PERFORMANCE,
-            batch_size=10000,
-            path_parts_optimization=True,
-        )
-    )
-```
-
-#### `with_deterministic_ids(id_fields)`
-
-Create a configuration with deterministic ID generation.
-
-```python
-@classmethod
-def with_deterministic_ids(cls, id_fields: Union[str, dict[str, str]]) -> "TransmogConfig":
-    """
-    Create a config with deterministic ID generation enabled.
-
-    Args:
-        id_fields: Field name or dictionary mapping paths to field names for deterministic IDs
-
-    Returns:
-        TransmogConfig with deterministic ID generation enabled
-    """
-    return cls(metadata=MetadataConfig(default_id_field=id_fields))
-```
-
-#### `with_custom_id_generation(strategy)`
-
-Create a configuration with custom ID generation.
-
-```python
-@classmethod
-def with_custom_id_generation(
-    cls, strategy: Callable[[dict[str, Any]], str]
-) -> "TransmogConfig":
-    """
-    Create a configuration with custom ID generation.
-
-    Args:
-        strategy: Function that takes a record and returns a string ID
-
-    Returns:
-        TransmogConfig: New configuration with custom ID generation
-    """
-    return cls(metadata=MetadataConfig(id_generation_strategy=strategy))
-```
-
-#### `disable_arrays()`
-
-Configure to skip array processing and keep arrays as JSON strings.
-
-```python
-def disable_arrays(self) -> "TransmogConfig":
-    """
-    Configure to skip array processing and keep arrays as JSON strings.
-
-    This is useful when you want to keep arrays as single fields rather
-    than creating child tables.
-
-    Returns:
-        Updated TransmogConfig with array processing disabled
-    """
-    return self.with_processing(visit_arrays=False)
-```
-
-#### `keep_arrays()`
-
-Configure to keep arrays in the main table after processing them into child tables.
-
-```python
-def keep_arrays(self) -> "TransmogConfig":
-    """
-    Configure to keep arrays in the main table after processing.
-
-    When enabled, arrays will be processed into child tables but will also
-    remain in the main table. This can be useful when you need both the
-    normalized form in child tables and the original arrays.
-
-    Returns:
-        Updated TransmogConfig with arrays kept in main table after processing
-    """
-    return self.with_processing(keep_arrays=True)
-```
-
-### Instance Methods
-
-#### `with_naming(**kwargs)`
-
-Create a new configuration with updated naming settings.
-
-```python
-def with_naming(self, **kwargs) -> "TransmogConfig":
-    """
-    Create a new configuration with updated naming settings.
-
-    Args:
-        **kwargs: Keyword arguments to update in the naming configuration
-
-    Returns:
-        TransmogConfig: New configuration with updated naming settings
-    """
-    return TransmogConfig(
-        naming=NamingConfig(**{**self.naming.__dict__, **kwargs}),
-        processing=self.processing,
-        metadata=self.metadata,
-        error_handling=self.error_handling,
-    )
-```
-
-#### `with_processing(**kwargs)`
-
-Create a new configuration with updated processing settings.
-
-```python
-def with_processing(self, **kwargs) -> "TransmogConfig":
-    """
-    Create a new configuration with updated processing settings.
-
-    Args:
-        **kwargs: Keyword arguments to update in the processing configuration
-
-    Returns:
-        TransmogConfig: New configuration with updated processing settings
-    """
-    return TransmogConfig(
-        naming=self.naming,
-        processing=ProcessingConfig(**{**self.processing.__dict__, **kwargs}),
-        metadata=self.metadata,
-        error_handling=self.error_handling,
-    )
-```
-
-#### `with_metadata(**kwargs)`
-
-Create a new configuration with updated metadata settings.
-
-```python
-def with_metadata(self, **kwargs) -> "TransmogConfig":
-    """
-    Create a new configuration with updated metadata settings.
-
-    Args:
-        **kwargs: Keyword arguments to update in the metadata configuration
-
-    Returns:
-        TransmogConfig: New configuration with updated metadata settings
-    """
-    return TransmogConfig(
-        naming=self.naming,
-        processing=self.processing,
-        metadata=MetadataConfig(**{**self.metadata.__dict__, **kwargs}),
-        error_handling=self.error_handling,
-    )
-```
-
-#### `with_error_handling(**kwargs)`
-
-Create a new configuration with updated error handling settings.
-
-```python
-def with_error_handling(self, **kwargs) -> "TransmogConfig":
-    """
-    Create a new configuration with updated error handling settings.
-
-    Args:
-        **kwargs: Keyword arguments to update in the error handling configuration
-
-    Returns:
-        TransmogConfig: New configuration with updated error handling settings
-    """
-    return TransmogConfig(
-        naming=self.naming,
-        processing=self.processing,
-        metadata=self.metadata,
-        error_handling=ErrorHandlingConfig(
-            **{**self.error_handling.__dict__, **kwargs}
-        ),
-    )
-```
-
-## NamingConfig
-
-Configuration for naming conventions.
-
-```python
-@dataclass
-class NamingConfig:
-    """Configuration for naming conventions."""
-
-    separator: str = "_"
-    max_table_component_length: Optional[int] = None
-    max_field_component_length: Optional[int] = None
-    preserve_leaf_component: bool = True
-    deep_nesting_threshold: int = 4
-```
-
-### Parameters
-
-- **separator** (`str`, default: `"_"`): The separator to use between path components.
-- **max_table_component_length** (`Optional[int]`, default: `None`): Maximum length for table name components.
-- **max_field_component_length** (`Optional[int]`, default: `None`): Maximum length for field name components.
-- **preserve_leaf_component** (`bool`, default: `True`): Whether to preserve the leaf component in full.
-- **deep_nesting_threshold** (`int`, default: `4`): Depth threshold for special handling of deeply nested structures.
-
-## ProcessingConfig
-
-Configuration for data processing options.
-
-```python
-@dataclass
-class ProcessingConfig:
-    """Configuration for data processing options."""
-
-    cast_to_string: bool = True
-    include_empty: bool = False
-    skip_null: bool = True
-    max_nesting_depth: Optional[int] = None
-    max_depth: int = 100  # Maximum recursion depth
-    path_parts_optimization: bool = True
-    visit_arrays: bool = True
-    batch_size: int = 1000
-    processing_mode: ProcessingMode = ProcessingMode.STANDARD
-```
-
-### Parameters
-
-- **cast_to_string** (`bool`, default: `True`): Whether to cast all values to strings.
-- **include_empty** (`bool`, default: `False`): Whether to include empty values.
-- **skip_null** (`bool`, default: `True`): Whether to skip null values.
-- **max_nesting_depth** (`Optional[int]`, default: `None`): Maximum nesting depth (None for unlimited).
-- **max_depth** (`int`, default: `100`): Maximum recursion depth for nested structures.
-- **path_parts_optimization** (`bool`, default: `True`): Whether to optimize path handling.
-- **visit_arrays** (`bool`, default: `True`): Whether to process arrays as separate tables.
-- **keep_arrays** (`bool`, default: `False`): Whether to keep arrays in the main table after processing them into child tables.
-- **batch_size** (`int`, default: `1000`): Batch size for processing.
-- **processing_mode** (`ProcessingMode`, default: `ProcessingMode.STANDARD`): Processing mode.
-
-## MetadataConfig
-
-Configuration for metadata generation.
-
-```python
-@dataclass
-class MetadataConfig:
-    """
-    Configuration for metadata generation.
-
-    This class configures how metadata fields like IDs and timestamps
-    are generated during processing.
-    """
-
-    # Generation options
-    id_field: str = "__transmog_id"
-    default_id_field: Optional[Union[str, dict[str, str]]] = None
-    parent_field: str = "__parent_transmog_id"
-    time_field: str = "__transmog_datetime"
-    deterministic_id_fields: dict[str, str] = field(default_factory=dict)
-    id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None
-    force_transmog_id: bool = False
-    id_field_patterns: Optional[list[str]] = None
-    id_field_mapping: Optional[dict[str, str]] = None
-```
-
-### Parameters
-
-- **id_field** (`str`, default: `"__transmog_id"`): Field name for transmog IDs.
-- **default_id_field** (`Optional[Union[str, dict[str, str]]]`, default: `None`): Field name or dictionary mapping
-  paths to field names used for deterministic ID generation.
-- **parent_field** (`str`, default: `"__parent_transmog_id"`): Field name for parent IDs.
-- **time_field** (`str`, default: `"__transmog_datetime"`): Field name for timestamps.
-- **deterministic_id_fields** (`dict[str, str]`, default: `{}`): Dictionary mapping table paths to field names
-  for deterministic ID generation.
-- **id_generation_strategy** (`Optional[Callable[[dict[str, Any]], str]]`, default: `None`): Custom function for ID generation.
-- **force_transmog_id** (`bool`, default: `False`): Whether to always add transmog IDs even when natural IDs are found.
-- **id_field_patterns** (`Optional[list[str]]`, default: `None`): List of field names to check for natural IDs.
-- **id_field_mapping** (`Optional[dict[str, str]]`, default: `None`): Dictionary mapping table paths to field names
-  for natural ID discovery.
-
-## ErrorHandlingConfig
-
-Configuration for error handling and recovery.
-
-```python
-@dataclass
-class ErrorHandlingConfig:
-    """Configuration for error handling and recovery."""
-
-    allow_malformed_data: bool = False
-    recovery_strategy: str = "strict"  # "strict", "skip", "partial"
-    max_retries: int = 3
-    error_log_path: Optional[str] = None
-```
-
-### Parameters
-
-- **allow_malformed_data** (`bool`, default: `False`): Whether to allow malformed data.
-- **recovery_strategy** (`str`, default: `"strict"`): Recovery strategy to use ("strict", "skip",
-  or "partial").
-- **max_retries** (`int`, default: `3`): Maximum number of retry attempts.
-- **error_log_path** (`Optional[str]`, default: `None`): Path to write error logs to (None for no logging).
-
-## ProcessingMode
-
-Enum for processing modes determining memory/performance tradeoff.
-
-```python
-class ProcessingMode(Enum):
-    """Processing modes determining memory/performance tradeoff."""
-
-    STANDARD = auto()  # Default mode
-    LOW_MEMORY = auto()  # Optimize for memory usage
-    HIGH_PERFORMANCE = auto()  # Optimize for performance
-```
-
-### Values
-
-- **STANDARD**: Default mode balancing memory usage and performance.
-- **LOW_MEMORY**: Optimize for memory usage with lower memory footprint.
-- **HIGH_PERFORMANCE**: Optimize for performance with higher memory usage.
-
-## ConversionMode
-
-Enum for conversion modes controlling how data is converted and managed in memory when generating output.
-
-```python
-class ConversionMode(Enum):
-    """Conversion mode for ProcessingResult."""
-
-    EAGER = "eager"  # Convert immediately, keep all data in memory
-    LAZY = "lazy"  # Convert only when needed
-    MEMORY_EFFICIENT = "memory_efficient"  # Discard intermediate data after conversion
-```
-
-### Values
-
-- **EAGER**: Converts data immediately and keeps all formats in memory.
-- **LAZY**: Converts data only when needed.
-- **MEMORY_EFFICIENT**: Minimizes memory usage by clearing intermediate data.
-
-## Example Usage
-
-```python
-from transmog import TransmogConfig, Processor, ProcessingMode
-
-# Create a custom configuration
-config = (
-    TransmogConfig.default()
-    .with_naming(
-        separator=".",
-        max_table_component_length=30,
-        deep_nesting_threshold=4
-    )
-    .with_processing(
-        cast_to_string=False,
-        batch_size=500,
-        processing_mode=ProcessingMode.LOW_MEMORY
-    )
-    .with_metadata(
-        id_field="record_id",
-        parent_field="parent_id",
-        time_field="processed_at"
-    )
-    .with_error_handling(
-        allow_malformed_data=True,
-        recovery_strategy="skip",
-        max_retries=5
-    )
+# Using a specific field for IDs
+result = tm.flatten(
+    data=data,
+    name="records",
+    id_field="id"  # Use "id" field for deterministic IDs
 )
 
-# Create a processor with this configuration
-processor = Processor(config=config)
+# Using different fields for different tables
+result = tm.flatten(
+    data=data,
+    name="records",
+    id_field={
+        "": "id",                # Main table uses "id" field
+        "records_items": "itemId"  # Items table uses "itemId" field
+    }
+)
 
-# Process data
-result = processor.process(data, entity_name="records")
+# Automatic ID field discovery
+result = tm.flatten(
+    data=data,
+    name="records",
+    id_field="auto"  # Automatically discover ID fields
+)
 ```
+
+### Error Handling Configuration
+
+```python
+# Skip records with errors
+result = tm.flatten(
+    data=data,
+    name="records",
+    error_handling="skip"  # Skip records with errors
+)
+
+# Log warnings but continue processing
+result = tm.flatten(
+    data=data,
+    name="records",
+    error_handling="warn"  # Log warnings but continue
+)
+```
+
+### Streaming Configuration
+
+```python
+# Stream results directly to files
+tm.flatten(
+    data=data,
+    name="records",
+    stream=True,
+    output_path="output_directory",
+    output_format="parquet",
+    compression="snappy"
+)
+
+# Or use flatten_stream directly
+tm.flatten_stream(
+    file_path="large_file.json",
+    name="records",
+    output_path="output_directory",
+    output_format="csv",
+    include_header=True,
+    delimiter=","
+)
+```
+
+### Saving Results with Format Options
+
+```python
+# Process data
+result = tm.flatten(data, name="records")
+
+# Save with format-specific options
+result.save(
+    "output_directory", 
+    format="parquet",
+    compression="snappy",
+    row_group_size=10000
+)
+
+# Save as CSV with options
+result.save(
+    "output_directory", 
+    format="csv",
+    include_header=True,
+    delimiter=",",
+    quotechar='"',
+    encoding="utf-8"
+)
+```
+
+## Transforms
+
+Transforms allow you to modify field values during processing. They are specified as a dictionary mapping field names to transform functions.
+
+```python
+# Define transform functions
+def uppercase_name(value):
+    """Convert name to uppercase"""
+    if isinstance(value, str):
+        return value.upper()
+    return value
+
+def calculate_total(order):
+    """Calculate order total"""
+    if isinstance(order, dict):
+        price = order.get("price", 0)
+        quantity = order.get("quantity", 1)
+        return price * quantity
+    return 0
+
+# Apply transforms during processing
+result = tm.flatten(
+    data=data,
+    name="records",
+    transforms={
+        "name": uppercase_name,           # Transform the "name" field
+        "orders.total": calculate_total   # Transform the "orders.total" field
+    }
+)
+```
+
+## Migration from v1.0.6
+
+If you were previously using the `TransmogConfig` class and its methods, here's how to migrate to the new API:
+
+| Old API (v1.0.6) | New API (v1.1.0) |
+|------------------|------------------|
+| `TransmogConfig().memory_optimized()` | `low_memory=True` |
+| `TransmogConfig().performance_optimized()` | `low_memory=False, chunk_size=None` |
+| `TransmogConfig.with_deterministic_ids("id")` | `id_field="id"` |
+| `TransmogConfig.with_custom_id_generation(func)` | Use transforms with `id_field` |
+| `config.with_naming(separator="-")` | `separator="-"` |
+| `config.with_processing(visit_arrays=False)` | Not directly supported, use transforms |
+| `config.with_metadata(add_timestamps=True)` | `add_timestamps=True` |
+| `config.with_error_handling(strategy=ErrorStrategy.SKIP_AND_LOG)` | `error_handling="skip"` |

@@ -1,7 +1,7 @@
 # Using Natural IDs in Your Data
 
 This tutorial demonstrates how to use Transmog's natural ID discovery feature to leverage existing ID fields in
-your data instead of always generating synthetic IDs.
+data instead of generating synthetic IDs.
 
 ## Prerequisites
 
@@ -11,8 +11,7 @@ your data instead of always generating synthetic IDs.
 
 ## Introduction
 
-Many datasets already contain well-defined unique identifiers. Transmog's natural ID discovery feature allows you
-to use these existing IDs instead of generating synthetic ones, which can be useful for:
+Many datasets already contain well-defined unique identifiers. Transmog's natural ID discovery feature allows use of existing IDs instead of generating synthetic ones, which is useful for:
 
 - Maintaining data lineage and traceability
 - Preserving referential integrity with external systems
@@ -54,16 +53,13 @@ Notice how different entities use different field names for their IDs.
 
 ## Step 2: Basic Natural ID Discovery
 
-The simplest way to use natural ID discovery is to create a processor with the `with_natural_ids()` method:
+The simplest way to use natural ID discovery is to use the `id_field="auto"` parameter:
 
 ```python
 import transmog as tm
 
-# Create a processor with natural ID discovery enabled
-processor = tm.Processor.with_natural_ids()
-
-# Process the data
-result = processor.process(data, entity_name="company")
+# Process the data with automatic ID discovery
+result = tm.flatten(data, name="company", id_field="auto")
 ```
 
 With this configuration, Transmog will check for common ID field names like "id", "ID", "uuid", etc. In our
@@ -71,21 +67,18 @@ example, only the top-level "id" field will be recognized.
 
 ## Step 3: Customize ID Field Detection
 
-To recognize the custom ID fields in our data, we can provide a mapping of table names to ID field names:
+To recognize the custom ID fields in the data, provide a mapping of table names to ID field names:
 
 ```python
 # Create a mapping of tables to their ID fields
 id_mapping = {
-    "company_departments": "dept_code",
-    "company_departments_employees": "employee_id",
-    "*": "id"  # Default for all other tables
+    "": "id",                              # Main table uses "id" field
+    "company_departments": "dept_code",           # Departments table uses "dept_code" field
+    "company_departments_employees": "employee_id" # Employees table uses "employee_id" field
 }
 
-# Create processor with custom ID mapping
-processor = tm.Processor.with_natural_ids(id_field_mapping=id_mapping)
-
-# Process the data
-result = processor.process(data, entity_name="company")
+# Process with custom ID mapping
+result = tm.flatten(data, name="company", id_field=id_mapping)
 ```
 
 Now Transmog will use:
@@ -101,67 +94,61 @@ Let's examine the processed data to see how natural IDs were used:
 ```python
 # Check main table
 print("Main table:")
-for record in result.main_table:
+for record in result.main:
     print(f"  ID: {record.get('id')}")
     print(f"  Name: {record.get('name')}")
-    print(f"  Has transmog ID: {'__transmog_id' in record}")
+    print(f"  Has transmog ID: {'_id' in record}")
     print()
 
 # Check departments table
 print("Departments table:")
-dept_table = result.child_tables["company_departments"]
+dept_table = result.tables["company_departments"]
 for record in dept_table:
     print(f"  ID: {record.get('dept_code')}")
     print(f"  Name: {record.get('name')}")
-    print(f"  Parent ID: {record.get('__parent_transmog_id')}")
-    print(f"  Has transmog ID: {'__transmog_id' in record}")
+    print(f"  Parent ID: {record.get('_parent_id')}")
+    print(f"  Has transmog ID: {'_id' in record}")
     print()
 
 # Check employees table
 print("Employees table:")
-emp_table = result.child_tables["company_departments_employees"]
+emp_table = result.tables["company_departments_employees"]
 for record in emp_table:
     print(f"  ID: {record.get('employee_id', 'N/A')}")
     print(f"  Name: {record.get('name')}")
-    print(f"  Parent ID: {record.get('__parent_transmog_id')}")
-    print(f"  Has transmog ID: {'__transmog_id' in record}")
+    print(f"  Parent ID: {record.get('_parent_id')}")
+    print(f"  Has transmog ID: {'_id' in record}")
     print()
 ```
 
 You'll notice that:
 
-1. Records with natural IDs don't have a `__transmog_id` field
-2. Records without natural IDs (like some employees) do have a `__transmog_id` field
-3. Parent-child relationships are maintained using the natural IDs
+1. Records with natural IDs still have an `_id` field that contains the natural ID value
+2. Records without natural IDs get a generated `_id` field
+3. Parent-child relationships are maintained using the IDs
 
-## Step 5: Alternative Approach - Custom ID Field Patterns
+## Step 5: Alternative Approach - Single ID Field
 
-Instead of mapping tables to specific fields, you can also provide a list of field names to check:
+A single ID field can be specified for all tables:
 
 ```python
-# Define custom patterns to check for ID fields
-custom_patterns = ["id", "dept_code", "employee_id", "uuid", "code"]
-
-# Create processor with custom ID patterns
-processor = tm.Processor.with_natural_ids(id_field_patterns=custom_patterns)
-
-# Process the data
-result = processor.process(data, entity_name="company")
+# Process with a single ID field
+result = tm.flatten(data, name="company", id_field="id")
 ```
 
-This approach is simpler but less precise than the mapping approach. It will check each record for the specified
-fields in order and use the first one found.
+This approach is simpler but less flexible than the mapping approach. It will only use the specified field as the ID.
 
 ## Step 6: Export the Results
 
 Finally, let's export the processed data to see the results:
 
 ```python
-# Export to JSON
-result.write_all_json("output/natural_ids")
+# Export to any format with a single call
+result.save("output/natural_ids")
 
-# Or export to CSV
-result.write_all_csv("output/natural_ids")
+# Or specify the format explicitly
+result.save("output/natural_ids.json")  # JSON format
+result.save("output/natural_ids.csv")   # CSV format
 ```
 
 ## Advanced: Handling Mixed ID Fields
@@ -180,19 +167,37 @@ mixed_data = {
 }
 
 # Process with natural ID discovery
-processor = tm.Processor.with_natural_ids(id_field_mapping={"company_departments": "dept_code"})
-result = processor.process(mixed_data, entity_name="company")
+result = tm.flatten(
+    mixed_data, 
+    name="company", 
+    id_field={"": "id", "company_departments": "dept_code"}
+)
 
 # Check departments table
-dept_table = result.child_tables["company_departments"]
+dept_table = result.tables["company_departments"]
 for record in dept_table:
     print(f"  Name: {record.get('name')}")
     print(f"  Natural ID: {record.get('dept_code', 'None')}")
-    print(f"  Transmog ID: {record.get('__transmog_id', 'None')}")
+    print(f"  ID field: {record.get('_id')}")
     print()
 ```
 
-You'll see that the HR department uses its natural ID, while the Engineering department gets a synthetic ID.
+The HR department uses its natural ID, while the Engineering department gets a synthetic ID.
+
+## Combining with Other Features
+
+Natural ID discovery can be combined with other Transmog features:
+
+```python
+# Combine with custom delimiter and error handling
+result = tm.flatten(
+    data,
+    name="company",
+    id_field={"": "id", "company_departments": "dept_code"},
+    delimiter="__",            # Use double underscore as delimiter
+    error_handling="skip"      # Skip records with errors
+)
+```
 
 ## Conclusion
 

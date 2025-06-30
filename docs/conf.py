@@ -20,7 +20,7 @@ except ImportError:
     try:
         from src.transmog import __version__ as release
     except ImportError:
-        release = "1.0.6"
+        release = "1.1.0"
 
 # -- General configuration ---------------------------------------------------
 extensions = [
@@ -110,8 +110,8 @@ html_theme = "furo"
 html_static_path = ["_static"]
 html_css_files = ["css/custom.css"]
 html_js_files = ["js/custom.js"]
-html_title = "Transmog 1.0.6"
-html_short_title = "Transmog 1.0.6"
+html_title = "Transmog 1.1.0"
+html_short_title = "Transmog 1.1.0"
 
 # Theme options
 html_theme_options = {

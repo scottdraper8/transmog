@@ -2,58 +2,154 @@
 
 > **API Reference**: For detailed API documentation, see the [Configuration API Reference](../../api/config.md).
 
-Transmog implements a configuration system based on the `TransmogConfig` class, which organizes configuration
-options into logical categories.
+Transmog v1.1.0 provides two levels of configuration:
 
-## Basic Configuration
+1. **Simple Options** - Direct parameters to the `flatten()` function
+2. **Advanced Configuration** - Full configuration system for complex scenarios
 
-The default configuration is applied as follows:
+## Simple Configuration (New in v1.1.0)
+
+For most use cases, you can configure Transmog directly through parameters to the `flatten()` function:
 
 ```python
 import transmog as tm
 
-# Use default configuration
-processor = tm.Processor()
+# Basic configuration through parameters
+result = tm.flatten(
+    data,
+    name="users",
+    
+    # ID generation options
+    id_field="id",               # Use natural IDs when available
+    parent_id_field="_parent_id", # Custom parent ID field name
+    add_timestamp=True,           # Add processing timestamp
+    
+    # Naming options
+    separator=".",                # Use dots for nested fields
+    nested_threshold=5,           # Control when to create child tables
+    
+    # Array handling
+    arrays="separate",            # How to handle arrays: "separate", "inline", or "skip"
+    
+    # Data options
+    preserve_types=False,         # Convert values to strings
+    skip_null=True,               # Skip null values
+    skip_empty=True,              # Skip empty values
+    
+    # Error handling
+    errors="skip",                # Skip problematic records
+    
+    # Performance
+    batch_size=1000,              # Batch size for processing
+    low_memory=False              # Enable memory optimization
+)
 ```
 
-## Pre-configured Factory Methods
+### Common Simple Options
 
-Factory methods are provided for common configuration patterns:
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `name` | str | `"data"` | Base name for the flattened tables |
+| `id_field` | str/dict | `None` | Field name for record IDs or dict mapping table names to ID fields |
+| `parent_id_field` | str | `"_parent_id"` | Field name for parent record IDs |
+| `add_timestamp` | bool | `False` | Add processing timestamp to records |
+| `separator` | str | `"_"` | Separator for nested field names |
+| `nested_threshold` | int | `4` | Depth threshold for creating child tables |
+| `arrays` | str | `"separate"` | Array handling: "separate", "inline", or "skip" |
+| `preserve_types` | bool | `False` | Keep original data types (don't convert to strings) |
+| `skip_null` | bool | `True` | Skip null values in output |
+| `skip_empty` | bool | `True` | Skip empty values in output |
+| `errors` | str | `"raise"` | Error handling: "raise", "skip", or "warn" |
+| `batch_size` | int | `1000` | Number of records per batch for processing |
+| `low_memory` | bool | `False` | Enable memory optimization for large datasets |
+
+## File Processing Options
+
+When processing files directly with `flatten_file()`, you can specify additional options:
 
 ```python
-# Create with default configuration
-processor = tm.Processor.default()
-
-# Create with memory optimization for large datasets
-processor = tm.Processor.memory_optimized()
-
-# Create with performance optimization
-processor = tm.Processor.performance_optimized()
-
-# Create with deterministic ID generation
-processor = tm.Processor.with_deterministic_ids({
-    "": "id",                     # Root level uses "id" field
-    "user_orders": "id"           # Order records use "id" field
-})
-
-# Create with custom ID generation
-def custom_id_strategy(record):
-    return f"CUSTOM-{record['id']}"
-
-processor = tm.Processor.with_custom_id_generation(custom_id_strategy)
-
-# Create with partial recovery
-processor = tm.Processor.with_partial_recovery()
+# Process a file with options
+result = tm.flatten_file(
+    "data.json",
+    name="records",              # Base name for tables
+    format="json",               # Force specific format
+    errors="warn",               # Log warnings but continue
+    
+    # All other options from flatten() are also available
+    separator=".",
+    arrays="separate",
+    preserve_types=True
+)
 ```
 
-## Configuration Object
+## Streaming Options
 
-A custom configuration object is created as follows:
+For streaming processing with `flatten_stream()`, you can configure output formats:
 
 ```python
+# Stream with format-specific options
+tm.flatten_stream(
+    large_dataset,
+    output_path="output/",       # Output directory or file
+    name="big_data",             # Base name for tables
+    format="parquet",            # Output format: "json", "csv", "parquet"
+    
+    # Format-specific options
+    compression="snappy",        # Compression for Parquet
+    
+    # Processing options (same as flatten())
+    batch_size=10000,            # Records per batch
+    add_timestamp=True,          # Add timestamps
+    arrays="separate",           # Array handling
+    errors="skip"                # Error handling
+)
+```
+
+## Save Method Options
+
+The `save()` method accepts format-specific options:
+
+```python
+# Save with format-specific options
+result = tm.flatten(data, name="products")
+
+# JSON options
+result.save(
+    "output.json",
+    format="json",               # Explicitly specify format
+    indent=2,                    # Pretty-print with indentation
+    ensure_ascii=False           # Allow non-ASCII characters
+)
+
+# CSV options
+result.save(
+    "output_csv/",
+    format="csv",                # Explicitly specify format
+    delimiter=",",               # Field delimiter
+    quotechar='"',               # Quote character
+    include_headers=True         # Include header row
+)
+
+# Parquet options
+result.save(
+    "output.parquet",
+    format="parquet",            # Explicitly specify format
+    compression="snappy",        # Compression algorithm
+    row_group_size=10000         # Row group size
+)
+```
+
+## Advanced Configuration
+
+For complex scenarios, you can still use the full configuration system through the internal API:
+
+```python
+from transmog.process import Processor
+from transmog.config import TransmogConfig
+
 # Create a custom configuration with the fluent API
 config = (
-    tm.TransmogConfig.default()
+    TransmogConfig.default()
     .with_naming(
         separator=".",
         max_table_component_length=30,
@@ -65,9 +161,9 @@ config = (
         include_empty=False
     )
     .with_metadata(
-        id_field="custom_id",
-        parent_field="parent_id",
-        time_field="processed_at"
+        id_field="_custom_id",
+        parent_field="_parent_id",
+        time_field="_processed_at"
     )
     .with_error_handling(
         recovery_strategy="skip",
@@ -82,290 +178,135 @@ config = (
 )
 
 # Create processor with this configuration
-processor = tm.Processor(config=config)
+processor = Processor(config=config)
+
+# Process data with advanced configuration
+result = processor.process(data, entity_name="users")
 ```
 
-## Processor Configuration Methods
+## Pre-configured Optimization Modes
 
-A processor's configuration is updated as follows:
+The advanced API provides factory methods for common optimization scenarios:
 
 ```python
-# Create a processor with default configuration
-processor = tm.Processor()
+from transmog.process import Processor
 
-# Create a new processor with updated naming settings
-updated_processor = processor.with_naming(
-    separator=".",
-    deep_nesting_threshold=5
+# Memory-optimized for large datasets
+processor = Processor.memory_optimized()
+result = processor.process(data, entity_name="users")
+
+# Performance-optimized for speed
+processor = Processor.performance_optimized()
+result = processor.process(data, entity_name="users")
+```
+
+## ID Generation Strategies
+
+### Natural IDs
+
+Use existing fields as record identifiers:
+
+```python
+# Simple API - use a specific field as ID
+result = tm.flatten(data, name="users", id_field="user_id")
+
+# Simple API - use different fields for different tables
+result = tm.flatten(
+    data, 
+    name="users", 
+    id_field={
+        "": "id",                # Root level uses "id" field
+        "users_orders": "order_id"  # Order records use "order_id" field
+    }
 )
 
-# Create a new processor with updated processing settings
-updated_processor = processor.with_processing(
-    cast_to_string=False,
+# Advanced API
+processor = Processor.with_deterministic_ids({
+    "": "id",                     # Root level uses "id" field
+    "user_orders": "order_id"     # Order records use "order_id" field
+})
+```
+
+### Custom ID Generation
+
+For advanced ID generation, use the internal API:
+
+```python
+# Advanced API
+def custom_id_strategy(record):
+    return f"CUSTOM-{record.get('id', 'unknown')}"
+
+processor = Processor.with_custom_id_generation(custom_id_strategy)
+```
+
+## Error Handling Strategies
+
+Three error handling modes are available:
+
+1. **"raise"** (default) - Raises exceptions on errors
+2. **"skip"** - Skips problematic records and continues
+3. **"warn"** - Logs warnings but continues processing
+
+```python
+# Simple API
+result = tm.flatten(data, name="users", errors="skip")
+
+# Advanced API
+config = TransmogConfig.default().with_error_handling(recovery_strategy="skip")
+processor = Processor(config=config)
+```
+
+## Memory Optimization
+
+For large datasets, use these approaches:
+
+```python
+# Simple streaming API - best for very large datasets
+tm.flatten_stream(
+    large_dataset,
+    output_path="output/",
+    name="big_data",
+    format="parquet",
+    batch_size=10000
+)
+
+# Simple API with memory optimization
+result = tm.flatten(
+    large_dataset,
+    name="big_data",
+    low_memory=True,
     batch_size=5000
 )
 
-# Create a new processor with updated metadata settings
-updated_processor = processor.with_metadata(
-    id_field="custom_id"
-)
-
-# Create a new processor with updated error handling settings
-updated_processor = processor.with_error_handling(
-    recovery_strategy="skip",
-    allow_malformed_data=True,
-    max_retries=3
-)
-
-# Create a new processor with updated caching settings
-updated_processor = processor.with_caching(
-    enabled=True,
-    maxsize=50000
-)
-
-# Create a new processor with a completely new configuration
-updated_processor = processor.with_config(custom_config)
-```
-
-## Configuration Components
-
-The configuration is organized into five components:
-
-### Naming Configuration
-
-Controls table and field naming through the following parameters:
-
-```python
-naming_config = tm.NamingConfig(
-    separator="_",                # Field name separator
-    max_table_component_length=30,# Maximum length for table name components
-    max_field_component_length=30,# Maximum length for field name components
-    preserve_leaf_component=True, # Keep the leaf component in full
-    preserve_root_component=True, # Keep the root component in full
-    deep_nesting_threshold=4      # Threshold for special handling of deep nesting
-)
-
-# Use this configuration component
-config = tm.TransmogConfig(naming=naming_config)
-```
-
-### Processing Configuration
-
-Controls data processing through the following parameters:
-
-```python
-processing_config = tm.ProcessingConfig(
-    cast_to_string=True,          # Convert all values to strings
-    include_empty=False,          # Include empty values
-    skip_null=True,               # Skip null values
-    max_nesting_depth=100,        # Maximum nesting depth (None for unlimited)
-    path_parts_optimization=True, # Optimize path handling
-    visit_arrays=True,            # Process arrays as separate tables
-    keep_arrays=False,            # Keep arrays in main table after processing
-    batch_size=1000,              # Batch size for processing
-    processing_mode=tm.ProcessingMode.STANDARD  # Processing mode
-)
-
-# Use this configuration component
-config = tm.TransmogConfig(processing=processing_config)
-```
-
-### Metadata Configuration
-
-Controls metadata generation through the following parameters:
-
-```python
-metadata_config = tm.MetadataConfig(
-    id_field="__transmog_id",     # Field name for record IDs
-    parent_field="__parent_transmog_id",  # Field name for parent IDs
-    time_field="__transmog_datetime", # Field name for timestamps
-    deterministic_id_fields={    # Fields to use for deterministic IDs
-        "users": "user_id",
-        "orders": "order_id"
-    },
-    id_generation_strategy=None  # Optional custom ID generation function
-)
-
-# Use this configuration component
-config = tm.TransmogConfig(metadata=metadata_config)
-```
-
-### Error Handling Configuration
-
-Controls error handling:
-
-```python
-error_config = tm.ErrorHandlingConfig(
-    allow_malformed_data=False,  # Allow malformed data
-    recovery_strategy="strict",  # "strict", "skip", or "partial"
-    max_retries=3,               # Maximum retry attempts
-    error_log_path=None          # Path for error logging
-)
-
-# Use this configuration component
-config = tm.TransmogConfig(error_handling=error_config)
-```
-
-### Caching Configuration
-
-Controls value processing caching:
-
-```python
-caching_config = tm.CachingConfig(
-    enabled=True,           # Enable or disable caching
-    maxsize=10000,          # Maximum cache size
-    clear_after_batch=False # Clear cache after each batch
-)
-
-# Use this configuration component
-config = tm.TransmogConfig(caching=caching_config)
-
-# Or use the fluent API
-config = (
-    tm.TransmogConfig.default()
-    .with_caching(
-        enabled=True,        # Enable or disable caching
-        maxsize=50000,       # Maximum cache size
-        clear_after_batch=False  # Clear cache after each batch
-    )
-)
-
-# Use this configuration
-processor = tm.Processor(config=config)
-
-# Manually clear the cache
-processor.clear_cache()
-```
-
-## Processing Modes
-
-Processing modes in `ProcessingMode` enum:
-
-1. **Standard Mode** (`ProcessingMode.STANDARD`)
-   - Balanced approach
-   - Default configuration
-
-2. **Low Memory Mode** (`ProcessingMode.LOW_MEMORY`)
-   - Optimized for memory usage
-   - For large datasets or memory-constrained environments
-   - Reduces caching and in-memory data
-
-3. **High Performance Mode** (`ProcessingMode.HIGH_PERFORMANCE`)
-   - Optimized for processing speed
-   - Increases caching
-
-Set the processing mode:
-
-```python
-# Option 1: Set via TransmogConfig
-config = (
-    tm.TransmogConfig.default()
-    .with_processing(processing_mode=tm.ProcessingMode.LOW_MEMORY)
-)
-processor = tm.Processor(config=config)
-
-# Option 2: Use factory method
-processor = tm.Processor.memory_optimized()  # Uses LOW_MEMORY mode
-processor = tm.Processor.performance_optimized()  # Uses HIGH_PERFORMANCE mode
-```
-
-## Configuration Profiles
-
-For reusable configurations:
-
-```python
-# Create a configuration
-config = tm.TransmogConfig.default().with_naming(separator=".")
-
-# Save configuration to a file
-import json
-with open("my_config.json", "w") as f:
-    json.dump(config.as_dict(), f)
-
-# Load configuration from a file
-# Supports JSON, YAML (.yaml/.yml), and TOML (.toml/.tml) formats
-loaded_config = tm.load_config("my_config.json")
-processor = tm.Processor(config=loaded_config)
-```
-
-## Global Settings
-
-Settings that affect all processors:
-
-```python
-# Configure global settings
-tm.settings.cache_enabled = True
-tm.settings.cache_maxsize = 20000
-tm.settings.default_batch_size = 1000
+# Advanced API with memory optimization
+processor = Processor.memory_optimized()
+result = processor.process(data, entity_name="users")
 ```
 
 ## Configuration Best Practices
 
-- **Performance vs. Memory**: For large datasets, use `memory_optimized()`
-- **ID Consistency**: Use deterministic IDs for consistent record identification
+- **Simple vs. Advanced**: Use the simple API for most cases, advanced for complex scenarios
+- **Performance vs. Memory**: For large datasets, use streaming or memory optimization
+- **ID Consistency**: Use natural IDs when possible for consistent record identification
 - **Error Recovery**: Choose error handling based on data quality:
-  - `strict`: For data where errors indicate problems
-  - `skip`: For bulk processing where some records can be skipped
-  - `partial`: For extracting data from inconsistent sources
-- **Naming Consistency**: Configure naming conventions consistently
-  - Use the same separator throughout
-  - Configure deep nesting threshold appropriately for your data structure
+  - `"raise"`: For data where errors indicate problems that should stop processing
+  - `"skip"`: For data with known issues that should be ignored
+  - `"warn"`: For data with issues that should be logged but processing should continue
+- **Array Handling**: Choose array handling based on your needs:
+  - `"separate"`: For normalized data with child tables (default)
+  - `"inline"`: For denormalized data with arrays kept in the parent
+  - `"skip"`: To ignore arrays completely
 
-## Simplified Configuration API
+## Migration from v1.0.x
 
-Transmog now provides several shortcut methods for common configuration scenarios:
+If you're migrating from v1.0.x, here's how configuration options map to the new API:
 
-```python
-import transmog as tm
+| v1.0.x Configuration | v1.1.0 Simple API |
+|----------------------|-------------------|
+| `TransmogConfig().with_naming(separator=".")` | `tm.flatten(data, separator=".")` |
+| `TransmogConfig().with_metadata(id_field="custom_id")` | `tm.flatten(data, id_field="custom_id")` |
+| `TransmogConfig().with_metadata(add_timestamp=True)` | `tm.flatten(data, add_timestamp=True)` |
+| `TransmogConfig().with_error_handling(recovery_strategy="skip")` | `tm.flatten(data, on_error="skip")` |
+| `TransmogConfig().with_processing(cast_to_string=False)` | `tm.flatten(data, cast_to_string=False)` |
 
-# Optimized for CSV output
-config = tm.TransmogConfig.csv_optimized()
-
-# Error tolerant configuration
-config = tm.TransmogConfig.error_tolerant()
-
-# Simple mode with minimal metadata
-config = tm.TransmogConfig.simple_mode()
-
-# Optimized for streaming
-config = tm.TransmogConfig.streaming_optimized()
-
-# Common modifications
-config = (
-    tm.TransmogConfig.default()
-    .use_dot_notation()           # Use dots as separators
-    .disable_arrays()             # Skip array processing
-    .use_string_format()          # Cast all values to strings
-)
-```
-
-## Configuration Validation
-
-The configuration system now includes built-in validation to catch potential issues early:
-
-```python
-import transmog as tm
-from transmog.error import ConfigurationError
-
-try:
-    # Invalid separator would be caught immediately
-    config = tm.TransmogConfig.default().with_naming(separator="")
-except ConfigurationError as e:
-    print(f"Configuration error: {e}")
-
-try:
-    # Invalid metadata field names would be caught
-    config = tm.TransmogConfig.default().with_metadata(
-        id_field="__id",
-        parent_field="__id"  # Same as id_field - not allowed
-    )
-except ConfigurationError as e:
-    print(f"Configuration error: {e}")
-```
-
-Validation helps prevent common mistakes like:
-
-- Invalid separators (empty or invalid characters)
-- Duplicate metadata field names
-- Invalid batch sizes or cache configuration
-- Invalid recovery strategy names
+For more complex configurations, you can still use the advanced API with the `Processor` class.

@@ -26,7 +26,7 @@ including using multiple fields
 Let's start with field-based deterministic IDs using a single field:
 
 ```python
-from transmog import Processor, TransmogConfig
+import transmog as tm
 
 # Sample data
 employee_data = {
@@ -40,23 +40,21 @@ employee_data = {
     ]
 }
 
-# Configure with deterministic IDs based on a specific field
-# Note: with_deterministic_ids only accepts a single field name or mapping
-config = TransmogConfig.with_deterministic_ids("employeeId")  # Use employeeId field for IDs
-processor = Processor(config=config)
-
-# Or use the processor factory method directly
-processor = Processor.with_deterministic_ids("employeeId")
-
-# Process the data
-result = processor.process(data=employee_data, entity_name="employee")
+# Process with deterministic IDs based on a specific field
+result = tm.flatten(
+    data=employee_data, 
+    name="employee",
+    id_field="employeeId"  # Use employeeId field for IDs
+)
 
 # Display the results
-tables = result.to_dict()
-for table_name, records in tables.items():
-    print(f"\n=== {table_name} ===")
-    for record in records:
-        print(f"ID: {record['__transmog_id']}, Data: {record}")
+print("\n=== employee ===")
+for record in result.main:
+    print(f"ID: {record['_id']}, Data: {record}")
+
+print("\n=== employee_projects ===")
+for record in result.tables["employee_projects"]:
+    print(f"ID: {record['_id']}, Data: {record}")
 ```
 
 ## Using Different Fields for Different Tables
@@ -64,104 +62,126 @@ for table_name, records in tables.items():
 You can specify different ID fields for different tables using a dictionary mapping:
 
 ```python
-# Map table paths to their ID fields
+# Map table names to their ID fields
 id_mapping = {
-    "": "employeeId",              # Root level uses "employeeId" field
+    "": "employeeId",              # Main table uses "employeeId" field
     "employee_projects": "projectId"  # Projects table uses "projectId" field
 }
 
-# Configure with the mapping
-processor = Processor.with_deterministic_ids(id_mapping)
+# Process with the mapping
+result = tm.flatten(
+    data=employee_data, 
+    name="employee",
+    id_field=id_mapping
+)
 
-# Process the data
-result = processor.process(data=employee_data, entity_name="employee")
+# Display the results
+print("\n=== employee ===")
+for record in result.main:
+    print(f"ID: {record['_id']}")  # Will contain employeeId value
+
+print("\n=== employee_projects ===")
+for record in result.tables["employee_projects"]:
+    print(f"ID: {record['_id']}")  # Will contain projectId value
 ```
 
 ## Multiple Fields for Deterministic IDs
 
-To use multiple fields for deterministic ID generation, you need to use a custom ID function:
+To use multiple fields for deterministic ID generation, you can use transform functions:
 
 ```python
-import hashlib
-
-# Define a custom ID generation function
-def multi_field_id_generator(record):
+# Define transform functions for ID generation
+def employee_id_generator(record):
     """Generate an ID by combining multiple fields"""
-    # For the main record, combine department and employeeId
     department = record.get("department", "")
     employee_id = record.get("employeeId", "")
-
-    # Create a combined string and return it
     return f"{department}-{employee_id}"
 
-# Configure with custom ID generation
-processor = Processor.with_custom_id_generation(multi_field_id_generator)
+def project_id_generator(record):
+    """Generate an ID for project records"""
+    project_id = record.get("projectId", "")
+    project_name = record.get("name", "")
+    return f"{project_id}-{project_name.replace(' ', '_')}"
 
-# Process the data
-result = processor.process(data=employee_data, entity_name="employee")
+# Process with transforms
+result = tm.flatten(
+    data=employee_data, 
+    name="employee",
+    transforms={
+        "employeeId": employee_id_generator,  # Transform employeeId field
+        "projectId": project_id_generator     # Transform projectId field
+    },
+    id_field={
+        "": "employeeId",                # Use transformed employeeId for main table
+        "employee_projects": "projectId"  # Use transformed projectId for projects table
+    }
+)
 ```
 
-## Path-Aware Custom ID Generation
+## Advanced ID Generation with Transforms
 
-For more complete control, you can create a custom ID generator that handles different tables:
+For more complex scenarios, you can create custom transforms for different fields:
 
 ```python
 import hashlib
 
-# Define a custom ID generation function
-def path_aware_id_generator(record):
-    """Generate an ID based on record content and type"""
-    # For employee records
-    if "employeeId" in record:
-        department = record.get("department", "")
-        employee_id = record.get("employeeId", "")
-        return f"EMP-{department}-{employee_id}"
+# Define transform functions
+def create_employee_id(record):
+    """Create a deterministic employee ID"""
+    department = record.get("department", "")
+    employee_id = record.get("employeeId", "")
+    return f"EMP-{department}-{employee_id}"
 
-    # For project records
-    elif "projectId" in record:
-        project_id = record.get("projectId", "")
-        project_name = record.get("name", "")
-        # Create a hash of the name to keep IDs compact
-        name_hash = hashlib.md5(project_name.encode()).hexdigest()[:8]
-        return f"PROJ-{project_id}-{name_hash}"
+def create_project_id(record):
+    """Create a deterministic project ID"""
+    project_id = record.get("projectId", "")
+    project_name = record.get("name", "")
+    # Create a hash of the name to keep IDs compact
+    name_hash = hashlib.md5(project_name.encode()).hexdigest()[:8]
+    return f"PROJ-{project_id}-{name_hash}"
 
-    # Default fallback
-    else:
-        record_str = str(sorted(record.items()))
-        return hashlib.md5(record_str.encode()).hexdigest()[:16]
-
-# Configure with custom ID generation
-processor = Processor.with_custom_id_generation(path_aware_id_generator)
-
-# Process the data
-result = processor.process(data=employee_data, entity_name="employee")
+# Process with advanced transforms
+result = tm.flatten(
+    data=employee_data, 
+    name="employee",
+    transforms={
+        "employeeId": create_employee_id,  # Transform employeeId
+        "projectId": create_project_id     # Transform projectId
+    },
+    id_field={
+        "": "employeeId",                # Use transformed employeeId for main table
+        "employee_projects": "projectId"  # Use transformed projectId for projects table
+    }
+)
 ```
 
-## Including Parent IDs in Child Records
+## Creating Hierarchical IDs
 
-When using custom ID generation, you can create hierarchical IDs that include parent information:
+You can create hierarchical IDs by accessing parent information in your transforms:
 
 ```python
-def hierarchical_id_generator(record):
-    """Create hierarchical IDs that include parent information when available"""
-    # Check if this is a child record with parent reference
-    if "__parent_transmog_id" in record:
-        parent_id = record.get("__parent_transmog_id", "")
+# First, process the data normally to get parent-child relationships
+result = tm.flatten(
+    data=employee_data, 
+    name="employee",
+    id_field={
+        "": "employeeId",
+        "employee_projects": "projectId"
+    }
+)
 
-        # For project records
-        if "projectId" in record:
-            project_id = record.get("projectId", "")
-            return f"{parent_id}_PROJ_{project_id}"
+# Access the parent-child relationships
+employee = result.main[0]
+employee_id = employee["_id"]
 
-    # For employee (root) records
-    elif "employeeId" in record:
-        return f"EMP_{record['employeeId']}"
-
-    # Default random ID fallback
-    return None  # Return None to use random UUID
-
-# Set up the processor with custom ID generation
-processor = Processor.with_custom_id_generation(hierarchical_id_generator)
+projects = result.tables["employee_projects"]
+for project in projects:
+    parent_id = project["_parent_id"]  # Contains the parent's ID
+    project_id = project["projectId"]
+    
+    # Create a hierarchical ID
+    hierarchical_id = f"{parent_id}_PROJ_{project_id}"
+    print(f"Hierarchical ID: {hierarchical_id}")
 ```
 
 ## Using Deterministic IDs with File Processing
@@ -175,17 +195,38 @@ import json
 with open("employee.json", "w") as f:
     json.dump(employee_data, f)
 
-# Configure with deterministic IDs
-processor = Processor.with_deterministic_ids("employeeId")
+# Process the file with deterministic IDs
+result = tm.flatten_file(
+    "employee.json", 
+    name="employee",
+    id_field="employeeId"
+)
 
-# Process the file
-result = processor.process_file("employee.json", entity_name="employee")
-
-# Write to output files
-result.write_all_json("output_directory")
+# Save to output files
+result.save("output_directory")
 
 # Process the same file again - will produce identical IDs
-result2 = processor.process_file("employee.json", entity_name="employee")
+result2 = tm.flatten_file(
+    "employee.json", 
+    name="employee",
+    id_field="employeeId"
+)
+
+# Verify IDs are the same
+assert result.main[0]["_id"] == result2.main[0]["_id"]
+```
+
+## Using Natural IDs
+
+If your data already contains good ID fields, you can use the "auto" option to automatically discover them:
+
+```python
+# Process with natural ID discovery
+result = tm.flatten(
+    data=employee_data, 
+    name="employee",
+    id_field="auto"  # Automatically discover ID fields
+)
 ```
 
 ## Best Practices for ID Generation
@@ -211,6 +252,6 @@ Key aspects demonstrated in the example:
 
 ## Next Steps
 
-- Explore [error recovery strategies](../advanced/error-recovery-strategies.md)
+- Explore [error handling strategies](../../user/advanced/error-handling.md)
 - Learn about [optimizing memory usage](../../user/advanced/performance-optimization.md)
 - Try [streaming large datasets](./streaming-large-datasets.md)

@@ -74,7 +74,7 @@ Let's work with customer data containing nested information and arrays:
 First, import the necessary components:
 
 ```python
-from transmog import TransmogProcessor, TransmogConfig
+import transmog as tm
 ```
 
 ### Basic Flattening and Normalization
@@ -125,21 +125,35 @@ customer_data = {
   ]
 }
 
-# Create processor with default configuration
-processor = TransmogProcessor()
+# Process the data with a single function call
+result = tm.flatten(customer_data, name="customer")
 
-# Process the data
-result = processor.process_data(customer_data)
-
-# Convert to dictionaries
-tables = result.to_dict()
+# Access the tables directly
+main_table = result.main
+shipping_addresses = result.tables["customer_shippingAddresses"]
+orders = result.tables["customer_orders"]
+order_items = result.tables["customer_orders_items"]
 
 # Print the tables to see the structure
-for table_name, records in tables.items():
-    print(f"\n=== {table_name} ===")
-    print(f"Record count: {len(records)}")
-    if records:
-        print("Fields:", list(records[0].keys()))
+print(f"\n=== customer ===")
+print(f"Record count: {len(main_table)}")
+if main_table:
+    print("Fields:", list(main_table[0].keys()))
+
+print(f"\n=== customer_shippingAddresses ===")
+print(f"Record count: {len(shipping_addresses)}")
+if shipping_addresses:
+    print("Fields:", list(shipping_addresses[0].keys()))
+
+print(f"\n=== customer_orders ===")
+print(f"Record count: {len(orders)}")
+if orders:
+    print("Fields:", list(orders[0].keys()))
+
+print(f"\n=== customer_orders_items ===")
+print(f"Record count: {len(order_items)}")
+if order_items:
+    print("Fields:", list(order_items[0].keys()))
 ```
 
 ### Expected Output Structure
@@ -147,37 +161,39 @@ for table_name, records in tables.items():
 The transformation will create four tables:
 
 1. `customer` - Main customer information
-   - Includes flattened `contactInfo` as `contactInfo.email` and `contactInfo.phone`
+   - Includes flattened `contactInfo` as `contactInfo_email` and `contactInfo_phone`
 
 2. `customer_shippingAddresses` - Extracted shipping addresses
-   - Each address linked to the customer via `customer_id` foreign key
+   - Each address linked to the customer via `_parent_id` foreign key
 
 3. `customer_orders` - Extracted orders
-   - Each order linked to the customer via `customer_id` foreign key
+   - Each order linked to the customer via `_parent_id` foreign key
 
 4. `customer_orders_items` - Extracted order items
-   - Each item linked to the order via `customer_orders_id` foreign key
+   - Each item linked to the order via `_parent_id` foreign key
 
 ## Customizing the Flattening Process
 
 You can customize how flattening and normalization work:
 
 ```python
-# Configure with specific options
-config = TransmogConfig().with_flattening(
+# Process with specific options
+result = tm.flatten(
+    customer_data,
+    name="customer",
     # Keep arrays as arrays in the parent object instead of extracting them
     extract_arrays=False,
-    # Preserve the original paths in the array tables
-    preserve_array_paths=True,
-    # Override the default delimiter for flattened field names
-    path_delimiter="__"
+    # Use a different delimiter for flattened field names
+    delimiter="__"
 )
 
-# Create processor with custom configuration
-custom_processor = TransmogProcessor(config)
-
-# Process the data
-custom_result = custom_processor.process_data(customer_data)
+# Or customize array handling
+result = tm.flatten(
+    customer_data,
+    name="customer",
+    # Keep specific arrays in the parent object
+    keep_arrays=["shippingAddresses"]
+)
 ```
 
 ## Exporting the Results
@@ -185,14 +201,30 @@ custom_result = custom_processor.process_data(customer_data)
 You can export the normalized data to various formats:
 
 ```python
-# Export to CSV files
-result.write_all_csv("output_directory")
+# Export all tables to a directory
+result.save("output_directory")
 
-# Export to Parquet files
-result.write_all_parquet("output_directory")
+# Export to specific formats
+result.save("output_directory/customer.csv")    # CSV format
+result.save("output_directory/customer.json")   # JSON format
+result.save("output_directory/customer.parquet") # Parquet format
+```
 
-# Export to JSON files
-result.write_all_json("output_directory")
+## Working with Files
+
+You can also process JSON files directly:
+
+```python
+# Process a JSON file
+file_result = tm.flatten_file("customer.json", name="customer")
+
+# Stream process a large file directly to output
+tm.flatten_stream(
+    file_path="large_customer_data.json",
+    name="customer",
+    output_path="output_directory",
+    output_format="parquet"
+)
 ```
 
 ## Next Steps

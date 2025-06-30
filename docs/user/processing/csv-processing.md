@@ -9,32 +9,30 @@ and writing CSV data.
 
 ## Reading CSV Files
 
-The primary method for processing CSV files is `process_csv`:
+The primary method for processing CSV files is `flatten_file`:
 
 ```python
-from transmog import Processor
-
-processor = Processor()
+import transmog as tm
 
 # Process a CSV file
-result = processor.process_csv(
+result = tm.flatten_file(
     "data.csv",
-    entity_name="customers"
+    name="customers"
 )
 
 # Access the processed data
-main_table = result.get_main_table()
+main_table = result.main
 print(f"Processed {len(main_table)} records")
 ```
 
 ### Reading Options
 
-The `process_csv` method accepts various parameters to configure how CSV files are read:
+The `flatten_file` method accepts various parameters to configure how CSV files are read:
 
 ```python
-result = processor.process_csv(
+result = tm.flatten_file(
     "data.csv",
-    entity_name="customers",
+    name="customers",
     delimiter=",",       # Set the delimiter (default: auto-detect or ',')
     quotechar='"',       # Set the quote character (default: '"')
     has_header=True,     # Whether the CSV has a header row (default: True)
@@ -62,8 +60,9 @@ Type inference can be disabled by setting `infer_types=False`, which will keep a
 The `null_values` parameter specifies which string values should be interpreted as NULL:
 
 ```python
-result = processor.process_csv(
+result = tm.flatten_file(
     "data.csv",
+    name="customers",
     null_values=["", "NULL", "NA", "N/A", "-", "None"]
 )
 ```
@@ -84,8 +83,9 @@ For example, "Customer Name" becomes "customer_name", and "SELECT" becomes "_sel
 For large CSV files, use the `chunk_size` parameter to process the file in smaller batches:
 
 ```python
-result = processor.process_csv(
+result = tm.flatten_file(
     "large_data.csv",
+    name="large_data",
     chunk_size=10000  # Process 10,000 rows at a time
 )
 ```
@@ -97,8 +97,9 @@ This reduces memory usage by avoiding loading the entire file at once.
 For non-standard CSV formats:
 
 ```python
-result = processor.process_csv(
+result = tm.flatten_file(
     "data.tsv",
+    name="tab_data",
     delimiter="\t",        # Tab-separated
     quotechar="'",         # Single quote for text fields
     encoding="latin-1"     # Specific encoding
@@ -120,17 +121,18 @@ Transmog provides methods for writing processed data to CSV format:
 
 ### Writing to Files
 
-The `write_all_csv` method writes all tables to CSV files:
+The `save` method writes all tables to CSV files:
 
 ```python
 # Write all tables to CSV files
-output_paths = result.write_all_csv(
-    base_path="output/csv",
+result.save(
+    path="output/csv",
+    format="csv",
     delimiter=",",
     include_header=True
 )
 
-print(f"Main table written to: {output_paths['main']}")
+print(f"Main table written to: output/csv/main.csv")
 ```
 
 ### Writing Options
@@ -138,8 +140,9 @@ print(f"Main table written to: {output_paths['main']}")
 The CSV writing methods accept various parameters:
 
 ```python
-result.write_all_csv(
-    base_path="output/csv",
+result.save(
+    path="output/csv",
+    format="csv",
     delimiter=",",         # Column delimiter
     include_header=True,   # Include column headers
     quotechar='"',         # Character for quoting fields
@@ -150,26 +153,33 @@ result.write_all_csv(
 
 ### Memory-Efficient Output
 
-For memory-efficient output without writing to disk, use the `to_csv_bytes` method:
+For memory-efficient output without intermediate storage, use the `flatten_stream` function:
 
 ```python
-# Get CSV data as bytes
-csv_bytes = result.to_csv_bytes(
+import transmog as tm
+
+# Stream process a file directly to CSV
+tm.flatten_stream(
+    file_path="large_data.csv",
+    name="large_data",
+    output_path="output/csv",
+    output_format="csv",
+    chunk_size=10000,  # Process in chunks
     include_header=True,
     delimiter=","
 )
-
-# Access individual tables
-main_table_bytes = csv_bytes["main"]
 ```
 
 ### CSV Dialect Options
 
-Both `write_all_csv` and `to_csv_bytes` accept standard CSV dialect options:
+The `save` method accepts standard CSV dialect options:
 
 ```python
-result.write_all_csv(
-    base_path="output/csv",
+import csv
+
+result.save(
+    path="output/csv",
+    format="csv",
     delimiter=",",
     quotechar='"',
     quoting=csv.QUOTE_MINIMAL,  # Quoting style
@@ -248,166 +258,45 @@ The CSV processing functionality has three implementations:
 These implementations are selected automatically based on file size and available dependencies.
 You can override the selection using the `TRANSMOG_FORCE_NATIVE_CSV` environment variable.
 
-## Further Reading
-
-For detailed API information and examples:
-
-- [CSV Reader API Reference](../../api/csv-reader.md)
-- [Processor API Reference](../../api/processor.md) for information on the `process_csv` method
-
-## CSV Processing Options
-
-Transmog provides several options to customize CSV processing:
-
-```python
-result = processor.process_csv(
-    "data.csv",
-    entity_name="customers",
-    delimiter=",",       # Set the delimiter (default: ',')
-    quotechar='"',       # Set the quote character (default: '"')
-    has_header=True,     # Whether the CSV has a header row (default: True)
-    chunk_size=1000,     # Process in chunks of 1000 rows (for large files)
-    column_types={       # Specify column data types
-        "age": int,
-        "price": float,
-        "is_active": bool
-    }
-)
-```
-
-## Processing CSV with Custom Headers
-
-If your CSV file doesn't have headers, you can provide them:
-
-```python
-# CSV without headers
-result = processor.process_csv(
-    "data_no_header.csv",
-    entity_name="products",
-    has_header=False,
-    headers=["id", "name", "category", "price", "stock"]
-)
-```
-
-## Memory-Optimized CSV Processing
-
-For large CSV files, Transmog offers memory-optimized processing:
-
-```python
-# Create a processor optimized for memory usage
-processor = Processor(optimize_for_memory=True)
-
-# Process a large CSV file in chunks
-result = processor.process_csv(
-    "large_dataset.csv",
-    entity_name="transactions",
-    chunk_size=5000,  # Process 5000 rows at a time
-    optimize_for_memory=True  # Override the processor's default setting
-)
-```
-
-## Processing CSV with Nested Data
-
-Transmog can handle CSV files containing nested data in JSON format:
-
-```python
-# Example CSV with a JSON column
-# id,name,metadata
-# 1,"Product A","{""color"":""red"",""dimensions"":{""width"":10,""height"":5}}"
-# 2,"Product B","{""color"":""blue"",""dimensions"":{""width"":8,""height"":4}}"
-
-result = processor.process_csv(
-    "products_with_json.csv",
-    entity_name="products",
-    json_columns=["metadata"]  # Specify columns containing JSON data
-)
-
-# The JSON data will be parsed and flattened like regular JSON
-```
-
-## Transforming CSV Data
-
-You can transform CSV data during processing:
-
-```python
-def transform_row(row):
-    # Convert price from string to float and apply discount
-    if "price" in row:
-        row["price"] = float(row["price"]) * 0.9
-    return row
-
-result = processor.process_csv(
-    "products.csv",
-    entity_name="products",
-    transform_function=transform_row
-)
-```
-
-## Filtering CSV Data
-
-You can filter CSV data during processing:
-
-```python
-def filter_row(row):
-    # Only include active products with stock > 0
-    return row.get("is_active") == "true" and int(row.get("stock", 0)) > 0
-
-result = processor.process_csv(
-    "products.csv",
-    entity_name="products",
-    filter_function=filter_row
-)
-```
-
-## Handling CSV Errors
-
-Transmog provides options for handling CSV parsing errors:
-
-```python
-result = processor.process_csv(
-    "data_with_errors.csv",
-    entity_name="logs",
-    on_error="skip",      # Options: "skip", "raise", "continue"
-    error_log="errors.log"  # Log errors to a file
-)
-```
-
-## Working with CSV Results
-
-The processed CSV data can be exported in various formats:
-
-```python
-# Process a CSV file
-result = processor.process_csv("customers.csv", entity_name="customers")
-
-# Get the data as a list of dictionaries
-data_dicts = result.get_main_table()
-
-# Export as JSON
-json_data = result.to_json()
-
-# Export back to CSV
-csv_data = result.to_csv()
-```
-
 ## Advanced CSV Processing
 
-### Processing Multiple CSV Files
+### Streaming Large CSV Files
 
-You can process and merge multiple CSV files:
+For very large CSV files, use the streaming API for memory-efficient processing:
 
 ```python
-# Process multiple CSV files with the same structure
-results = []
-for file_path in ["data1.csv", "data2.csv", "data3.csv"]:
-    result = processor.process_csv(file_path, entity_name="combined_data")
-    results.append(result)
+import transmog as tm
 
-# Combine the results
-from transmog.processing_result import ProcessingResult
-combined_result = ProcessingResult.combine(results)
-
-# Access the combined data
-combined_data = combined_result.get_main_table()
-print(f"Processed {len(combined_data)} total records")
+# Stream a large CSV file directly to output files
+tm.flatten_stream(
+    file_path="very_large.csv",
+    name="large_data",
+    output_path="output/large_csv",
+    output_format="csv",
+    chunk_size=50000,  # Process in chunks of 50,000 rows
+    low_memory=True    # Use memory-efficient processing
+)
 ```
+
+### Converting CSV to Other Formats
+
+Convert CSV to other formats in a memory-efficient way:
+
+```python
+import transmog as tm
+
+# Convert CSV to Parquet
+result = tm.flatten_file("data.csv", name="data")
+result.save("output/data.parquet")  # Format detected from extension
+
+# Or stream directly to Parquet
+tm.flatten_stream(
+    file_path="large.csv",
+    name="data",
+    output_path="output/data",
+    output_format="parquet",
+    compression="snappy"  # Parquet-specific option
+)
+```
+
+

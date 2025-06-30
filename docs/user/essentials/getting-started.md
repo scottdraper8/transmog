@@ -1,10 +1,10 @@
 # Getting Started with Transmog
 
-This guide covers basic usage of Transmog for transforming nested JSON into flattened formats.
+This guide covers basic usage of Transmog for transforming nested JSON into flattened formats using the new simplified API in v1.1.0.
 
-## Basic Usage
+## Quick Start
 
-Flattening nested JSON structures:
+The simplest way to flatten nested JSON structures:
 
 ```python
 import transmog as tm
@@ -25,176 +25,199 @@ data = {
     }
 }
 
-# Create a processor with default configuration
-processor = tm.Processor()
+# Flatten the data with one simple call
+result = tm.flatten(data, name="users")
 
-# Process the data - entity_name is a required parameter
-result = processor.process(data, entity_name="users")
-
-# View the flattened data
-print(result.get_main_table())
+# Access the flattened data
+print("Main table:", result.main)
+print("Child tables:", list(result.tables.keys()))
 ```
 
-This outputs a list containing the flattened record:
+This outputs:
 
 ```python
-[
+Main table: [
     {
-        "__transmog_id": "12345678-90ab-cdef-1234-567890abcdef",
-        "__transmog_datetime": "2023-01-01T12:00:00",
+        "_id": "12345678-90ab-cdef-1234-567890abcdef",
         "user_id": "1",
         "user_name": "John Doe",
         "user_contact_email": "john@example.com",
         "user_contact_phone": "555-1234"
     }
 ]
+
+Child tables: ['users_user_orders']
 ```
 
 ## Core Concepts
 
-Transmog consists of:
+Transmog v1.1.0 consists of:
 
-- **Processor**: Entry point for transforming data
-- **ProcessingResult**: Contains the output tables
-- **Configuration**: System for customizing processing behavior
-- **ID Generation**: Methods for record identification
-- **Output formats**: Options to export transformed data
+- **`flatten()` function**: Simple entry point for transforming data
+- **`FlattenResult`**: Contains the output tables with intuitive access
+- **Options**: Simple parameters for customizing behavior
+- **Advanced API**: Full `Processor` class for complex scenarios
+- **Multiple formats**: Easy export to JSON, CSV, Parquet
 
-## Common Customizations
+## Common Usage Patterns
 
-### Using Pre-configured Modes
-
-Pre-configured modes for common use cases:
+### Save Results to Files
 
 ```python
-# Memory-optimized configuration
-processor = tm.Processor.memory_optimized()
+# Flatten and save in one step
+result = tm.flatten(data, name="users")
 
-# Performance-optimized configuration
-processor = tm.Processor.performance_optimized()
+# Save to different formats
+result.save("output.json")      # JSON format
+result.save("output.csv")       # CSV format (creates multiple files for child tables)
+result.save("output.parquet")   # Parquet format
 ```
 
-### Custom Separators
-
-Change the separator for nested keys:
+### Process Files Directly
 
 ```python
-# Create a processor with custom separator
-processor = tm.Processor(
-    tm.TransmogConfig.default().with_naming(separator="/")
+# Process a JSON file directly
+result = tm.flatten_file("input.json", name="users")
+result.save("output.csv")
+```
+
+### Streaming for Large Datasets
+
+```python
+# For very large datasets, stream directly to files
+tm.flatten_stream(
+    large_data, 
+    output_dir="output/", 
+    name="users", 
+    format="parquet"
 )
-result = processor.process(data, entity_name="users")
-print(result.get_main_table())
 ```
 
-Output with forward slash separators:
+### Custom Options
+
+```python
+# Customize the flattening behavior
+result = tm.flatten(
+    data, 
+    name="users",
+    natural_ids=True,        # Use natural IDs when possible
+    add_timestamp=True,      # Add timestamp to records
+    on_error="skip"         # Skip problematic records
+)
+```
+
+
+
+## Understanding the Output
+
+### Main Table Structure
+
+The main table contains the flattened parent object:
+
+```python
+result = tm.flatten(data, name="users")
+print(result.main[0])
+```
+
+```python
+{
+    "_id": "12345678-90ab-cdef-1234-567890abcdef",
+    "user_id": "1",
+    "user_name": "John Doe", 
+    "user_contact_email": "john@example.com",
+    "user_contact_phone": "555-1234"
+}
+```
+
+### Child Tables
+
+Arrays are automatically extracted into separate child tables:
+
+```python
+# Access child tables
+orders = result.tables["users_user_orders"]
+print(orders)
+```
 
 ```python
 [
     {
-        "__transmog_id": "12345678-90ab-cdef-1234-567890abcdef",
-        "__transmog_datetime": "2023-01-01T12:00:00",
-        "user/id": "1",
-        "user/name": "John Doe",
-        "user/contact/email": "john@example.com",
-        "user/contact/phone": "555-1234"
+        "_id": "23456789-0abc-def1-2345-6789abcdef01",
+        "_parent_id": "12345678-90ab-cdef-1234-567890abcdef",
+        "id": "101",
+        "amount": "99.99",
+        "_array_field": "orders",
+        "_array_index": 0
+    },
+    {
+        "_id": "3456789a-bcde-f123-4567-89abcdef0123", 
+        "_parent_id": "12345678-90ab-cdef-1234-567890abcdef",
+        "id": "102",
+        "amount": "45.50",
+        "_array_field": "orders",
+        "_array_index": 1
     }
 ]
 ```
 
-### Handling Arrays
+### All Tables Access
 
-By default, Transmog extracts arrays into separate child tables:
+```python
+# Access all tables at once
+for table_name, records in result.all_tables.items():
+    print(f"{table_name}: {len(records)} records")
+```
 
+## Advanced Usage
+
+For complex scenarios, you can still access the full `Processor` API:
+
+```python
+from transmog.process import Processor
+from transmog.config import TransmogConfig
+
+# Create custom configuration
+config = (
+    TransmogConfig.default()
+    .with_naming(separator="/")
+    .with_processing(cast_to_string=False)
+    .with_metadata(add_timestamp=True)
+)
+
+# Use the advanced processor
+processor = Processor(config)
+result = processor.process(data, entity_name="users")
+
+# Access results using the old API
+main_data = result.get_main_table()
+child_tables = result.get_child_table("users_user_orders")
+```
+
+## Migration from v1.0.x
+
+If you're upgrading from v1.0.x, here's how the APIs compare:
+
+### Old API (v1.0.x)
 ```python
 processor = tm.Processor()
 result = processor.process(data, entity_name="users")
-
-# Get the main flattened data
 main_data = result.get_main_table()
-print("Main data:", main_data)
-
-# Get the extracted child tables
-table_names = result.get_table_names()
-print("Tables:", table_names)
-
-# Access the orders table
-orders_table = result.get_child_table("users_user_orders")
-print("Orders:", orders_table)
+child_data = result.get_child_table("users_user_orders")
+result.write_all_json("output")
 ```
 
-Output:
-
+### New API (v1.1.0)
 ```python
-Main data: [
-    {
-        "__transmog_id": "12345678-90ab-cdef-1234-567890abcdef",
-        "__transmog_datetime": "2023-01-01T12:00:00",
-        "user_id": "1",
-        "user_name": "John Doe",
-        "user_contact_email": "john@example.com",
-        "user_contact_phone": "555-1234"
-    }
-]
-
-Tables: ['users_user_orders']
-
-Orders: [
-    {
-        "__transmog_id": "23456789-0abc-def1-2345-6789abcdef01",
-        "__parent_transmog_id": "12345678-90ab-cdef-1234-567890abcdef",
-        "__transmog_datetime": "2023-01-01T12:00:00",
-        "id": "101",
-        "amount": "99.99",
-        "__array_field": "orders",
-        "__array_index": 0
-    },
-    {
-        "__transmog_id": "3456789a-bcde-f123-4567-89abcdef0123",
-        "__parent_transmog_id": "12345678-90ab-cdef-1234-567890abcdef",
-        "__transmog_datetime": "2023-01-01T12:00:00",
-        "id": "102",
-        "amount": "45.50",
-        "__array_field": "orders",
-        "__array_index": 1
-    }
-]
+result = tm.flatten(data, name="users")
+main_data = result.main
+child_data = result.tables["users_user_orders"]
+result.save("output.json")
 ```
 
-By default, arrays are removed from the main table after being extracted. If you want to keep
-the original arrays in the main table while still creating child tables, use the `keep_arrays` parameter:
+The new API is much simpler for common use cases, but the old API is still available for advanced scenarios.
 
-```python
-# Configure to keep arrays in main table after processing
-processor = tm.Processor(
-    tm.TransmogConfig.default().keep_arrays()
-)
-result = processor.process(data, entity_name="users")
+## Next Steps
 
-# The main table will contain both flattened fields and the original arrays
-main_data = result.get_main_table()
-# The child tables are still created as before
-```
-
-### Processing Options
-
-Configuration system for customizing processing behavior:
-
-```python
-# Create a processor with custom processing options
-processor = tm.Processor(
-    tm.TransmogConfig.default()
-    .with_processing(
-        cast_to_string=True,      # Convert values to strings
-        include_empty=False,      # Exclude empty values
-        skip_null=True,           # Skip null values
-        visit_arrays=True         # Process arrays into child tables
-    )
-)
-```
-
-For detailed configuration options, see:
-
-- [Configuration Guide](configuration.md) - Complete configuration system documentation
-- [Array Handling Options](../processing/array-handling.md) - Detailed array processing options
-- [Configuration API Reference](../../api/config.md) - Technical API details
+- [Configuration Guide](configuration.md) - Learn about all available options
+- [Processing Guide](../processing/processing-overview.md) - Understand data transformation
+- [Array Handling](../processing/array-handling.md) - Master array processing

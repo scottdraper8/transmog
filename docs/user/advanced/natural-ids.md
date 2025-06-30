@@ -14,14 +14,14 @@ By default, Transmog generates synthetic UUIDs for all records. To enable natura
 ```python
 import transmog as tm
 
-# Create a processor that uses natural IDs
-processor = tm.Processor.with_natural_ids()
+# Process data using natural IDs
+result = tm.flatten(data, name="company", id_field="auto")
 
-# Process data as usual
-result = processor.process(data, entity_name="company")
+# Access the results as usual
+main_table = result.main
 ```
 
-With natural ID discovery enabled, Transmog will:
+With natural ID discovery enabled (`id_field="auto"`), Transmog will:
 
 1. Look for common ID fields in each record (like "id", "uuid", "code", etc.)
 2. Use the first valid ID field found instead of generating a synthetic ID
@@ -29,18 +29,14 @@ With natural ID discovery enabled, Transmog will:
 
 ## Customizing ID Field Detection
 
-### Custom ID Field Patterns
+### Specifying Exact ID Field Names
 
-You can provide custom patterns to check for ID fields:
+You can specify the exact field name to use as the ID:
 
 ```python
-# Define custom patterns to check for ID fields
-custom_patterns = ["id", "ID", "sku", "employee_id", "product_code"]
-
-processor = tm.Processor.with_natural_ids(id_field_patterns=custom_patterns)
+# Use a specific field as the ID
+result = tm.flatten(data, name="company", id_field="company_id")
 ```
-
-The patterns are checked in order, and the first matching field with a valid value is used.
 
 ### Table-Specific ID Fields
 
@@ -49,27 +45,35 @@ Different tables often use different field names for IDs. You can map specific t
 ```python
 # Map specific tables to their ID fields
 id_mapping = {
-    "company_departments_employees": "employee_id",
-    "company_products": "sku",
-    "*": "id",  # Default for all other tables
+    "": "id",                              # Main table uses "id" field
+    "company_departments_employees": "employee_id",  # Employees table uses "employee_id"
+    "company_products": "sku",             # Products table uses "sku"
 }
 
-processor = tm.Processor.with_natural_ids(id_field_mapping=id_mapping)
+result = tm.flatten(data, name="company", id_field=id_mapping)
 ```
 
-The `"*"` key acts as a wildcard default for tables not explicitly mapped.
+The empty string key `""` represents the main table. All other keys should match the generated table names.
 
 ## ID Field Selection Rules
 
 When determining which field to use as an ID, Transmog follows these rules:
 
-1. Check table-specific mapping if provided
-2. Check wildcard mapping (`"*"`) if provided
-3. Check each pattern in the ID field patterns list
-4. Fall back to generating a synthetic ID if no suitable field is found
+1. If `id_field` is a string (other than "auto"):
+   - Use that specific field name for all tables
+   - Generate synthetic IDs if the field doesn't exist or has no value
+
+2. If `id_field` is a dictionary:
+   - For each table, check if there's a specific mapping
+   - Use the specified field if it exists and has a value
+   - Generate synthetic IDs if the field doesn't exist or has no value
+
+3. If `id_field` is "auto":
+   - Check common ID field names ("id", "uuid", "code", etc.)
+   - Use the first valid field found
+   - Fall back to generating a synthetic ID if no suitable field is found
 
 A field is considered suitable if:
-
 - It exists in the record
 - Its value is not null/None
 - Its value is a scalar type (string, number)
@@ -81,11 +85,11 @@ When using natural IDs, parent-child relationships are maintained using the natu
 
 ```python
 # With natural ID discovery
-result = processor.with_natural_ids().process(data, entity_name="company")
+result = tm.flatten(data, name="company", id_field="auto")
 
 # Child records will reference parent's natural ID
-dept = result.child_tables["company_departments"][0]
-print(dept["__parent_transmog_id"])  # Will contain parent's natural ID
+dept = result.tables["company_departments"][0]
+print(dept["_parent_id"])  # Will contain parent's natural ID
 ```
 
 ## Mixed ID Fields
@@ -101,8 +105,8 @@ Transmog handles records with mixed ID field presence gracefully:
 To revert to the default behavior of always adding synthetic IDs:
 
 ```python
-# Default processor always adds transmog IDs
-processor = tm.Processor()
+# Default behavior always adds synthetic IDs
+result = tm.flatten(data, name="company")
 ```
 
 ## Example
@@ -133,16 +137,15 @@ data = [
 
 # Custom ID field mapping
 id_mapping = {
-    "company_departments_employees": "employee_id",
-    "*": "id",  # Default for all other tables
+    "": "id",                              # Main table uses "id" field
+    "company_departments_employees": "employee_id",  # Employees table uses "employee_id"
 }
 
 # Process with natural ID discovery
-processor = tm.Processor.with_natural_ids(id_field_mapping=id_mapping)
-result = processor.process(data, entity_name="company")
+result = tm.flatten(data, name="company", id_field=id_mapping)
 
-# Export results
-result.write_all_json("output/natural_ids")
+# Save results
+result.save("output/natural_ids")
 ```
 
 ## Best Practices
