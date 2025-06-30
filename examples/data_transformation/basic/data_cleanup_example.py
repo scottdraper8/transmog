@@ -5,7 +5,6 @@ This example shows how to clean and standardize data using various transformatio
 before flattening with Transmog.
 """
 
-import csv
 import os
 import re
 from datetime import datetime
@@ -293,7 +292,7 @@ def main():
     # Flatten the cleaned data
     result = tm.flatten(cleaned_data, name="employees")
 
-    print(f"Flattening completed!")
+    print("Flattening completed!")
     print(f"- Main table: {len(result.main)} records")
     print(f"- Child tables: {len(result.tables)}")
 
@@ -451,7 +450,7 @@ def main():
         large_dataset, name="employees", output_path=streaming_output, chunk_size=100
     )
 
-    print(f"Streaming processing completed")
+    print("Streaming processing completed")
     print(f"Output saved to: {streaming_output}")
 
     print("\n=== Example Completed Successfully ===")

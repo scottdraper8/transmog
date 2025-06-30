@@ -13,7 +13,6 @@ Learning Objectives:
 - How to balance data quality and processing completeness
 """
 
-import json
 import os
 from pprint import pprint
 
@@ -161,8 +160,8 @@ def main():
     print("Description: Tailored error handling for specific requirements")
 
     # For advanced error handling, access the Processor class directly
-    from transmog.process import Processor
     from transmog.config import TransmogConfig
+    from transmog.process import Processor
 
     # Create custom error handling configuration
     custom_config = TransmogConfig.default().with_error_handling(

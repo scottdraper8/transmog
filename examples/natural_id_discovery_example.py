@@ -52,7 +52,7 @@ print("-" * 50)
 result = tm.flatten(data, name="company", id_field="id")
 
 # Display results
-print(f"\nMain table name: company")
+print("\nMain table name: company")
 print(f"Available child tables: {list(result.tables.keys())}")
 
 print("\nMain table:")
@@ -100,8 +100,8 @@ print("\n\nExample 3: Using specific ID field patterns")
 print("-" * 50)
 
 # For advanced use cases, access the full processor
-from transmog.process import Processor
 from transmog.config import TransmogConfig
+from transmog.process import Processor
 
 # Define custom patterns to check for ID fields
 custom_patterns = ["id", "ID", "sku", "employee_id", "product_code"]

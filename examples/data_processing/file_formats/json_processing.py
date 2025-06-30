@@ -9,7 +9,6 @@ Learning Objectives:
 - Outputting to different formats
 """
 
-import json
 import os
 
 import transmog as tm
@@ -231,12 +230,12 @@ def main():
 
     # Default threshold
     result_default = tm.flatten(deep_data, name="deep")
-    print(f"\nDefault nested_threshold (4):")
+    print("\nDefault nested_threshold (4):")
     print(f"  Field name: {list(result_default.main[0].keys())}")
 
     # Higher threshold
     result_high = tm.flatten(deep_data, name="deep", nested_threshold=10)
-    print(f"\nWith nested_threshold=10:")
+    print("\nWith nested_threshold=10:")
     print(f"  Field name: {list(result_high.main[0].keys())}")
 
     print(f"\n\nAll output files saved to: {output_dir}")

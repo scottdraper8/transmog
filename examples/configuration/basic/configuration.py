@@ -9,9 +9,6 @@ Learning Objectives:
 - Error handling options
 """
 
-import os
-from pprint import pprint
-
 import transmog as tm
 
 

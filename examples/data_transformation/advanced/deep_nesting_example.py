@@ -109,7 +109,7 @@ def main():
     # Get the deeply nested data
     deeply_nested_data = create_deeply_nested_data()
 
-    print(f"Sample data has deeply nested structures with up to 10+ levels of nesting")
+    print("Sample data has deeply nested structures with up to 10+ levels of nesting")
 
     # Example 1: Default behavior (simple API)
     print("\n=== Example 1: Default Behavior ===")
@@ -117,7 +117,7 @@ def main():
 
     default_result = tm.flatten(deeply_nested_data, name="customer")
 
-    print(f"Results with default settings:")
+    print("Results with default settings:")
     print(f"- Main table: {len(default_result.main)} records")
     print(f"- Child tables: {len(default_result.tables)}")
 
@@ -170,7 +170,7 @@ def main():
         data=deeply_nested_data, entity_name="customer"
     )
 
-    print(f"Results with low nesting threshold (2):")
+    print("Results with low nesting threshold (2):")
     print(f"- Main table: {len(low_threshold_result.get_main_table())} records")
     print(f"- Child tables: {len(low_threshold_result.get_table_names())}")
 
@@ -205,7 +205,7 @@ def main():
         data=deeply_nested_data, entity_name="customer"
     )
 
-    print(f"Results with high nesting threshold (6):")
+    print("Results with high nesting threshold (6):")
     print(f"- Main table: {len(high_threshold_result.get_main_table())} records")
     print(f"- Child tables: {len(high_threshold_result.get_table_names())}")
 
@@ -284,7 +284,7 @@ def main():
         natural_ids=False,  # Skip natural ID detection for better performance
     )
 
-    print(f"Optimized simple API results:")
+    print("Optimized simple API results:")
     print(f"- Main table: {len(optimized_result.main)} records")
     print(f"- Child tables: {len(optimized_result.tables)}")
     print(

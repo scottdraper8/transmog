@@ -389,7 +389,7 @@ def main():
     print("\n=== Step 3: Validating Data ===")
     valid_records, invalid_records = validator.validate_records(sample_data)
 
-    print(f"Validation completed:")
+    print("Validation completed:")
     print(f"- Valid records: {len(valid_records)}")
     print(f"- Invalid records: {len(invalid_records)}")
     print(f"- Total issues found: {len(validator.issues)}")
@@ -413,7 +413,7 @@ def main():
         # Flatten the valid records
         valid_result = tm.flatten(valid_records, name="employees")
 
-        print(f"Valid records processed:")
+        print("Valid records processed:")
         print(f"- Main table: {len(valid_result.main)} records")
         print(f"- Child tables: {len(valid_result.tables)}")
 
@@ -438,7 +438,7 @@ def main():
                 invalid_records, name="employees", on_error="warn"
             )
 
-            print(f"Invalid records processed with warnings:")
+            print("Invalid records processed with warnings:")
             print(f"- Main table: {len(invalid_result.main)} records")
             print(f"- Child tables: {len(invalid_result.tables)}")
 
@@ -512,7 +512,7 @@ def main():
         corrected_data
     )
 
-    print(f"Corrected data validation:")
+    print("Corrected data validation:")
     print(f"- Valid records: {len(corrected_valid)}")
     print(f"- Invalid records: {len(corrected_invalid)}")
     print(f"- Total issues: {len(corrected_validator.issues)}")
@@ -528,7 +528,7 @@ def main():
     print("\n=== Step 9: Data Quality Comparison ===")
 
     print("Data Quality Summary:")
-    print(f"Original data:")
+    print("Original data:")
     print(f"  - Total records: {len(sample_data)}")
     print(
         f"  - Valid records: {len(valid_records)} ({len(valid_records) / len(sample_data) * 100:.1f}%)"
@@ -536,7 +536,7 @@ def main():
     print(f"  - Validation errors: {validator.count_by_severity(Severity.ERROR)}")
     print(f"  - Validation warnings: {validator.count_by_severity(Severity.WARNING)}")
 
-    print(f"Corrected data:")
+    print("Corrected data:")
     print(f"  - Total records: {len(corrected_data)}")
     print(
         f"  - Valid records: {len(corrected_valid)} ({len(corrected_valid) / len(corrected_data) * 100:.1f}%)"

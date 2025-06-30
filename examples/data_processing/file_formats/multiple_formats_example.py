@@ -128,8 +128,8 @@ def main():
     print("\n=== Example 4: Advanced Format Options ===")
 
     # For advanced features, use the Processor directly
-    from transmog.process import Processor
     from transmog.config import TransmogConfig
+    from transmog.process import Processor
 
     # Create custom configuration
     config = (

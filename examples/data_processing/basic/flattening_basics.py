@@ -8,8 +8,9 @@ Learning Objectives:
 - How to save data in different formats easily
 """
 
-import transmog as tm
 from pprint import pprint
+
+import transmog as tm
 
 
 def main():

@@ -242,7 +242,7 @@ def main():
     print("For advanced performance tuning, you can still access the Processor class:")
 
     # Import advanced configuration classes
-    from transmog.config import TransmogConfig, ProcessingMode
+    from transmog.config import ProcessingMode, TransmogConfig
 
     # Memory-optimized configuration
     memory_config = TransmogConfig.default().with_processing(
