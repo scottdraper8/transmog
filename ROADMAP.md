@@ -6,7 +6,7 @@ and denormalization.
 ## Core Purpose
 
 Transmog is designed to excel at a specific task: transforming complex nested JSON data into flat, structured
-formats while preserving relationships. We aim to be the best-in-class solution for this specific niche
+formats while preserving relationships. Transmog aims to be the best-in-class solution for this specific niche
 rather than a general-purpose ETL tool.
 
 ## Current Features
@@ -67,11 +67,10 @@ rather than a general-purpose ETL tool.
 
 ## Development Philosophy
 
-Rather than expanding scope indefinitely, we will focus on making Transmog the absolute best tool for
+Rather than expanding scope indefinitely, development focuses on making Transmog the absolute best tool for
 JSON transformation while ensuring it integrates seamlessly with other specialized tools in the data
-ecosystem. We believe in doing one thing extremely well rather than many things adequately.
+ecosystem. The philosophy emphasizes doing one thing extremely well rather than many things adequately.
 
 ## Feature Requests and Contributions
 
-Feature requests and contributions aligned with our core focus are welcome! Please feel free to open
-issues or submit pull requests on GitHub to help Transmog excel at JSON transformation tasks.
+Feature requests and contributions aligned with the core focus are welcome! Issues and pull requests may be submitted on GitHub to help Transmog excel at JSON transformation tasks.

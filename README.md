@@ -4,18 +4,15 @@
 [![Python versions](https://img.shields.io/badge/python-3.9%2B-blue?logo=python)](https://pypi.org/project/transmog/)
 [![License](https://img.shields.io/github/license/scottdraper8/transmog.svg?logo=github)](https://github.com/scottdraper8/transmog/blob/main/LICENSE)
 
-A Python library for transforming complex nested data structures into flat,
-tabular formats while preserving hierarchical relationships.
+Transform nested data into flat tables with a simple, intuitive API.
 
 ## Features
 
-- **Multiple Input Formats**: JSON, JSONL, CSV
-- **Nested Structure Handling**: Flattens deeply nested objects with customizable separators
-- **Array Processing**: Extracts arrays as child tables with parent-child relationships maintained
-- **Output Options**: Python dictionaries, PyArrow tables, JSON, CSV, Parquet
-- **Performance Features**: Chunked processing, streaming output, memory optimization
-- **Data Integrity**: Deterministic ID generation, consistent parent-child linking
-- **Error Recovery**: Configurable strategies for handling malformed data
+- **Simple API**: One function does it all - `flatten()`
+- **Smart Defaults**: Works out of the box for 90% of use cases
+- **Multiple Formats**: JSON, CSV, Parquet, and more
+- **Preserves Relationships**: Parent-child links maintained automatically
+- **Flexible**: Customize separators, IDs, error handling, and more when needed
 
 ## Installation
 
@@ -23,106 +20,128 @@ tabular formats while preserving hierarchical relationships.
 pip install transmog
 ```
 
-Optional dependencies:
-
-```bash
-pip install transmog[dev]  # Development tools
-```
-
-## Quick Example
+## Quick Start
 
 ```python
 import transmog as tm
 
-# Sample nested data
+# Flatten nested data with one line
+result = tm.flatten({"name": "Product", "specs": {"cpu": "i7", "ram": "16GB"}})
+
+# Access the flattened data
+print(result.main)
+# [{'name': 'Product', 'specs_cpu': 'i7', 'specs_ram': '16GB', '_id': '...'}]
+
+# Save to any format
+result.save("output.json")
+result.save("output.csv")
+result.save("output.parquet")
+```
+
+## Common Use Cases
+
+### Flatten Complex JSON
+
+```python
 data = {
+    "id": 1,
     "user": {
-        "id": 1,
-        "name": "John Doe",
-        "contact": {
-            "email": "john@example.com"
-        },
-        "orders": [
-            {"id": 101, "amount": 99.99},
-            {"id": 102, "amount": 45.50}
-        ]
-    }
+        "name": "Alice",
+        "email": "alice@example.com"
+    },
+    "orders": [
+        {"id": 101, "amount": 99.99},
+        {"id": 102, "amount": 45.50}
+    ]
 }
 
-# Process the data
-processor = tm.Processor()
-result = processor.process(data)
+result = tm.flatten(data, name="customer")
 
-# Access the data
-tables = result.to_dict()
-main_table = tables["main"]
-orders = tables["user_orders"]
+# Main table has user data
+print(result.main)
+# [{'id': 1, 'user_name': 'Alice', 'user_email': 'alice@...', '_id': '...'}]
 
-# Export to different formats
-result.write_all_json("output/json")
-result.write_all_csv("output/csv")
-result.write_all_parquet("output/parquet")
+# Orders are in a separate table with parent reference
+print(result.tables['customer_orders'])
+# [{'id': 101, 'amount': 99.99, '_parent_id': '...'}, ...]
 ```
 
-## Configuration
+### Use Existing IDs
 
 ```python
-# Use pre-configured modes
-config = tm.TransmogConfig.memory_optimized()
-# or
-config = tm.TransmogConfig.performance_optimized()
+# Use an existing field as ID instead of generating synthetic ones
+result = tm.flatten(data, id_field="customer_id")
 
-# Custom configuration
-config = (
-    tm.TransmogConfig.default()
-    .with_naming(separator=".")
-    .with_processing(cast_to_string=True)
-    .with_metadata(id_field="custom_id")
-    .with_error_handling(max_retries=3)
-)
-
-processor = tm.Processor(config=config)
+# Or map different fields for different tables
+result = tm.flatten(data, id_field={
+    "customers": "customer_id",
+    "customers_orders": "order_id"
+})
 ```
 
-## Large Dataset Processing
+### Custom Separators
 
 ```python
-# Memory-optimized processing
-processor = tm.Processor.memory_optimized()
-
-# Chunked processing
-result = processor.process_chunked(
-    "large_data.jsonl",
-    entity_name="records",
-    chunk_size=1000
-)
-
-# Streaming output
-processor.stream_process_file(
-    "large_data.jsonl",
-    entity_name="records",
-    output_format="parquet",
-    output_destination="output_dir"
-)
+# Use dots instead of underscores
+result = tm.flatten(data, separator=".")
+print(result.main[0]['user.name'])  # Instead of 'user_name'
 ```
 
-## Error Handling
+### Error Handling
 
 ```python
-# Skip and log errors
-processor = tm.Processor().with_error_handling(recovery_strategy="skip")
+# Skip bad records instead of failing
+result = tm.flatten(messy_data, errors="skip")
 
-# Partial recovery (preserves valid portions)
-processor = tm.Processor.with_partial_recovery()
+# Or just warn about issues
+result = tm.flatten(messy_data, errors="warn")
+```
+
+### Working with Files
+
+```python
+# Automatically detects format
+result = tm.flatten_file("data.json")
+result = tm.flatten_file("data.csv")
+
+# Save with format detection
+result.save("output.parquet")
+```
+
+
+
+## Advanced Options
+
+For more control:
+
+```python
+result = tm.flatten(
+    data,
+    name="products",
+    # Naming
+    separator=".",              # Use dots: user.name
+    nested_threshold=3,         # Simplify deeply nested names
+    # IDs
+    id_field="sku",            # Use existing field as ID
+    parent_id_field="_parent",  # Customize parent reference name
+    add_timestamp=True,         # Add timestamp to records
+    # Arrays
+    arrays="inline",           # Keep arrays as JSON instead of separate tables
+    # Data handling
+    preserve_types=True,       # Keep original types (don't convert to strings)
+    skip_null=False,           # Include null values
+    skip_empty=False,          # Include empty strings/lists
+    # Performance
+    batch_size=5000,           # Process in larger batches
+    low_memory=True,           # Optimize for low memory usage
+)
 ```
 
 ## Documentation
 
-- [Installation Guide](https://scottdraper8.github.io/transmog/installation.html)
-- [Getting Started](https://scottdraper8.github.io/transmog/getting-started.html)
-- [Configuration Guide](https://scottdraper8.github.io/transmog/configuration.html)
-- [API Reference](https://scottdraper8.github.io/transmog/api/index.html)
-- [Examples](examples/README.md)
+- [API Reference](https://scottdraper8.github.io/transmog/api.html)
+- [Examples](examples/)
+- [Migration from v1.0](docs/migration.md)
 
 ## License
 

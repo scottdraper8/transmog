@@ -1,12 +1,10 @@
 # Contributing to Transmog
 
-Thank you for your interest in contributing to Transmog! This document provides guidelines and instructions
-for contributing.
+This document provides guidelines and instructions for contributing to Transmog.
 
 ## Code of Conduct
 
-Please note that this project is released with a [Contributor Code of Conduct](CODE_OF_CONDUCT.md). By
-participating in this project, you agree to abide by its terms.
+This project is released with a [Contributor Code of Conduct](CODE_OF_CONDUCT.md). Participation in this project requires adherence to its terms.
 
 ## Getting Started
 
@@ -17,7 +15,7 @@ participating in this project, you agree to abide by its terms.
 
 ## Development Environment
 
-We recommend using a virtual environment for development:
+A virtual environment is recommended for development:
 
 ```bash
 python -m venv .env
@@ -47,7 +45,7 @@ When contributing to Transmog, please keep these principles in mind:
 1. **Check the roadmap**: See [ROADMAP.md](ROADMAP.md) for planned features
 2. **Look at open issues**: Find something that needs attention
 3. **Make your changes**: Implement your feature or fix
-4. **Add tests**: Ensure your code is tested
+4. **Add tests**: Ensure your code is tested (see [Testing Guide](docs/dev/testing.md))
 5. **Run tests**: `pytest tests/`
 6. **Update documentation**: Make sure docs reflect your changes
 
@@ -56,7 +54,7 @@ When contributing to Transmog, please keep these principles in mind:
 - Follow PEP 8 guidelines
 - Use type hints where appropriate
 - Write docstrings for functions and classes (Google style)
-- Formatting and linting is automatically handled by pre-commit hooks when you commit
+- Formatting and linting is automatically handled by pre-commit hooks during commits
 
 ## Pull Request Process
 
@@ -64,7 +62,7 @@ When contributing to Transmog, please keep these principles in mind:
 2. **Create a pull request**: From your feature branch to the main repository
 3. **Describe your changes**: Provide a clear description of what your PR does
 4. **Reference issues**: Link to any related issues
-5. **Be responsive**: Address review comments promptly
+5. **Address feedback**: Respond to review comments promptly
 
 ## Feature Implementation Guidelines
 
@@ -87,11 +85,11 @@ These areas would particularly benefit from contributions:
 
 ## Questions?
 
-If you have questions or need help, please open an issue with the "question" label.
+Questions and requests for help should be submitted as issues with the "question" label.
 
 ## Pre-commit hooks
 
-We use pre-commit hooks to ensure code quality and consistency. To set up pre-commit hooks:
+Pre-commit hooks are used to ensure code quality and consistency. To set up pre-commit hooks:
 
 1. Install pre-commit:
 
@@ -125,7 +123,7 @@ If a hook fails, the commit will be aborted. Fix the issues and try committing a
 
 ### Building Documentation
 
-We use Sphinx with MyST for documentation:
+Documentation is built using Sphinx with MyST:
 
 ```bash
 # Install documentation dependencies
@@ -150,7 +148,7 @@ xdg-open _build/html/index.html  # On Linux
 - **Examples** (`examples/`): Complete, runnable examples with explanations
 - **Developer Guide** (`dev/`): Information for contributors and developers
 
-When adding new features, please update:
+Adding new features requires updating:
 
 1. Docstrings in the code (Google style)
 2. API reference if adding new classes/functions
@@ -181,9 +179,83 @@ These examples are meant to be educational and provide real-world usage patterns
 
 ## Versioning
 
-We follow [Semantic Versioning](https://semver.org/). The version is specified in `pyproject.toml`.
+Versioning follows [Semantic Versioning](https://semver.org/). The version is specified in `pyproject.toml`.
 
 ## License
 
-By contributing to Transmog, you agree that your contributions will be licensed under the project's [MIT
-License](LICENSE).
+Contributions to Transmog are licensed under the project's [MIT License](LICENSE).
+
+## Testing
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=transmog
+
+# Run specific test categories
+pytest tests/unit/api/          # API tests
+pytest tests/unit/core/         # Core functionality tests
+pytest tests/integration/      # Integration tests
+pytest tests/performance/      # Performance benchmarks
+
+# Run with verbose output
+pytest -v
+
+# Run tests in parallel (if pytest-xdist is installed)
+pytest -n auto
+```
+
+### Test Organization
+
+The test suite is organized into several categories:
+
+- **Unit Tests** (`tests/unit/`): Test individual components in isolation
+  - API tests: Core flatten() functionality and FlattenResult class
+  - Core tests: Data processing, flattening, metadata, and ID generation
+  - Config tests: Configuration management and validation
+  - I/O tests: File readers and writers for all supported formats
+  - Error tests: Error handling and recovery strategies
+  - Naming tests: Field and table naming conventions
+  - Process tests: Processing strategies and streaming
+
+- **Integration Tests** (`tests/integration/`): Test complete workflows
+  - Format conversion workflows (JSON to CSV, etc.)
+  - End-to-end processing scenarios
+  - Real-world data processing examples
+
+- **Performance Tests** (`tests/performance/`): Validate performance characteristics
+  - Processing speed benchmarks
+  - Memory usage validation
+  - Scalability testing
+
+### Writing New Tests
+
+When adding new functionality, please include comprehensive tests:
+
+1. **Unit Tests**: Test the new functionality in isolation
+2. **Integration Tests**: Test how it works with existing features
+3. **Error Cases**: Test error conditions and edge cases
+4. **Performance**: Add benchmarks for performance-critical features
+
+### Test Quality Standards
+
+All tests should:
+- Use realistic test data that reflects real-world usage
+- Test both happy path and error scenarios
+- Handle optional dependencies gracefully
+- Use proper fixtures and setup/teardown
+- Include clear documentation and comments
+- Follow the existing test patterns and conventions
+
+### Test Dependencies
+
+- **Core tests**: No external dependencies required
+- **Parquet tests**: Gracefully handle missing pyarrow
+- **Performance tests**: Include memory and speed benchmarks
+- **Optional features**: Tests skip gracefully when dependencies are missing
+
+The test suite ensures that transmog is reliable, performant, and handles edge cases gracefully across all supported platforms and dependency combinations.
