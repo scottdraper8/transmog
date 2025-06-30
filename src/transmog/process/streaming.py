@@ -452,5 +452,5 @@ def stream_process(
             force_transmog_id=force_transmog_id,
         )
     finally:
-        # Ensure writer is closed
-        writer.close()
+        # Ensure writer is finalized and closed
+        writer.finalize()

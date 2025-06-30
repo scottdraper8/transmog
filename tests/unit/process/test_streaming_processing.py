@@ -667,6 +667,44 @@ class TestStreamingOutputFormats:
             content = f.read()
         assert "  " in content  # Should have indentation
 
+    def test_streaming_to_parquet_format(self, tmp_path):
+        """Test streaming to Parquet format with finalization.
+
+        This is a regression test for the issue where Parquet files
+        were not created due to missing finalization call.
+        """
+        pytest.importorskip("pyarrow")
+
+        data = [
+            {"id": 1, "name": "Alice", "score": 95.5},
+            {"id": 2, "name": "Bob", "score": 87.2},
+        ]
+
+        processor = Processor()
+        output_dir = tmp_path / "output"
+
+        # Stream to Parquet format
+        stream_process(
+            processor=processor,
+            data=data,
+            entity_name="scores",
+            output_format="parquet",
+            output_destination=str(output_dir),
+        )
+
+        # Verify Parquet file was created
+        parquet_file = output_dir / "scores.parquet"
+        assert parquet_file.exists()
+        assert parquet_file.stat().st_size > 0  # File should have content
+
+        # Verify the content using PyArrow
+        import pyarrow.parquet as pq
+
+        table = pq.read_table(str(parquet_file))
+        assert table.num_rows == 2
+        assert "name" in table.schema.names
+        assert "score" in table.schema.names
+
 
 class TestStreamingEdgeCases:
     """Test edge cases in streaming processing."""

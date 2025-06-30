@@ -819,7 +819,6 @@ class FileStrategy(ProcessingStrategy):
             arrays = extract_arrays(
                 record_copy,
                 parent_id=main_ids[i],
-                parent_id=parent_id,
                 entity_name=entity_name,
                 separator=params["separator"],
                 cast_to_string=params["cast_to_string"],

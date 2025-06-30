@@ -490,6 +490,9 @@ class ParquetStreamingWriter(StreamingWriter):
 
         self.output_files[table_name] = file_path
 
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
         # Create a file writer
         if pq is not None:
             if append and os.path.exists(file_path):
