@@ -52,8 +52,6 @@ coverage.xml
 *~
 
 # Project specific
-# Example output directories - ignore generated files but not example code
-examples/output/
 logs/
 
 # Documentation
