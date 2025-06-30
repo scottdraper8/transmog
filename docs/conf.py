@@ -203,110 +203,7 @@ autodoc_typehints_format = "short"
 # Path setup for custom templates
 templates_path = ["_templates"]
 
-# -- Code importing utility for documentation --------------------------------
-
-# Path to the examples directory (relative to conf.py)
-EXAMPLES_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "examples")
-)
-
-
-def extract_code_from_example(
-    example_path, start_line=None, end_line=None, strip_docstring=False
-):
-    """Extract code snippet from an example file.
-
-    Args:
-        example_path: Path to the example file (relative to examples directory)
-        start_line: Start line number (1-indexed, inclusive)
-        end_line: End line number (1-indexed, inclusive)
-        strip_docstring: Whether to strip the module docstring
-
-    Returns:
-        str: Extracted code snippet
-    """
-    full_path = os.path.join(EXAMPLES_DIR, example_path)
-
-    if not os.path.exists(full_path):
-        return f"Error: Example file not found: {example_path}"
-
-    with open(full_path) as f:
-        lines = f.readlines()
-
-    if strip_docstring:
-        # Find and remove the module docstring
-        in_docstring = False
-        docstring_end = 0
-
-        for i, line in enumerate(lines):
-            if line.strip().startswith('"""') or line.strip().startswith("'''"):
-                if not in_docstring:
-                    in_docstring = True
-                    continue
-                else:
-                    docstring_end = i + 1
-                    break
-            elif in_docstring and (
-                line.strip().endswith('"""') or line.strip().endswith("'''")
-            ):
-                docstring_end = i + 1
-                break
-
-        if docstring_end > 0:
-            lines = lines[:0] + lines[docstring_end:]
-
-    # Extract specified lines if provided
-    if start_line is not None and end_line is not None:
-        # Convert to 0-indexed
-        start_idx = max(0, start_line - 1)
-        end_idx = min(len(lines), end_line)
-        lines = lines[start_idx:end_idx]
-
-    return "".join(lines)
-
-
-def setup_code_importing(app):
-    """Set up code importing functionality."""
-    app.add_config_value("examples_dir", EXAMPLES_DIR, "env")
-
-    # Register a new directive for including example code
-    from docutils import nodes
-    from docutils.parsers.rst import Directive
-
-    class IncludeExampleDirective(Directive):
-        """Directive for including code from examples."""
-
-        has_content = False
-        required_arguments = 1
-        optional_arguments = 0
-        final_argument_whitespace = True
-        option_spec = {
-            "start-line": int,
-            "end-line": int,
-            "strip-docstring": lambda x: x.strip().lower() == "true",
-            "language": str,
-        }
-
-        def run(self):
-            example_path = self.arguments[0]
-            start_line = self.options.get("start-line")
-            end_line = self.options.get("end-line")
-            strip_docstring = self.options.get("strip-docstring", False)
-            language = self.options.get("language", "python")
-
-            code = extract_code_from_example(
-                example_path,
-                start_line=start_line,
-                end_line=end_line,
-                strip_docstring=strip_docstring,
-            )
-
-            literal = nodes.literal_block(code, code)
-            literal["language"] = language
-
-            return [literal]
-
-    app.add_directive("include-example", IncludeExampleDirective)
+# -- Sphinx configuration utilities ------------------------------------------
 
 
 # Additional items for autodoc to skip
@@ -321,9 +218,6 @@ def skip_member(app, what, name, obj, skip, options):
 def setup(app):
     """Set up Sphinx application."""
     app.connect("autodoc-skip-member", skip_member)
-
-    # Set up code importing
-    setup_code_importing(app)
 
     # Add CSS classes for admonitions
     app.add_css_file("css/custom.css")

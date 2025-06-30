@@ -4,238 +4,116 @@ hide-toc: false
 
 # Transmog Documentation
 
-Transmog is a Python library for transforming nested JSON data into flat, structured formats.
+Transform nested JSON data into flat, tabular formats while preserving relationships between parent and child records.
 
-:::info API Overview
-**Transmog - Simple API**
+## What is Transmog?
 
-Transmog provides a simplified API while preserving all advanced functionality:
+Transmog simplifies working with complex, nested data by converting it into flat tables suitable for databases, analytics, and data processing. It automatically:
 
-- **Simple API**: `tm.flatten()` for easy data transformation
-- **Streaming Support**: `tm.flatten_stream()` for memory-efficient processing
-- **File Processing**: `tm.flatten_file()` for direct file handling
-- **Advanced Features**: Full `Processor` API available for complex use cases
-- **Intuitive Results**: `FlattenResult` with `.main`, `.tables`, and `.save()` methods
-:::
+- Flattens nested objects using path notation
+- Extracts arrays into separate relational tables
+- Generates unique identifiers for record tracking
+- Supports multiple output formats (JSON, CSV, Parquet)
 
-## Quick Start
+## Quick Example
 
 ```python
 import transmog as tm
 
-# Basic usage - transform nested data
-result = tm.flatten({"name": "Product", "tags": ["sale", "clearance"]})
-print(result.main)      # Main table
-print(result.tables)    # Child tables
-result.save("output.json")  # Save to file
+# Transform nested data with one function call
+data = {"company": "TechCorp", "employees": [{"name": "Alice", "role": "Engineer"}]}
+result = tm.flatten(data, name="companies")
 
-# Stream large datasets
-tm.flatten_stream(large_data, "output/", format="parquet")
-
-# Process files directly
-result = tm.flatten_file("data.json", name="products")
+# Get flat tables with preserved relationships
+print(result.main)          # Main company data
+print(result.tables)        # Employee data in separate table
 ```
 
-## Overview
+## Documentation Sections
 
-Transmog features:
+### Getting Started
+New to Transmog? Start here for installation, basic concepts, and first steps.
 
-- **Simple API**: Easy-to-use functions for 90% of use cases
-- **Powerful Processing**: Flattens nested JSON/dict structures into relational tables
-- **Array Extraction**: Converts arrays into separate tables with parent-child relationships
-- **Multiple Formats**: Output to JSON, CSV, Parquet, and more
-- **Memory Efficient**: Streaming support for datasets that don't fit in memory
-- **Flexible IDs**: Auto-generate IDs or use existing natural ID fields
-- **Error Handling**: Robust error recovery for real-world data
+- **Quick introduction** to data flattening concepts
+- **10-minute tutorial** to get up and running
+- **Essential configuration** options
+- **Common use case patterns**
 
-## Quick Links
+[**→ Getting Started Guide**](getting_started.md)
 
-- [Installation Guide](installation.md)
-- [Getting Started Guide](user/essentials/getting-started.md)
-- [Basic Concepts](user/essentials/basic-concepts.md)
-- [Data Structures](user/essentials/data-structures.md)
+### User Guide
+Task-oriented guides covering all functionality by topic area. Each guide focuses on specific workflows and practical examples.
 
-## API Overview
+- **File Processing** - Working with JSON and CSV files
+- **Array Handling** - Controlling how arrays become tables
+- **Output Formats** - Choosing JSON, CSV, or Parquet output
+- **ID Management** - Configuring record identifiers
+- **Error Handling** - Recovery strategies and error modes
 
-### Simple API - Recommended
-
-For most use cases, the simple API is recommended:
-
-```python
-import transmog as tm
-
-# Main functions
-result = tm.flatten(data, name="products")           # Basic flattening
-result = tm.flatten_file("data.json")                # Process files
-tm.flatten_stream(data, "output/", format="json")    # Memory-efficient streaming
-
-# Result manipulation
-result.main              # Main table
-result.tables           # Child tables dictionary
-result.save("out.csv")  # Save to file
-
-```
-
-### Advanced API - For Complex Use Cases
-
-For advanced features, import the Processor directly:
-
-```python
-from transmog.process import Processor
-from transmog.config import TransmogConfig
-
-# Full control over processing
-config = TransmogConfig.default().with_naming(separator=".")
-processor = Processor(config)
-result = processor.process(data, entity_name="products")
-
-# Advanced streaming
-processor.stream_process(data, entity_name="products", output_format="parquet")
-```
-
-## Documentation Structure
-
-The Transmog documentation is organized into several key sections:
-
-### User Guides
-
-User guides provide conceptual overviews, practical examples, and best practices for using Transmog.
-
-#### Essentials
-
-- [Getting Started](user/essentials/getting-started.md) - First steps with Transmog
-- [Basic Concepts](user/essentials/basic-concepts.md) - Fundamental concepts
-- [Data Structures](user/essentials/data-structures.md) - Input and output data structures
-- [Configuration](user/essentials/configuration.md) - Simple and advanced configuration options
-- [Dependencies and Features](user/essentials/dependencies-and-features.md) - Optional dependencies and features
-
-#### Processing
-
-- [Processing Overview](user/processing/processing-overview.md) - General processing guide
-- [Data Transformation](user/processing/data-transformation.md) - Transforming data structures
-- [File Processing](user/processing/file-processing.md) - Working with files
-- [JSON Handling](user/processing/json-handling.md) - Working with JSON data
-- [CSV Processing](user/processing/csv-processing.md) - Working with CSV data
-- [Naming](user/processing/naming.md) - Field and table naming
-- [Array Handling](user/processing/array-handling.md) - Options for array processing
-- [Metadata](user/processing/metadata.md) - Working with metadata
-- [Transforms](user/processing/transforms.md) - Transformation functions and operations
-- [IO Operations](user/processing/io.md) - Input/output operations
-
-#### Advanced Topics
-
-- [Streaming](user/advanced/streaming.md) - Processing large datasets with memory efficiency
-- [Performance Optimization](user/advanced/performance-optimization.md) - Optimizing for speed and memory
-- [Error Handling](user/advanced/error-handling.md) - Dealing with problematic data
-- [Deterministic IDs](user/advanced/deterministic-ids.md) - Generating consistent IDs
-- [Natural IDs](user/advanced/natural-ids.md) - Using existing ID fields in data
-
-#### Output Options
-
-- [Output Formats](user/output/output-formats.md) - Available output formats and when to use them
+[**→ User Guide**](user_guide/file-processing.md)
 
 ### API Reference
+Complete technical documentation of all functions, classes, and parameters. Detailed reference for every public API component.
 
-API reference documents provide technical details about the Transmog API.
+- **Functions** - `flatten()`, `flatten_file()`, `flatten_stream()`
+- **Classes** - `FlattenResult` with all methods and properties
+- **Error Types** - Exception classes and error handling
+- **Type Definitions** - Complete type annotations
 
-### Developer Guides
+[**→ API Reference**](api_reference/api.md)
 
-Developer guides contain information for those contributing to Transmog or extending its functionality.
+### Developer Guide
+Contributing, extending, and advanced usage patterns. Resources for developers wanting to contribute or customize Transmog.
 
-### Tutorials
+- **Contributing Guidelines** - How to contribute to the project
+- **Performance Optimization** - Advanced configuration for speed
+- **Streaming Processing** - Memory-efficient processing techniques
+- **Custom Extensions** - Extending functionality
 
-Step-by-step guides to accomplish specific tasks with Transmog:
+[**→ Developer Guide**](developer_guide/contributing.md)
 
-- [Transform Nested JSON](tutorials/basic/transform-nested-json.md)
-- [Flatten and Normalize](tutorials/basic/flatten-and-normalize.md)
-- [Streaming Large Datasets](tutorials/intermediate/streaming-large-datasets.md)
-- [Customizing ID Generation](tutorials/intermediate/customizing-id-generation.md)
-- [Using Natural IDs](tutorials/intermediate/using-natural-ids.md)
-- [Error Recovery Strategies](tutorials/advanced/error-recovery-strategies.md)
-- [Optimizing Memory Usage](tutorials/advanced/optimizing-memory-usage.md)
+## Support and Community
 
-## Where to Start
-
-- **Starting with Transmog?** Begin with [Getting Started](user/essentials/getting-started.md) and [Basic Concepts](user/essentials/basic-concepts.md)
-- **Need to solve a specific problem?** Try the tutorials section
-- **Looking for detailed API information?** Check the API reference section
+- **GitHub Issues**: [Bug reports and feature requests](https://github.com/scottdraper8/transmog/issues)
+- **GitHub Discussions**: [Questions and community support](https://github.com/scottdraper8/transmog/discussions)
+- **Documentation**: Complete guides and reference materials
 
 ```{toctree}
-:maxdepth: 1
+:maxdepth: 2
 :hidden:
 :caption: Getting Started
 
-installation
-user/essentials/getting-started
-user/essentials/basic-concepts
-user/essentials/data-structures
+getting_started
 ```
 
 ```{toctree}
-:maxdepth: 1
+:maxdepth: 2
 :hidden:
 :caption: User Guide
 
-user/essentials/configuration
-user/essentials/dependencies-and-features
-user/processing/processing-overview
-user/processing/data-transformation
-user/processing/json-handling
-user/processing/csv-processing
-user/processing/file-processing
-user/processing/array-handling
-user/processing/metadata
-user/processing/naming
-user/processing/transforms
-user/processing/io
-user/advanced/streaming
-user/advanced/performance-optimization
-user/advanced/error-handling
-user/advanced/deterministic-ids
-user/advanced/natural-ids
-user/output/output-formats
-user/examples
+user_guide/file-processing
+user_guide/array-handling
+user_guide/output-formats
+user_guide/id-management
+user_guide/error-handling
 ```
 
 ```{toctree}
-:maxdepth: 1
-:hidden:
-:caption: Tutorials
-
-tutorials/basic/transform-nested-json
-tutorials/basic/flatten-and-normalize
-tutorials/intermediate/streaming-large-datasets
-tutorials/intermediate/customizing-id-generation
-tutorials/intermediate/using-natural-ids
-tutorials/advanced/error-recovery-strategies
-tutorials/advanced/optimizing-memory-usage
-```
-
-```{toctree}
-:maxdepth: 1
+:maxdepth: 2
 :hidden:
 :caption: API Reference
 
-api/processor
-api/processing-result
-api/process
-api/config
-api/csv-reader
-api/core
-api/error
-api/io
-api/naming
-api/types
+api_reference/api
 ```
 
 ```{toctree}
-:maxdepth: 1
+:maxdepth: 2
 :hidden:
 :caption: Developer Guide
 
-dev/architecture
-dev/extending
-dev/testing
-dev/benchmarking
-dev/code-style
+developer_guide/contributing
+developer_guide/performance
+developer_guide/streaming
+developer_guide/extending
+developer_guide/custom-configuration
 ```
