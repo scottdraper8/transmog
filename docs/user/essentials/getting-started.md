@@ -1,6 +1,6 @@
 # Getting Started with Transmog
 
-This guide covers basic usage of Transmog for transforming nested JSON into flattened formats using the new simplified API in v1.1.0.
+This guide covers basic usage of Transmog for transforming nested JSON into flattened formats using the simplified API.
 
 ## Quick Start
 
@@ -51,7 +51,7 @@ Child tables: ['users_user_orders']
 
 ## Core Concepts
 
-Transmog v1.1.0 consists of:
+Transmog consists of:
 
 - **`flatten()` function**: Simple entry point for transforming data
 - **`FlattenResult`**: Contains the output tables with intuitive access
@@ -188,33 +188,12 @@ config = (
 processor = Processor(config)
 result = processor.process(data, entity_name="users")
 
-# Access results using the old API
+# Access results using the internal API
 main_data = result.get_main_table()
 child_tables = result.get_child_table("users_user_orders")
 ```
 
-## Migration from v1.0.x
 
-If you're upgrading from v1.0.x, here's how the APIs compare:
-
-### Old API (v1.0.x)
-```python
-processor = tm.Processor()
-result = processor.process(data, entity_name="users")
-main_data = result.get_main_table()
-child_data = result.get_child_table("users_user_orders")
-result.write_all_json("output")
-```
-
-### New API (v1.1.0)
-```python
-result = tm.flatten(data, name="users")
-main_data = result.main
-child_data = result.tables["users_user_orders"]
-result.save("output.json")
-```
-
-The new API is much simpler for common use cases, but the old API is still available for advanced scenarios.
 
 ## Next Steps
 

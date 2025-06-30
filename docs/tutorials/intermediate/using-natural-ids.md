@@ -7,7 +7,7 @@ data instead of generating synthetic IDs.
 
 - Basic understanding of Transmog
 - Python 3.8 or newer
-- Transmog 1.1.0 or newer
+- Transmog installed
 
 ## Introduction
 

@@ -1,6 +1,6 @@
 # Basic Concepts
 
-This document explains the core concepts of Transmog v1.1.0 and their interactions.
+This document explains the core concepts of Transmog and their interactions.
 
 ## What is Transmog?
 
@@ -40,9 +40,9 @@ This transforms the nested structure into relational tables that can be easily s
 
 ## Core Components
 
-### Simple API (New in v1.1.0)
+### Simple API
 
-The new simple API provides three main functions:
+The simple API provides three main functions:
 
 - **`tm.flatten(data, name)`**: Process data in memory
 - **`tm.flatten_file(filepath, name)`**: Process files directly

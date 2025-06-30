@@ -4,9 +4,9 @@
 
 This document describes the IO functionality in Transmog.
 
-## Input/Output in the New API
+## Input/Output API
 
-In Transmog 1.1.0, IO operations are simplified through the main API functions and the `FlattenResult` class.
+IO operations are simplified through the main API functions and the `FlattenResult` class.
 
 ### Reading Data
 

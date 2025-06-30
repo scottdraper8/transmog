@@ -14,7 +14,7 @@ from various processing approaches and memory optimization techniques.
 
 ## Overview of Processing Methods
 
-Transmog v1.1.0 offers several methods for processing data, each optimized for different scenarios:
+Transmog offers several methods for processing data, each optimized for different scenarios:
 
 | Processing Method | Best For | Memory Usage | Performance | API Function |
 |-------------------|----------|--------------|-------------|--------------|

@@ -1,22 +1,23 @@
-# Configuration API Reference
+# Configuration API
 
-> **User Guide**: For usage guidance and examples, see the [Configuration Guide](../user/essentials/configuration.md).
+> **User Guide**: For practical configuration examples, see the [Configuration Guide](../user/essentials/configuration.md).
 
-This document provides a reference for the configuration options in Transmog.
+Configuration is done through simple parameters passed to the main API functions (`flatten()`, `flatten_file()`, and `flatten_stream()`). This section documents all available configuration parameters.
 
-## Configuration Parameters
+## Basic Parameters
 
-In Transmog 1.1.0, configuration is done through simple parameters passed to the main API functions (`flatten()`, `flatten_file()`, and `flatten_stream()`). This section documents all available configuration parameters.
-
-### Basic Configuration
+These are the most commonly used configuration options:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `name` | str | Required | Name for the main entity (used for table naming) |
-| `separator` | str | "_" | Separator to use between path segments in field names |
-| `cast_to_string` | bool | False | Whether to cast all values to strings |
-| `include_empty` | bool | False | Whether to include empty values |
-| `skip_null` | bool | True | Whether to skip null values |
+| `name` | str | "main" | Base name for generated tables |
+| `separator` | str | "_" | Separator for nested field names |
+| `cast_to_string` | bool | True | Convert all values to strings |
+| `include_empty` | bool | True | Include fields with empty values |
+| `skip_null` | bool | False | Skip fields with null values |
+| `low_memory` | bool | False | Enable memory optimization |
+| `chunk_size` | int | None | Process data in chunks (for large datasets) |
+| `error_handling` | str | "raise" | How to handle errors ("raise", "skip", "warn") |
 
 ### Metadata Configuration
 
@@ -32,14 +33,11 @@ In Transmog 1.1.0, configuration is done through simple parameters passed to the
 |-----------|------|---------|-------------|
 | `max_depth` | int | 100 | Maximum recursion depth |
 | `deep_nesting_threshold` | int | 4 | Threshold for special handling of deeply nested structures |
-| `low_memory` | bool | False | Whether to optimize for low memory usage |
-| `chunk_size` | int | None | Size of chunks for processing (enables chunked processing) |
 
 ### Error Handling Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `error_handling` | str | "raise" | Error handling strategy ("raise", "skip", or "warn") |
 | `error_log` | str | None | Path to write error logs (when using `flatten_stream()`) |
 
 ### Output Configuration
@@ -232,18 +230,3 @@ result = tm.flatten(
     }
 )
 ```
-
-## Migration from v1.0.6
-
-If you were previously using the `TransmogConfig` class and its methods, here's how to migrate to the new API:
-
-| Old API (v1.0.6) | New API (v1.1.0) |
-|------------------|------------------|
-| `TransmogConfig().memory_optimized()` | `low_memory=True` |
-| `TransmogConfig().performance_optimized()` | `low_memory=False, chunk_size=None` |
-| `TransmogConfig.with_deterministic_ids("id")` | `id_field="id"` |
-| `TransmogConfig.with_custom_id_generation(func)` | Use transforms with `id_field` |
-| `config.with_naming(separator="-")` | `separator="-"` |
-| `config.with_processing(visit_arrays=False)` | Not directly supported, use transforms |
-| `config.with_metadata(add_timestamps=True)` | `add_timestamps=True` |
-| `config.with_error_handling(strategy=ErrorStrategy.SKIP_AND_LOG)` | `error_handling="skip"` |

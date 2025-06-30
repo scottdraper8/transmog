@@ -2,12 +2,12 @@
 
 > **API Reference**: For detailed API documentation, see the [Configuration API Reference](../../api/config.md).
 
-Transmog v1.1.0 provides two levels of configuration:
+Transmog provides two levels of configuration:
 
 1. **Simple Options** - Direct parameters to the `flatten()` function
 2. **Advanced Configuration** - Full configuration system for complex scenarios
 
-## Simple Configuration (New in v1.1.0)
+## Simple Configuration
 
 For most use cases, you can configure Transmog directly through parameters to the `flatten()` function:
 
@@ -296,17 +296,3 @@ result = processor.process(data, entity_name="users")
   - `"separate"`: For normalized data with child tables (default)
   - `"inline"`: For denormalized data with arrays kept in the parent
   - `"skip"`: To ignore arrays completely
-
-## Migration from v1.0.x
-
-If you're migrating from v1.0.x, here's how configuration options map to the new API:
-
-| v1.0.x Configuration | v1.1.0 Simple API |
-|----------------------|-------------------|
-| `TransmogConfig().with_naming(separator=".")` | `tm.flatten(data, separator=".")` |
-| `TransmogConfig().with_metadata(id_field="custom_id")` | `tm.flatten(data, id_field="custom_id")` |
-| `TransmogConfig().with_metadata(add_timestamp=True)` | `tm.flatten(data, add_timestamp=True)` |
-| `TransmogConfig().with_error_handling(recovery_strategy="skip")` | `tm.flatten(data, on_error="skip")` |
-| `TransmogConfig().with_processing(cast_to_string=False)` | `tm.flatten(data, cast_to_string=False)` |
-
-For more complex configurations, you can still use the advanced API with the `Processor` class.

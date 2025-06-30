@@ -6,7 +6,7 @@ This document provides the technical details of Transmog's type system.
 
 ## Public Types
 
-In Transmog v1.1.0, the public API exposes a minimal set of types that users need to interact with:
+Transmog's public API exposes a minimal set of types that users need to interact with:
 
 ```python
 import transmog as tm
@@ -30,7 +30,7 @@ The core data types used in Transmog are simple Python dictionaries and lists:
 
 ## Internal Types
 
-> Note: These types are considered internal implementation details. Most users should use the new API functions instead.
+> Note: These types are considered internal implementation details. Most users should use the main API functions instead.
 
 For advanced users who need to work with the internal types:
 
@@ -97,14 +97,3 @@ TableFormat = Literal["json", "csv", "parquet"]  # Output format
 # Error handling
 ErrorHandling = Literal["raise", "skip", "warn"]  # Error handling options
 ```
-
-## Migration from v1.0.6 to v1.1.0
-
-If you were using internal types in v1.0.6, here's how they map to v1.1.0:
-
-| Old Type (v1.0.6) | New Type (v1.1.0) |
-|-------------------|-------------------|
-| `ProcessingResult` | `FlattenResult` |
-| `RecoveryStrategy` | `ErrorHandling` |
-| `ProcessingMode.IN_MEMORY` | `ProcessingMode.STANDARD` |
-| `ProcessingMode.CHUNKED` | `ProcessingMode.LOW_MEMORY` |

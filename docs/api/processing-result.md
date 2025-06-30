@@ -6,7 +6,7 @@ This document describes the result classes in Transmog.
 
 ## FlattenResult
 
-The `FlattenResult` class is the primary result type in Transmog v1.1.0. It encapsulates the result of processing data and provides intuitive access to the processed tables and convenient methods for saving and converting data.
+The `FlattenResult` class is the primary result type in Transmog. It encapsulates the result of processing data and provides intuitive access to the processed tables and convenient methods for saving and converting data.
 
 ### Import
 
@@ -129,7 +129,7 @@ result.save("output", format="parquet", compression="zstd")
 
 ## Internal ProcessingResult (Legacy)
 
-> Note: The `ProcessingResult` class is now considered an internal implementation detail. Most users should use the new `FlattenResult` class instead.
+> Note: The `ProcessingResult` class is now considered an internal implementation detail. Most users should use the `FlattenResult` class instead.
 
 For advanced users who need direct access to the underlying result object, the legacy `ProcessingResult` class can still be imported from the internal module:
 
@@ -137,19 +137,4 @@ For advanced users who need direct access to the underlying result object, the l
 from transmog.process import ProcessingResult
 ```
 
-The internal `ProcessingResult` class provides the implementation for the new `FlattenResult` class and maintains backward compatibility with existing code.
-
-### Migration from ProcessingResult to FlattenResult
-
-If you're currently using the `ProcessingResult` class, here's how to migrate to the new API:
-
-| Old API (v1.0.6) | New API (v1.1.0) |
-|------------------|------------------|
-| `result.get_main_table()` | `result.main` |
-| `result.get_child_table("customers_orders")` | `result.tables["customers_orders"]` |
-| `result.get_table_names()` | `result.tables.keys()` |
-| `result.write_all_json("output")` | `result.save("output", format="json")` |
-| `result.write_all_csv("output")` | `result.save("output", format="csv")` |
-| `result.write_all_parquet("output")` | `result.save("output", format="parquet")` |
-| `result.to_dict()` | `result.tables` |
-| `result.to_pyarrow_tables()` | `result.to_pyarrow()` |
+The internal `ProcessingResult` class provides the implementation for the `FlattenResult` class and maintains backward compatibility with existing code.

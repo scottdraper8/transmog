@@ -8,15 +8,15 @@
 >
 > For details on the underlying processing components, see the [Process API](process.md).
 
-## New API (v1.1.0)
+## Main API
 
-In Transmog v1.1.0, the `Processor` class has been replaced with a simpler, more intuitive API. The new API consists of three main functions:
+Transmog provides a simple, intuitive API consisting of three main functions:
 
 - `flatten()` - Process in-memory data
 - `flatten_file()` - Process data from a file
 - `flatten_stream()` - Stream process data directly to output files
 
-These functions provide a more straightforward interface for common use cases while maintaining all the functionality of the previous API.
+These functions provide a straightforward interface for common use cases while maintaining all the functionality needed for data processing.
 
 ```python
 import transmog as tm
@@ -40,7 +40,7 @@ For detailed documentation on these functions, see the [Core API Reference](core
 
 ## Internal Processor Class
 
-> Note: The `Processor` class is now considered an internal implementation detail. Most users should use the new API functions instead.
+> Note: The `Processor` class is now considered an internal implementation detail. Most users should use the main API functions instead.
 
 For advanced users who need direct access to the underlying processor, it can still be imported from the internal module:
 
@@ -48,30 +48,16 @@ For advanced users who need direct access to the underlying processor, it can st
 from transmog.process import Processor
 ```
 
-The internal `Processor` class provides the implementation for the new API functions and maintains backward compatibility with existing code.
+The internal `Processor` class provides the implementation for the main API functions and maintains backward compatibility with existing code.
 
 ### When to Use the Internal Processor
 
-You might need to use the internal `Processor` class directly in these rare cases:
+You might need to use the internal `Processor` class directly in these cases:
 
-1. You have existing code using the old API that you haven't migrated yet
-2. You need extremely fine-grained control over the processing pipeline
-3. You're extending Transmog with custom processing logic
+1. You need extremely fine-grained control over the processing pipeline
+2. You're extending Transmog with custom processing logic
 
-### Migration from Processor to New API
-
-If you're currently using the `Processor` class, here's how to migrate to the new API:
-
-| Old API (v1.0.6) | New API (v1.1.0) |
-|------------------|------------------|
-| `processor = Processor()` <br> `result = processor.process(data, entity_name="customers")` | `result = tm.flatten(data, name="customers")` |
-| `result = processor.process_file("data.json", entity_name="customers")` | `result = tm.flatten_file("data.json", name="customers")` |
-| `result = processor.process_csv("data.csv", entity_name="customers")` | `result = tm.flatten_file("data.csv", name="customers")` |
-| `result = processor.process_stream(stream_data, streaming_output=True)` <br> `result.write_streaming_json("output")` | `tm.flatten_stream(data=stream_data, name="customers", output_path="output", output_format="json")` |
-| `processor = Processor.memory_optimized()` | `result = tm.flatten(data, name="customers", low_memory=True)` |
-| `processor = Processor.with_deterministic_ids("id")` | `result = tm.flatten(data, name="customers", id_field="id")` |
-
-## Example: Using the New API
+## Example: Using the Main API
 
 ```python
 import transmog as tm
@@ -122,4 +108,4 @@ main_table = result.get_main_table()
 child_tables = result.get_child_tables()
 ```
 
-For most use cases, we strongly recommend using the new API functions (`flatten()`, `flatten_file()`, `flatten_stream()`) as they provide a simpler and more intuitive interface.
+For most use cases, we strongly recommend using the main API functions (`flatten()`, `flatten_file()`, `flatten_stream()`) as they provide a simpler and more intuitive interface.
