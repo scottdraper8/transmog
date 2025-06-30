@@ -6,49 +6,40 @@
 
 Transform nested data into flat tables with a simple, intuitive API.
 
-## Features
+## Overview
 
-- **Simple API**: One function does it all - `flatten()`
-- **Smart Defaults**: Works out of the box for 90% of use cases
-- **Multiple Formats**: JSON, CSV, Parquet, and more
-- **Preserves Relationships**: Parent-child links maintained automatically
-- **Flexible**: Customize separators, IDs, error handling, and more when needed
+Transmog transforms nested JSON data into flat, tabular formats while preserving relationships between parent and child records.
 
-## Installation
+**Key Features:**
+- Simple one-function API with smart defaults
+- Multiple output formats (JSON, CSV, Parquet)
+- Automatic relationship preservation
+- Memory-efficient streaming for large datasets
+
+## Quick Start
 
 ```bash
 pip install transmog
 ```
 
-## Quick Start
-
 ```python
 import transmog as tm
 
-# Flatten nested data with one line
+# Transform nested data into flat tables
 result = tm.flatten({"name": "Product", "specs": {"cpu": "i7", "ram": "16GB"}})
+print(result.main)  # Flattened data: [{'name': 'Product', 'specs_cpu': 'i7', ...}]
 
-# Access the flattened data
-print(result.main)
-# [{'name': 'Product', 'specs_cpu': 'i7', 'specs_ram': '16GB', '_id': '...'}]
-
-# Save to any format
+# Save in any format
 result.save("output.json")
-result.save("output.csv")
-result.save("output.parquet")
 ```
 
-## Common Use Cases
+## Example
 
-### Flatten Complex JSON
+Transform complex nested data into relational tables:
 
 ```python
 data = {
-    "id": 1,
-    "user": {
-        "name": "Alice",
-        "email": "alice@example.com"
-    },
+    "user": {"name": "Alice", "email": "alice@example.com"},
     "orders": [
         {"id": 101, "amount": 99.99},
         {"id": 102, "amount": 45.50}
@@ -57,56 +48,15 @@ data = {
 
 result = tm.flatten(data, name="customer")
 
-# Main table has user data
-print(result.main)
-# [{'id': 1, 'user_name': 'Alice', 'user_email': 'alice@...', '_id': '...'}]
-
-# Orders are in a separate table with parent reference
-print(result.tables['customer_orders'])
-# [{'id': 101, 'amount': 99.99, '_parent_id': '...'}, ...]
+# Main table: [{'user_name': 'Alice', 'user_email': 'alice@...', '_id': '...'}]
+# Orders table: [{'id': 101, 'amount': 99.99, '_parent_id': '...'}, ...]
 ```
 
-### Use Existing IDs
-
-```python
-# Use an existing field as ID instead of generating synthetic ones
-result = tm.flatten(data, id_field="customer_id")
-
-# Or map different fields for different tables
-result = tm.flatten(data, id_field={
-    "customers": "customer_id",
-    "customers_orders": "order_id"
-})
-```
-
-### Custom Separators
-
-```python
-# Use dots instead of underscores
-result = tm.flatten(data, separator=".")
-print(result.main[0]['user.name'])  # Instead of 'user_name'
-```
-
-### Error Handling
-
-```python
-# Skip bad records instead of failing
-result = tm.flatten(messy_data, errors="skip")
-
-# Or just warn about issues
-result = tm.flatten(messy_data, errors="warn")
-```
-
-### Working with Files
-
-```python
-# Automatically detects format
-result = tm.flatten_file("data.json")
-result = tm.flatten_file("data.csv")
-
-# Save with format detection
-result.save("output.parquet")
-```
+**Key Options:**
+- Custom field separators: `separator="."`
+- Use existing IDs: `id_field="customer_id"`
+- Error handling: `errors="skip"`
+- File processing: `tm.flatten_file("data.json")`
 
 
 
@@ -139,9 +89,16 @@ result = tm.flatten(
 
 ## Documentation
 
-- [API Reference](https://scottdraper8.github.io/transmog/api.html)
-- [Examples](examples/)
-- [Migration from v1.0](docs/migration.md)
+Complete documentation is available at [scottdraper8.github.io/transmog](https://scottdraper8.github.io/transmog), including:
+
+- [Quick Start Guide](https://scottdraper8.github.io/transmog/quickstart.html)
+- [User Guides](https://scottdraper8.github.io/transmog/guides/)
+- [API Reference](https://scottdraper8.github.io/transmog/reference/)
+- [Advanced Topics](https://scottdraper8.github.io/transmog/advanced/)
+
+## Contributing
+
+For contribution guidelines, development setup, and coding standards, see the [Contributing Guide](https://scottdraper8.github.io/transmog/development/contributing.html) in the documentation.
 
 ## License
 
