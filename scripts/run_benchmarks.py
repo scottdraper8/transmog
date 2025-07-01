@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Benchmark script for transmog library.
+"""Benchmark script for transmog library v1.1.0.
 
-This script runs benchmarks for the transmog library to measure performance
-of different processing modes and configurations, including memory optimizations.
+This script runs comprehensive benchmarks for the transmog library to measure
+performance across different configurations, data sizes, and processing modes.
 """
 
 import gc
@@ -13,27 +13,35 @@ import sys
 import time
 import traceback
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 
 # Try to import from installed package first, fall back to development setup
 try:
     import transmog as tm
-    from transmog import Processor
 except ImportError:
     # Add parent directory to path for development mode
     parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     sys.path.insert(0, os.path.join(parent_dir, "src"))
     import transmog as tm
-    from transmog import Processor
 
 # Base directory relative to script location
 BASE_DIR = Path(__file__).parent.parent
 
 
-def generate_random_nested_data(count, levels=3, breadth=3):
+def generate_random_nested_data(
+    count: int, levels: int = 3, breadth: int = 3
+) -> list[dict[str, Any]]:
     """Generate random nested data structure for benchmarking.
 
     Uses cryptographically secure random number generation via the secrets module.
+
+    Args:
+        count: Number of top-level records to generate
+        levels: Number of nested levels to create
+        breadth: Number of fields per nested level
+
+    Returns:
+        List of nested dictionaries for benchmarking
     """
     result = []
 
@@ -78,7 +86,15 @@ def generate_random_nested_data(count, levels=3, breadth=3):
 
 
 def create_test_data(num_records: int = 1000, depth: int = 4) -> list[dict[str, Any]]:
-    """Create test data with configurable complexity for memory optimization tests."""
+    """Create test data with configurable complexity for memory optimization tests.
+
+    Args:
+        num_records: Number of records to generate
+        depth: Nesting depth for the data structure
+
+    Returns:
+        List of test records
+    """
     records = []
     for i in range(num_records):
         record = {
@@ -113,64 +129,31 @@ def get_memory_usage() -> float:
         process = psutil.Process(os.getpid())
         return process.memory_info().rss / (1024 * 1024)
     except ImportError:
-        # Fallback estimation
+        # Fallback estimation using garbage collection stats
         return gc.get_count()[0] * 0.001
 
 
-def benchmark_processing(data, count, label, mode=None, **kwargs):
-    """Run a benchmark for a specific processing mode."""
-    config = None
-    if mode:
-        # Uses processor's default mode when mode is specified
-        pass
+def benchmark_configuration(
+    config_name: str, data: list[dict[str, Any]], **config_options: Any
+) -> dict[str, Union[str, float, int]]:
+    """Benchmark a specific configuration.
 
-    processor = Processor(config=config)
+    Args:
+        config_name: Name of the configuration being tested
+        data: Test data to process
+        **config_options: Configuration options for tm.flatten()
 
-    start_time = time.time()
-    try:
-        result = processor.process(data=data, entity_name="benchmark", **kwargs)
-        end_time = time.time()
-
-        # Calculate memory used by result
-        memory_size = sys.getsizeof(result)
-        # Add size of values
-        for _key, value in result.items():
-            if isinstance(value, (bytes, bytearray)):
-                memory_size += len(value)
-            elif isinstance(value, (list, tuple)):
-                for item in value:
-                    memory_size += sys.getsizeof(item)
-
-        processing_info = {
-            "success": True,
-            "time": end_time - start_time,
-            "records": count,
-            "tables": len(result.get_table_names()) + 1,  # +1 for main table
-            "memory_kb": memory_size / 1024,
-            "records_per_second": count / (end_time - start_time),
-        }
-
-    except Exception as e:
-        end_time = time.time()
-        processing_info = {
-            "success": False,
-            "time": end_time - start_time,
-            "error": str(e),
-            "traceback": traceback.format_exc(),
-        }
-
-    print(f"Completed {label}")
-    return processing_info
-
-
-def benchmark_configuration(config_name: str, data: list, **config_options) -> dict:
-    """Benchmark a specific configuration with memory optimizations."""
+    Returns:
+        Dictionary containing benchmark metrics
+    """
     print(f"\n=== Benchmarking {config_name} ===")
 
     # Clear caches and collect garbage before test
     try:
-        tm.core.flattener.clear_caches()
-    except AttributeError:
+        from transmog.core.flattener import clear_caches
+
+        clear_caches()
+    except (ImportError, AttributeError):
         pass
     gc.collect()
 
@@ -195,6 +178,7 @@ def benchmark_configuration(config_name: str, data: list, **config_options) -> d
             if processing_time > 0
             else 0,
             "tables_created": len(result.all_tables),
+            "success": True,
         }
 
         print(f"  Processing time: {processing_time:.3f}s")
@@ -205,60 +189,98 @@ def benchmark_configuration(config_name: str, data: list, **config_options) -> d
         return metrics
 
     except Exception as e:
+        end_time = time.time()
+        processing_time = end_time - start_time
+
         print(f"  ERROR: {e}")
         return {
             "config": config_name,
             "error": str(e),
-            "processing_time": float("inf"),
+            "processing_time": processing_time,
             "memory_used_mb": float("inf"),
             "throughput": 0,
+            "success": False,
+            "traceback": traceback.format_exc(),
         }
 
 
-def run_benchmarks(record_counts, modes):
-    """Run all benchmarks for different record counts and modes."""
+def run_standard_benchmarks(record_counts: list[int]) -> dict[str, dict[str, Any]]:
+    """Run standard benchmarks across different record counts.
+
+    Args:
+        record_counts: List of record counts to test
+
+    Returns:
+        Nested dictionary of results organized by record count and configuration
+    """
     results = {}
 
-    for count in record_counts:
-        print(f"\nGenerating benchmark data for {count} records...")
-        data = generate_random_nested_data(count)
+    # Define configurations to test
+    configurations = [
+        ("Default", {}),
+        ("Low Memory", {"low_memory": True}),
+        ("Large Batches", {"batch_size": 5000}),
+        ("Small Batches", {"batch_size": 100}),
+        ("Preserve Types", {"preserve_types": True}),
+        ("Skip Empty", {"skip_empty": True, "skip_null": True}),
+        ("Inline Arrays", {"arrays": "inline"}),
+        ("Skip Arrays", {"arrays": "skip"}),
+        ("Custom Separator", {"separator": "."}),
+        ("Deep Nesting", {"nested_threshold": 8}),
+        ("Shallow Nesting", {"nested_threshold": 2}),
+    ]
 
+    for count in record_counts:
+        print(f"\n{'=' * 60}")
+        print(f"Generating benchmark data for {count} records...")
+        print(f"{'=' * 60}")
+
+        data = generate_random_nested_data(count)
         results[str(count)] = {}
-        for mode in modes:
-            print(f"Running benchmark with {count} records in {mode} mode...")
-            results[str(count)][mode] = benchmark_processing(
-                data=data,
-                count=count,
-                label=f"{count} records in {mode} mode",
-                mode=mode,
-            )
+
+        for config_name, config_options in configurations:
+            try:
+                result = benchmark_configuration(config_name, data, **config_options)
+                results[str(count)][config_name] = result
+            except Exception as e:
+                print(f"  Failed to benchmark {config_name}: {e}")
+                results[str(count)][config_name] = {
+                    "config": config_name,
+                    "error": str(e),
+                    "success": False,
+                }
 
     return results
 
 
-def run_memory_benchmarks():
+def run_memory_benchmarks() -> None:
     """Run memory optimization benchmarks."""
-    print("\n" + "=" * 50)
+    print("\n" + "=" * 60)
     print("Memory Optimization Benchmark")
-    print("=" * 50)
+    print("=" * 60)
 
     # Test different dataset sizes
-    test_sizes = [100, 500, 1000]
+    test_sizes = [100, 500, 1000, 2000]
 
     for size in test_sizes:
         print(f"\n🔬 Testing with {size} records")
-        print("-" * 30)
+        print("-" * 40)
 
         data = create_test_data(size)
         results = []
 
-        # Test different configurations
+        # Test different memory configurations
         configs = [
             ("Standard", {}),
             ("Low Memory", {"low_memory": True}),
             ("Small Batches", {"batch_size": 50, "low_memory": True}),
             ("Large Batches", {"batch_size": 2000, "low_memory": False}),
             ("Performance Optimized", {"batch_size": 1000, "low_memory": False}),
+            ("Memory + Types", {"low_memory": True, "preserve_types": False}),
+            (
+                "Memory + Skip Empty",
+                {"low_memory": True, "skip_empty": True, "skip_null": True},
+            ),
         ]
 
         for config_name, config_options in configs:
@@ -266,7 +288,7 @@ def run_memory_benchmarks():
             results.append(metrics)
 
         # Find best configuration for this dataset size
-        valid_results = [r for r in results if "error" not in r]
+        valid_results = [r for r in results if r.get("success", False)]
         if valid_results:
             best_throughput = max(valid_results, key=lambda x: x["throughput"])
             best_memory = min(valid_results, key=lambda x: x["memory_used_mb"])
@@ -286,7 +308,6 @@ def run_memory_benchmarks():
     print("-" * 40)
 
     try:
-        # Test adaptive cache sizing
         from transmog.core.flattener import get_adaptive_cache_size
 
         cache_size = get_adaptive_cache_size()
@@ -295,7 +316,6 @@ def run_memory_benchmarks():
         print("  Adaptive cache sizing: Not available")
 
     try:
-        # Test memory monitoring
         from transmog.core.memory import get_global_memory_monitor
 
         monitor = get_global_memory_monitor()
@@ -305,7 +325,6 @@ def run_memory_benchmarks():
         print("  Memory monitoring: Not available")
 
     try:
-        # Test adaptive batch sizing
         from transmog.core.memory import get_global_batch_sizer
 
         batch_sizer = get_global_batch_sizer()
@@ -316,14 +335,177 @@ def run_memory_benchmarks():
 
     print("\n✅ Memory optimization features tested!")
     print("Available optimizations:")
-    print("  • Efficient path building reduces string operations")
-    print("  • In-place modifications reduce memory allocations")
+    print("  • Low memory mode with adaptive batch sizing")
     print("  • Memory-aware caching adapts to available memory")
-    print("  • Adaptive batch sizing responds to memory pressure")
     print("  • Strategic garbage collection reduces memory pressure")
+    print("  • Efficient data processing with in-place modifications")
 
 
-def main():
+def run_streaming_benchmarks() -> None:
+    """Run streaming processing benchmarks."""
+    print("\n" + "=" * 60)
+    print("Streaming Processing Benchmark")
+    print("=" * 60)
+
+    test_sizes = [1000, 5000, 10000]
+    output_dir = BASE_DIR / "benchmark_output"
+
+    for size in test_sizes:
+        print(f"\n🚀 Testing streaming with {size} records")
+        print("-" * 40)
+
+        data = create_test_data(size)
+
+        # Test streaming vs in-memory processing
+        print("  Testing in-memory processing...")
+        start_time = time.time()
+        start_memory = get_memory_usage()
+
+        tm.flatten(data, name=f"memory_{size}")
+
+        memory_time = time.time() - start_time
+        memory_usage = get_memory_usage() - start_memory
+
+        print(f"    In-memory: {memory_time:.3f}s, {memory_usage:.1f} MB")
+
+        # Test streaming processing
+        print("  Testing streaming processing...")
+        start_time = time.time()
+        start_memory = get_memory_usage()
+
+        try:
+            # Create output directory
+            stream_output = output_dir / f"stream_{size}"
+            stream_output.mkdir(parents=True, exist_ok=True)
+
+            tm.flatten_stream(
+                data,
+                output_path=stream_output,
+                name=f"stream_{size}",
+                output_format="json",
+                low_memory=True,
+            )
+
+            stream_time = time.time() - start_time
+            stream_memory = get_memory_usage() - start_memory
+
+            print(f"    Streaming: {stream_time:.3f}s, {stream_memory:.1f} MB")
+            memory_savings = (memory_usage - stream_memory) / memory_usage * 100
+            print(f"    Memory savings: {memory_savings:.1f}%")
+
+        except Exception as e:
+            print(f"    Streaming failed: {e}")
+
+    # Clean up output directory
+    import shutil
+
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+
+
+def run_array_handling_benchmarks() -> None:
+    """Run benchmarks for different array handling modes."""
+    print("\n" + "=" * 60)
+    print("Array Handling Benchmark")
+    print("=" * 60)
+
+    # Create data with many arrays
+    array_heavy_data = []
+    for i in range(1000):
+        record = {
+            "id": i,
+            "name": f"Record {i}",
+            "tags": [f"tag_{j}" for j in range(10)],
+            "categories": [{"id": j, "name": f"Cat {j}"} for j in range(5)],
+            "metrics": [
+                {"value": j * 10, "timestamp": f"2023-01-{j + 1:02d}"} for j in range(8)
+            ],
+            "nested": {
+                "items": [{"nested_id": j, "data": f"data_{j}"} for j in range(6)]
+            },
+        }
+        array_heavy_data.append(record)
+
+    array_modes = [
+        ("Separate Tables", {"arrays": "separate"}),
+        ("Inline JSON", {"arrays": "inline"}),
+        ("Skip Arrays", {"arrays": "skip"}),
+    ]
+
+    print(f"Testing array handling with {len(array_heavy_data)} records...")
+
+    for mode_name, config in array_modes:
+        result = benchmark_configuration(mode_name, array_heavy_data, **config)
+
+        if result.get("success", False):
+            # Get the actual result to analyze table structure
+            try:
+                tm_result = tm.flatten(array_heavy_data, name="array_test", **config)
+                print(f"    Tables created: {len(tm_result.all_tables)}")
+
+                for table_name, table_data in tm_result.all_tables.items():
+                    print(f"      {table_name}: {len(table_data)} records")
+
+            except Exception as e:
+                print(f"    Could not analyze result: {e}")
+
+
+def save_results(
+    results: dict[str, Any], filename: str = "benchmark_results.json"
+) -> None:
+    """Save benchmark results to a JSON file.
+
+    Args:
+        results: Results dictionary to save
+        filename: Output filename
+    """
+    result_file = BASE_DIR / filename
+    with open(result_file, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2, default=str)
+    print(f"\nBenchmark results saved to {result_file}")
+
+
+def print_summary(results: dict[str, Any]) -> None:
+    """Print a summary of benchmark results.
+
+    Args:
+        results: Results dictionary to summarize
+    """
+    print("\n" + "=" * 60)
+    print("BENCHMARK SUMMARY")
+    print("=" * 60)
+
+    for record_count, configs in results.items():
+        print(f"\n📊 {record_count} records:")
+
+        successful_configs = {
+            k: v for k, v in configs.items() if v.get("success", False)
+        }
+
+        if successful_configs:
+            # Find fastest configuration
+            fastest = max(successful_configs.items(), key=lambda x: x[1]["throughput"])
+            print(
+                f"  Fastest: {fastest[0]} ({fastest[1]['throughput']:.0f} records/sec)"
+            )
+
+            # Find most memory efficient
+            most_efficient = min(
+                successful_configs.items(), key=lambda x: x[1]["memory_used_mb"]
+            )
+            memory_mb = most_efficient[1]["memory_used_mb"]
+            print(f"  Most memory efficient: {most_efficient[0]} ({memory_mb:.1f} MB)")
+
+            # Calculate average throughput
+            avg_throughput = sum(
+                c["throughput"] for c in successful_configs.values()
+            ) / len(successful_configs)
+            print(f"  Average throughput: {avg_throughput:.0f} records/sec")
+        else:
+            print("  No successful configurations")
+
+
+def main() -> None:
     """Run benchmarks and save results to file."""
     import argparse
 
@@ -334,32 +516,55 @@ def main():
     parser.add_argument(
         "--standard", action="store_true", help="Run standard benchmarks"
     )
+    parser.add_argument(
+        "--streaming", action="store_true", help="Run streaming benchmarks"
+    )
+    parser.add_argument(
+        "--arrays", action="store_true", help="Run array handling benchmarks"
+    )
+    parser.add_argument("--all", action="store_true", help="Run all benchmark suites")
+    parser.add_argument(
+        "--sizes",
+        nargs="+",
+        type=int,
+        default=[10, 100, 1000, 5000],
+        help="Record counts to test (default: 10 100 1000 5000)",
+    )
 
     args = parser.parse_args()
 
     # Default to standard if no specific option is chosen
-    if not (args.memory or args.standard):
+    if not any([args.memory, args.standard, args.streaming, args.arrays, args.all]):
         args.standard = True
 
-    if args.standard:
-        print("Running standard benchmarks...")
-        # Configuration
-        record_counts = [10, 100, 1000, 10000]
-        modes = ["default", "memory_optimized", "performance_optimized"]
+    print(f"Transmog Benchmark Suite v{tm.__version__}")
+    print("=" * 60)
 
-        # Run benchmarks for all combinations
-        results = run_benchmarks(record_counts, modes)
+    all_results = {}
 
-        # Save results to file
-        result_file = BASE_DIR / "benchmark_results.json"
-        with open(result_file, "w") as f:
-            json.dump(results, f, indent=2)
+    if args.standard or args.all:
+        print("\n🚀 Running standard benchmarks...")
+        standard_results = run_standard_benchmarks(args.sizes)
+        all_results["standard"] = standard_results
+        print_summary(standard_results)
 
-        print(f"\nBenchmark results saved to {result_file}")
-
-    if args.memory:
-        print("\nRunning memory optimization benchmarks...")
+    if args.memory or args.all:
+        print("\n🧠 Running memory optimization benchmarks...")
         run_memory_benchmarks()
+
+    if args.streaming or args.all:
+        print("\n🌊 Running streaming benchmarks...")
+        run_streaming_benchmarks()
+
+    if args.arrays or args.all:
+        print("\n📊 Running array handling benchmarks...")
+        run_array_handling_benchmarks()
+
+    # Save results if we have any
+    if all_results:
+        save_results(all_results)
+
+    print("\n✅ Benchmark suite completed!")
 
 
 if __name__ == "__main__":
