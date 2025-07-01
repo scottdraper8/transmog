@@ -92,10 +92,10 @@ result = tm.flatten(
 Complete documentation is available at
 [scottdraper8.github.io/transmog](https://scottdraper8.github.io/transmog), including:
 
-- [Quick Start Guide](https://scottdraper8.github.io/transmog/quickstart.html)
-- [User Guides](https://scottdraper8.github.io/transmog/guides/)
-- [API Reference](https://scottdraper8.github.io/transmog/reference/)
-- [Advanced Topics](https://scottdraper8.github.io/transmog/advanced/)
+- [Getting Started Guide](https://scottdraper8.github.io/transmog/getting_started.html)
+- [User Guide](https://scottdraper8.github.io/transmog/user_guide/file-processing.html)
+- [API Reference](https://scottdraper8.github.io/transmog/api_reference/api.html)
+- [Developer Guide](https://scottdraper8.github.io/transmog/developer_guide/contributing.html)
 
 ## Contributing
 
