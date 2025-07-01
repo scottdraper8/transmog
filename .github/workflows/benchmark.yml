@@ -28,53 +28,40 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install -e ".[dev]"
 
-    # Note: We run each benchmark file completely separately with isolated pytests
-    # because pytest-benchmark fixture can only be used once per session
-
-    - name: Run output format benchmarks
+    # Run performance tests that exist in the current codebase
+    - name: Run performance tests
       run: |
-        # Run each benchmark file in a completely separate pytest invocation
-        python -m pytest tests/benchmarks/test_output_format_benchmarks.py -xvs --benchmark-only
+        python -m pytest tests/performance/ -xvs
 
-    - name: Run transformation benchmarks
-      run: |
-        # Run with completely separate pytest invocation
-        python -m pytest tests/benchmarks/test_core_transformation_benchmarks.py -xvs --benchmark-only
-
-    - name: Run caching benchmarks
-      run: |
-        # Run with completely separate pytest invocation
-        python -m pytest tests/benchmarks/test_caching_benchmarks.py -xvs --benchmark-only
-
-    - name: Run standalone benchmarks
+    # Run the main benchmark script with correct arguments for v1.1.0
+    - name: Run standard benchmarks
       run: |
         mkdir -p benchmark_results
-        # Basic benchmarks with different complexity levels
-        python scripts/run_benchmarks.py --records 1000 --complexity medium --output benchmark_results/medium.json
-        python scripts/run_benchmarks.py --records 100 --complexity complex --output benchmark_results/complex.json
+        # Run benchmarks with different record counts
+        python scripts/run_benchmarks.py --standard --sizes 100 1000
 
-    - name: Test memory usage
+    - name: Run memory optimization benchmarks
       run: |
-        # Compare memory usage between standard and streaming modes
-        python scripts/run_benchmarks.py --records 5000 --complexity medium --output benchmark_results/memory_standard.json --mode standard
-        python scripts/run_benchmarks.py --records 5000 --complexity medium --output benchmark_results/memory_streaming.json --mode streaming
+        # Test memory usage optimization
+        python scripts/run_benchmarks.py --memory
 
-    - name: Test processing strategies
+    - name: Run streaming benchmarks
       run: |
-        # Compare different processing strategies
-        python scripts/run_benchmarks.py --records 1000 --complexity medium --output benchmark_results/strategy_standard.json --strategy standard
-        python scripts/run_benchmarks.py --records 1000 --complexity medium --output benchmark_results/strategy_memory.json --strategy memory
-        python scripts/run_benchmarks.py --records 1000 --complexity medium --output benchmark_results/strategy_performance.json --strategy performance
+        # Test streaming processing
+        python scripts/run_benchmarks.py --streaming
 
-    - name: Test recovery strategies
+    - name: Run array handling benchmarks
       run: |
-        # Compare different recovery strategies
-        python scripts/run_benchmarks.py --records 500 --complexity medium --output benchmark_results/recovery_strict.json --recovery strict
-        python scripts/run_benchmarks.py --records 500 --complexity medium --output benchmark_results/recovery_skip.json --recovery skip
-        python scripts/run_benchmarks.py --records 500 --complexity medium --output benchmark_results/recovery_partial.json --recovery partial
+        # Test array handling performance
+        python scripts/run_benchmarks.py --arrays
+
+    - name: Run all benchmark suites
+      run: |
+        # Run comprehensive benchmark suite
+        python scripts/run_benchmarks.py --all --sizes 500 2000
 
     - name: Upload benchmark results
       uses: actions/upload-artifact@v4
       with:
         name: benchmark-results
-        path: benchmark_results/
+        path: benchmark_results.json

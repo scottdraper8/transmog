@@ -55,6 +55,7 @@ optional-dependencies.dev = [
   "mypy>=0.9",
   "myst-parser>=2",
   "pre-commit>=3.5",
+  "psutil>=5.8",
   "pyproject-fmt>=1.5.1",
   "pyproject-parser>=0.7",
   "pytest>=7",

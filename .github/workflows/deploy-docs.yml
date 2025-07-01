@@ -32,8 +32,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Install full package with docs and all optional dependencies
-          python -m pip install -e ".[docs,dev,all]"
+          # Install package with dev dependencies (includes docs dependencies)
+          python -m pip install -e ".[dev]"
 
       - name: Validate documentation
         run: |

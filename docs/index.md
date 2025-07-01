@@ -83,7 +83,7 @@ Contributing, extending, and advanced usage patterns. Resources for developers w
 ## Support and Community
 
 - **GitHub Issues**: [Bug reports and feature requests](https://github.com/scottdraper8/transmog/issues)
-- **GitHub Discussions**: [Questions and community support](https://github.com/scottdraper8/transmog/discussions)
+- **Questions**: Use GitHub issues for questions and community support
 - **Documentation**: Complete guides and reference materials
 
 ```{toctree}
