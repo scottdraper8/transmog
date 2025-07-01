@@ -280,8 +280,8 @@ class PartialProcessingRecovery(RecoveryStrategy):
                 f"{entity_info}: {error}",
             )
 
-            # Empty list for file errors
-            return []
+            # Return dict for consistency with other error types
+            return {"_error": str(error), "error": str(error)}
 
         else:
             # Generic error handling

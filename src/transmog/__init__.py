@@ -1,188 +1,49 @@
-"""Transmog - Flatten, transform, and organize complex data.
+"""Transmog v1.1.0 - Simple data flattening library.
 
-Provides tools to transform deeply nested JSON structures into flattened tables.
+Transmog transforms complex nested data structures into flat, tabular formats
+while preserving relationships between parent and child records.
+
+Basic Usage:
+    >>> import transmog as tm
+    >>> result = tm.flatten({"name": "Product", "tags": ["sale", "clearance"]})
+    >>> result.main  # Main table
+    >>> result.tables  # Child tables
+    >>> result.save("output.json")  # Save to file
+
+Advanced Usage:
+    >>> # For very large datasets, use streaming
+    >>> tm.flatten_stream(large_data, "output/", format="parquet")
+
+    >>> # For advanced features, use the Processor directly
+    >>> from transmog.process import Processor
+    >>> processor = Processor()
+    >>> processor.stream_process(...)
 """
 
-__version__ = "1.0.6"
+__version__ = "1.1.0"
 
-# Configuration functionality
-from transmog.config import (
-    ErrorHandlingConfig,
-    MetadataConfig,
-    NamingConfig,
-    ProcessingConfig,
-    ProcessingMode,
-    TransmogConfig,
-    configure,
-    extensions,
-    load_config,
-    load_profile,
-    settings,
-)
-from transmog.core.extractor import extract_arrays, stream_extract_arrays
+# Import the simplified API
+from .api import FlattenResult, flatten, flatten_file, flatten_stream
 
-# Core functionality
-from transmog.core.flattener import flatten_json
-from transmog.core.hierarchy import (
-    process_record_batch,
-    process_records_in_single_pass,
-    process_structure,
-    stream_process_records,
-)
-from transmog.core.metadata import (
-    annotate_with_metadata,
-    create_batch_metadata,
-    generate_extract_id,
-    get_current_timestamp,
-)
+# Import the main error classes for user convenience
+from .error import TransmogError, ValidationError
 
-# Error handling and exceptions
-from transmog.error import (
-    DEFAULT,
-    LENIENT,
-    STRICT,
-    ConfigurationError,
-    FileError,
-    MissingDependencyError,
-    OutputError,
-    ParsingError,
-    PartialProcessingRecovery,
-    ProcessingError,
-    # Recovery strategies
-    RecoveryStrategy,
-    SkipAndLogRecovery,
-    StrictRecovery,
-    # Exceptions
-    TransmogError,
-    ValidationError,
-    # Error handling utilities
-    error_context,
-    setup_logging,
-    with_recovery,
-)
-
-# IO utilities
-from transmog.io import (
-    DataWriter,
-    FormatRegistry,
-    # Streaming writer interface
-    StreamingWriter,
-    create_streaming_writer,
-    create_writer,
-    detect_format,
-    get_supported_streaming_formats,
-    initialize_io_features,
-    is_streaming_format_available,
-)
-
-# Specific writer implementations
-from transmog.io.writers.parquet import ParquetStreamingWriter
-
-# Naming utilities
-from transmog.naming.conventions import (
-    get_standard_field_name,
-    get_table_name,
-    handle_deeply_nested_path,
-    sanitize_name,
-)
-
-# High-level processor class for one-step processing
-from transmog.process import (
-    BatchStrategy,
-    ChunkedStrategy,
-    CSVStrategy,
-    FileStrategy,
-    InMemoryStrategy,
-    ProcessingResult,
-    ProcessingStrategy,
-    Processor,
-)
-
-# Alias the DependencyManager for backwards compatibility
-from .dependencies import DependencyManager, DependencyManager as IoDependencyManager
-from .features import Features
-
-# Initialize IO features
-initialize_io_features()
-
-# Public API
+# Public API - only these are available to users
 __all__ = [
-    # Main classes
-    "Processor",
-    "ProcessingResult",
-    # Strategy pattern classes
-    "ProcessingStrategy",
-    "InMemoryStrategy",
-    "FileStrategy",
-    "BatchStrategy",
-    "ChunkedStrategy",
-    "CSVStrategy",
-    # Configuration
-    "TransmogConfig",
-    "ProcessingMode",
-    "NamingConfig",
-    "ProcessingConfig",
-    "MetadataConfig",
-    "ErrorHandlingConfig",
-    # Configuration utilities
-    "settings",
-    "extensions",
-    "load_profile",
-    "load_config",
-    "configure",
-    # Format utilities
-    "FormatRegistry",
-    "detect_format",
-    "create_writer",
-    "DataWriter",
-    # Streaming features
-    "StreamingWriter",
-    "create_streaming_writer",
-    "get_supported_streaming_formats",
-    "is_streaming_format_available",
-    # Specific writer implementations
-    "ParquetStreamingWriter",
-    # Features and dependencies
-    "Features",
-    "DependencyManager",
-    "IoDependencyManager",
-    # Exceptions
-    "TransmogError",
-    "ProcessingError",
-    "ValidationError",
-    "ParsingError",
-    "FileError",
-    "MissingDependencyError",
-    "ConfigurationError",
-    "OutputError",
+    # Main functions
+    "flatten",
+    "flatten_file",
+    "flatten_stream",
+    # Result class
+    "FlattenResult",
     # Error handling
-    "error_context",
-    "setup_logging",
-    # Recovery strategies
-    "RecoveryStrategy",
-    "StrictRecovery",
-    "SkipAndLogRecovery",
-    "PartialProcessingRecovery",
-    "with_recovery",
-    "STRICT",
-    "DEFAULT",
-    "LENIENT",
-    # Core functionality
-    "flatten_json",
-    "process_record_batch",
-    "process_records_in_single_pass",
-    "process_structure",
-    "stream_process_records",
-    "extract_arrays",
-    "stream_extract_arrays",
-    # Metadata
-    "annotate_with_metadata",
-    "create_batch_metadata",
-    "generate_extract_id",
-    "get_current_timestamp",
-    # Naming utilities
-    "get_standard_field_name",
-    "get_table_name",
-    "sanitize_name",
-    "handle_deeply_nested_path",
+    "TransmogError",
+    "ValidationError",
+    # Version
+    "__version__",
 ]
+
+# For users who need advanced features, they can import:
+# from transmog.process import Processor
+# from transmog.config import TransmogConfig
+# etc.

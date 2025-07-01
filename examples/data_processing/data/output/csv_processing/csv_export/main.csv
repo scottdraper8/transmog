@@ -1,8 +1,0 @@
-"id","name","department","salary","hire_date","manager_id","address_city","address_state","skills","__extract_id","__extract_datetime"
-"1","John Smith","Engineering","85000","2020-01-15","5","San Francisco","CA","Python,Java,SQL","e4c40f08-020f-44a2-9832-0f8ff2a9cbdc","2025-05-29 18:11:32.062157"
-"2","Alice Johnson","Marketing","75000","2019-05-20","6","New York","NY","SEO,Content,Analytics","71603ef3-7192-4b93-a96a-32c335026ce3","2025-05-29 18:11:32.062157"
-"3","Robert Davis","Engineering","90000","2018-11-10","5","Austin","TX","C++,Go,Rust","b8057ef1-3761-4a9a-98c6-18cccd19a4c5","2025-05-29 18:11:32.062157"
-"4","Maria Garcia","Finance","95000","2021-03-22","7","Chicago","IL","Accounting,Excel,Tableau","9c6694a8-56a2-4a69-807e-801dab0700e8","2025-05-29 18:11:32.062157"
-"5","David Wilson","Engineering","120000","2015-08-05",,"Seattle","WA","Python,Management,Architecture","655e26d7-8e00-466e-b8d3-ae4c201411e0","2025-05-29 18:11:32.062157"
-"6","Susan Lee","Marketing","110000","2016-02-28",,"Boston","MA","Strategy,Leadership,Analytics","1987935a-1524-441d-8105-c9d9117197a0","2025-05-29 18:11:32.062157"
-"7","James Brown","Finance","115000","2017-10-15",,"Denver","CO","Budgeting,Forecasting,Investment","303e63fd-f2e8-4ecf-804b-e990b8f87e4a","2025-05-29 18:11:32.062157"

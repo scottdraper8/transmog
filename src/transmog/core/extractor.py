@@ -9,8 +9,15 @@ from datetime import datetime
 from typing import Any, Callable, Optional, Union
 
 from transmog.core.flattener import flatten_json
+from transmog.core.id_discovery import get_record_id
 from transmog.core.metadata import annotate_with_metadata
-from transmog.error import logger
+from transmog.error import (
+    ProcessingError,
+    build_error_context,
+    format_error_message,
+    get_recovery_strategy,
+    logger,
+)
 from transmog.naming.conventions import sanitize_name
 from transmog.naming.utils import get_table_name_for_array
 from transmog.types.base import JsonDict
@@ -30,17 +37,20 @@ def _extract_arrays_impl(
     cast_to_string: bool = True,
     include_empty: bool = False,
     skip_null: bool = True,
-    extract_time: Optional[Any] = None,
-    id_field: str = "__extract_id",
-    parent_field: str = "__parent_extract_id",
-    time_field: str = "__extract_datetime",
-    deeply_nested_threshold: int = 4,
+    transmog_time: Optional[Any] = None,
+    id_field: str = "__transmog_id",
+    parent_field: str = "__parent_transmog_id",
+    time_field: str = "__transmog_datetime",
+    nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     recovery_strategy: Optional[Any] = None,
     max_depth: int = 100,
     current_depth: int = 0,
     streaming_mode: bool = False,
+    id_field_patterns: Optional[list[str]] = None,
+    id_field_mapping: Optional[dict[str, str]] = None,
+    force_transmog_id: bool = False,
 ) -> Generator[tuple[str, dict[str, Any]], None, None]:
     """Implementation helper for array extraction.
 
@@ -58,18 +68,21 @@ def _extract_arrays_impl(
         cast_to_string: Whether to cast all values to strings
         include_empty: Whether to include empty values
         skip_null: Whether to skip null values
-        extract_time: Extraction timestamp
+        transmog_time: Transmog timestamp
         id_field: ID field name
         parent_field: Parent ID field name
         time_field: Timestamp field name
-        deeply_nested_threshold: Threshold for deep nesting (default 4)
+        nested_threshold: Threshold for deep nesting (default 4)
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
         id_generation_strategy: Custom function for ID generation
         recovery_strategy: Strategy for error recovery
         max_depth: Maximum recursion depth allowed
-        current_depth: Current depth in the recursion
+        current_depth: Depth in the recursion
         streaming_mode: Whether to operate in streaming mode
+        id_field_patterns: List of field names to check for natural IDs
+        id_field_mapping: Optional mapping of paths to specific ID fields
+        force_transmog_id: If True, always add transmog ID
 
     Yields:
         Tuples of (table_name, record) for each extracted record
@@ -91,7 +104,7 @@ def _extract_arrays_impl(
         if key.startswith("__"):
             continue
 
-        # Build the current path for this field
+        # Build the path for this field
         current_path = f"{parent_path}{separator}{key}" if parent_path else key
 
         # Skip empty arrays and dictionaries
@@ -112,7 +125,7 @@ def _extract_arrays_impl(
                 array_name=sanitized_key,
                 parent_path=parent_path,
                 separator=separator,
-                deeply_nested_threshold=deeply_nested_threshold,
+                nested_threshold=nested_threshold,
             )
 
             # Process each item in the array
@@ -162,7 +175,7 @@ def _extract_arrays_impl(
                             skip_null=skip_null,
                             parent_path="",
                             in_place=False,
-                            deeply_nested_threshold=deeply_nested_threshold,
+                            nested_threshold=nested_threshold,
                             mode="streaming" if streaming_mode else "standard",
                             recovery_strategy=recovery_strategy,
                         )
@@ -177,13 +190,17 @@ def _extract_arrays_impl(
                     annotated = annotate_with_metadata(
                         metadata_dict,
                         parent_id=parent_id,
-                        extract_time=extract_time,
+                        transmog_time=transmog_time,
                         id_field=id_field,
                         parent_field=parent_field,
                         time_field=time_field,
                         in_place=True,
                         source_field=source_field,
                         id_generation_strategy=id_generation_strategy,
+                        id_field_patterns=id_field_patterns,
+                        path=table_name,
+                        id_field_mapping=id_field_mapping,
+                        force_transmog_id=force_transmog_id,
                     )
 
                     # Track array source information
@@ -195,56 +212,93 @@ def _extract_arrays_impl(
 
                     # Process any nested arrays recursively, but only for dict items
                     if isinstance(item, dict):
+                        # Get the parent ID - use natural ID if available
+                        parent_id_field, parent_id_value = get_record_id(
+                            annotated,
+                            id_field_patterns=id_field_patterns,
+                            path=table_name,
+                            id_field_mapping=id_field_mapping,
+                            fallback_field=id_field,
+                        )
                         nested_generator = _extract_arrays_impl(
                             item,
-                            parent_id=annotated.get(id_field),
+                            parent_id=parent_id_value,
                             parent_path=item_path,
                             entity_name=entity_name,
                             separator=separator,
                             cast_to_string=cast_to_string,
                             include_empty=include_empty,
                             skip_null=skip_null,
-                            extract_time=extract_time,
+                            transmog_time=transmog_time,
                             id_field=id_field,
                             parent_field=parent_field,
                             time_field=time_field,
-                            deeply_nested_threshold=deeply_nested_threshold,
+                            nested_threshold=nested_threshold,
                             default_id_field=default_id_field,
                             id_generation_strategy=id_generation_strategy,
                             recovery_strategy=recovery_strategy,
                             max_depth=max_depth,
                             current_depth=current_depth + 1,
                             streaming_mode=streaming_mode,
+                            id_field_patterns=id_field_patterns,
+                            id_field_mapping=id_field_mapping,
+                            force_transmog_id=force_transmog_id,
                         )
                         # Process nested arrays one by one
                         yield from nested_generator
                 except Exception as e:
-                    # Apply recovery strategy if available
-                    if recovery_strategy == "skip":
-                        # Skip this array item
+                    # Handle errors using standardized recovery strategy
+                    strategy = get_recovery_strategy(recovery_strategy)
+                    context = build_error_context(
+                        entity_name=f"{sanitized_key}[{i}]",
+                        entity_type="array item",
+                        operation="array extraction",
+                        source=table_name,
+                        array_field=sanitized_key,
+                        array_index=i,
+                    )
+
+                    try:
+                        recovery_result = strategy.recover(e, **context)
+                        if recovery_result is not None:
+                            # Create error record from recovery result
+                            if isinstance(recovery_result, dict):
+                                error_record = recovery_result.copy()
+                            else:
+                                error_record = {"__error": str(recovery_result)}
+
+                            # Add array context
+                            error_record.update(
+                                {
+                                    "__array_field": sanitized_key,
+                                    "__array_index": i,
+                                }
+                            )
+
+                            # Add metadata
+                            annotated = annotate_with_metadata(
+                                error_record,
+                                parent_id=parent_id,
+                                transmog_time=transmog_time,
+                                id_field=id_field,
+                                parent_field=parent_field,
+                                time_field=time_field,
+                                in_place=True,
+                                id_field_patterns=id_field_patterns,
+                                path=f"{table_name}{separator}errors",
+                                id_field_mapping=id_field_mapping,
+                                force_transmog_id=force_transmog_id,
+                            )
+                            # Output the error record
+                            yield f"{table_name}{separator}errors", annotated
+                        # Continue processing other items
                         continue
-                    elif recovery_strategy == "partial":
-                        # Create error record
-                        error_record = {
-                            "__error": str(e),
-                            "__array_field": sanitized_key,
-                            "__array_index": i,
-                        }
-                        # Add metadata
-                        annotated = annotate_with_metadata(
-                            error_record,
-                            parent_id=parent_id,
-                            extract_time=extract_time,
-                            id_field=id_field,
-                            parent_field=parent_field,
-                            time_field=time_field,
-                            in_place=True,
+                    except Exception:
+                        # Re-raise with formatted message
+                        error_msg = format_error_message(
+                            "array_processing", e, **context
                         )
-                        # Output the error record
-                        yield f"{table_name}{separator}errors", annotated
-                    else:
-                        # Raise the exception (default behavior)
-                        raise
+                        raise ProcessingError(error_msg) from e
 
         # Nested object processing (non-array)
         elif isinstance(value, dict):
@@ -262,17 +316,20 @@ def _extract_arrays_impl(
                 cast_to_string=cast_to_string,
                 include_empty=include_empty,
                 skip_null=skip_null,
-                extract_time=extract_time,
+                transmog_time=transmog_time,
                 id_field=id_field,
                 parent_field=parent_field,
                 time_field=time_field,
-                deeply_nested_threshold=deeply_nested_threshold,
+                nested_threshold=nested_threshold,
                 default_id_field=default_id_field,
                 id_generation_strategy=id_generation_strategy,
                 recovery_strategy=recovery_strategy,
                 max_depth=max_depth,
                 current_depth=current_depth + 1,
                 streaming_mode=streaming_mode,
+                id_field_patterns=id_field_patterns,
+                id_field_mapping=id_field_mapping,
+                force_transmog_id=force_transmog_id,
             )
             # Process nested arrays one by one
             yield from nested_generator
@@ -287,17 +344,20 @@ def extract_arrays(
     cast_to_string: bool = True,
     include_empty: bool = False,
     skip_null: bool = True,
-    extract_time: Optional[Any] = None,
-    id_field: str = "__extract_id",
-    parent_field: str = "__parent_extract_id",
-    time_field: str = "__extract_datetime",
-    deeply_nested_threshold: int = 4,
+    transmog_time: Optional[Any] = None,
+    id_field: str = "__transmog_id",
+    parent_field: str = "__parent_transmog_id",
+    time_field: str = "__transmog_datetime",
+    nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     streaming: bool = False,
     recovery_strategy: Optional[Any] = None,
     max_depth: int = 100,
     current_depth: int = 0,
+    id_field_patterns: Optional[list[str]] = None,
+    id_field_mapping: Optional[dict[str, str]] = None,
+    force_transmog_id: bool = False,
 ) -> ExtractResult:
     """Extract nested arrays into flattened tables.
 
@@ -313,18 +373,21 @@ def extract_arrays(
         cast_to_string: Whether to cast all values to strings
         include_empty: Whether to include empty values
         skip_null: Whether to skip null values
-        extract_time: Extraction timestamp
+        transmog_time: Transmog timestamp
         id_field: ID field name
         parent_field: Parent ID field name
         time_field: Timestamp field name
-        deeply_nested_threshold: Threshold for deep nesting (default 4)
+        nested_threshold: Threshold for deep nesting (default 4)
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
         id_generation_strategy: Custom function for ID generation
         streaming: Whether to use streaming mode (returns generator)
         recovery_strategy: Strategy for error recovery
         max_depth: Maximum recursion depth allowed
-        current_depth: Current depth in the recursion
+        current_depth: Depth in the recursion
+        id_field_patterns: List of field names to check for natural IDs
+        id_field_mapping: Optional mapping of paths to specific ID fields
+        force_transmog_id: If True, always add transmog ID
 
     Returns:
         Dictionary mapping table names to lists of records
@@ -334,9 +397,9 @@ def extract_arrays(
         - Dictionary items that are empty are also skipped
         - Null values in arrays are skipped when skip_null is True
     """
-    # Initialize extraction timestamp if not provided
-    if extract_time is None:
-        extract_time = datetime.now()
+    # Initialize transmog timestamp if not provided
+    if transmog_time is None:
+        transmog_time = datetime.now()
 
     # Collect records in streaming mode
     result: ExtractResult = {}
@@ -349,17 +412,20 @@ def extract_arrays(
         cast_to_string=cast_to_string,
         include_empty=include_empty,
         skip_null=skip_null,
-        extract_time=extract_time,
+        transmog_time=transmog_time,
         id_field=id_field,
         parent_field=parent_field,
         time_field=time_field,
-        deeply_nested_threshold=deeply_nested_threshold,
+        nested_threshold=nested_threshold,
         default_id_field=default_id_field,
         id_generation_strategy=id_generation_strategy,
         recovery_strategy=recovery_strategy,
         max_depth=max_depth,
         current_depth=current_depth,
         streaming_mode=False,
+        id_field_patterns=id_field_patterns,
+        id_field_mapping=id_field_mapping,
+        force_transmog_id=force_transmog_id,
     ):
         # Accumulate records by table
         if table_name not in result:
@@ -378,16 +444,19 @@ def stream_extract_arrays(
     cast_to_string: bool = True,
     include_empty: bool = False,
     skip_null: bool = True,
-    extract_time: Optional[Any] = None,
-    id_field: str = "__extract_id",
-    parent_field: str = "__parent_extract_id",
-    time_field: str = "__extract_datetime",
-    deeply_nested_threshold: int = 4,
+    transmog_time: Optional[Any] = None,
+    id_field: str = "__transmog_id",
+    parent_field: str = "__parent_transmog_id",
+    time_field: str = "__transmog_datetime",
+    nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     recovery_strategy: Optional[Any] = None,
     max_depth: int = 100,
     current_depth: int = 0,
+    id_field_patterns: Optional[list[str]] = None,
+    id_field_mapping: Optional[dict[str, str]] = None,
+    force_transmog_id: bool = False,
 ) -> StreamExtractResult:
     """Extract nested arrays into a stream of records for memory-efficient processing.
 
@@ -404,17 +473,20 @@ def stream_extract_arrays(
         cast_to_string: Whether to cast all values to strings
         include_empty: Whether to include empty values
         skip_null: Whether to skip null values
-        extract_time: Extraction timestamp
+        transmog_time: Transmog timestamp
         id_field: ID field name
         parent_field: Parent ID field name
         time_field: Timestamp field name
-        deeply_nested_threshold: Threshold for deep nesting (default 4)
+        nested_threshold: Threshold for deep nesting (default 4)
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
         id_generation_strategy: Custom function for ID generation
         recovery_strategy: Strategy for error recovery
         max_depth: Maximum recursion depth allowed
-        current_depth: Current depth in the recursion
+        current_depth: Depth in the recursion
+        id_field_patterns: List of field names to check for natural IDs
+        id_field_mapping: Optional mapping of paths to specific ID fields
+        force_transmog_id: If True, always add transmog ID
 
     Yields:
         Tuples of (table_name, record) for each extracted record
@@ -424,9 +496,9 @@ def stream_extract_arrays(
         - Dictionary items that are empty are also skipped
         - Null values in arrays are skipped when skip_null is True
     """
-    # Initialize extraction timestamp if not provided
-    if extract_time is None:
-        extract_time = datetime.now()
+    # Initialize transmog timestamp if not provided
+    if transmog_time is None:
+        transmog_time = datetime.now()
 
     # Process all records from the implementation and yield each record individually
     yield from _extract_arrays_impl(
@@ -438,15 +510,18 @@ def stream_extract_arrays(
         cast_to_string=cast_to_string,
         include_empty=include_empty,
         skip_null=skip_null,
-        extract_time=extract_time,
+        transmog_time=transmog_time,
         id_field=id_field,
         parent_field=parent_field,
         time_field=time_field,
-        deeply_nested_threshold=deeply_nested_threshold,
+        nested_threshold=nested_threshold,
         default_id_field=default_id_field,
         id_generation_strategy=id_generation_strategy,
         recovery_strategy=recovery_strategy,
         max_depth=max_depth,
         current_depth=current_depth,
         streaming_mode=True,
+        id_field_patterns=id_field_patterns,
+        id_field_mapping=id_field_mapping,
+        force_transmog_id=force_transmog_id,
     )

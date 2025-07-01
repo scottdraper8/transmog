@@ -31,6 +31,7 @@ class ProcessingConfig:
     memory_tracking_enabled: bool = (
         False  # Controls memory usage tracking during processing
     )
+    force_transmog_id: bool = False  # Controls whether to always add transmog ID
     additional_options: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:

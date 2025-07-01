@@ -7,7 +7,7 @@ including default settings, profiles, and environmental configuration.
 import json
 import logging
 import os
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from ..error.exceptions import ConfigurationError
 
@@ -20,7 +20,7 @@ DEFAULT_OPTIONS = {
     "include_empty": False,
     "skip_null": True,
     "visit_arrays": True,
-    "deeply_nested_threshold": 4,
+    "nested_threshold": 4,
     "preserve_leaf_component": True,
     "path_parts_optimization": True,
     "max_nesting_depth": 100,
@@ -28,10 +28,15 @@ DEFAULT_OPTIONS = {
     "batch_size": 1000,
     "processing_mode": "standard",
     "memory_threshold": 100 * 1024 * 1024,  # 100MB threshold for memory mode switching
-    "memory_tracking_enabled": False,  # Memory usage tracking flag
+    "memory_tracking_enabled": True,  # Enable memory usage tracking
+    "adaptive_batch_sizing": True,  # Enable adaptive batch sizing
+    "memory_pressure_threshold": 0.8,  # Memory pressure threshold (0.0-1.0)
     "cache_enabled": True,
     "cache_maxsize": 10000,
+    "adaptive_cache_sizing": True,  # Enable adaptive cache sizing
     "clear_cache_after_batch": False,
+    "gc_frequency": 1000,  # Garbage collection frequency
+    "strategic_gc_enabled": True,  # Enable strategic garbage collection
 }
 
 # Configuration file path environment variable
@@ -50,9 +55,9 @@ class TransmogSettings:
     DEFAULT_CAST_TO_STRING = True
     DEFAULT_INCLUDE_EMPTY = False
     DEFAULT_SKIP_NULL = True
-    DEFAULT_ID_FIELD = "__extract_id"
-    DEFAULT_PARENT_FIELD = "__parent_extract_id"
-    DEFAULT_TIME_FIELD = "__extract_datetime"
+    DEFAULT_ID_FIELD = "__transmog_id"
+    DEFAULT_PARENT_FIELD = "__parent_transmog_id"
+    DEFAULT_TIME_FIELD = "__transmog_datetime"
     DEFAULT_BATCH_SIZE = 1000
     DEFAULT_OPTIMIZE_FOR_MEMORY = False
     DEFAULT_MAX_NESTING_DEPTH = None
@@ -61,7 +66,28 @@ class TransmogSettings:
     DEFAULT_ALLOW_MALFORMED_DATA = False
     DEFAULT_DEFAULT_ID_FIELD = None
     DEFAULT_ID_GENERATION_STRATEGY = None
-    DEFAULT_DEEPLY_NESTED_THRESHOLD = 4
+    DEFAULT_NESTED_THRESHOLD = 4
+    DEFAULT_FORCE_TRANSMOG_ID = False
+    DEFAULT_ID_FIELD_PATTERNS = [
+        "id",
+        "ID",
+        "Id",
+        "_id",
+        "uuid",
+        "UUID",
+        "guid",
+        "GUID",
+        "pk",
+        "PK",
+        "primary_key",
+        "key",
+        "identifier",
+        "code",
+        "number",
+        "no",
+    ]
+    DEFAULT_NATURAL_ID_FIELD = None  # Will use ID discovery by default
+    DEFAULT_ID_FIELD_MAPPING = None  # Optional per-table mapping
 
     # CSV settings
     DEFAULT_CSV_DELIMITER = ","
@@ -92,23 +118,35 @@ class TransmogSettings:
         },
         "memory_efficient": {
             "optimize_for_memory": True,
-            "batch_size": 500,
-            "chunk_size": 200,
+            "batch_size": 200,  # Smaller batches for memory efficiency
+            "chunk_size": 100,
             "lru_cache_size": 256,
             "cache_enabled": True,
             "cache_maxsize": 1000,
+            "adaptive_cache_sizing": True,
             "clear_cache_after_batch": True,
+            "memory_tracking_enabled": True,
+            "adaptive_batch_sizing": True,
+            "memory_pressure_threshold": 0.7,  # Lower threshold for memory-efficient
+            "gc_frequency": 500,  # More frequent GC
+            "strategic_gc_enabled": True,
         },
         "performance": {
             "optimize_for_memory": False,
-            "batch_size": 2000,
-            "chunk_size": 1000,
+            "batch_size": 5000,  # Larger batches for performance
+            "chunk_size": 2000,
             "path_parts_optimization": True,
             "lru_cache_size": 2048,
             "max_workers": 8,
             "cache_enabled": True,
             "cache_maxsize": 50000,
+            "adaptive_cache_sizing": False,  # Use fixed large cache for performance
             "clear_cache_after_batch": False,
+            "memory_tracking_enabled": False,  # Disable for maximum performance
+            "adaptive_batch_sizing": False,  # Use fixed large batches
+            "memory_pressure_threshold": 0.9,  # Higher threshold for performance mode
+            "gc_frequency": 2000,  # Less frequent GC
+            "strategic_gc_enabled": False,  # Disable strategic GC for performance
         },
         "strict": {
             "allow_malformed_data": False,
@@ -121,10 +159,10 @@ class TransmogSettings:
             "skip_null": False,
         },
         "simple_naming": {
-            "deeply_nested_threshold": 6,
+            "nested_threshold": 6,
         },
         "compact_naming": {
-            "deeply_nested_threshold": 3,
+            "nested_threshold": 3,
         },
         "csv_strict": {
             "csv_delimiter": ",",
@@ -464,7 +502,7 @@ class TransmogSettings:
         raise AttributeError(f"Setting '{name}' not found")
 
     def update(self, **kwargs: Any) -> None:
-        """Update settings with new values.
+        """Update settings with values.
 
         Args:
             **kwargs: Settings to update
@@ -482,7 +520,7 @@ class TransmogSettings:
         return dict(self._settings)
 
     def configure_logging(self) -> None:
-        """Configure logging based on current settings."""
+        """Configure logging based on settings."""
         log_level = self.get("log_level", logging.WARNING)
         log_format = self.get("log_format")
         log_file = self.get("log_file")
@@ -490,74 +528,6 @@ class TransmogSettings:
         from ..error.handling import setup_logging
 
         setup_logging(level=log_level, log_format=log_format, log_file=log_file)
-
-
-# Extension point registration system
-class ExtensionRegistry:
-    """Registry for Transmog extensions and custom handlers."""
-
-    def __init__(self) -> None:
-        """Initialize the extension registry."""
-        self._type_handlers: dict[str, Callable[..., Any]] = {}
-        self._naming_strategies: dict[str, Callable[..., Any]] = {}
-        self._validators: dict[str, Callable[..., Any]] = {}
-
-    def register_type_handler(
-        self, type_name: str, handler_func: Callable[..., Any]
-    ) -> None:
-        """Register a custom type handler.
-
-        Args:
-            type_name: Type name to handle
-            handler_func: Handler function
-        """
-        self._type_handlers[type_name] = handler_func
-
-    def register_naming_strategy(
-        self, strategy_name: str, strategy_func: Callable[..., Any]
-    ) -> None:
-        """Register a custom naming strategy.
-
-        Args:
-            strategy_name: Strategy name
-            strategy_func: Strategy function
-        """
-        self._naming_strategies[strategy_name] = strategy_func
-
-    def register_validator(
-        self, field_pattern: str, validator_func: Callable[..., Any]
-    ) -> None:
-        """Register a custom field validator.
-
-        Args:
-            field_pattern: Field pattern to validate
-            validator_func: Validator function
-        """
-        self._validators[field_pattern] = validator_func
-
-    def get_type_handler(self, type_name: str) -> Optional[Callable[..., Any]]:
-        """Get a registered type handler by name."""
-        return self._type_handlers.get(type_name)
-
-    def get_naming_strategy(self, strategy_name: str) -> Optional[Callable[..., Any]]:
-        """Get a registered naming strategy by name."""
-        return self._naming_strategies.get(strategy_name)
-
-    def get_validator(self, field_pattern: str) -> Optional[Callable[..., Any]]:
-        """Get a registered validator by field pattern."""
-        return self._validators.get(field_pattern)
-
-    def get_all_type_handlers(self) -> dict[str, Callable[..., Any]]:
-        """Get all registered type handlers."""
-        return dict(self._type_handlers)
-
-    def get_all_naming_strategies(self) -> dict[str, Callable[..., Any]]:
-        """Get all registered naming strategies."""
-        return dict(self._naming_strategies)
-
-    def get_all_validators(self) -> dict[str, Callable[..., Any]]:
-        """Get all registered validators."""
-        return dict(self._validators)
 
 
 # Global settings instance

@@ -17,8 +17,11 @@ from .exceptions import (
 
 # Error handling utilities
 from .handling import (
+    build_error_context,
     check_dependency,
     error_context,
+    format_error_message,
+    get_recovery_strategy,
     logger,
     require_dependency,
     safe_json_loads,
@@ -49,7 +52,10 @@ __all__ = [
     "ConfigurationError",
     "OutputError",
     # Error handling
+    "build_error_context",
     "error_context",
+    "format_error_message",
+    "get_recovery_strategy",
     "setup_logging",
     "safe_json_loads",
     "check_dependency",

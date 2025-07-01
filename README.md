@@ -4,125 +4,104 @@
 [![Python versions](https://img.shields.io/badge/python-3.9%2B-blue?logo=python)](https://pypi.org/project/transmog/)
 [![License](https://img.shields.io/github/license/scottdraper8/transmog.svg?logo=github)](https://github.com/scottdraper8/transmog/blob/main/LICENSE)
 
-A Python library for transforming complex nested data structures into flat,
-tabular formats while preserving hierarchical relationships.
+Transform nested data into flat tables with a simple, intuitive API.
 
-## Features
+## Overview
 
-- **Multiple Input Formats**: JSON, JSONL, CSV
-- **Nested Structure Handling**: Flattens deeply nested objects with customizable separators
-- **Array Processing**: Extracts arrays as child tables with parent-child relationships maintained
-- **Output Options**: Python dictionaries, PyArrow tables, JSON, CSV, Parquet
-- **Performance Features**: Chunked processing, streaming output, memory optimization
-- **Data Integrity**: Deterministic ID generation, consistent parent-child linking
-- **Error Recovery**: Configurable strategies for handling malformed data
+Transmog transforms nested JSON data into flat, tabular formats while preserving relationships between parent and child records.
 
-## Installation
+**Key Features:**
+
+- Simple one-function API with smart defaults
+- Multiple output formats (JSON, CSV, Parquet)
+- Automatic relationship preservation
+- Memory-efficient streaming for large datasets
+
+## Quick Start
 
 ```bash
 pip install transmog
 ```
 
-Optional dependencies:
-
-```bash
-pip install transmog[dev]  # Development tools
-```
-
-## Quick Example
-
 ```python
 import transmog as tm
 
-# Sample nested data
+# Transform nested data into flat tables
+result = tm.flatten({"name": "Product", "specs": {"cpu": "i7", "ram": "16GB"}})
+print(result.main)  # Flattened data: [{'name': 'Product', 'specs_cpu': 'i7', ...}]
+
+# Save in any format
+result.save("output.json")
+```
+
+## Example
+
+Transform complex nested data into relational tables:
+
+```python
 data = {
-    "user": {
-        "id": 1,
-        "name": "John Doe",
-        "contact": {
-            "email": "john@example.com"
-        },
-        "orders": [
-            {"id": 101, "amount": 99.99},
-            {"id": 102, "amount": 45.50}
-        ]
-    }
+    "user": {"name": "Alice", "email": "alice@example.com"},
+    "orders": [
+        {"id": 101, "amount": 99.99},
+        {"id": 102, "amount": 45.50}
+    ]
 }
 
-# Process the data
-processor = tm.Processor()
-result = processor.process(data)
+result = tm.flatten(data, name="customer")
 
-# Access the data
-tables = result.to_dict()
-main_table = tables["main"]
-orders = tables["user_orders"]
-
-# Export to different formats
-result.write_all_json("output/json")
-result.write_all_csv("output/csv")
-result.write_all_parquet("output/parquet")
+# Main table: [{'user_name': 'Alice', 'user_email': 'alice@...', '_id': '...'}]
+# Orders table: [{'id': 101, 'amount': 99.99, '_parent_id': '...'}, ...]
 ```
 
-## Configuration
+**Key Options:**
+
+- Custom field separators: `separator="."`
+- Use existing IDs: `id_field="customer_id"`
+- Error handling: `errors="skip"`
+- File processing: `tm.flatten_file("data.json")`
+
+## Advanced Options
+
+For more control:
 
 ```python
-# Use pre-configured modes
-config = tm.TransmogConfig.memory_optimized()
-# or
-config = tm.TransmogConfig.performance_optimized()
-
-# Custom configuration
-config = (
-    tm.TransmogConfig.default()
-    .with_naming(separator=".")
-    .with_processing(cast_to_string=True)
-    .with_metadata(id_field="custom_id")
-    .with_error_handling(max_retries=3)
+result = tm.flatten(
+    data,
+    name="products",
+    # Naming
+    separator=".",              # Use dots: user.name
+    nested_threshold=3,         # Simplify deeply nested names
+    # IDs
+    id_field="sku",            # Use existing field as ID
+    parent_id_field="_parent",  # Customize parent reference name
+    add_timestamp=True,         # Add timestamp to records
+    # Arrays
+    arrays="inline",           # Keep arrays as JSON instead of separate tables
+    # Data handling
+    preserve_types=True,       # Keep original types (don't convert to strings)
+    skip_null=False,           # Include null values
+    skip_empty=False,          # Include empty strings/lists
+    # Performance
+    batch_size=5000,           # Process in larger batches
+    low_memory=True,           # Optimize for low memory usage
 )
-
-processor = tm.Processor(config=config)
-```
-
-## Large Dataset Processing
-
-```python
-# Memory-optimized processing
-processor = tm.Processor.memory_optimized()
-
-# Chunked processing
-result = processor.process_chunked(
-    "large_data.jsonl",
-    entity_name="records",
-    chunk_size=1000
-)
-
-# Streaming output
-processor.stream_process_file(
-    "large_data.jsonl",
-    entity_name="records",
-    output_format="parquet",
-    output_destination="output_dir"
-)
-```
-
-## Error Handling
-
-```python
-# Skip and log errors
-processor = tm.Processor().with_error_handling(recovery_strategy="skip")
-
-# Partial recovery (preserves valid portions)
-processor = tm.Processor.with_partial_recovery()
 ```
 
 ## Documentation
 
-- [Installation Guide](https://scottdraper8.github.io/transmog/installation.html)
-- [Getting Started](https://scottdraper8.github.io/transmog/getting-started.html)
-- [Configuration Guide](https://scottdraper8.github.io/transmog/configuration.html)
-- [API Reference](https://scottdraper8.github.io/transmog/api/index.html)
-- [Examples](examples/README.md)
+Complete documentation is available at
+[scottdraper8.github.io/transmog](https://scottdraper8.github.io/transmog), including:
+
+- [Quick Start Guide](https://scottdraper8.github.io/transmog/quickstart.html)
+- [User Guides](https://scottdraper8.github.io/transmog/guides/)
+- [API Reference](https://scottdraper8.github.io/transmog/reference/)
+- [Advanced Topics](https://scottdraper8.github.io/transmog/advanced/)
+
+## Contributing
+
+For contribution guidelines, development setup, and coding standards,
+see the [Contributing Guide](https://scottdraper8.github.io/transmog/development/contributing.html)
+in the documentation.
 
 ## License
 

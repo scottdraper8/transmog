@@ -1,346 +1,263 @@
 """
-Pytest configuration for Transmog tests.
+Pytest configuration for Transmog v1.1.0 tests.
 
 This file contains fixtures and configuration for testing the Transmog package.
+All tests use real functionality without mocks.
 """
 
 import json
-import os
-import sys
+import tempfile
+from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 
-# Add the package root to sys.path for importing
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-# Import core package components
-from transmog import Processor
-from transmog.config import TransmogConfig
-
-
-# Clear any module-level caches before and after tests
-@pytest.fixture(autouse=True)
-def clear_caches():
-    """Clear all caches before and after each test to prevent state pollution."""
-    # Import locally to avoid circular imports
-    from transmog.core.flattener import clear_caches
-
-    # Clear caches before test
-    clear_caches()
-
-    # Run the test
-    yield
-
-    # Clear caches after test
-    clear_caches()
-
+# Import the actual v1.1.0 API
+import transmog as tm
 
 # ---- Test Data Fixtures ----
 
 
 @pytest.fixture
 def simple_data() -> dict[str, Any]:
-    """Return a simple nested JSON structure."""
+    """Simple nested data structure for basic testing."""
     return {
-        "id": 123,
+        "id": 1,
         "name": "Test Entity",
-        "address": {
-            "street": "123 Main St",
-            "city": "Anytown",
-            "state": "CA",
-            "zip": "12345",
+        "status": "active",
+        "metadata": {
+            "created_at": "2023-01-01T00:00:00Z",
+            "updated_at": "2023-01-02T00:00:00Z",
+            "version": 1,
         },
-        "contacts": [
+    }
+
+
+@pytest.fixture
+def array_data() -> dict[str, Any]:
+    """Data with arrays for testing array handling."""
+    return {
+        "id": 1,
+        "name": "Company",
+        "tags": ["tech", "startup", "ai"],
+        "employees": [
             {
-                "type": "primary",
-                "name": "John Doe",
-                "phone": "555-1234",
-                "details": {"department": "Sales", "position": "Manager"},
+                "id": 101,
+                "name": "Alice",
+                "role": "Engineer",
+                "skills": ["python", "sql", "docker"],
             },
             {
-                "type": "secondary",
-                "name": "Jane Smith",
-                "phone": "555-5678",
-                "details": {"department": "Support", "position": "Director"},
+                "id": 102,
+                "name": "Bob",
+                "role": "Designer",
+                "skills": ["figma", "photoshop"],
             },
         ],
     }
 
 
 @pytest.fixture
-def complex_data() -> dict[str, Any]:
-    """Return a complex nested JSON structure with multiple levels of nesting."""
+def complex_nested_data() -> dict[str, Any]:
+    """Complex deeply nested data structure."""
     return {
-        "id": 456,
+        "id": 1,
         "name": "Complex Entity",
-        "metadata": {
-            "created_at": "2023-01-01T00:00:00Z",
-            "updated_at": "2023-01-02T00:00:00Z",
-            "status": "active",
-            "tags": ["tag1", "tag2", "tag3"],
-            "flags": {"important": True, "verified": False, "featured": True},
-        },
-        "details": {
-            "description": "Complex nested structure",
-            "attributes": {"color": "blue", "size": "medium", "weight": 15.5},
-            "metrics": [
-                {"name": "views", "value": 1000, "unit": "count"},
-                {"name": "score", "value": 4.5, "unit": "points"},
+        "organization": {
+            "id": "org-1",
+            "name": "Main Org",
+            "departments": [
+                {
+                    "id": "dept-1",
+                    "name": "Engineering",
+                    "teams": [
+                        {
+                            "id": "team-1",
+                            "name": "Backend",
+                            "members": [
+                                {"id": "emp-1", "name": "John", "role": "Senior"},
+                                {"id": "emp-2", "name": "Jane", "role": "Junior"},
+                            ],
+                        },
+                        {
+                            "id": "team-2",
+                            "name": "Frontend",
+                            "members": [
+                                {"id": "emp-3", "name": "Mike", "role": "Lead"}
+                            ],
+                        },
+                    ],
+                },
+                {
+                    "id": "dept-2",
+                    "name": "Sales",
+                    "teams": [
+                        {
+                            "id": "team-3",
+                            "name": "Enterprise",
+                            "members": [
+                                {"id": "emp-4", "name": "Sarah", "role": "Manager"}
+                            ],
+                        }
+                    ],
+                },
             ],
         },
-        "related_items": [
-            {
-                "id": "related-1",
-                "name": "Related 1",
-                "type": "reference",
-                "strength": 0.9,
-                "sub_items": [
-                    {
-                        "id": "sub-1-1",
-                        "value": 0.1,
-                        "properties": {"enabled": True, "visible": True},
-                    },
-                    {
-                        "id": "sub-1-2",
-                        "value": 0.2,
-                        "properties": {"enabled": False, "visible": True},
-                    },
-                ],
-            },
-            {
-                "id": "related-2",
-                "name": "Related 2",
-                "type": "similar",
-                "strength": 0.7,
-                "sub_items": [
-                    {
-                        "id": "sub-2-1",
-                        "value": 0.3,
-                        "properties": {"enabled": True, "visible": False},
-                    }
-                ],
-            },
-        ],
     }
 
 
 @pytest.fixture
 def batch_data() -> list[dict[str, Any]]:
-    """Return a batch of simple records for testing."""
-    return [{"id": i, "name": f"Record {i}", "value": i * 10} for i in range(10)]
-
-
-@pytest.fixture
-def complex_batch() -> list[dict[str, Any]]:
-    """Return a batch of records with nested structures."""
+    """Batch of records for testing."""
     return [
         {
             "id": i,
             "name": f"Record {i}",
-            "metadata": {
-                "created": "2023-01-01",
-                "type": "test" if i % 2 == 0 else "production",
-            },
-            "items": [
-                {"id": f"{i}-{j}", "name": f"Item {j}", "quantity": j}
-                for j in range(1, 4)
-            ],
+            "value": i * 10,
+            "tags": [f"tag{i}", f"category{i % 3}"],
         }
-        for i in range(5)
+        for i in range(1, 11)
     ]
 
 
 @pytest.fixture
-def deeply_nested_data() -> dict[str, Any]:
-    """Return data with a deeply nested structure for max depth testing."""
-    result = {"id": 789, "name": "Deeply Nested Structure"}
+def mixed_types_data() -> dict[str, Any]:
+    """Data with various data types."""
+    return {
+        "id": 1,
+        "name": "Mixed Types Test",
+        "active": True,
+        "score": 95.5,
+        "count": 42,
+        "created_at": "2023-01-01T00:00:00Z",
+        "tags": ["string", "array"],
+        "metadata": {
+            "null_value": None,
+            "empty_string": "",
+            "zero": 0,
+            "false_value": False,
+            "nested_array": [1, 2, 3],
+        },
+    }
 
-    # Create a deeply nested structure (10 levels deep)
-    current = result
-    for i in range(10):
-        current["level"] = {"id": f"level-{i}", "name": f"Level {i}"}
-        current = current["level"]
 
-    return result
+@pytest.fixture
+def problematic_data() -> list[dict[str, Any]]:
+    """Data that might cause processing issues."""
+    return [
+        {"id": 1, "name": "Valid Record"},
+        {"id": None, "name": "Null ID"},
+        {"name": "Missing ID"},
+        {"id": "", "name": "Empty ID"},
+        {"id": 2, "name": None},
+        {"id": 3, "name": ""},
+        {"id": 4, "circular_ref": None},  # Will be modified in tests
+    ]
 
 
-# ---- Test File Fixtures ----
+# ---- File Fixtures ----
 
 
 @pytest.fixture
 def json_file(tmp_path, simple_data) -> str:
-    """Create and return a temporary JSON file."""
-    json_path = tmp_path / "test.json"
-    with open(json_path, "w") as f:
+    """Create a temporary JSON file."""
+    file_path = tmp_path / "test.json"
+    with open(file_path, "w") as f:
         json.dump(simple_data, f)
-    return str(json_path)
+    return str(file_path)
 
 
 @pytest.fixture
 def jsonl_file(tmp_path, batch_data) -> str:
-    """Create and return a temporary JSONL file."""
-    jsonl_path = tmp_path / "test.jsonl"
-    with open(jsonl_path, "w") as f:
+    """Create a temporary JSONL file."""
+    file_path = tmp_path / "test.jsonl"
+    with open(file_path, "w") as f:
         for record in batch_data:
             f.write(json.dumps(record) + "\n")
-    return str(jsonl_path)
+    return str(file_path)
 
 
 @pytest.fixture
-def csv_file(tmp_path, batch_data) -> str:
-    """Create and return a temporary CSV file."""
-    import csv
-
-    csv_path = tmp_path / "test.csv"
-
-    # Get all keys from the batch
-    keys = set()
-    for record in batch_data:
-        keys.update(record.keys())
-    keys = sorted(keys)
-
-    with open(csv_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=keys)
-        writer.writeheader()
-        writer.writerows(batch_data)
-
-    return str(csv_path)
-
-
-# ---- Processor Fixtures ----
+def csv_file(tmp_path) -> str:
+    """Create a temporary CSV file."""
+    file_path = tmp_path / "test.csv"
+    csv_content = """id,name,value,active
+1,Alice,100,true
+2,Bob,200,false
+3,Charlie,300,true
+"""
+    with open(file_path, "w") as f:
+        f.write(csv_content)
+    return str(file_path)
 
 
 @pytest.fixture
-def processor():
-    """Return a basic processor with default configuration."""
-    config = (
-        TransmogConfig.default()
-        .with_processing(cast_to_string=True)
-        .with_naming(
-            separator="_",  # Ensure consistency in tests
-            deeply_nested_threshold=4,  # Use standard deeply nested threshold
-        )
-    )
-    return Processor(config=config)
+def large_json_file(tmp_path) -> str:
+    """Create a large JSON file for streaming tests."""
+    file_path = tmp_path / "large.json"
+    large_data = [
+        {
+            "id": i,
+            "name": f"Record {i}",
+            "data": {
+                "value": i * 10,
+                "category": f"cat_{i % 5}",
+                "items": [{"item_id": f"{i}-{j}", "quantity": j} for j in range(1, 4)],
+            },
+        }
+        for i in range(1, 1001)  # 1000 records
+    ]
+    with open(file_path, "w") as f:
+        json.dump(large_data, f)
+    return str(file_path)
+
+
+# ---- Output Directory Fixtures ----
 
 
 @pytest.fixture
-def memory_optimized_processor():
-    """Return a memory-optimized processor."""
-    return Processor.memory_optimized()
+def output_dir(tmp_path) -> Path:
+    """Create a temporary output directory."""
+    output_path = tmp_path / "output"
+    output_path.mkdir(exist_ok=True)
+    return output_path
 
 
 @pytest.fixture
-def performance_optimized_processor():
-    """Return a performance-optimized processor."""
-    return Processor.performance_optimized()
+def temp_file(tmp_path) -> Path:
+    """Create a temporary file path."""
+    return tmp_path / "temp_output.json"
 
 
-# ---- Dependency Management Fixtures ----
+# ---- Utility Functions ----
 
 
-@pytest.fixture
-def dependency_status():
-    """Return the availability status of optional dependencies."""
-    return {
-        "pyarrow": _is_dependency_available("pyarrow"),
-        "orjson": _is_dependency_available("orjson"),
-        "zstandard": _is_dependency_available("zstandard"),
-    }
+def assert_valid_result(result: tm.FlattenResult) -> None:
+    """Assert that a FlattenResult is valid."""
+    assert isinstance(result, tm.FlattenResult)
+    assert hasattr(result, "main")
+    assert hasattr(result, "tables")
+    assert isinstance(result.main, list)
+    assert isinstance(result.tables, dict)
 
 
-def _is_dependency_available(module_name):
-    """Check if a dependency is available."""
-    try:
-        __import__(module_name)
-        return True
-    except ImportError:
-        return False
+def assert_record_has_id(record: dict[str, Any]) -> None:
+    """Assert that a record has some form of ID."""
+    assert "_id" in record or "id" in record, f"Record missing ID: {record}"
 
 
-@pytest.fixture
-def dependency_injection_factory():
-    """Create a factory for injecting dependencies."""
-
-    def _create_dependency_injector(module_name, mock_attributes=None):
-        """
-        Create an injector for dependencies.
-
-        Args:
-            module_name: Name of the module to inject
-            mock_attributes: Dictionary of attributes to mock
-
-        Returns:
-            Function that injects dependencies
-        """
-        mock_attributes = mock_attributes or {}
-
-        def _injector(monkeypatch):
-            # Try to import the real module
-            try:
-                real_module = __import__(module_name)
-
-                # Create a mock that wraps the real module
-                mock_module = MagicMock(wraps=real_module)
-
-                # Override specific attributes
-                for attr_name, mock_value in mock_attributes.items():
-                    setattr(mock_module, attr_name, mock_value)
-
-            except ImportError:
-                # If real module is not available, create a pure mock
-                mock_module = MagicMock()
-
-                # Add a custom is_available method that returns False
-                mock_module.is_available = lambda: False
-
-                # Set all required mock attributes
-                for attr_name, mock_value in mock_attributes.items():
-                    setattr(mock_module, attr_name, mock_value)
-
-            # Apply the mock
-            monkeypatch.setitem(sys.modules, module_name, mock_module)
-
-            return mock_module
-
-        return _injector
-
-    return _create_dependency_injector
+def assert_files_created(paths: list[str]) -> None:
+    """Assert that all specified file paths exist."""
+    for path in paths:
+        assert Path(path).exists(), f"File not created: {path}"
 
 
-# Configure pytest
-def pytest_configure(config):
-    """Configure pytest with custom markers."""
-    config.addinivalue_line(
-        "markers", "requires_pyarrow: mark test that requires PyArrow"
-    )
-    config.addinivalue_line(
-        "markers", "requires_orjson: mark test that requires orjson"
-    )
-    config.addinivalue_line(
-        "markers", "requires_zstandard: mark test that requires zstandard"
-    )
-    config.addinivalue_line("markers", "integration: mark test as an integration test")
-    config.addinivalue_line(
-        "markers", "benchmark: mark test as a performance benchmark"
-    )
+def load_json_file(file_path: str) -> Any:
+    """Load data from a JSON file."""
+    with open(file_path) as f:
+        return json.load(f)
 
 
-# Define dependency-specific test skipping
-def pytest_runtest_setup(item):
-    """Skip tests based on dependency requirements."""
-    for marker in item.iter_markers():
-        if marker.name == "requires_pyarrow" and not _is_dependency_available(
-            "pyarrow"
-        ):
-            pytest.skip("PyArrow is required for this test")
-        elif marker.name == "requires_orjson" and not _is_dependency_available(
-            "orjson"
-        ):
-            pytest.skip("orjson is required for this test")
-        elif marker.name == "requires_zstandard" and not _is_dependency_available(
-            "zstandard"
-        ):
-            pytest.skip("zstandard is required for this test")
+def count_files_in_dir(directory: Path, pattern: str = "*") -> int:
+    """Count files matching pattern in directory."""
+    return len(list(directory.glob(pattern)))
