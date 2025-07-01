@@ -383,11 +383,10 @@ Releases follow semantic versioning:
 
 ## Getting Help
 
-- **Documentation**: Check the [documentation](https://scottdraper.github.io/transmog/)
+- **Documentation**: Check the documentation (available after deployment)
 - **Issues**: Search existing
-  [GitHub issues](https://github.com/scottdraper/transmog/issues)
-- **Discussions**: Use [GitHub Discussions](https://github.com/scottdraper/transmog/discussions)
-  for questions
+  [GitHub issues](https://github.com/scottdraper8/transmog/issues)
+- **Questions**: Use GitHub issues for questions and support
 - **Contact**: Reach out to maintainers for guidance on larger
   contributions
 
