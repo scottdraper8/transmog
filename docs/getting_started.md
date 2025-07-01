@@ -4,7 +4,8 @@ This guide provides everything needed to get up and running quickly with data tr
 
 ## What is Transmog?
 
-Transmog transforms complex nested data structures into flat, tabular formats while preserving relationships between parent and child records. Perfect for:
+Transmog transforms complex nested data structures into flat, tabular formats while preserving
+relationships between parent and child records. Perfect for:
 
 - Converting JSON data for database storage
 - Preparing API responses for analytics
@@ -62,6 +63,7 @@ print(result.tables["companies_employees"])
 **Output:**
 
 Main table:
+
 ```python
 [{
     'company': 'TechCorp',
@@ -72,6 +74,7 @@ Main table:
 ```
 
 Employee table:
+
 ```python
 [
     {
@@ -106,10 +109,10 @@ Process files directly:
 result = tm.flatten_file("data.json", name="products")
 
 # Save results as CSV
-result.save("output", format="csv")
+result.save("output", output_format="csv")
 
 # Save results as JSON
-result.save("output", format="json")
+result.save("output", output_format="json")
 ```
 
 ### Streaming Large Data
@@ -122,7 +125,7 @@ tm.flatten_stream(
     large_data,
     output_path="output/",
     name="large_dataset",
-    format="parquet"
+    output_format="parquet"
 )
 ```
 
@@ -225,7 +228,8 @@ result = tm.flatten(data, errors="skip")
 result = tm.flatten(data, errors="warn")
 ```
 
-The error handling system provides consistent error messages with standardized templates and context information across all processing modules.
+The error handling system provides consistent error messages with standardized templates and
+context information across all processing modules.
 
 ## Common Patterns
 
@@ -305,10 +309,10 @@ result = tm.flatten(data, name="table_name")
 result = tm.flatten_file("input.json", name="table_name")
 
 # Streaming
-tm.flatten_stream(data, "output/", name="table_name", format="parquet")
+tm.flatten_stream(data, "output/", name="table_name", output_format="parquet")
 
 # Save results
-result.save("output", format="csv")
+result.save("output", output_format="csv")
 result.save("output.json")  # Single file for simple data
 
 # Access data

@@ -154,8 +154,7 @@ class TestBatchStrategy:
 
         # Convert to generator
         def data_generator():
-            for item in batch_data:
-                yield item
+            yield from batch_data
 
         result = strategy.process(data_generator(), entity_name="test_gen")
 

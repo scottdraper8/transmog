@@ -1,6 +1,7 @@
 # Error Handling
 
-This guide covers Transmog's error handling capabilities, including error recovery strategies and robust data processing techniques.
+This guide covers Transmog's error handling capabilities, including error recovery strategies and
+robust data processing techniques.
 
 ## Error Handling Overview
 
@@ -12,7 +13,8 @@ Transmog provides three error handling strategies to manage problematic data:
 | `"skip"` | Skip problematic records and continue | Production, data quality issues |
 | `"warn"` | Log warnings but continue processing | Monitoring, partial data recovery |
 
-The error handling system uses standardized error message templates and context-aware error reporting for consistent behavior across all processing modules.
+The error handling system uses standardized error message templates and context-aware error
+reporting for consistent behavior across all processing modules.
 
 ## Error Handling Modes
 
@@ -181,7 +183,7 @@ def process_files_with_recovery(file_pattern, output_dir, **options):
 
             # Save successful results
             output_file = Path(output_dir) / f"{Path(file_path).stem}"
-            result.save(output_file, format="json")
+            result.save(output_file, output_format="json")
             successful.append(file_path)
 
         except Exception as e:
@@ -213,7 +215,7 @@ try:
         large_problematic_dataset,
         output_path="streaming_output/",
         name="large_data",
-        format="parquet",
+        output_format="parquet",
         errors="skip",       # Skip problematic records
         batch_size=1000,
         low_memory=True
@@ -240,7 +242,7 @@ def streaming_with_checkpoints(data, output_path, checkpoint_interval=10000):
                 chunk,
                 output_path=f"{output_path}/{chunk_name}/",
                 name="data",
-                format="parquet",
+                output_format="parquet",
                 errors="skip",       # Skip problematic records in chunk
                 batch_size=1000
             )

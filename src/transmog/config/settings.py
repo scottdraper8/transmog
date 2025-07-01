@@ -127,7 +127,7 @@ class TransmogSettings:
             "clear_cache_after_batch": True,
             "memory_tracking_enabled": True,
             "adaptive_batch_sizing": True,
-            "memory_pressure_threshold": 0.7,  # Lower threshold for memory-efficient mode
+            "memory_pressure_threshold": 0.7,  # Lower threshold for memory-efficient
             "gc_frequency": 500,  # More frequent GC
             "strategic_gc_enabled": True,
         },

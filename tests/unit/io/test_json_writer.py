@@ -7,7 +7,7 @@ Tests JSON output, formatting, and writer interface implementation.
 import json
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 
@@ -512,5 +512,5 @@ class TestJsonWriter:
         assert len(results) == 5
 
         # All threads should have written the same number of records
-        for thread_id, record_count in results:
+        for _thread_id, record_count in results:
             assert record_count == len(sample_data)

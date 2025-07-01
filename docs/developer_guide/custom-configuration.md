@@ -1,6 +1,8 @@
 # Custom Configuration Patterns
 
-Advanced Transmog usage often requires fine-grained control over processing behavior. The internal configuration system provides flexible options for customizing data transformation, naming conventions, and processing strategies.
+Advanced Transmog usage often requires fine-grained control over processing behavior. The
+internal configuration system provides flexible options for customizing data transformation,
+naming conventions, and processing strategies.
 
 ## Configuration System Overview
 

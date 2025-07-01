@@ -4,21 +4,24 @@ Provides settings management, profile configuration, and extension points.
 """
 
 import dataclasses
+import logging
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Union, cast
 
 from transmog.config.settings import (
     TransmogSettings,
-    configure,
-    load_config,
-    load_profile,
+    configure as configure,
+    load_config as load_config,
+    load_profile as load_profile,
 )
 from transmog.error import ConfigurationError
 from transmog.validation import (
     ParameterValidator,
     validate_config_parameters,
 )
+
+logger = logging.getLogger(__name__)
 
 # Internal use only - use the tm.flatten() API
 # These are still needed internally but not exported
@@ -64,18 +67,75 @@ class ProcessingConfig:
     validate_table_names: bool = False
 
 
+def _default_time_field() -> str:
+    """Factory function for default time field."""
+    return "__transmog_datetime"
+
+
 @dataclass
 class MetadataConfig:
     """Configuration for metadata generation."""
 
     id_field: str = "__transmog_id"
     parent_field: str = "__parent_transmog_id"
-    time_field: str = "__transmog_datetime"
+    time_field: Optional[str] = field(default_factory=_default_time_field)
     default_id_field: Optional[Union[str, dict[str, str]]] = None
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None
     force_transmog_id: bool = False
     id_field_patterns: Optional[list[str]] = None
     id_field_mapping: Optional[dict[str, str]] = None
+
+    def __post_init__(self) -> None:
+        """Validate metadata configuration after initialization."""
+        # Check for duplicate field names only if all fields are non-None strings
+        fields_to_check = []
+        if self.id_field:
+            fields_to_check.append(("id_field", self.id_field))
+        if self.parent_field:
+            fields_to_check.append(("parent_field", self.parent_field))
+        if self.time_field:
+            fields_to_check.append(("time_field", self.time_field))
+
+        # Check for duplicates
+        field_values = [field[1] for field in fields_to_check]
+        if len(field_values) != len(set(field_values)):
+            field_names = {field[1]: field[0] for field in fields_to_check}
+            duplicates = [
+                name
+                for value in field_values
+                if field_values.count(value) > 1
+                for name in [field_names[value]]
+            ]
+            duplicates_str = ", ".join(set(duplicates))
+            raise ConfigurationError(
+                f"Metadata field names must be unique. "
+                f"Duplicate fields found: {duplicates_str}"
+            )
+
+
+def validate_and_convert_param(value: Any, param_name: str, target_type: type) -> Any:
+    """Validate and convert parameter with clear error messages.
+
+    Args:
+        value: The value to validate and convert
+        param_name: Name of the parameter for error messages
+        target_type: Target type to convert to
+
+    Returns:
+        Converted value
+
+    Raises:
+        ConfigurationError: If conversion fails
+    """
+    if value is None:
+        return None
+    try:
+        return target_type(value)
+    except (ValueError, TypeError) as e:
+        raise ConfigurationError(
+            f"Invalid {param_name}: cannot convert {value!r} to "
+            f"{target_type.__name__}: {e}"
+        ) from e
 
 
 @dataclass
@@ -125,7 +185,7 @@ class TransmogConfig:
         nested_threshold: Optional[int] = None,
         id_field: Optional[str] = None,
         parent_field: Optional[str] = None,
-        time_field: Optional[str] = None,
+        time_field: Optional[str] = "UNSPECIFIED",
         recovery_strategy: Optional[str] = None,
         allow_malformed_data: Optional[bool] = None,
         cache_enabled: Optional[bool] = None,
@@ -151,7 +211,7 @@ class TransmogConfig:
             nested_threshold: Threshold for deeply nested paths
             id_field: ID field name for metadata
             parent_field: Parent ID field name for metadata
-            time_field: Timestamp field name for metadata
+            time_field: Timestamp field name for metadata (None to disable)
             recovery_strategy: Error recovery strategy
             allow_malformed_data: Whether to allow malformed data
             cache_enabled: Whether to enable caching
@@ -165,8 +225,11 @@ class TransmogConfig:
         self.error_handling = error_handling or ErrorHandlingConfig()
         self.cache_config = cache_config or CacheConfig()
 
-        # Apply convenience parameters to appropriate components
+        # Apply convenience parameters to appropriate components with validation
         if batch_size is not None:
+            batch_size = cast(
+                int, validate_and_convert_param(batch_size, "batch_size", int)
+            )
             validate_config_parameters(batch_size=batch_size)
             self.processing = dataclasses.replace(
                 self.processing, batch_size=batch_size
@@ -195,6 +258,10 @@ class TransmogConfig:
             )
 
         if nested_threshold is not None:
+            nested_threshold = cast(
+                int,
+                validate_and_convert_param(nested_threshold, "nested_threshold", int),
+            )
             self.naming = dataclasses.replace(
                 self.naming, nested_threshold=nested_threshold
             )
@@ -209,8 +276,13 @@ class TransmogConfig:
                 self.metadata, parent_field=parent_field
             )
 
-        if time_field is not None:
-            validate_config_parameters(time_field=time_field)
+        # Handle time_field parameter - only modify if explicitly provided
+        if time_field != "UNSPECIFIED":
+            # Explicitly set time_field (including None to disable)
+            if (
+                time_field is not None and time_field
+            ):  # Only validate non-empty, non-None strings
+                validate_config_parameters(time_field=time_field)
             self.metadata = dataclasses.replace(self.metadata, time_field=time_field)
 
         if recovery_strategy is not None:
@@ -230,21 +302,15 @@ class TransmogConfig:
             )
 
         if cache_maxsize is not None:
+            cache_maxsize = cast(
+                int, validate_and_convert_param(cache_maxsize, "cache_maxsize", int)
+            )
             validate_config_parameters(cache_maxsize=cache_maxsize)
             self.cache_config = dataclasses.replace(
                 self.cache_config, maxsize=cache_maxsize
             )
 
-        # Validate field name uniqueness for metadata
-        if (
-            self.metadata.id_field == self.metadata.parent_field
-            or self.metadata.id_field == self.metadata.time_field
-            or self.metadata.parent_field == self.metadata.time_field
-        ):
-            raise ConfigurationError(
-                f"Metadata field names must be unique. Got: "
-                f"id={self.metadata.id_field}, parent={self.metadata.parent_field}, time={self.metadata.time_field}"
-            )
+        # Final validation happens in MetadataConfig.__post_init__
 
     # Basic factories
 

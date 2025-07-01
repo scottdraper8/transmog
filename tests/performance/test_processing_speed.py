@@ -112,7 +112,10 @@ class TestProcessingSpeedBenchmarks:
                                 {
                                     "id": f"emp_{i}_{j}_{k}",
                                     "name": f"Employee {k}",
-                                    "skills": [f"skill_{k}_{l}" for l in range(3)],
+                                    "skills": [
+                                        f"skill_{k}_{skill_idx}"
+                                        for skill_idx in range(3)
+                                    ],
                                 }
                                 for k in range(5)
                             ],

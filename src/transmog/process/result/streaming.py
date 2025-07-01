@@ -5,12 +5,15 @@ with memory-efficient processing.
 """
 
 import os
-from typing import Any, BinaryIO, Optional, Union
+from typing import TYPE_CHECKING, Any, BinaryIO, Optional, Union
 
 from transmog.error.exceptions import MissingDependencyError, OutputError
 from transmog.io.writer_factory import create_streaming_writer, is_format_available
 
 from .utils import _check_pyarrow_available
+
+if TYPE_CHECKING:
+    from .core import ProcessingResult
 
 
 class ResultStreaming:

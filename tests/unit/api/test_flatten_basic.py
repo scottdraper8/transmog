@@ -274,7 +274,10 @@ class TestFlattenStreamFunction:
         output_path = output_dir / "csv_stream"
 
         result = tm.flatten_stream(
-            batch_data, output_path=str(output_path), name="csv_data", format="csv"
+            batch_data,
+            output_path=str(output_path),
+            name="csv_data",
+            output_format="csv",
         )
 
         assert result is None
@@ -355,7 +358,7 @@ class TestAPIEdgeCases:
                 simple_data,
                 output_path=str(output_dir / "invalid"),
                 name="test",
-                format="invalid_format",
+                output_format="invalid_format",
             )
 
     def test_invalid_array_handling(self, array_data):

@@ -28,14 +28,14 @@ class TestEndToEndWorkflows:
         assert len(result.tables) > 0
 
         # Step 2: Save to JSON
-        json_paths = result.save(str(output_dir / "json_output"), format="json")
+        json_paths = result.save(str(output_dir / "json_output"), output_format="json")
         if isinstance(json_paths, dict):
             assert_files_created(list(json_paths.values()))
         else:
             assert_files_created(json_paths)
 
         # Step 3: Save to CSV
-        csv_paths = result.save(str(output_dir / "csv_output"), format="csv")
+        csv_paths = result.save(str(output_dir / "csv_output"), output_format="csv")
         if isinstance(csv_paths, dict):
             assert_files_created(list(csv_paths.values()))
         else:
@@ -43,7 +43,7 @@ class TestEndToEndWorkflows:
 
         # Step 4: Save to Parquet
         parquet_paths = result.save(
-            str(output_dir / "parquet_output"), format="parquet"
+            str(output_dir / "parquet_output"), output_format="parquet"
         )
         if isinstance(parquet_paths, dict):
             assert_files_created(list(parquet_paths.values()))
@@ -156,7 +156,7 @@ class TestRealWorldScenarios:
         assert any("items" in name.lower() for name in table_names)
 
         # Save to CSV for analysis
-        paths = result.save(str(output_dir / "ecommerce"), format="csv")
+        paths = result.save(str(output_dir / "ecommerce"), output_format="csv")
         if isinstance(paths, dict):
             assert_files_created(list(paths.values()))
         else:

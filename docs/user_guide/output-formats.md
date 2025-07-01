@@ -1,6 +1,7 @@
 # Output Formats
 
-This guide covers Transmog's output format options, including JSON, CSV, and Parquet, with guidance on choosing the right format for different use cases.
+This guide covers Transmog's output format options, including JSON, CSV, and Parquet, with
+guidance on choosing the right format for different use cases.
 
 ## Supported Formats
 
@@ -44,6 +45,7 @@ result.save("output")
 Each table becomes a separate JSON file:
 
 **products.json:**
+
 ```json
 [
   {
@@ -55,6 +57,7 @@ Each table becomes a separate JSON file:
 ```
 
 **products_reviews.json:**
+
 ```json
 [
   {
@@ -88,7 +91,7 @@ result = tm.flatten(
     skip_null=False,         # Include null values for completeness
     arrays="separate"        # Enable relationship analysis
 )
-result.save("api_output", format="json")
+result.save("api_output", output_format="json")
 
 # For document storage
 result = tm.flatten(
@@ -98,7 +101,7 @@ result = tm.flatten(
     preserve_types=True,     # Maintain type information
     add_timestamp=True       # Add processing metadata
 )
-result.save("document_store", format="json")
+result.save("document_store", output_format="json")
 ```
 
 ## CSV Output
@@ -107,7 +110,7 @@ result.save("document_store", format="json")
 
 ```python
 # Save as CSV files
-result.save("output", format="csv")
+result.save("output", output_format="csv")
 # Creates:
 # output/products.csv (main table)
 # output/products_reviews.csv (reviews table)
@@ -118,12 +121,14 @@ result.save("output", format="csv")
 Each table becomes a CSV file with headers:
 
 **products.csv:**
+
 ```text
 product_name,product_price,_id
 Laptop,999.99,generated_id
 ```
 
 **products_reviews.csv:**
+
 ```text
 rating,comment,_parent_id
 5,Excellent,generated_id
@@ -156,7 +161,7 @@ result = tm.flatten(
     skip_null=True,          # Clean data for SQL
     arrays="separate"        # Create relational tables
 )
-result.save("database_import", format="csv")
+result.save("database_import", output_format="csv")
 
 # For Excel analysis
 result = tm.flatten(
@@ -166,7 +171,7 @@ result = tm.flatten(
     skip_empty=True,         # Remove empty cells
     arrays="separate"        # Multiple worksheets concept
 )
-result.save("excel_analysis", format="csv")
+result.save("excel_analysis", output_format="csv")
 ```
 
 ## Parquet Output
@@ -175,7 +180,7 @@ result.save("excel_analysis", format="csv")
 
 ```python
 # Save as Parquet files
-result.save("output", format="parquet")
+result.save("output", output_format="parquet")
 # Creates:
 # output/products.parquet (main table)
 # output/products_reviews.parquet (reviews table)
@@ -209,7 +214,7 @@ result = tm.flatten(
     arrays="separate",       # Enable relational analysis
     add_timestamp=True       # Add processing metadata
 )
-result.save("analytics_data", format="parquet")
+result.save("analytics_data", output_format="parquet")
 
 # For data lake storage
 result = tm.flatten(
@@ -219,7 +224,7 @@ result = tm.flatten(
     arrays="separate",       # Normalized structure
     id_field="natural_id"    # Consistent identification
 )
-result.save("data_lake", format="parquet")
+result.save("data_lake", output_format="parquet")
 ```
 
 ## Streaming Output
@@ -234,7 +239,7 @@ tm.flatten_stream(
     large_dataset,
     output_path="streaming_output/",
     name="large_data",
-    format="parquet",        # Best for large datasets
+    output_format="parquet",        # Best for large datasets
     batch_size=1000,
     low_memory=True,
     compression="snappy"     # Format-specific option
@@ -245,7 +250,7 @@ tm.flatten_stream(
     web_data,
     output_path="web_output/",
     name="web_data",
-    format="json",
+    output_format="json",
     batch_size=500,
     preserve_types=True
 )
@@ -255,7 +260,7 @@ tm.flatten_stream(
     db_data,
     output_path="db_staging/",
     name="staging_data",
-    format="csv",
+    output_format="csv",
     batch_size=2000,
     preserve_types=False     # Strings for SQL compatibility
 )
@@ -301,7 +306,7 @@ result = tm.flatten(
     skip_empty=True,         # Remove empty strings
     preserve_types=False     # Use strings (smaller than numbers in JSON)
 )
-result.save("compact_json", format="json")
+result.save("compact_json", output_format="json")
 
 # Optimize JSON for processing speed
 result = tm.flatten(
@@ -311,7 +316,7 @@ result = tm.flatten(
     low_memory=True,         # Reduce memory pressure
     batch_size=500           # Smaller processing batches
 )
-result.save("fast_processing", format="json")
+result.save("fast_processing", output_format="json")
 ```
 
 ### CSV Optimizations
@@ -326,7 +331,7 @@ result = tm.flatten(
     id_field="natural_id",   # Use natural foreign keys
     separator="_"            # Database-friendly column names
 )
-result.save("database_ready", format="csv")
+result.save("database_ready", output_format="csv")
 
 # Optimize CSV for analytics
 result = tm.flatten(
@@ -336,7 +341,7 @@ result = tm.flatten(
     add_timestamp=True,      # Add time dimensions
     preserve_types=False     # Consistent for spreadsheet tools
 )
-result.save("analytics_ready", format="csv")
+result.save("analytics_ready", output_format="csv")
 ```
 
 ### Parquet Optimizations
@@ -351,14 +356,14 @@ result = tm.flatten(
     arrays="separate",       # Normalized for joins
     add_timestamp=True       # Time-based partitioning support
 )
-result.save("query_ready", format="parquet")
+result.save("query_ready", output_format="parquet")
 
 # Optimize Parquet for storage efficiency
 tm.flatten_stream(
     large_data,
     output_path="efficient_storage/",
     name="compressed_data",
-    format="parquet",
+    output_format="parquet",
     preserve_types=True,     # Better compression with types
     batch_size=5000,         # Larger batches for compression
     compression="snappy"     # Fast compression algorithm
@@ -384,7 +389,7 @@ else:
 
 ```python
 # Multiple tables create directory structure
-result.save("product_data", format="csv")
+result.save("product_data", output_format="csv")
 # Creates:
 # product_data/
 #   products.csv
@@ -397,7 +402,7 @@ result.save("product_data", format="csv")
 ```python
 # Use descriptive entity names for clear file names
 result = tm.flatten(data, name="customer_orders")
-result.save("output", format="json")
+result.save("output", output_format="json")
 # Creates:
 # output/customer_orders.json
 # output/customer_orders_items.json
@@ -418,7 +423,7 @@ result = tm.flatten(
     skip_null=True,
     arrays="separate"
 )
-result.save("postgres_import", format="csv")
+result.save("postgres_import", output_format="csv")
 
 # SQL import commands
 # COPY customers FROM 'postgres_import/customers.csv' CSV HEADER;
@@ -433,7 +438,7 @@ tm.flatten_stream(
     analytics_data,
     output_path="spark_input/",
     name="events",
-    format="parquet",
+    output_format="parquet",
     preserve_types=True,
     arrays="separate",
     batch_size=10000
@@ -455,7 +460,7 @@ result = tm.flatten(
     arrays="inline",      # Single JSON per user
     skip_null=False       # Complete user profiles
 )
-result.save("api_data", format="json")
+result.save("api_data", output_format="json")
 
 # Use in web application
 # with open("api_data/users.json") as f:

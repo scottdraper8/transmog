@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 # Check for PyArrow availability
 try:
-    import pyarrow as pa
-    import pyarrow.csv as pa_csv
+    import pyarrow as pa  # noqa: F401
+    import pyarrow.csv as pa_csv  # noqa: F401
 
     PYARROW_AVAILABLE = True
 except ImportError:
@@ -148,10 +148,10 @@ class CsvWriter(DataWriter):
                     return output_path
 
             # Extract field names from all records
-            field_names = set()
+            field_names_set: set[str] = set()
             for record in table_data:
-                field_names.update(record.keys())
-            field_names = sorted(field_names)
+                field_names_set.update(record.keys())
+            field_names = sorted(field_names_set)
 
             # Generate CSV content
             csv_content = self._generate_csv_content(
@@ -248,7 +248,7 @@ class CsvWriter(DataWriter):
             str: CSV content
         """
         csv_buffer = io.StringIO(newline="")
-        writer_params = {
+        writer_params: dict[str, Any] = {
             "fieldnames": field_names,
             "delimiter": delimiter,
             "quotechar": quotechar,
@@ -258,7 +258,7 @@ class CsvWriter(DataWriter):
         if escapechar:
             writer_params["escapechar"] = escapechar
 
-        writer = csv.DictWriter(csv_buffer, **writer_params)
+        writer: csv.DictWriter[str] = csv.DictWriter(csv_buffer, **writer_params)
 
         if include_header:
             writer.writeheader()
@@ -494,10 +494,10 @@ class CsvStreamingWriter(StreamingWriter):
             return
 
         # Extract field names from records
-        field_names = set()
+        field_names_set: set[str] = set()
         for record in records:
-            field_names.update(record.keys())
-        field_names = sorted(field_names)
+            field_names_set.update(record.keys())
+        field_names = sorted(field_names_set)
 
         # Get or create writer
         writer = self._get_writer_for_table("main", field_names)
@@ -528,15 +528,15 @@ class CsvStreamingWriter(StreamingWriter):
             return
 
         # Extract field names from records
-        field_names = set()
+        field_names_set: set[str] = set()
         for record in records:
-            field_names.update(record.keys())
+            field_names_set.update(record.keys())
 
         # Merge with existing field names if table already exists
         if table_name in self.fieldnames:
-            field_names.update(self.fieldnames[table_name])
+            field_names_set.update(self.fieldnames[table_name])
 
-        field_names = sorted(field_names)
+        field_names = sorted(field_names_set)
 
         # Get or create writer
         writer = self._get_writer_for_table(table_name, field_names)

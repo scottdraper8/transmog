@@ -182,7 +182,7 @@ class TestSettingsIntegration:
             ("TRANSMOG_VERBOSE", "verbose", "false"),
         ]
 
-        for env_var, setting_key, test_value in test_cases:
+        for env_var, _setting_key, test_value in test_cases:
             original_env = os.environ.get(env_var)
 
             try:

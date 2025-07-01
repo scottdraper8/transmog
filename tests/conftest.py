@@ -8,7 +8,7 @@ All tests use real functionality without mocks.
 import json
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 
@@ -19,7 +19,7 @@ import transmog as tm
 
 
 @pytest.fixture
-def simple_data() -> Dict[str, Any]:
+def simple_data() -> dict[str, Any]:
     """Simple nested data structure for basic testing."""
     return {
         "id": 1,
@@ -34,7 +34,7 @@ def simple_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def array_data() -> Dict[str, Any]:
+def array_data() -> dict[str, Any]:
     """Data with arrays for testing array handling."""
     return {
         "id": 1,
@@ -58,7 +58,7 @@ def array_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def complex_nested_data() -> Dict[str, Any]:
+def complex_nested_data() -> dict[str, Any]:
     """Complex deeply nested data structure."""
     return {
         "id": 1,
@@ -107,7 +107,7 @@ def complex_nested_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def batch_data() -> List[Dict[str, Any]]:
+def batch_data() -> list[dict[str, Any]]:
     """Batch of records for testing."""
     return [
         {
@@ -121,7 +121,7 @@ def batch_data() -> List[Dict[str, Any]]:
 
 
 @pytest.fixture
-def mixed_types_data() -> Dict[str, Any]:
+def mixed_types_data() -> dict[str, Any]:
     """Data with various data types."""
     return {
         "id": 1,
@@ -142,7 +142,7 @@ def mixed_types_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def problematic_data() -> List[Dict[str, Any]]:
+def problematic_data() -> list[dict[str, Any]]:
     """Data that might cause processing issues."""
     return [
         {"id": 1, "name": "Valid Record"},
@@ -241,12 +241,12 @@ def assert_valid_result(result: tm.FlattenResult) -> None:
     assert isinstance(result.tables, dict)
 
 
-def assert_record_has_id(record: Dict[str, Any]) -> None:
+def assert_record_has_id(record: dict[str, Any]) -> None:
     """Assert that a record has some form of ID."""
     assert "_id" in record or "id" in record, f"Record missing ID: {record}"
 
 
-def assert_files_created(paths: List[str]) -> None:
+def assert_files_created(paths: list[str]) -> None:
     """Assert that all specified file paths exist."""
     for path in paths:
         assert Path(path).exists(), f"File not created: {path}"

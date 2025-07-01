@@ -1,10 +1,12 @@
 # ID Management
 
-This guide covers how Transmog handles record identification, including automatic ID generation, natural ID fields, and relationship management.
+This guide covers how Transmog handles record identification, including automatic ID generation,
+natural ID fields, and relationship management.
 
 ## ID System Overview
 
 Transmog uses ID fields to:
+
 - Uniquely identify each record
 - Link child records to their parents
 - Maintain data relationships during transformation

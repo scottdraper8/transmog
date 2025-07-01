@@ -6,7 +6,7 @@ garbage collection management for memory-efficient processing.
 
 import gc
 import logging
-from typing import Optional
+from typing import Any, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,7 @@ class MemoryMonitor:
     """Monitor memory usage and pressure for adaptive processing."""
 
     def __init__(self, max_memory_percent: float = 0.8):
+        """Initialize memory monitor with maximum memory percentage threshold."""
         self.max_memory_percent = max_memory_percent
         self._initial_memory = self.get_current_memory_mb()
 
@@ -32,9 +33,10 @@ class MemoryMonitor:
         if PSUTIL_AVAILABLE:
             try:
                 process = psutil.Process()
-                return process.memory_info().rss / (1024 * 1024)
+                return float(process.memory_info().rss) / (1024 * 1024)
             except Exception:
-                pass
+                # Log the exception for debugging but continue with fallback
+                logger.debug("Failed to get memory info via psutil")
 
         # Fallback - estimate based on object count
         return gc.get_count()[0] * 0.001  # Very rough estimate
@@ -50,7 +52,8 @@ class MemoryMonitor:
                     "used_percent": memory.percent,
                 }
             except Exception:
-                pass
+                # Log the exception for debugging but continue with fallback
+                logger.debug("Failed to get system memory info via psutil")
 
         # Fallback
         return {
@@ -64,9 +67,10 @@ class MemoryMonitor:
         if PSUTIL_AVAILABLE:
             try:
                 memory = psutil.virtual_memory()
-                return memory.percent / 100.0
+                return float(memory.percent) / 100.0
             except Exception:
-                pass
+                # Log the exception for debugging but continue with fallback
+                logger.debug("Failed to get memory pressure via psutil")
 
         # Fallback - estimate based on current vs initial memory
         current = self.get_current_memory_mb()
@@ -92,6 +96,7 @@ class AdaptiveBatchSizer:
     def __init__(
         self, initial_size: int = 1000, min_size: int = 50, max_size: int = 10000
     ):
+        """Initialize batch size adjuster with size limits."""
         self.initial_size = initial_size
         self.min_size = min_size
         self.max_size = max_size
@@ -133,6 +138,7 @@ class GCManager:
     """Strategic garbage collection management."""
 
     def __init__(self, gc_frequency: int = 1000):
+        """Initialize garbage collection manager with processing frequency."""
         self.gc_frequency = gc_frequency
         self.processed_count = 0
         self.total_collected = 0
@@ -169,7 +175,7 @@ class GCManager:
         }
 
 
-def estimate_object_memory_mb(obj) -> float:
+def estimate_object_memory_mb(obj: Any) -> float:
     """Estimate memory usage of an object in MB."""
     try:
         import sys
@@ -197,7 +203,7 @@ def estimate_object_memory_mb(obj) -> float:
 
 def get_memory_efficient_config(
     available_memory_mb: Optional[float] = None,
-) -> dict[str, int]:
+) -> dict[str, Union[int, float]]:
     """Get memory-efficient configuration based on available memory."""
     if available_memory_mb is None:
         monitor = MemoryMonitor()

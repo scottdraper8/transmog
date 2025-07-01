@@ -248,7 +248,12 @@ class ProcessingResult(ResultInterface):
         # Try to serialize and deserialize to catch non-serializable objects
         try:
             json_str = json.dumps(data)
-            return json.loads(json_str)
+            result = json.loads(json_str)
+            # Ensure we return the correct type
+            if isinstance(result, list):
+                return result
+            else:
+                return [result] if isinstance(result, dict) else []
         except (TypeError, ValueError):
             # Handle non-serializable objects by converting them to strings
             serializable_data = []
@@ -311,7 +316,7 @@ class ProcessingResult(ResultInterface):
             return pa.table({})
 
         # Get all column names from the data
-        all_columns = set()
+        all_columns: set[str] = set()
         for record in data:
             all_columns.update(record.keys())
         column_names = sorted(all_columns)
@@ -392,3 +397,52 @@ class ProcessingResult(ResultInterface):
             f"main_records={main_count}, child_records={child_count}, "
             f"child_tables={len(self.child_tables)})"
         )
+
+    def to_parquet_bytes(self, **kwargs: Any) -> dict[str, bytes]:
+        """Convert to Parquet bytes."""
+        from .converters import ResultConverters
+
+        converter = ResultConverters(self)
+        return converter.to_parquet_bytes(**kwargs)
+
+    def to_csv_bytes(self, **kwargs: Any) -> dict[str, bytes]:
+        """Convert to CSV bytes."""
+        from .converters import ResultConverters
+
+        converter = ResultConverters(self)
+        return converter.to_csv_bytes(**kwargs)
+
+    def to_json_bytes(self, **kwargs: Any) -> dict[str, bytes]:
+        """Convert to JSON bytes."""
+        from .converters import ResultConverters
+
+        converter = ResultConverters(self)
+        return converter.to_json_bytes(**kwargs)
+
+    def write(self, format_name: str, base_path: str, **kwargs: Any) -> dict[str, str]:
+        """Write data to files in the specified format."""
+        from .writers import ResultWriters
+
+        writer = ResultWriters(self)
+        return writer.write(format_name, base_path, **kwargs)
+
+    def write_all_parquet(self, base_path: str, **kwargs: Any) -> dict[str, str]:
+        """Write data to Parquet files."""
+        from .writers import ResultWriters
+
+        writer = ResultWriters(self)
+        return writer.write_all_parquet(base_path, **kwargs)
+
+    def write_all_json(self, base_path: str, **kwargs: Any) -> dict[str, str]:
+        """Write data to JSON files."""
+        from .writers import ResultWriters
+
+        writer = ResultWriters(self)
+        return writer.write_all_json(base_path, **kwargs)
+
+    def write_all_csv(self, base_path: str, **kwargs: Any) -> dict[str, str]:
+        """Write data to CSV files."""
+        from .writers import ResultWriters
+
+        writer = ResultWriters(self)
+        return writer.write_all_csv(base_path, **kwargs)

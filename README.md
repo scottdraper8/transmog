@@ -11,6 +11,7 @@ Transform nested data into flat tables with a simple, intuitive API.
 Transmog transforms nested JSON data into flat, tabular formats while preserving relationships between parent and child records.
 
 **Key Features:**
+
 - Simple one-function API with smart defaults
 - Multiple output formats (JSON, CSV, Parquet)
 - Automatic relationship preservation
@@ -53,12 +54,11 @@ result = tm.flatten(data, name="customer")
 ```
 
 **Key Options:**
+
 - Custom field separators: `separator="."`
 - Use existing IDs: `id_field="customer_id"`
 - Error handling: `errors="skip"`
 - File processing: `tm.flatten_file("data.json")`
-
-
 
 ## Advanced Options
 
@@ -89,7 +89,8 @@ result = tm.flatten(
 
 ## Documentation
 
-Complete documentation is available at [scottdraper8.github.io/transmog](https://scottdraper8.github.io/transmog), including:
+Complete documentation is available at
+[scottdraper8.github.io/transmog](https://scottdraper8.github.io/transmog), including:
 
 - [Quick Start Guide](https://scottdraper8.github.io/transmog/quickstart.html)
 - [User Guides](https://scottdraper8.github.io/transmog/guides/)
@@ -98,7 +99,9 @@ Complete documentation is available at [scottdraper8.github.io/transmog](https:/
 
 ## Contributing
 
-For contribution guidelines, development setup, and coding standards, see the [Contributing Guide](https://scottdraper8.github.io/transmog/development/contributing.html) in the documentation.
+For contribution guidelines, development setup, and coding standards,
+see the [Contributing Guide](https://scottdraper8.github.io/transmog/development/contributing.html)
+in the documentation.
 
 ## License
 

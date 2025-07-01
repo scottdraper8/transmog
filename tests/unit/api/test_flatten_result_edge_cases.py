@@ -190,7 +190,7 @@ class TestFlattenResultEdgeCases:
         info = complex_result.table_info()
         assert isinstance(info, dict)
 
-        for table_name, table_info in info.items():
+        for _table_name, table_info in info.items():
             assert "records" in table_info
             assert "fields" in table_info
             assert "is_main" in table_info
@@ -217,7 +217,7 @@ class TestFlattenResultEdgeCases:
 
         # Test iteration is memory efficient
         count = 0
-        for record in result:
+        for _record in result:
             count += 1
             if count > 10:  # Don't iterate through everything
                 break
@@ -373,7 +373,7 @@ class TestFlattenResultEdgeCases:
 
         # Should be able to iterate
         count = 0
-        for record in result:
+        for _record in result:
             count += 1
             if count > 100:  # Limit iteration
                 break
@@ -415,7 +415,7 @@ class TestFlattenResultEdgeCases:
             # Restore if possible
             try:
                 complex_result._result = original_main
-            except:
+            except Exception:
                 pass
 
     def test_result_with_null_and_none_values(self):

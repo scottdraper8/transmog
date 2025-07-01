@@ -334,7 +334,7 @@ class TestParquetWriterIntegration:
             output_path = Path(temp_dir) / "output"
 
             # Save as Parquet
-            paths = result.save(str(output_path), format="parquet")
+            paths = result.save(str(output_path), output_format="parquet")
 
             # Verify files were created
             if isinstance(paths, dict):

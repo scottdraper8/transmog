@@ -228,7 +228,7 @@ class TestStreamingErrorHandling:
                 simple_data,
                 output_path=str(tmp_path / "output"),
                 name="test",
-                format="invalid_format",
+                output_format="invalid_format",
             )
 
     def test_streaming_with_error_recovery(self, tmp_path):

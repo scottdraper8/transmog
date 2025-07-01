@@ -7,11 +7,14 @@ like JSON, CSV, Parquet, and PyArrow tables.
 import io
 import json
 import logging
-from typing import Any, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from transmog.error.exceptions import MissingDependencyError, OutputError
 
 from .utils import _check_orjson_available, _check_pyarrow_available, _get_cache_key
+
+if TYPE_CHECKING:
+    from .core import ProcessingResult
 
 logger = logging.getLogger(__name__)
 

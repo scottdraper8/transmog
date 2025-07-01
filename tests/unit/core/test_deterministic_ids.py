@@ -5,7 +5,7 @@ Tests deterministic ID generation, composite IDs, and reproducible behavior.
 """
 
 import hashlib
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 
@@ -208,7 +208,7 @@ class TestDeterministicIdGeneration:
         }
 
         # Generate IDs multiple times
-        for key, value in test_data.items():
+        for _key, value in test_data.items():
             ids = [generate_deterministic_id(value) for _ in range(10)]
 
             # All IDs should be identical

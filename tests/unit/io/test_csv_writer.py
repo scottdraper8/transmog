@@ -8,7 +8,7 @@ import csv
 import tempfile
 from io import StringIO
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 
@@ -599,5 +599,5 @@ class TestCsvWriter:
         assert len(results) == 3
 
         # All threads should have written the same number of records
-        for thread_id, record_count in results:
+        for _thread_id, record_count in results:
             assert record_count == len(sample_data)

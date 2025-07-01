@@ -4,7 +4,7 @@ Tests for batch processing functionality.
 Tests batch processing of records with different configurations and sizes.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 
@@ -17,7 +17,7 @@ class TestBatchProcessing:
     """Test batch processing functionality."""
 
     @pytest.fixture
-    def sample_records(self) -> List[Dict[str, Any]]:
+    def sample_records(self) -> list[dict[str, Any]]:
         """Sample records for batch processing tests."""
         return [
             {"id": 1, "name": "Alice", "age": 30, "city": "New York"},
@@ -28,7 +28,7 @@ class TestBatchProcessing:
         ]
 
     @pytest.fixture
-    def nested_records(self) -> List[Dict[str, Any]]:
+    def nested_records(self) -> list[dict[str, Any]]:
         """Nested records for batch processing tests."""
         return [
             {
@@ -153,7 +153,7 @@ class TestBatchProcessingIntegration:
     """Test batch processing integration with other features."""
 
     @pytest.fixture
-    def large_dataset(self) -> List[Dict[str, Any]]:
+    def large_dataset(self) -> list[dict[str, Any]]:
         """Large dataset for integration testing."""
         return [
             {

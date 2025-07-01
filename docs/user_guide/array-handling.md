@@ -1,6 +1,7 @@
 # Array Handling
 
-This guide covers Transmog's array processing capabilities, including the three handling modes and advanced array processing scenarios.
+This guide covers Transmog's array processing capabilities, including the three handling modes and
+advanced array processing scenarios.
 
 ## Array Handling Overview
 
@@ -151,6 +152,7 @@ print("Child tables:", result.tables)
 ### When to Use Inline Mode
 
 Inline mode is useful when:
+
 - Document-oriented storage is preferred
 - Array relationships are not needed for analysis
 - Minimizing table count is important
@@ -193,6 +195,7 @@ print("Child tables:", result.tables)
 ### When to Use Skip Mode
 
 Skip mode is useful when:
+
 - Only scalar data is relevant
 - Arrays contain unstructured or irrelevant data
 - Simplifying data structure is the goal
@@ -312,7 +315,7 @@ tm.flatten_stream(
     large_data_with_arrays,
     output_path="output/",
     name="large_dataset",
-    format="parquet",
+    output_format="parquet",
     arrays="separate",      # Best for large arrays
     batch_size=1000,
     low_memory=True

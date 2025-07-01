@@ -34,6 +34,7 @@ class PathBuilder:
     """Efficient path building with minimal string operations."""
 
     def __init__(self, separator: str = "_"):
+        """Initialize the path builder with a separator."""
         self.separator = separator
         self.parts: list[str] = []
 
@@ -67,6 +68,7 @@ class DepthTracker:
     """Efficient depth tracking for nested structures."""
 
     def __init__(self, threshold: int):
+        """Initialize depth tracker with a nesting threshold."""
         self.threshold = threshold
         self.current_depth = 0
 
@@ -130,10 +132,11 @@ class MemoryAwareCache:
     """Memory-aware caching system with adaptive sizing."""
 
     def __init__(self, max_memory_mb: int = 50, fallback_size: int = 1000):
+        """Initialize cache with memory limits and fallback size."""
         self.max_memory_mb = max_memory_mb
         self.fallback_size = fallback_size
-        self._cache = {}
-        self._access_order = []
+        self._cache: dict[Any, Any] = {}
+        self._access_order: list[Any] = []
 
     def get_memory_usage_mb(self) -> float:
         """Estimate current cache memory usage in MB."""
@@ -163,7 +166,7 @@ class MemoryAwareCache:
                 oldest_key = self._access_order.pop(0)
                 self._cache.pop(oldest_key, None)
 
-    def get(self, key: Any, default=None):
+    def get(self, key: Any, default: Any = None) -> Any:
         """Get value from cache with LRU tracking."""
         if key in self._cache:
             # Move to end (most recently used)
@@ -335,14 +338,16 @@ def _process_value_wrapper(
     except Exception as e:
         # Handle errors based on recovery strategy
         strategy = get_recovery_strategy(recovery_strategy)
-        context = build_error_context(operation="value processing", value=repr(value))
+        error_context = build_error_context(
+            operation="value processing", value=repr(value)
+        )
 
         try:
-            return strategy.recover(e, **context)
+            return strategy.recover(e, **error_context)
         except Exception:
             # If recovery fails, raise with formatted message
             error_msg = format_error_message(
-                "type_conversion", e, **context, target_type="processed"
+                "type_conversion", e, **error_context, target_type="processed"
             )
             raise ProcessingError(error_msg) from e
 
@@ -425,7 +430,8 @@ def _flatten_json_core(
     # Track keys to remove when not in-place
     keys_to_remove = []
 
-    # Process each key in the data (create list to avoid iteration issues during modification)
+    # Process each key in the data (create list to avoid iteration issues
+    # during modification)
     for key, value in list(data.items()):
         # Skip internal metadata fields from processing
         if key.startswith("__"):
@@ -448,9 +454,9 @@ def _flatten_json_core(
 
         # Apply deep nesting simplification using depth tracker
         if depth_tracker is not None and depth_tracker.at_threshold():
-            current_path = handle_deeply_nested_path(
-                current_path, separator, nested_threshold
-            )
+            # Provide default threshold if None
+            threshold = nested_threshold if nested_threshold is not None else 4
+            current_path = handle_deeply_nested_path(current_path, separator, threshold)
 
         # Skip empty dictionaries and arrays
         if (isinstance(value, dict) and not value) or (
@@ -502,7 +508,7 @@ def _flatten_json_core(
             except Exception as e:
                 # Handle errors using standardized recovery strategy
                 strategy = get_recovery_strategy(recovery_strategy)
-                context = build_error_context(
+                error_context = build_error_context(
                     entity_name=key,
                     entity_type="nested object",
                     operation="flattening",
@@ -510,7 +516,7 @@ def _flatten_json_core(
                 )
 
                 try:
-                    recovery_result = strategy.recover(e, **context)
+                    recovery_result = strategy.recover(e, **error_context)
                     if recovery_result is not None:
                         # Add recovery result to output
                         result[f"{current_path}{separator}__error"] = recovery_result
@@ -518,7 +524,7 @@ def _flatten_json_core(
                     continue
                 except Exception:
                     # Re-raise with formatted message
-                    error_msg = format_error_message("processing", e, **context)
+                    error_msg = format_error_message("processing", e, **error_context)
                     raise ProcessingError(error_msg) from e
         elif isinstance(value, list) and visit_arrays:
             # Process array based on configuration
@@ -671,7 +677,7 @@ def flatten_json(
             except (TypeError, ValueError, OverflowError) as serialization_error:
                 # Handle non-serializable values using standardized recovery
                 strategy = get_recovery_strategy(recovery_strategy)
-                context = build_error_context(
+                error_context = build_error_context(
                     entity_name=key,
                     entity_type="field",
                     operation="serialization check",
@@ -679,7 +685,9 @@ def flatten_json(
                 )
 
                 try:
-                    recovery_result = strategy.recover(serialization_error, **context)
+                    recovery_result = strategy.recover(
+                        serialization_error, **error_context
+                    )
                     if recovery_result is not None:
                         # Replace with recovery result
                         data[key] = recovery_result
@@ -690,7 +698,7 @@ def flatten_json(
                     error_msg = format_error_message(
                         "type_conversion",
                         serialization_error,
-                        **context,
+                        **error_context,
                         target_type="serializable",
                     )
                     raise ProcessingError(error_msg) from serialization_error

@@ -6,12 +6,12 @@ This module defines abstract base classes for data writers with unified interfac
 import gzip
 import os
 from abc import ABC, abstractmethod
-from typing import Any, BinaryIO, Callable, Optional, TextIO, Union
-
-from typing_extensions import Literal
+from typing import Any, BinaryIO, Callable, Literal, Optional, TextIO, Union, cast
 
 from transmog.types.base import JsonDict
 from transmog.types.io_types import StreamingWriterProtocol, WriterProtocol
+
+logger = __import__("logging").getLogger(__name__)
 
 
 class WriterUtils:
@@ -28,7 +28,9 @@ class WriterUtils:
         Args:
             path: Directory path to create
         """
-        os.makedirs(path, exist_ok=True)
+        directory = os.path.dirname(path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
 
     @staticmethod
     def sanitize_filename(name: str) -> str:
@@ -40,7 +42,11 @@ class WriterUtils:
         Returns:
             Sanitized filename safe for filesystem use
         """
-        return name.replace(".", "_").replace("/", "_").replace("\\", "_")
+        import re
+
+        sanitized = re.sub(r"[^\w\-_.]", "_", name)
+        sanitized = re.sub(r"_{2,}", "_", sanitized)
+        return sanitized.strip("_")
 
     @staticmethod
     def get_file_extension(format_name: str, compression: Optional[str] = None) -> str:
@@ -56,7 +62,10 @@ class WriterUtils:
         base_ext = f".{format_name.lower()}"
         if compression == "gzip":
             return f"{base_ext}.gz"
-        return base_ext
+        elif compression == "snappy" and format_name.lower() == "parquet":
+            return base_ext  # Snappy is internal to parquet
+        else:
+            return base_ext
 
     @staticmethod
     def build_output_path(
@@ -135,14 +144,14 @@ class WriterUtils:
         """
         if compression == "gzip":
             if "b" in mode:
-                return gzip.open(file_path, mode)
+                return cast(BinaryIO, gzip.open(file_path, mode))
             else:
-                return gzip.open(file_path, mode, encoding=encoding)
+                return cast(TextIO, gzip.open(file_path, mode, encoding=encoding))
         else:
             if "b" in mode:
-                return open(file_path, mode)
+                return cast(BinaryIO, open(file_path, mode))
             else:
-                return open(file_path, mode, encoding=encoding)
+                return cast(TextIO, open(file_path, mode, encoding=encoding))
 
     @staticmethod
     def write_all_tables_pattern(
@@ -151,24 +160,21 @@ class WriterUtils:
         base_path: str,
         entity_name: str,
         format_name: str,
-        write_table_func: Callable[[list[JsonDict], str, Any], None],
+        write_table_func: Callable[[list[JsonDict], Union[str, BinaryIO, TextIO]], Any],
         compression: Optional[str] = None,
         **options: Any,
     ) -> dict[str, str]:
-        """Common pattern for writing all tables to files.
-
-        This consolidates the repetitive logic found across all writers
-        for handling directory creation, path building, and table iteration.
+        """Common pattern for writing main and child tables.
 
         Args:
             main_table: Main table data
             child_tables: Dictionary of child tables
-            base_path: Base directory path
-            entity_name: Entity name for main table
+            base_path: Base directory for output files
+            entity_name: Name of the entity
             format_name: Format name for file extensions
-            write_table_func: Function to write a single table
+            write_table_func: Function to write individual tables
             compression: Optional compression method
-            **options: Additional options to pass to write function
+            **options: Additional format-specific options
 
         Returns:
             Dictionary mapping table names to file paths
@@ -182,11 +188,11 @@ class WriterUtils:
         )
 
         # Write main table
-        write_table_func(main_table, paths["main"], **options)
+        write_table_func(main_table, paths["main"])
 
         # Write child tables
         for table_name, table_data in child_tables.items():
-            write_table_func(table_data, paths[table_name], **options)
+            write_table_func(table_data, paths[table_name])
 
         return paths
 
@@ -326,7 +332,7 @@ class DataWriter(ABC, WriterProtocol):
         return []
 
 
-class UnifiedStreamingWriter(ABC):
+class UnifiedStreamingWriter:
     """Unified base class for streaming writers with consistent behavior."""
 
     def __init__(

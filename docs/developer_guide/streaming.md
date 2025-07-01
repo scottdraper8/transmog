@@ -1,6 +1,8 @@
 # Streaming and Memory-Efficient Processing
 
-Large datasets require specialized handling to avoid memory exhaustion and optimize processing performance. Transmog provides streaming capabilities and memory optimization features designed for datasets that exceed available system memory.
+Large datasets require specialized handling to avoid memory exhaustion and optimize processing
+performance. Transmog provides streaming capabilities and memory optimization features designed
+for datasets that exceed available system memory.
 
 ## Memory-Efficient Functions
 
@@ -65,7 +67,8 @@ result = tm.flatten(
 
 ### Memory Usage Patterns
 
-Different configurations impact memory consumption. The adaptive memory management system automatically adjusts parameters based on available memory:
+Different configurations impact memory consumption. The adaptive memory management system
+automatically adjusts parameters based on available memory:
 
 | Configuration | Memory Usage | Processing Speed | Adaptive Features | Best For |
 |---------------|--------------|------------------|-------------------|----------|
@@ -73,7 +76,8 @@ Different configurations impact memory consumption. The adaptive memory manageme
 | `batch_size=1000, low_memory=True` | Low | High | Adaptive sizing | Balanced approach |
 | `batch_size=5000, low_memory=False` | Variable | Highest | Minimal adaptation | Abundant memory |
 
-The system achieves consistent throughput (13,000+ records/sec) across different memory configurations through adaptive optimization.
+The system achieves consistent throughput (13,000+ records/sec) across different memory
+configurations through adaptive optimization.
 
 ## Streaming Input Sources
 

@@ -45,7 +45,7 @@ class CSVStrategy(ProcessingStrategy):
             ProcessingResult containing processed data
         """
         # Extract parameters from kwargs
-        result = kwargs.pop("result", None)
+        result: Optional[ProcessingResult] = kwargs.pop("result", None)
         delimiter = kwargs.pop("delimiter", None)
         has_header = kwargs.pop("has_header", True)
         null_values = kwargs.pop("null_values", None)
@@ -158,9 +158,6 @@ class CSVStrategy(ProcessingStrategy):
         except Exception as e:
             # Handle file errors
             handle_file_error(file_path, e, "CSV")
-            # This line is never reached because handle_file_error always raises
-            # But we include it to satisfy type checking
-            return result
 
     def _process_csv_chunk(
         self,

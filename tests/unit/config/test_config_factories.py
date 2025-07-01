@@ -160,7 +160,7 @@ class TestConfigProfiles:
             ("error_tolerant", TransmogConfig.error_tolerant()),
         ]
 
-        for profile_name, config in profiles:
+        for _profile_name, config in profiles:
             # Basic consistency checks
             assert isinstance(config, TransmogConfig)
             assert config.naming.separator is not None

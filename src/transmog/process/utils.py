@@ -4,7 +4,7 @@ This module contains common utility functions used across the process module.
 """
 
 import json
-from typing import Any, Optional, TypeVar
+from typing import Any, NoReturn, Optional, TypeVar
 
 from ..config.utils import ConfigParameterBuilder
 from ..error import FileError, ParsingError, ProcessingError
@@ -46,7 +46,7 @@ def get_batch_size(processor: Any, override: Optional[int] = None) -> int:
 
 def handle_file_error(
     file_path: str, error: Exception, error_type: str = "file"
-) -> None:
+) -> NoReturn:
     """Handle errors in file processing with consistent error messages.
 
     Args:

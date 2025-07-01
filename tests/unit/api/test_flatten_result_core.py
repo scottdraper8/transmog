@@ -99,7 +99,7 @@ class TestFlattenResultBasics:
         assert isinstance(info, dict)
 
         # Check info structure
-        for table_name, table_info in info.items():
+        for _table_name, table_info in info.items():
             assert "records" in table_info
             assert "fields" in table_info
             assert "is_main" in table_info
@@ -158,7 +158,7 @@ class TestFlattenResultSaving:
 
     def test_save_csv_format(self, complex_result, output_dir):
         """Test saving to CSV format."""
-        paths = complex_result.save(str(output_dir / "csv_output"), format="csv")
+        paths = complex_result.save(str(output_dir / "csv_output"), output_format="csv")
 
         # Save returns a dictionary for multiple tables
         assert isinstance(paths, dict)
@@ -173,7 +173,7 @@ class TestFlattenResultSaving:
     def test_save_parquet_format(self, complex_result, output_dir):
         """Test saving to Parquet format."""
         paths = complex_result.save(
-            str(output_dir / "parquet_output"), format="parquet"
+            str(output_dir / "parquet_output"), output_format="parquet"
         )
 
         # Save returns a dictionary for multiple tables
@@ -203,12 +203,12 @@ class TestFlattenResultSaving:
     def test_save_invalid_format(self, simple_result, temp_file):
         """Test saving with invalid format."""
         with pytest.raises(ValueError):
-            simple_result.save(str(temp_file), format="invalid")
+            simple_result.save(str(temp_file), output_format="invalid")
 
     def test_save_pathlib_path(self, simple_result, output_dir):
         """Test saving with pathlib.Path objects."""
         output_path = output_dir / "pathlib_test"
-        paths = simple_result.save(output_path, format="json")
+        paths = simple_result.save(output_path, output_format="json")
 
         # Single table returns list
         assert isinstance(paths, list)

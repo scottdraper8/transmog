@@ -10,14 +10,14 @@ Transform nested data structures into flat tables.
 
 ```python
 flatten(
-    data: Union[Dict[str, Any], List[Dict[str, Any]], str, Path, bytes],
+    data: Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes],
     *,
     name: str = "data",
     # Naming options
     separator: str = "_",
     nested_threshold: int = 4,
     # ID options
-    id_field: Union[str, Dict[str, str], None] = None,
+    id_field: Union[str, dict[str, str], None] = None,
     parent_id_field: str = "_parent_id",
     add_timestamp: bool = False,
     # Array handling
@@ -36,7 +36,7 @@ flatten(
 
 **Parameters:**
 
-- **data** (*Union[Dict, List[Dict], str, Path, bytes]*): Input data to transform. Can be:
+- **data** (*Union[Dict, list[Dict], str, Path, bytes]*): Input data to transform. Can be:
   - Dictionary or list of dictionaries
   - JSON string
   - File path (str or Path)
@@ -45,36 +45,43 @@ flatten(
 - **name** (*str*, default="data"): Base name for generated tables
 
 **Naming Options:**
+
 - **separator** (*str*, default="_"): Character to join nested field names
 - **nested_threshold** (*int*, default=4): Maximum nesting depth before simplifying field names
 
 **ID Options:**
-- **id_field** (*str | Dict[str, str] | None*, default=None): Field(s) to use as record IDs
+
+- **id_field** (*str | dict[str, str] | None*, default=None): Field(s) to use as record IDs
 - **parent_id_field** (*str*, default="_parent_id"): Name for parent reference fields
 - **add_timestamp** (*bool*, default=False): Add processing timestamp metadata
 
 **Array Handling:**
+
 - **arrays** (*Literal["separate", "inline", "skip"]*, default="separate"): How to process arrays:
   - "separate": Extract arrays into child tables (default)
   - "inline": Keep arrays as JSON strings in main table
   - "skip": Ignore arrays completely
 
 **Data Options:**
+
 - **preserve_types** (*bool*, default=False): Maintain original data types vs convert to strings
 - **skip_null** (*bool*, default=True): Exclude null values from output
 - **skip_empty** (*bool*, default=True): Exclude empty strings and collections
 
 **Error Handling:**
+
 - **errors** (*Literal["raise", "skip", "warn"]*, default="raise"): Error handling strategy:
   - "raise": Stop processing and raise exception
   - "skip": Skip problematic records and continue
   - "warn": Log warnings but continue processing
 
 **Performance:**
+
 - **batch_size** (*int*, default=1000): Records to process in each batch
 - **low_memory** (*bool*, default=False): Use memory-efficient processing (slower)
 
 **Returns:**
+
 - **FlattenResult**: Object containing transformed tables and metadata
 
 **Examples:**
@@ -111,7 +118,7 @@ flatten_file(
     path: Union[str, Path],
     *,
     name: Optional[str] = None,
-    format: Optional[str] = None,
+    file_format: Optional[str] = None,
     **options: Any,
 ) -> FlattenResult
 ```
@@ -120,14 +127,16 @@ flatten_file(
 
 - **path** (*Union[str, Path]*): Path to input file
 - **name** (*Optional[str]*, default=None): Table name (defaults to filename without extension)
-- **format** (*Optional[str]*, default=None): Input format (auto-detected from extension)
+- **file_format** (*Optional[str]*, default=None): Input format (auto-detected from extension)
 - **\*\*options**: All options from `flatten()` function
 
 **Supported Formats:**
+
 - JSON (.json)
 - CSV (.csv) - for files containing JSON in cells
 
 **Returns:**
+
 - **FlattenResult**: Object containing transformed tables
 
 **Examples:**
@@ -149,15 +158,15 @@ Stream large datasets directly to files without loading into memory.
 
 ```python
 flatten_stream(
-    data: Union[Dict[str, Any], List[Dict[str, Any]], str, Path, bytes],
+    data: Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes],
     output_path: Union[str, Path],
     *,
     name: str = "data",
-    format: str = "json",
+    output_format: str = "json",
     # All options from flatten()
     separator: str = "_",
     nested_threshold: int = 4,
-    id_field: Union[str, Dict[str, str], None] = None,
+    id_field: Union[str, dict[str, str], None] = None,
     parent_id_field: str = "_parent_id",
     add_timestamp: bool = False,
     arrays: Literal["separate", "inline", "skip"] = "separate",
@@ -175,32 +184,34 @@ flatten_stream(
 - **data**: Input data (same as `flatten()`)
 - **output_path** (*Union[str, Path]*): Directory or file path for output
 - **name** (*str*, default="data"): Base name for output files
-- **format** (*str*, default="json"): Output format ("json", "csv", "parquet")
+- **output_format** (*str*, default="json"): Output format ("json", "csv", "parquet")
 - **\*\*format_options**: Format-specific options
 
 **Output Formats:**
+
 - **"json"**: JSON Lines format for efficient streaming
 - **"csv"**: CSV files with proper escaping
 - **"parquet"**: Columnar format for analytics (requires pyarrow)
 
 **Returns:**
+
 - **None**: Data is written directly to files
 
 **Examples:**
 
 ```python
 # Stream to JSON files
-tm.flatten_stream(large_data, "output/", name="products", format="json")
+tm.flatten_stream(large_data, "output/", name="products", output_format="json")
 
 # Stream to Parquet for analytics
-tm.flatten_stream(data, "output/", format="parquet", batch_size=5000)
+tm.flatten_stream(data, "output/", output_format="parquet", batch_size=5000)
 
 # Stream with custom options
 tm.flatten_stream(
     data,
     "output/",
     name="logs",
-    format="csv",
+    output_format="csv",
     arrays="skip",
     errors="warn"
 )
@@ -214,21 +225,21 @@ Container for flattened data with convenience methods for access and export.
 
 #### Properties
 
-**main** (*List[Dict[str, Any]]*): Main flattened table
+**main** (*list[dict[str, Any]]*): Main flattened table
 
 ```python
 result = tm.flatten(data)
 main_table = result.main
 ```
 
-**tables** (*Dict[str, List[Dict[str, Any]]]*): Child tables dictionary
+**tables** (*dict[str, list[dict[str, Any]]]*): Child tables dictionary
 
 ```python
 child_tables = result.tables
 reviews = result.tables["products_reviews"]
 ```
 
-**all_tables** (*Dict[str, List[Dict[str, Any]]]*): All tables including main
+**all_tables** (*dict[str, list[dict[str, Any]]]*): All tables including main
 
 ```python
 all_data = result.all_tables
@@ -236,23 +247,25 @@ all_data = result.all_tables
 
 #### Methods
 
-**save(path, format=None)**
+##### save(path, output_format=None)
 
 Save all tables to files.
 
 ```python
 save(
     path: Union[str, Path],
-    format: Optional[str] = None
-) -> Union[List[str], Dict[str, str]]
+    output_format: Optional[str] = None
+) -> Union[list[str], dict[str, str]]
 ```
 
 **Parameters:**
+
 - **path**: Output path (file or directory)
-- **format**: Output format ("json", "csv", "parquet", auto-detected from extension)
+- **output_format**: Output format ("json", "csv", "parquet", auto-detected from extension)
 
 **Returns:**
-- **Union[List[str], Dict[str, str]]**: Created file paths
+
+- **Union[list[str], dict[str, str]]**: Created file paths
 
 **Examples:**
 
@@ -261,21 +274,22 @@ save(
 paths = result.save("output/")
 
 # Save as CSV with explicit format
-paths = result.save("output/", format="csv")
+paths = result.save("output/", output_format="csv")
 
 # Save single table as JSON file
 paths = result.save("data.json")
 ```
 
-**table_info()**
+##### table_info()
 
 Get metadata about all tables.
 
 ```python
-table_info() -> Dict[str, Dict[str, Any]]
+table_info() -> dict[str, dict[str, Any]]
 ```
 
 **Returns:**
+
 - **Dict**: Table metadata including record counts, fields, and main table indicator
 
 **Example:**
@@ -346,6 +360,7 @@ class ValidationError(TransmogError):
 ```
 
 **Common Causes:**
+
 - Invalid configuration parameters
 - Malformed input data
 - Unsupported data types
@@ -367,7 +382,7 @@ except tm.ValidationError as e:
 Type alias for supported input data formats.
 
 ```python
-DataInput = Union[Dict[str, Any], List[Dict[str, Any]], str, Path, bytes]
+DataInput = Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes]
 ```
 
 ### ArrayHandling
@@ -391,7 +406,7 @@ ErrorHandling = Literal["raise", "skip", "warn"]
 Type alias for ID field specifications.
 
 ```python
-IdSource = Union[str, Dict[str, str], None]
+IdSource = Union[str, dict[str, str], None]
 ```
 
 ## Module Information

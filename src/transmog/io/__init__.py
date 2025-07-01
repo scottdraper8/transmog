@@ -46,7 +46,7 @@ def initialize_io_features() -> None:
     # Manually register writers to avoid circular import issues
     try:
         # Import writer modules first
-        from . import writers
+        from . import writers  # noqa: F401
 
         # Now register them manually
         from .writers.json import JsonStreamingWriter, JsonWriter
@@ -103,27 +103,27 @@ class _AdvancedAPI:
     """Advanced IO functionality for power users."""
 
     @staticmethod
-    def get_format_registry():
+    def get_format_registry() -> type:
         """Get the format registry for advanced format management."""
         return FormatRegistry
 
     @staticmethod
-    def get_dependency_manager():
+    def get_dependency_manager() -> type:
         """Get the dependency manager for advanced dependency checking."""
         return DependencyManager
 
     @staticmethod
-    def register_writer(format_name: str, writer_class):
+    def register_writer(format_name: str, writer_class: type) -> None:
         """Register a custom writer class."""
         return register_writer(format_name, writer_class)
 
     @staticmethod
-    def register_streaming_writer(format_name: str, writer_class):
+    def register_streaming_writer(format_name: str, writer_class: type) -> None:
         """Register a custom streaming writer class."""
         return register_streaming_writer(format_name, writer_class)
 
     @staticmethod
-    def initialize_features():
+    def initialize_features() -> None:
         """Manually initialize IO features."""
         return initialize_io_features()
 

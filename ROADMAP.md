@@ -73,4 +73,5 @@ ecosystem. The philosophy emphasizes doing one thing extremely well rather than 
 
 ## Feature Requests and Contributions
 
-Feature requests and contributions aligned with the core focus are welcome! Issues and pull requests may be submitted on GitHub to help Transmog excel at JSON transformation tasks.
+Feature requests and contributions aligned with the core focus are welcome! Issues and pull requests may be
+submitted on GitHub to help Transmog excel at JSON transformation tasks.

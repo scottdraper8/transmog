@@ -56,12 +56,18 @@ def process_batch_main_records(
         for record in batch:
             strategy_instance._remove_array_fields_from_record(record)
 
-    # Process records in single pass with memory optimization
+        # Process records in single pass with memory optimization
+    nested_threshold_value = params.get("nested_threshold")
+    if nested_threshold_value is not None:
+        nested_threshold_value = int(nested_threshold_value)
+    else:
+        nested_threshold_value = 4  # Default value
+
     processed_records, child_arrays = process_records_in_single_pass(
         batch,
         entity_name=entity_name,
         separator=params["separator"],
-        nested_threshold=params.get("nested_threshold"),
+        nested_threshold=nested_threshold_value,
         cast_to_string=params.get("cast_to_string", True),
         include_empty=params.get("include_empty", False),
         skip_null=params.get("skip_null", True),
@@ -100,7 +106,8 @@ def process_batch_main_records(
         collected = gc_manager.collect_after_batch()
         if collected > 0:
             logger.debug(
-                f"Memory optimization: collected {collected} objects after batch processing"
+                f"Memory optimization: collected {collected} objects "
+                f"after batch processing"
             )
 
     return main_ids
@@ -149,11 +156,17 @@ def process_batch_arrays(
 
         # Extract arrays from the record
         try:
+            nested_threshold_value = params.get("nested_threshold")
+            if nested_threshold_value is not None:
+                nested_threshold_value = int(nested_threshold_value)
+            else:
+                nested_threshold_value = 4  # Default value
+
             arrays = extract_arrays(
                 record,
                 entity_name=entity_name,
                 separator=params["separator"],
-                nested_threshold=params.get("nested_threshold"),
+                nested_threshold=nested_threshold_value,
                 cast_to_string=params.get("cast_to_string", True),
                 include_empty=params.get("include_empty", False),
                 skip_null=params.get("skip_null", True),

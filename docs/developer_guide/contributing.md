@@ -1,6 +1,7 @@
 # Contributing to Transmog
 
-Contributions to Transmog are welcome and appreciated. This guide covers everything needed to get started contributing to the project.
+Contributions to Transmog are welcome and appreciated. This guide covers everything needed to get
+started contributing to the project.
 
 ## Quick Start
 
@@ -18,20 +19,20 @@ git clone https://github.com/your-username/transmog.git
 cd transmog
 ```
 
-2. **Create a virtual environment**
+1. **Create a virtual environment**
 
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. **Install development dependencies**
+1. **Install development dependencies**
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-4. **Install pre-commit hooks**
+1. **Install pre-commit hooks**
 
 ```bash
 pre-commit install
@@ -39,7 +40,7 @@ pre-commit install
 
 The pre-commit hooks handle code formatting, linting, and style checks automatically. No manual formatting is needed.
 
-5. **Verify the setup**
+1. **Verify the setup**
 
 ```bash
 python -m pytest tests/
@@ -55,11 +56,11 @@ python -m pytest tests/
 git checkout -b feature/your-feature-name
 ```
 
-2. **Make your changes**
+1. **Make your changes**
 
 Write code, add tests, update documentation as needed.
 
-3. **Run tests locally**
+1. **Run tests locally**
 
 ```bash
 # Run all tests
@@ -72,7 +73,7 @@ python -m pytest tests/test_specific.py
 python -m pytest --cov=transmog
 ```
 
-4. **Commit your changes**
+1. **Commit your changes**
 
 Pre-commit hooks will automatically format and check code.
 
@@ -81,7 +82,7 @@ git add .
 git commit -m "Add feature: brief description"
 ```
 
-5. **Push and create pull request**
+1. **Push and create pull request**
 
 ```bash
 git push origin feature/your-feature-name
@@ -112,12 +113,14 @@ For feature requests:
 ### Code Contributions
 
 **Good first contributions:**
+
 - Documentation improvements
 - Test coverage improvements
 - Bug fixes with clear reproduction steps
 - Performance optimizations with benchmarks
 
 **Larger contributions:**
+
 - Data format support
 - Processing optimizations
 - API enhancements
@@ -153,6 +156,7 @@ The Transmog codebase is organized into focused, single-responsibility modules:
 - **`src/transmog/error/`** - Error handling and recovery strategies
 
 This modular structure makes it easier to:
+
 - Navigate and understand specific functionality
 - Write focused tests for individual components
 - Make changes without affecting unrelated code
@@ -270,19 +274,22 @@ When creating a pull request, include:
 **Description**
 Brief description of changes and motivation.
 
-**Type of Change**
+#### Type of Change
+
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Documentation update
 - [ ] Performance improvement
 - [ ] Code refactoring
 
-**Testing**
+#### Testing
+
 - [ ] Tests added/updated
 - [ ] All tests pass
 - [ ] Manual testing performed
 
-**Documentation**
+#### Documentation
+
 - [ ] Documentation updated
 - [ ] Examples added/updated
 - [ ] API documentation updated
@@ -377,17 +384,22 @@ Releases follow semantic versioning:
 ## Getting Help
 
 - **Documentation**: Check the [documentation](https://scottdraper.github.io/transmog/)
-- **Issues**: Search existing [GitHub issues](https://github.com/scottdraper/transmog/issues)
-- **Discussions**: Use [GitHub Discussions](https://github.com/scottdraper/transmog/discussions) for questions
-- **Contact**: Reach out to maintainers for guidance on larger contributions
+- **Issues**: Search existing
+  [GitHub issues](https://github.com/scottdraper/transmog/issues)
+- **Discussions**: Use [GitHub Discussions](https://github.com/scottdraper/transmog/discussions)
+  for questions
+- **Contact**: Reach out to maintainers for guidance on larger
+  contributions
 
 ## Code of Conduct
 
-Be respectful, inclusive, and constructive in all interactions. Focus on the code and ideas, not the person. Help create a welcoming environment for all contributors.
+Be respectful, inclusive, and constructive in all interactions. Focus on the code and ideas, not the
+person. Help create a welcoming environment for all contributors.
 
 ## Recognition
 
 Contributors are recognized in:
+
 - Release notes for significant contributions
 - GitHub contributors list
 - Project acknowledgments

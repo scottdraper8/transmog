@@ -4,7 +4,7 @@ This package provides the ProcessingResult class and its supporting modules,
 split from the original oversized result.py file for better maintainability.
 """
 
-from typing import Any, BinaryIO, Callable, Optional, Union
+from typing import Any, BinaryIO, Optional, Union
 
 from .converters import ResultConverters
 from .core import ConversionMode, ProcessingResult as CoreProcessingResult
@@ -21,7 +21,7 @@ class ProcessingResult(CoreProcessingResult):
     result.py file.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize ProcessingResult with all components."""
         super().__init__(*args, **kwargs)
 

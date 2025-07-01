@@ -37,7 +37,7 @@ print(f"Processed {len(result.main)} records")
 print(f"Created {len(result.tables)} child tables")
 
 # Save processed results
-result.save("output", format="csv")
+result.save("output", output_format="csv")
 ```
 
 ### JSON File Structure Support
@@ -45,6 +45,7 @@ result.save("output", format="csv")
 Transmog handles various JSON file structures:
 
 #### Single Object
+
 ```json
 {
   "company": "TechCorp",
@@ -53,6 +54,7 @@ Transmog handles various JSON file structures:
 ```
 
 #### Array of Objects
+
 ```json
 [
   {"id": 1, "name": "Product A"},
@@ -61,6 +63,7 @@ Transmog handles various JSON file structures:
 ```
 
 #### Nested Structure
+
 ```json
 {
   "data": {
@@ -81,7 +84,7 @@ tm.flatten_stream(
     "large_data.json",
     output_path="processed/",
     name="large_dataset",
-    format="parquet",
+    output_format="parquet",
     batch_size=1000,
     low_memory=True
 )
@@ -119,6 +122,7 @@ result = tm.flatten_file(
 ### CSV File Requirements
 
 CSV files should follow these guidelines:
+
 - First row contains column headers
 - Consistent column structure throughout
 - Standard CSV delimiters (comma, semicolon, tab)
@@ -193,7 +197,7 @@ def process_data_directory(input_dir, output_dir):
 
         # Save results
         output_file = output_path / file_path.stem
-        result.save(output_file, format="csv")
+        result.save(output_file, output_format="csv")
 
 # Process entire directory
 process_data_directory("raw_data/", "processed_data/")
@@ -280,7 +284,7 @@ tm.flatten_stream(
     "huge_dataset.json",
     output_path="streaming_output/",
     name="huge_data",
-    format="parquet",
+    output_format="parquet",
     batch_size=1000,
     low_memory=True,
     errors="skip"
@@ -368,7 +372,7 @@ result = tm.flatten_file(
 )
 
 # Save as CSV for database import
-result.save("db_import", format="csv")
+result.save("db_import", output_format="csv")
 ```
 
 ### Data Pipeline Integration
@@ -397,7 +401,7 @@ def file_to_pipeline(input_file, pipeline_config):
 
 ### File Organization
 
-```
+```text
 project/
 ├── raw_data/           # Original files
 │   ├── products.json

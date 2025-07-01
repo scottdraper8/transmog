@@ -209,7 +209,7 @@ class TestArrayExtractionIntegration:
             if len(parts) == 3:  # relationship + test + tablename
                 direct_child_tables[table_name] = records
 
-        for table_name, records in direct_child_tables.items():
+        for _table_name, records in direct_child_tables.items():
             for record in records:
                 assert "_parent_id" in record
                 # The parent ID should match the main record's ID

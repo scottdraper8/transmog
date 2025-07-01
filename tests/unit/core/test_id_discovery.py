@@ -4,7 +4,7 @@ Tests for ID discovery functionality.
 Tests natural ID field discovery and ID extraction from records.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import pytest
 

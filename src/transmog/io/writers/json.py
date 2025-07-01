@@ -13,7 +13,7 @@ from typing import Any, BinaryIO, Optional, TextIO, Union, cast
 from transmog.error import OutputError
 
 # Import writer interfaces
-from transmog.io.writer_interface import DataWriter, StreamingWriter
+from transmog.io.writer_interface import DataWriter, StreamingWriter, WriterUtils
 from transmog.types.base import JsonDict
 
 # Configure logger
@@ -26,8 +26,6 @@ try:
     ORJSON_AVAILABLE = True
 except ImportError:
     ORJSON_AVAILABLE = False
-
-from ..writer_interface import WriterUtils
 
 
 class JsonWriter(DataWriter):
@@ -163,16 +161,24 @@ class JsonWriter(DataWriter):
             # Use orjson for better performance
             json_bytes = orjson.dumps(data, option=orjson.OPT_INDENT_2 if indent else 0)
             if hasattr(file_obj, "mode") and "b" in getattr(file_obj, "mode", ""):
-                file_obj.write(json_bytes)
+                # Binary file
+                binary_file = cast(BinaryIO, file_obj)
+                binary_file.write(json_bytes)
             else:
-                file_obj.write(json_bytes.decode("utf-8"))
+                # Text file
+                text_file = cast(TextIO, file_obj)
+                text_file.write(json_bytes.decode("utf-8"))
         else:
             # Use standard json module
             json_str = json.dumps(data, indent=indent, ensure_ascii=False)
             if hasattr(file_obj, "mode") and "b" in getattr(file_obj, "mode", ""):
-                file_obj.write(json_str.encode("utf-8"))
+                # Binary file
+                binary_file = cast(BinaryIO, file_obj)
+                binary_file.write(json_str.encode("utf-8"))
             else:
-                file_obj.write(json_str)
+                # Text file
+                text_file = cast(TextIO, file_obj)
+                text_file.write(json_str)
 
     def write_all_tables(
         self,
@@ -204,9 +210,10 @@ class JsonWriter(DataWriter):
             base_path=base_path,
             entity_name=entity_name,
             format_name="json",
-            write_table_func=self.write_table,
+            write_table_func=lambda table_data, output_path: self.write_table(
+                table_data, output_path, **options
+            ),
             compression=options.get("compression", self.compression),
-            **options,
         )
 
 
@@ -261,7 +268,7 @@ class JsonStreamingWriter(StreamingWriter):
         # Initialize destination
         if destination is None:
             # Default to stdout
-            self.file_objects = {"main": sys.stdout}
+            self.file_objects = {"main": cast(TextIO, sys.stdout)}
             self.should_close = False
         elif isinstance(destination, str):
             # Check if it's a single file path (has .json extension) or directory
@@ -277,7 +284,7 @@ class JsonStreamingWriter(StreamingWriter):
                 )
                 file_obj = open(destination, mode)
 
-                self.file_objects = {"main": file_obj}
+                self.file_objects = {"main": cast(Union[BinaryIO, TextIO], file_obj)}
                 self.should_close = True
             else:
                 # Directory path
@@ -286,7 +293,7 @@ class JsonStreamingWriter(StreamingWriter):
                 self.should_close = True
         else:
             # File-like object
-            self.file_objects = {"main": destination}
+            self.file_objects = {"main": cast(Union[BinaryIO, TextIO], destination)}
             self.should_close = False
 
     def _get_file_for_table(self, table_name: str) -> Union[BinaryIO, TextIO]:
@@ -318,8 +325,9 @@ class JsonStreamingWriter(StreamingWriter):
             # Open file in appropriate mode
             mode = "wb" if self.compression else "w"
             file_obj = open(file_path, mode)
-            self.file_objects[table_name] = file_obj
-            return file_obj
+            typed_file_obj = cast(Union[BinaryIO, TextIO], file_obj)
+            self.file_objects[table_name] = typed_file_obj
+            return typed_file_obj
         else:
             raise OutputError(f"Cannot create file for table {table_name}")
 
@@ -477,21 +485,22 @@ class JsonStreamingWriter(StreamingWriter):
             if self.compression == "gzip":
                 gzip_file = getattr(self, "_gzip_files", {}).get(table_name)
                 if gzip_file:
-                    closing = b"\n]" if self.indent else b"]"
-                    gzip_file.write(closing)
+                    closing_bytes = b"\n]" if self.indent else b"]"
+                    gzip_file.write(closing_bytes)
                     gzip_file.close()
             else:
                 file_obj = self.file_objects.get(table_name)
                 if file_obj:
-                    closing = "\n]" if self.indent else "]"
+                    closing_str = "\n]" if self.indent else "]"
                     if hasattr(file_obj, "mode") and "b" not in getattr(
                         file_obj, "mode", ""
                     ):
                         text_obj = cast(TextIO, file_obj)
-                        text_obj.write(closing)
+                        text_obj.write(closing_str)
                     else:
                         binary_obj = cast(BinaryIO, file_obj)
-                        binary_obj.write(closing.encode("utf-8"))
+                        closing_bytes = closing_str.encode("utf-8")
+                        binary_obj.write(closing_bytes)
 
         self.finalized = True
 

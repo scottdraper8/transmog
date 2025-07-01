@@ -13,7 +13,7 @@ import sys
 import time
 import traceback
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 # Try to import from installed package first, fall back to development setup
 try:
@@ -77,7 +77,7 @@ def generate_random_nested_data(count, levels=3, breadth=3):
     return result
 
 
-def create_test_data(num_records: int = 1000, depth: int = 4) -> list[Dict[str, Any]]:
+def create_test_data(num_records: int = 1000, depth: int = 4) -> list[dict[str, Any]]:
     """Create test data with configurable complexity for memory optimization tests."""
     records = []
     for i in range(num_records):
@@ -273,10 +273,12 @@ def run_memory_benchmarks():
 
             print(f"\n📊 Summary for {size} records:")
             print(
-                f"  Best throughput: {best_throughput['config']} ({best_throughput['throughput']:.0f} rec/sec)"
+                f"  Best throughput: {best_throughput['config']} "
+                f"({best_throughput['throughput']:.0f} rec/sec)"
             )
             print(
-                f"  Best memory: {best_memory['config']} ({best_memory['memory_used_mb']:.1f} MB)"
+                f"  Best memory: {best_memory['config']} "
+                f"({best_memory['memory_used_mb']:.1f} MB)"
             )
 
     # Test memory optimization features

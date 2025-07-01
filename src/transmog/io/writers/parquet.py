@@ -123,7 +123,8 @@ class ParquetWriter(DataWriter):
                         output_path, "mode", ""
                     ):
                         raise OutputError(
-                            "Parquet format requires binary streams, text streams not supported"
+                            "Parquet format requires binary streams, "
+                            "text streams not supported"
                         )
                     pq.write_table(
                         empty_table, output_path, compression=compression_val
@@ -155,7 +156,8 @@ class ParquetWriter(DataWriter):
                     output_path, "mode", ""
                 ):
                     raise OutputError(
-                        "Parquet format requires binary streams, text streams not supported"
+                        "Parquet format requires binary streams, "
+                        "text streams not supported"
                     )
                 pq.write_table(
                     table, output_path, compression=compression_val, **format_options
@@ -197,17 +199,24 @@ class ParquetWriter(DataWriter):
                 package="pyarrow",
             )
 
-        # Use the consolidated write pattern
-        return WriterUtils.write_all_tables_pattern(
-            main_table=main_table,
-            child_tables=child_tables,
-            base_path=base_path,
-            entity_name=entity_name,
-            format_name="parquet",
-            write_table_func=self.write_table,
-            compression=None,  # Parquet handles compression internally
-            **options,
+        # Write main table
+        main_filename = WriterUtils.sanitize_filename(entity_name)
+        main_path = WriterUtils.build_output_path(
+            base_path, main_filename, "parquet", None
         )
+        self.write_table(main_table, main_path, **options)
+
+        # Write child tables
+        paths = {"main": main_path}
+        for table_name, table_data in child_tables.items():
+            child_filename = WriterUtils.sanitize_filename(table_name)
+            child_path = WriterUtils.build_output_path(
+                base_path, child_filename, "parquet", None
+            )
+            self.write_table(table_data, child_path, **options)
+            paths[table_name] = child_path
+
+        return paths
 
 
 class ParquetStreamingWriter(StreamingWriter):
@@ -274,7 +283,8 @@ class ParquetStreamingWriter(StreamingWriter):
                 destination, "mode", ""
             ):
                 logger.warning(
-                    "Parquet streaming writer requires binary streams for file-like objects"
+                    "Parquet streaming writer requires binary streams "
+                    "for file-like objects"
                 )
 
     def initialize_main_table(self, **options: Any) -> None:
@@ -427,7 +437,8 @@ class ParquetStreamingWriter(StreamingWriter):
         if file_path is None:
             # Cannot create streaming writer without file path
             logger.warning(
-                f"Cannot create Parquet streaming writer for table {table_name} without file path"
+                f"Cannot create Parquet streaming writer for table "
+                f"{table_name} without file path"
             )
             return
 

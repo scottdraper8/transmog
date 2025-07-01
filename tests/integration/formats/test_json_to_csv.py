@@ -22,7 +22,7 @@ class TestJsonToCsvConversion:
         result = tm.flatten(simple_data, name="simple")
 
         # Save as CSV
-        csv_paths = result.save(str(output_dir / "simple_csv"), format="csv")
+        csv_paths = result.save(str(output_dir / "simple_csv"), output_format="csv")
 
         # Verify CSV files were created
         if isinstance(csv_paths, dict):
@@ -54,7 +54,7 @@ class TestJsonToCsvConversion:
         result = tm.flatten(complex_nested_data, name="organization", arrays="separate")
 
         # Save as CSV
-        csv_paths = result.save(str(output_dir / "nested_csv"), format="csv")
+        csv_paths = result.save(str(output_dir / "nested_csv"), output_format="csv")
 
         # Should create multiple CSV files for nested arrays
         if isinstance(csv_paths, dict):
@@ -86,7 +86,7 @@ class TestJsonToCsvConversion:
         result = tm.flatten(array_data, name="company", arrays="separate")
 
         # Save as CSV
-        csv_paths = result.save(str(output_dir / "array_csv"), format="csv")
+        csv_paths = result.save(str(output_dir / "array_csv"), output_format="csv")
 
         if isinstance(csv_paths, dict):
             # Should have main company CSV
@@ -131,7 +131,7 @@ class TestJsonToCsvConversion:
         result = tm.flatten(batch_data, name="records")
 
         # Save as CSV
-        csv_paths = result.save(str(output_dir / "batch_csv"), format="csv")
+        csv_paths = result.save(str(output_dir / "batch_csv"), output_format="csv")
 
         # Verify main CSV has all records
         if isinstance(csv_paths, dict):
@@ -157,7 +157,7 @@ class TestJsonToCsvConversion:
         result = tm.flatten_file(json_file, name="from_file")
 
         # Save as CSV
-        csv_paths = result.save(str(output_dir / "file_csv"), format="csv")
+        csv_paths = result.save(str(output_dir / "file_csv"), output_format="csv")
 
         # Verify conversion
         if isinstance(csv_paths, dict):
@@ -182,7 +182,7 @@ class TestJsonToCsvConversion:
         result = tm.flatten_file(large_json_file, name="large_data")
 
         # Save as CSV
-        csv_paths = result.save(str(output_dir / "large_csv"), format="csv")
+        csv_paths = result.save(str(output_dir / "large_csv"), output_format="csv")
 
         # Verify large CSV was created
         if isinstance(csv_paths, dict):
@@ -212,7 +212,7 @@ class TestJsonToCsvOptions:
         result = tm.flatten(simple_data, name="dot_sep", separator=".")
 
         # Save as CSV
-        csv_paths = result.save(str(output_dir / "dot_csv"), format="csv")
+        csv_paths = result.save(str(output_dir / "dot_csv"), output_format="csv")
 
         # Verify CSV has dot-separated field names
         if isinstance(csv_paths, dict):
@@ -235,7 +235,7 @@ class TestJsonToCsvOptions:
         result = tm.flatten(problematic_data, name="error_test", errors="skip")
 
         # Save as CSV
-        csv_paths = result.save(str(output_dir / "error_csv"), format="csv")
+        csv_paths = result.save(str(output_dir / "error_csv"), output_format="csv")
 
         # Should create CSV with valid records
         if isinstance(csv_paths, dict):
@@ -260,7 +260,7 @@ class TestJsonToCsvOptions:
         result = tm.flatten(mixed_types_data, name="types", preserve_types=True)
 
         # Save as CSV
-        csv_paths = result.save(str(output_dir / "types_csv"), format="csv")
+        csv_paths = result.save(str(output_dir / "types_csv"), output_format="csv")
 
         # Verify CSV was created
         if isinstance(csv_paths, dict):
@@ -286,7 +286,7 @@ class TestJsonToCsvOptions:
         result = tm.flatten(simple_data, name="natural", id_field="id")
 
         # Save as CSV
-        csv_paths = result.save(str(output_dir / "natural_csv"), format="csv")
+        csv_paths = result.save(str(output_dir / "natural_csv"), output_format="csv")
 
         # Verify CSV has natural ID
         if isinstance(csv_paths, dict):
@@ -315,7 +315,7 @@ class TestJsonToCsvEdgeCases:
         result = tm.flatten(empty_data, name="empty")
 
         # Save as CSV
-        csv_paths = result.save(str(output_dir / "empty_csv"), format="csv")
+        csv_paths = result.save(str(output_dir / "empty_csv"), output_format="csv")
 
         # Should create empty CSV or handle gracefully
         if isinstance(csv_paths, dict):
@@ -338,7 +338,7 @@ class TestJsonToCsvEdgeCases:
         result = tm.flatten(special_data, name="special")
 
         # Save as CSV
-        csv_paths = result.save(str(output_dir / "special_csv"), format="csv")
+        csv_paths = result.save(str(output_dir / "special_csv"), output_format="csv")
 
         # Verify CSV handles special characters
         if isinstance(csv_paths, dict):
@@ -372,7 +372,7 @@ class TestJsonToCsvEdgeCases:
         result = tm.flatten(deep_data, name="deep")
 
         # Save as CSV
-        csv_paths = result.save(str(output_dir / "deep_csv"), format="csv")
+        csv_paths = result.save(str(output_dir / "deep_csv"), output_format="csv")
 
         # Should handle deep nesting
         if isinstance(csv_paths, dict):
@@ -408,7 +408,7 @@ class TestJsonToCsvEdgeCases:
         result = tm.flatten(null_data, name="nulls")
 
         # Save as CSV
-        csv_paths = result.save(str(output_dir / "nulls_csv"), format="csv")
+        csv_paths = result.save(str(output_dir / "nulls_csv"), output_format="csv")
 
         # Verify CSV handles null values
         if isinstance(csv_paths, dict):

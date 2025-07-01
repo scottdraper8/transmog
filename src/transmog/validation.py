@@ -5,14 +5,14 @@ ensuring consistent error messages and validation logic across the entire codeba
 """
 
 import re
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 from transmog.error import ConfigurationError, ValidationError
 
 # Type aliases for validation
 ArrayHandling = Literal["separate", "inline", "skip"]
 ErrorHandling = Literal["raise", "skip", "warn"]
-IdSource = Union[str, Dict[str, str], None]
+IdSource = Union[str, dict[str, str], None]
 
 
 class ParameterValidator:
@@ -291,8 +291,8 @@ class ParameterValidator:
                 pass
 
             raise error_class(
-                f"Data input must be a dictionary, list, string, bytes, or Path object, "
-                f"got {type(value).__name__}"
+                f"Data input must be a dictionary, list, string, bytes, "
+                f"or Path object, got {type(value).__name__}"
             )
 
     @staticmethod

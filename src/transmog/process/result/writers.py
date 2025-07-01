@@ -6,12 +6,15 @@ and handling file I/O operations.
 
 import json
 import os
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from transmog.error.exceptions import OutputError
 from transmog.io.writer_factory import create_writer, is_format_available
 
 from .converters import ResultConverters
+
+if TYPE_CHECKING:
+    from .core import ProcessingResult
 
 
 class ResultWriters:

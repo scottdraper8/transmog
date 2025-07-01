@@ -1,10 +1,13 @@
 # Extending and Customization
 
-Transmog provides extension points for customizing data transformation behavior, adding functionality, and integrating with external systems. This guide covers advanced customization techniques and extension patterns.
+Transmog provides extension points for customizing data transformation behavior, adding
+functionality, and integrating with external systems. This guide covers advanced customization
+techniques and extension patterns.
 
 ## Advanced API Access
 
-For developers requiring access to internal functionality, Transmog provides an advanced API namespace that exposes lower-level components:
+For developers requiring access to internal functionality, Transmog provides an advanced API
+namespace that exposes lower-level components:
 
 ```python
 import transmog as tm
@@ -24,7 +27,8 @@ advanced.register_writer("custom_format", CustomWriter)
 dependency_manager = advanced.get_dependency_manager()
 ```
 
-The advanced API provides access to internal classes like `FormatRegistry` and `DependencyManager` that are not exposed in the standard public API for cleaner interfaces.
+The advanced API provides access to internal classes like `FormatRegistry` and `DependencyManager`
+that are not exposed in the standard public API for cleaner interfaces.
 
 ## Custom Processors
 

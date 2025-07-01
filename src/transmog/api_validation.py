@@ -5,14 +5,14 @@ separate from configuration validation. Always uses ValidationError for
 consistency in API error handling.
 """
 
-from typing import Any, Dict, Literal, Union
+from typing import Any, Literal, Union
 
 from transmog.error import ValidationError
 
 # Type aliases used in API
 ArrayHandling = Literal["separate", "inline", "skip"]
 ErrorHandling = Literal["raise", "skip", "warn"]
-IdSource = Union[str, Dict[str, str], None]
+IdSource = Union[str, dict[str, str], None]
 
 
 def validate_api_parameters(**params: Any) -> None:
@@ -104,7 +104,8 @@ def validate_nested_threshold_api(nested_threshold: Any) -> None:
     """
     if not isinstance(nested_threshold, int):
         raise ValidationError(
-            f"nested_threshold must be an integer, got {type(nested_threshold).__name__}"
+            f"nested_threshold must be an integer, got "
+            f"{type(nested_threshold).__name__}"
         )
 
     if nested_threshold < 1:
@@ -264,7 +265,9 @@ def validate_data_api(data: Any) -> None:
             json.loads(data)
             return  # Valid JSON string
         except json.JSONDecodeError:
-            raise ValidationError("String data must be valid JSON or a valid file path")
+            raise ValidationError(
+                "String data must be valid JSON or a valid file path"
+            ) from None
 
 
 def validate_path_api(path: Any) -> None:

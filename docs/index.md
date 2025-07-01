@@ -4,11 +4,13 @@ hide-toc: false
 
 # Transmog Documentation
 
-Transform nested JSON data into flat, tabular formats while preserving relationships between parent and child records.
+Transform nested JSON data into flat, tabular formats while preserving relationships
+between parent and child records.
 
 ## What is Transmog?
 
-Transmog transforms complex, nested data structures into flat tables suitable for databases, analytics, and data processing. The system:
+Transmog transforms complex, nested data structures into flat tables suitable for databases,
+analytics, and data processing. The system:
 
 - Flattens nested objects using configurable path notation
 - Extracts arrays into separate relational tables
@@ -34,6 +36,7 @@ print(result.tables)        # Employee data in separate table
 ## Documentation Sections
 
 ### Getting Started
+
 Start here for installation, basic concepts, and first steps.
 
 - **Quick introduction** to data flattening concepts
@@ -44,6 +47,7 @@ Start here for installation, basic concepts, and first steps.
 [**→ Getting Started Guide**](getting_started.md)
 
 ### User Guide
+
 Task-oriented guides covering all functionality by topic area. Each guide focuses on specific workflows and practical examples.
 
 - **File Processing** - Working with JSON and CSV files
@@ -55,6 +59,7 @@ Task-oriented guides covering all functionality by topic area. Each guide focuse
 [**→ User Guide**](user_guide/file-processing.md)
 
 ### API Reference
+
 Complete technical documentation of all functions, classes, and parameters. Detailed reference for every public API component.
 
 - **Functions** - `flatten()`, `flatten_file()`, `flatten_stream()`
@@ -65,6 +70,7 @@ Complete technical documentation of all functions, classes, and parameters. Deta
 [**→ API Reference**](api_reference/api.md)
 
 ### Developer Guide
+
 Contributing, extending, and advanced usage patterns. Resources for developers wanting to contribute or customize Transmog.
 
 - **Contributing Guidelines** - How to contribute to the project

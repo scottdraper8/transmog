@@ -52,7 +52,9 @@ class TestWriterFactory:
         assert writer_lower is not None
         assert writer_upper is not None
         assert writer_mixed is not None
-        assert type(writer_lower) == type(writer_upper) == type(writer_mixed)
+        assert isinstance(writer_lower, type(writer_upper)) and isinstance(
+            writer_upper, type(writer_mixed)
+        )
 
     def test_create_writer_with_options(self):
         """Test creating writer with options."""

@@ -217,7 +217,9 @@ class TestFlattenResultEdgeCases:
             output_path = Path(temp_dir) / "output.invalid"
 
             with pytest.raises((ValidationError, ValueError)):
-                single_record_result.save(str(output_path), format="invalid_format")
+                single_record_result.save(
+                    str(output_path), output_format="invalid_format"
+                )
 
     def test_result_table_info_edge_cases(self, empty_result):
         """Test table_info with edge cases."""

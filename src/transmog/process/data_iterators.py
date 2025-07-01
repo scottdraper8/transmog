@@ -44,7 +44,7 @@ class DataIteratorUtils:
             raise FileError(f"File not found: {file_path}")
 
     @staticmethod
-    def get_json_parser():
+    def get_json_parser() -> tuple[Any, tuple[type[Exception], ...]]:
         """Get the best available JSON parser.
 
         Returns:
@@ -315,7 +315,8 @@ def get_json_data_iterator(
             yield from parsed_data
         else:
             raise ProcessingError(
-                f"Expected dict or list from JSON data, got {type(parsed_data).__name__}"
+                f"Expected dict or list from JSON data, "
+                f"got {type(parsed_data).__name__}"
             )
 
     except Exception as e:

@@ -61,7 +61,7 @@ def _get_cache_key(
 
     # Create a hash of the options
     options_str = str(sorted(options.items()))
-    options_hash = hashlib.md5(options_str.encode()).hexdigest()
+    options_hash = hashlib.sha256(options_str.encode()).hexdigest()[:16]
 
     return (data_hash, format_type, options_hash)
 

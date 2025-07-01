@@ -378,8 +378,10 @@ ERROR_TEMPLATES = {
     "file_operation": "File operation failed for '{file_path}': {error}",
     "configuration": "Configuration error in {component}: {error}",
     "field_access": "Field access error for '{field_name}' in {entity_type}: {error}",
-    "type_conversion": "Type conversion error for value '{value}' to {target_type}: {error}",
-    "array_processing": "Array processing error in {entity_type} '{entity_name}': {error}",
+    "type_conversion": "Type conversion error for value '{value}' to "
+    "{target_type}: {error}",
+    "array_processing": "Array processing error in {entity_type} "
+    "'{entity_name}': {error}",
     "generic": "Error in {operation}: {error}",
 }
 

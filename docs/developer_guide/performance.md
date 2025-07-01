@@ -1,6 +1,8 @@
 # Performance Optimization
 
-Transmog performance can be optimized through configuration tuning, data preparation, and processing strategies. This guide covers techniques for maximizing throughput and minimizing processing time.
+Transmog performance can be optimized through configuration tuning, data preparation, and
+processing strategies. This guide covers techniques for maximizing throughput and minimizing
+processing time.
 
 ## Configuration Optimization
 
@@ -34,7 +36,8 @@ for size, duration in timings.items():
 
 ### Memory vs Speed Trade-offs
 
-Balance memory usage with processing speed. The system includes adaptive memory management that automatically adjusts processing parameters based on available memory:
+Balance memory usage with processing speed. The system includes adaptive memory management
+that automatically adjusts processing parameters based on available memory:
 
 ```python
 # High performance configuration
