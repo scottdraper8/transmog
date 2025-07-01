@@ -10,7 +10,7 @@ def get_table_name_for_array(
     array_name: str,
     parent_path: str,
     separator: str,
-    deeply_nested_threshold: int = 4,
+    nested_threshold: int = 4,
 ) -> str:
     """Generate consistent table names for arrays.
 
@@ -22,7 +22,7 @@ def get_table_name_for_array(
         array_name: Array field name
         parent_path: Parent path
         separator: Separator for path components
-        deeply_nested_threshold: Threshold for deeply nested paths (default 4)
+        nested_threshold: Threshold for deeply nested paths (default 4)
 
     Returns:
         Generated table name
@@ -36,9 +36,9 @@ def get_table_name_for_array(
     path_parts = full_path.split(separator)
 
     # Handle deeply nested structures specially
-    # Including the entity name, a path with deeply_nested_threshold components
+    # Including the entity name, a path with nested_threshold components
     # already counts as deeply nested
-    if len(path_parts) >= deeply_nested_threshold:
+    if len(path_parts) >= nested_threshold:
         # For deeply nested structures, use first component, nested indicator, and the
         # last component
         simplified_path = separator.join(

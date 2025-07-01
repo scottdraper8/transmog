@@ -87,14 +87,14 @@ class TestNamingOptionsValidation:
             NamingOptions(separator="")
 
     def test_threshold_validation(self):
-        """Test deeply_nested_threshold validation."""
+        """Test nested_threshold validation."""
         # Valid threshold
-        config = NamingOptions(deeply_nested_threshold=5)
-        assert config.deeply_nested_threshold == 5
+        config = NamingOptions(nested_threshold=5)
+        assert config.nested_threshold == 5
 
         # Invalid threshold
         with pytest.raises(ValueError):
-            NamingOptions(deeply_nested_threshold=1)
+            NamingOptions(nested_threshold=1)
 
 
 class TestProcessingConfigValidation:
@@ -161,7 +161,7 @@ class TestConfigurationDefaults:
 
         # Naming defaults
         assert config.naming.separator == "_"
-        assert config.naming.deeply_nested_threshold == 4
+        assert config.naming.nested_threshold == 4
 
         # Processing defaults
         assert config.processing.cast_to_string is True
@@ -178,7 +178,7 @@ class TestConfigurationDefaults:
         config = NamingOptions()
 
         assert config.separator == "_"
-        assert config.deeply_nested_threshold == 4
+        assert config.nested_threshold == 4
 
     def test_processing_config_defaults(self):
         """Test ProcessingConfig default values."""

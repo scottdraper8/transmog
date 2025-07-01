@@ -8,12 +8,14 @@ Transform nested JSON data into flat, tabular formats while preserving relations
 
 ## What is Transmog?
 
-Transmog simplifies working with complex, nested data by converting it into flat tables suitable for databases, analytics, and data processing. It automatically:
+Transmog transforms complex, nested data structures into flat tables suitable for databases, analytics, and data processing. The system:
 
-- Flattens nested objects using path notation
+- Flattens nested objects using configurable path notation
 - Extracts arrays into separate relational tables
 - Generates unique identifiers for record tracking
 - Supports multiple output formats (JSON, CSV, Parquet)
+- Includes unified error handling with consistent recovery strategies
+- Provides memory-efficient processing with adaptive batch sizing
 
 ## Quick Example
 
@@ -32,7 +34,7 @@ print(result.tables)        # Employee data in separate table
 ## Documentation Sections
 
 ### Getting Started
-New to Transmog? Start here for installation, basic concepts, and first steps.
+Start here for installation, basic concepts, and first steps.
 
 - **Quick introduction** to data flattening concepts
 - **10-minute tutorial** to get up and running

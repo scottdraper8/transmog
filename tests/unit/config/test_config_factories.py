@@ -214,7 +214,7 @@ class TestConfigComposition:
         config = (
             TransmogConfig.default()
             .with_processing(batch_size=2000, cast_to_string=True)
-            .with_naming(separator=".", deeply_nested_threshold=5)
+            .with_naming(separator=".", nested_threshold=5)
             .with_metadata(id_field="custom_id")
         )
 
@@ -222,7 +222,7 @@ class TestConfigComposition:
         assert config.processing.batch_size == 2000
         assert config.processing.cast_to_string is True
         assert config.naming.separator == "."
-        assert config.naming.deeply_nested_threshold == 5
+        assert config.naming.nested_threshold == 5
         assert config.metadata.id_field == "custom_id"
 
     def test_config_override_factory(self):
@@ -307,7 +307,7 @@ class TestConfigValidation:
             assert len(config.naming.separator) > 0
             assert config.processing.batch_size > 0
             assert config.cache_config.maxsize > 0
-            assert config.naming.deeply_nested_threshold > 0
+            assert config.naming.nested_threshold > 0
 
     def test_config_field_types(self):
         """Test that config fields have correct types."""
@@ -320,7 +320,7 @@ class TestConfigValidation:
 
         # Naming fields
         assert isinstance(config.naming.separator, str)
-        assert isinstance(config.naming.deeply_nested_threshold, int)
+        assert isinstance(config.naming.nested_threshold, int)
 
         # Metadata fields
         assert isinstance(config.metadata.id_field, str)
@@ -342,7 +342,7 @@ class TestConfigValidation:
         assert 1 <= config.cache_config.maxsize <= 1000000
 
         # Deep nesting threshold should be reasonable
-        assert 1 <= config.naming.deeply_nested_threshold <= 100
+        assert 1 <= config.naming.nested_threshold <= 100
 
         # Separator should be reasonable
         assert len(config.naming.separator) <= 10

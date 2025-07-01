@@ -13,7 +13,7 @@ def get_table_name(
     parent_entity: str,
     separator: str = "_",
     parent_path: str = "",
-    deeply_nested_threshold: int = 4,
+    nested_threshold: int = 4,
 ) -> str:
     """Generate standardized table name for nested arrays.
 
@@ -25,7 +25,7 @@ def get_table_name(
         parent_entity: Top-level entity name
         separator: Separator character for path components
         parent_path: Path to the parent object containing this array
-        deeply_nested_threshold: Threshold for when to consider a path deeply nested
+        nested_threshold: Threshold for when to consider a path deeply nested
 
     Returns:
         Formatted table name
@@ -39,9 +39,9 @@ def get_table_name(
     path_parts = full_path.split(separator)
 
     # Check if we have a deeply nested structure
-    # Including the entity name, a path with deeply_nested_threshold components
+    # Including the entity name, a path with nested_threshold components
     # already counts as deeply nested
-    if len(path_parts) >= deeply_nested_threshold:
+    if len(path_parts) >= nested_threshold:
         # For deeply nested structures, use first component, nested indicator, and the
         # last component
         simplified_path = separator.join(
@@ -202,7 +202,7 @@ def join_path(parts: tuple[str, ...], separator: str = "_") -> str:
 
 
 def handle_deeply_nested_path(
-    path: str, separator: str = "_", deeply_nested_threshold: int = 4
+    path: str, separator: str = "_", nested_threshold: int = 4
 ) -> str:
     """Handle deeply nested paths by simplifying them.
 
@@ -212,16 +212,16 @@ def handle_deeply_nested_path(
     Args:
         path: The path to potentially simplify
         separator: Separator character for path components
-        deeply_nested_threshold: Threshold for when to consider a path deeply nested
+        nested_threshold: Threshold for when to consider a path deeply nested
 
     Returns:
         Simplified path for deeply nested structures, original path otherwise
     """
     components = path.split(separator)
 
-    # Including the entity name, a path with deeply_nested_threshold components
+    # Including the entity name, a path with nested_threshold components
     # already counts as deeply nested
-    if len(components) >= deeply_nested_threshold:
+    if len(components) >= nested_threshold:
         # For deeply nested structures, include first and last components
         # with a "nested" indicator in between
         return separator.join([components[0], "nested", components[-1]])

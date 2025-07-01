@@ -9,30 +9,22 @@ from enum import Enum, auto
 from typing import Any, Callable, Optional, Union
 
 from transmog.config.settings import (
-    ExtensionRegistry,
     TransmogSettings,
     configure,
     load_config,
     load_profile,
 )
-from transmog.config.validation import (
-    validate_batch_size,
-    validate_cache_size,
-    validate_component_length,
-    validate_field_name,
-    validate_id_field_mapping,
-    validate_max_depth,
-    validate_recovery_strategy,
-    validate_separator,
-)
 from transmog.error import ConfigurationError
+from transmog.validation import (
+    ParameterValidator,
+    validate_config_parameters,
+)
 
 # Internal use only - use the tm.flatten() API
 # These are still needed internally but not exported
 
 # Global instances
 settings = TransmogSettings()
-extensions = ExtensionRegistry()
 
 
 class ProcessingMode(Enum):
@@ -48,7 +40,7 @@ class NamingConfig:
     """Configuration for naming conventions."""
 
     separator: str = "_"
-    deeply_nested_threshold: int = 4
+    nested_threshold: int = 4
 
 
 @dataclass
@@ -130,7 +122,7 @@ class TransmogConfig:
         include_empty: Optional[bool] = None,
         skip_null: Optional[bool] = None,
         visit_arrays: Optional[bool] = None,
-        deeply_nested_threshold: Optional[int] = None,
+        nested_threshold: Optional[int] = None,
         id_field: Optional[str] = None,
         parent_field: Optional[str] = None,
         time_field: Optional[str] = None,
@@ -156,7 +148,7 @@ class TransmogConfig:
             include_empty: Whether to include empty values
             skip_null: Whether to skip null values
             visit_arrays: Whether to process arrays into child tables
-            deeply_nested_threshold: Threshold for deeply nested paths
+            nested_threshold: Threshold for deeply nested paths
             id_field: ID field name for metadata
             parent_field: Parent ID field name for metadata
             time_field: Timestamp field name for metadata
@@ -175,13 +167,13 @@ class TransmogConfig:
 
         # Apply convenience parameters to appropriate components
         if batch_size is not None:
-            validate_batch_size(batch_size)
+            validate_config_parameters(batch_size=batch_size)
             self.processing = dataclasses.replace(
                 self.processing, batch_size=batch_size
             )
 
         if separator is not None:
-            validate_separator(separator)
+            validate_config_parameters(separator=separator)
             self.naming = dataclasses.replace(self.naming, separator=separator)
 
         if cast_to_string is not None:
@@ -202,27 +194,27 @@ class TransmogConfig:
                 self.processing, visit_arrays=visit_arrays
             )
 
-        if deeply_nested_threshold is not None:
+        if nested_threshold is not None:
             self.naming = dataclasses.replace(
-                self.naming, deeply_nested_threshold=deeply_nested_threshold
+                self.naming, nested_threshold=nested_threshold
             )
 
         if id_field is not None:
-            validate_field_name(id_field)
+            validate_config_parameters(id_field=id_field)
             self.metadata = dataclasses.replace(self.metadata, id_field=id_field)
 
         if parent_field is not None:
-            validate_field_name(parent_field)
+            validate_config_parameters(parent_field=parent_field)
             self.metadata = dataclasses.replace(
                 self.metadata, parent_field=parent_field
             )
 
         if time_field is not None:
-            validate_field_name(time_field)
+            validate_config_parameters(time_field=time_field)
             self.metadata = dataclasses.replace(self.metadata, time_field=time_field)
 
         if recovery_strategy is not None:
-            validate_recovery_strategy(recovery_strategy)
+            validate_config_parameters(recovery_strategy=recovery_strategy)
             self.error_handling = dataclasses.replace(
                 self.error_handling, recovery_strategy=recovery_strategy
             )
@@ -238,7 +230,7 @@ class TransmogConfig:
             )
 
         if cache_maxsize is not None:
-            validate_cache_size(cache_maxsize)
+            validate_config_parameters(cache_maxsize=cache_maxsize)
             self.cache_config = dataclasses.replace(
                 self.cache_config, maxsize=cache_maxsize
             )
@@ -467,13 +459,13 @@ class TransmogConfig:
     def with_naming(
         self,
         separator: Optional[str] = None,
-        deeply_nested_threshold: Optional[int] = None,
+        nested_threshold: Optional[int] = None,
     ) -> "TransmogConfig":
         """Update naming configuration.
 
         Args:
             separator: Separator character for path components
-            deeply_nested_threshold: Threshold for when to consider a path deeply nested
+            nested_threshold: Threshold for when to consider a path deeply nested
 
         Returns:
             Updated configuration
@@ -481,11 +473,11 @@ class TransmogConfig:
         naming = dataclasses.replace(self.naming)
 
         if separator is not None:
-            validate_separator(separator)
+            ParameterValidator.validate_separator(separator, "config")
             naming.separator = separator
 
-        if deeply_nested_threshold is not None:
-            naming.deeply_nested_threshold = deeply_nested_threshold
+        if nested_threshold is not None:
+            naming.nested_threshold = nested_threshold
 
         return dataclasses.replace(self, naming=naming)
 
@@ -500,10 +492,10 @@ class TransmogConfig:
         """
         # Validate parameters
         if "batch_size" in kwargs:
-            validate_batch_size(kwargs["batch_size"])
+            ParameterValidator.validate_batch_size(kwargs["batch_size"], "config")
 
         if "max_depth" in kwargs:
-            validate_max_depth(kwargs["max_depth"])
+            ParameterValidator.validate_max_depth(kwargs["max_depth"], "config")
 
         return TransmogConfig(
             naming=self.naming,
@@ -524,16 +516,16 @@ class TransmogConfig:
         """
         # Validate parameters
         if "id_field" in kwargs:
-            validate_field_name(kwargs["id_field"])
+            ParameterValidator.validate_field_name(kwargs["id_field"], "config")
 
         if "parent_field" in kwargs:
-            validate_field_name(kwargs["parent_field"])
+            ParameterValidator.validate_field_name(kwargs["parent_field"], "config")
 
         if "time_field" in kwargs:
-            validate_field_name(kwargs["time_field"])
+            ParameterValidator.validate_field_name(kwargs["time_field"], "config")
 
         if "default_id_field" in kwargs:
-            validate_id_field_mapping(kwargs["default_id_field"])
+            ParameterValidator.validate_id_field(kwargs["default_id_field"], "config")
 
         # Check for duplicate field names
         id_field = kwargs.get("id_field", self.metadata.id_field)
@@ -569,7 +561,9 @@ class TransmogConfig:
         """
         # Validate parameters
         if "recovery_strategy" in kwargs:
-            validate_recovery_strategy(kwargs["recovery_strategy"])
+            ParameterValidator.validate_recovery_strategy(
+                kwargs["recovery_strategy"], "config"
+            )
 
         return TransmogConfig(
             naming=self.naming,
@@ -603,7 +597,7 @@ class TransmogConfig:
             cache_config.enabled = enabled
 
         if maxsize is not None:
-            validate_cache_size(maxsize)
+            ParameterValidator.validate_cache_size(maxsize, "config")
             cache_config.maxsize = maxsize
 
         if clear_after_batch is not None:

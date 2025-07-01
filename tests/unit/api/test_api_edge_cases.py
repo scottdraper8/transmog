@@ -139,14 +139,14 @@ class TestFlattenEdgeCases:
         """Test flatten with invalid JSON string."""
         invalid_json = '{"invalid": json}'
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(ConfigurationError):
             tm.flatten(invalid_json, name="test")
 
     def test_flatten_nonexistent_file(self):
         """Test flatten with nonexistent file path."""
         nonexistent_path = "/path/that/does/not/exist.json"
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(ConfigurationError):
             tm.flatten(nonexistent_path, name="test")
 
     def test_flatten_unsupported_file_format(self):

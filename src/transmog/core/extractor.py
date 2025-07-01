@@ -11,7 +11,13 @@ from typing import Any, Callable, Optional, Union
 from transmog.core.flattener import flatten_json
 from transmog.core.id_discovery import get_record_id
 from transmog.core.metadata import annotate_with_metadata
-from transmog.error import logger
+from transmog.error import (
+    ProcessingError,
+    build_error_context,
+    format_error_message,
+    get_recovery_strategy,
+    logger,
+)
 from transmog.naming.conventions import sanitize_name
 from transmog.naming.utils import get_table_name_for_array
 from transmog.types.base import JsonDict
@@ -35,7 +41,7 @@ def _extract_arrays_impl(
     id_field: str = "__transmog_id",
     parent_field: str = "__parent_transmog_id",
     time_field: str = "__transmog_datetime",
-    deeply_nested_threshold: int = 4,
+    nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     recovery_strategy: Optional[Any] = None,
@@ -66,7 +72,7 @@ def _extract_arrays_impl(
         id_field: ID field name
         parent_field: Parent ID field name
         time_field: Timestamp field name
-        deeply_nested_threshold: Threshold for deep nesting (default 4)
+        nested_threshold: Threshold for deep nesting (default 4)
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
         id_generation_strategy: Custom function for ID generation
@@ -119,7 +125,7 @@ def _extract_arrays_impl(
                 array_name=sanitized_key,
                 parent_path=parent_path,
                 separator=separator,
-                deeply_nested_threshold=deeply_nested_threshold,
+                nested_threshold=nested_threshold,
             )
 
             # Process each item in the array
@@ -169,7 +175,7 @@ def _extract_arrays_impl(
                             skip_null=skip_null,
                             parent_path="",
                             in_place=False,
-                            deeply_nested_threshold=deeply_nested_threshold,
+                            nested_threshold=nested_threshold,
                             mode="streaming" if streaming_mode else "standard",
                             recovery_strategy=recovery_strategy,
                         )
@@ -227,7 +233,7 @@ def _extract_arrays_impl(
                             id_field=id_field,
                             parent_field=parent_field,
                             time_field=time_field,
-                            deeply_nested_threshold=deeply_nested_threshold,
+                            nested_threshold=nested_threshold,
                             default_id_field=default_id_field,
                             id_generation_strategy=id_generation_strategy,
                             recovery_strategy=recovery_strategy,
@@ -241,36 +247,58 @@ def _extract_arrays_impl(
                         # Process nested arrays one by one
                         yield from nested_generator
                 except Exception as e:
-                    # Apply recovery strategy if available
-                    if recovery_strategy == "skip":
-                        # Skip this array item
+                    # Handle errors using standardized recovery strategy
+                    strategy = get_recovery_strategy(recovery_strategy)
+                    context = build_error_context(
+                        entity_name=f"{sanitized_key}[{i}]",
+                        entity_type="array item",
+                        operation="array extraction",
+                        source=table_name,
+                        array_field=sanitized_key,
+                        array_index=i,
+                    )
+
+                    try:
+                        recovery_result = strategy.recover(e, **context)
+                        if recovery_result is not None:
+                            # Create error record from recovery result
+                            if isinstance(recovery_result, dict):
+                                error_record = recovery_result.copy()
+                            else:
+                                error_record = {"__error": str(recovery_result)}
+
+                            # Add array context
+                            error_record.update(
+                                {
+                                    "__array_field": sanitized_key,
+                                    "__array_index": i,
+                                }
+                            )
+
+                            # Add metadata
+                            annotated = annotate_with_metadata(
+                                error_record,
+                                parent_id=parent_id,
+                                transmog_time=transmog_time,
+                                id_field=id_field,
+                                parent_field=parent_field,
+                                time_field=time_field,
+                                in_place=True,
+                                id_field_patterns=id_field_patterns,
+                                path=f"{table_name}{separator}errors",
+                                id_field_mapping=id_field_mapping,
+                                force_transmog_id=force_transmog_id,
+                            )
+                            # Output the error record
+                            yield f"{table_name}{separator}errors", annotated
+                        # Continue processing other items
                         continue
-                    elif recovery_strategy == "partial":
-                        # Create error record
-                        error_record = {
-                            "__error": str(e),
-                            "__array_field": sanitized_key,
-                            "__array_index": i,
-                        }
-                        # Add metadata
-                        annotated = annotate_with_metadata(
-                            error_record,
-                            parent_id=parent_id,
-                            transmog_time=transmog_time,
-                            id_field=id_field,
-                            parent_field=parent_field,
-                            time_field=time_field,
-                            in_place=True,
-                            id_field_patterns=id_field_patterns,
-                            path=f"{table_name}{separator}errors",
-                            id_field_mapping=id_field_mapping,
-                            force_transmog_id=force_transmog_id,
+                    except Exception:
+                        # Re-raise with formatted message
+                        error_msg = format_error_message(
+                            "array_processing", e, **context
                         )
-                        # Output the error record
-                        yield f"{table_name}{separator}errors", annotated
-                    else:
-                        # Raise the exception (default behavior)
-                        raise
+                        raise ProcessingError(error_msg) from e
 
         # Nested object processing (non-array)
         elif isinstance(value, dict):
@@ -292,7 +320,7 @@ def _extract_arrays_impl(
                 id_field=id_field,
                 parent_field=parent_field,
                 time_field=time_field,
-                deeply_nested_threshold=deeply_nested_threshold,
+                nested_threshold=nested_threshold,
                 default_id_field=default_id_field,
                 id_generation_strategy=id_generation_strategy,
                 recovery_strategy=recovery_strategy,
@@ -320,7 +348,7 @@ def extract_arrays(
     id_field: str = "__transmog_id",
     parent_field: str = "__parent_transmog_id",
     time_field: str = "__transmog_datetime",
-    deeply_nested_threshold: int = 4,
+    nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     streaming: bool = False,
@@ -349,7 +377,7 @@ def extract_arrays(
         id_field: ID field name
         parent_field: Parent ID field name
         time_field: Timestamp field name
-        deeply_nested_threshold: Threshold for deep nesting (default 4)
+        nested_threshold: Threshold for deep nesting (default 4)
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
         id_generation_strategy: Custom function for ID generation
@@ -388,7 +416,7 @@ def extract_arrays(
         id_field=id_field,
         parent_field=parent_field,
         time_field=time_field,
-        deeply_nested_threshold=deeply_nested_threshold,
+        nested_threshold=nested_threshold,
         default_id_field=default_id_field,
         id_generation_strategy=id_generation_strategy,
         recovery_strategy=recovery_strategy,
@@ -420,7 +448,7 @@ def stream_extract_arrays(
     id_field: str = "__transmog_id",
     parent_field: str = "__parent_transmog_id",
     time_field: str = "__transmog_datetime",
-    deeply_nested_threshold: int = 4,
+    nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     recovery_strategy: Optional[Any] = None,
@@ -449,7 +477,7 @@ def stream_extract_arrays(
         id_field: ID field name
         parent_field: Parent ID field name
         time_field: Timestamp field name
-        deeply_nested_threshold: Threshold for deep nesting (default 4)
+        nested_threshold: Threshold for deep nesting (default 4)
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
         id_generation_strategy: Custom function for ID generation
@@ -486,7 +514,7 @@ def stream_extract_arrays(
         id_field=id_field,
         parent_field=parent_field,
         time_field=time_field,
-        deeply_nested_threshold=deeply_nested_threshold,
+        nested_threshold=nested_threshold,
         default_id_field=default_id_field,
         id_generation_strategy=id_generation_strategy,
         recovery_strategy=recovery_strategy,

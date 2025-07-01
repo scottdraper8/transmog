@@ -299,7 +299,7 @@ class TestHierarchyEdgeCases:
         current["value"] = "deep"
 
         main_record, child_tables = process_structure(
-            data, entity_name="deep_test", max_depth=25, deeply_nested_threshold=25
+            data, entity_name="deep_test", max_depth=25, nested_threshold=25
         )
 
         assert main_record is not None

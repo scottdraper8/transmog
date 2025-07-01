@@ -44,7 +44,7 @@ def process_structure(
     skip_null: bool = True,
     transmog_time: Optional[Any] = None,
     root_entity: Optional[str] = None,
-    deeply_nested_threshold: int = 4,
+    nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     id_field: str = "__transmog_id",
@@ -75,7 +75,7 @@ def process_structure(
         skip_null: Whether to skip null values
         transmog_time: Transmog timestamp
         root_entity: Top-level entity name
-        deeply_nested_threshold: Threshold for when to consider a path deeply nested
+        nested_threshold: Threshold for when to consider a path deeply nested
             (default 4)
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
@@ -129,7 +129,7 @@ def process_structure(
         include_empty=include_empty,
         skip_arrays=not keep_arrays,  # If keeping arrays, don't skip them
         skip_null=skip_null,
-        deeply_nested_threshold=deeply_nested_threshold,
+        nested_threshold=nested_threshold,
         mode="streaming",
         recovery_strategy=recovery_strategy,
         max_depth=max_depth,
@@ -230,7 +230,7 @@ def process_structure(
             id_field=id_field,
             parent_field=parent_field,
             time_field=time_field,
-            deeply_nested_threshold=deeply_nested_threshold,
+            nested_threshold=nested_threshold,
             default_id_field=child_default_id_field,
             id_generation_strategy=id_generation_strategy,
             recovery_strategy=recovery_strategy,
@@ -259,7 +259,7 @@ def process_structure(
             id_field=id_field,
             parent_field=parent_field,
             time_field=time_field,
-            deeply_nested_threshold=deeply_nested_threshold,
+            nested_threshold=nested_threshold,
             default_id_field=child_default_id_field,
             id_generation_strategy=id_generation_strategy,
             recovery_strategy=recovery_strategy,
@@ -293,7 +293,7 @@ def process_record_batch(
     parent_field: str = "__parent_transmog_id",
     time_field: str = "__transmog_datetime",
     visit_arrays: bool = True,
-    deeply_nested_threshold: int = 4,
+    nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     recovery_strategy: Optional[Any] = None,
@@ -321,7 +321,7 @@ def process_record_batch(
         parent_field: Parent ID field name
         time_field: Timestamp field name
         visit_arrays: Whether to visit and process arrays
-        deeply_nested_threshold: Threshold for when to consider a path deeply nested
+        nested_threshold: Threshold for when to consider a path deeply nested
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
         id_generation_strategy: Custom function for ID generation
@@ -349,7 +349,7 @@ def process_record_batch(
         parent_field=parent_field,
         time_field=time_field,
         visit_arrays=visit_arrays,
-        deeply_nested_threshold=deeply_nested_threshold,
+        nested_threshold=nested_threshold,
         default_id_field=default_id_field,
         id_generation_strategy=id_generation_strategy,
         recovery_strategy=recovery_strategy,
@@ -373,7 +373,7 @@ def process_records_in_single_pass(
     parent_field: str = "__parent_transmog_id",
     time_field: str = "__transmog_datetime",
     visit_arrays: bool = True,
-    deeply_nested_threshold: int = 4,
+    nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     recovery_strategy: Optional[Any] = None,
@@ -400,7 +400,7 @@ def process_records_in_single_pass(
         parent_field: Parent ID field name
         time_field: Timestamp field name
         visit_arrays: Whether to visit and process arrays
-        deeply_nested_threshold: Threshold for when to consider a path deeply
+        nested_threshold: Threshold for when to consider a path deeply
             nested (default 4)
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
@@ -439,7 +439,7 @@ def process_records_in_single_pass(
                 parent_field=parent_field,
                 time_field=time_field,
                 visit_arrays=visit_arrays,
-                deeply_nested_threshold=deeply_nested_threshold,
+                nested_threshold=nested_threshold,
                 default_id_field=default_id_field,
                 id_generation_strategy=id_generation_strategy,
                 recovery_strategy=recovery_strategy,
@@ -503,7 +503,7 @@ def stream_process_records(
     parent_field: str = "__parent_transmog_id",
     time_field: str = "__transmog_datetime",
     visit_arrays: bool = True,
-    deeply_nested_threshold: int = 4,
+    nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     max_depth: int = 100,
@@ -530,7 +530,7 @@ def stream_process_records(
         parent_field: Parent ID field name
         time_field: Timestamp field name
         visit_arrays: Whether to visit and process arrays
-        deeply_nested_threshold: Threshold for when to consider a path deeply
+        nested_threshold: Threshold for when to consider a path deeply
             nested (default 4)
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
@@ -566,7 +566,7 @@ def stream_process_records(
             parent_field=parent_field,
             time_field=time_field,
             visit_arrays=visit_arrays,
-            deeply_nested_threshold=deeply_nested_threshold,
+            nested_threshold=nested_threshold,
             default_id_field=default_id_field,
             id_generation_strategy=id_generation_strategy,
             streaming=True,  # Enable streaming mode

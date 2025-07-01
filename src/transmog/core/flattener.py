@@ -15,13 +15,73 @@ from typing import (
 )
 
 from ..config import settings
-from ..error import error_context, logger
+from ..error import (
+    build_error_context,
+    error_context,
+    format_error_message,
+    get_recovery_strategy,
+    logger,
+)
 from ..error.exceptions import ProcessingError
 from ..naming.conventions import handle_deeply_nested_path
 from ..types import FlattenMode
 
 # Define a return type variable for the decorator's generic type
 R = TypeVar("R")
+
+
+class PathBuilder:
+    """Efficient path building with minimal string operations."""
+
+    def __init__(self, separator: str = "_"):
+        self.separator = separator
+        self.parts: list[str] = []
+
+    def append(self, part: str) -> None:
+        """Add a part to the path."""
+        self.parts.append(part)
+
+    def build(self) -> str:
+        """Build the complete path string."""
+        return self.separator.join(self.parts)
+
+    def pop(self) -> None:
+        """Remove the last part from the path."""
+        if self.parts:
+            self.parts.pop()
+
+    def copy(self) -> "PathBuilder":
+        """Create a copy of this path builder."""
+        new_builder = PathBuilder(self.separator)
+        new_builder.parts = self.parts.copy()
+        return new_builder
+
+    def extend(self, parts: list[str]) -> "PathBuilder":
+        """Create a new path builder with additional parts."""
+        new_builder = self.copy()
+        new_builder.parts.extend(parts)
+        return new_builder
+
+
+class DepthTracker:
+    """Efficient depth tracking for nested structures."""
+
+    def __init__(self, threshold: int):
+        self.threshold = threshold
+        self.current_depth = 0
+
+    def descend(self) -> bool:
+        """Move deeper into nesting and check if threshold exceeded."""
+        self.current_depth += 1
+        return self.current_depth >= self.threshold
+
+    def ascend(self) -> None:
+        """Move up one level in nesting."""
+        self.current_depth = max(0, self.current_depth - 1)
+
+    def at_threshold(self) -> bool:
+        """Check if currently at the threshold depth."""
+        return self.current_depth >= self.threshold
 
 
 def _process_value(
@@ -66,15 +126,122 @@ def _process_value(
     return value
 
 
-def _get_lru_cache_decorator(maxsize: int = 10000) -> Callable:
-    """Create an LRU cache decorator with the specified maxsize.
+class MemoryAwareCache:
+    """Memory-aware caching system with adaptive sizing."""
+
+    def __init__(self, max_memory_mb: int = 50, fallback_size: int = 1000):
+        self.max_memory_mb = max_memory_mb
+        self.fallback_size = fallback_size
+        self._cache = {}
+        self._access_order = []
+
+    def get_memory_usage_mb(self) -> float:
+        """Estimate current cache memory usage in MB."""
+        try:
+            import sys
+
+            total_size = 0
+            for key, value in self._cache.items():
+                total_size += sys.getsizeof(key) + sys.getsizeof(value)
+            return total_size / (1024 * 1024)
+        except ImportError:
+            # Fallback estimation
+            return len(self._cache) * 0.005  # Rough estimate of 5KB per entry
+
+    def should_evict(self) -> bool:
+        """Check if cache should evict entries due to memory pressure."""
+        return self.get_memory_usage_mb() > self.max_memory_mb
+
+    def evict_oldest(self, percentage: float = 0.25) -> None:
+        """Evict oldest entries by percentage."""
+        if not self._access_order:
+            return
+
+        num_to_evict = max(1, int(len(self._access_order) * percentage))
+        for _ in range(num_to_evict):
+            if self._access_order:
+                oldest_key = self._access_order.pop(0)
+                self._cache.pop(oldest_key, None)
+
+    def get(self, key: Any, default=None):
+        """Get value from cache with LRU tracking."""
+        if key in self._cache:
+            # Move to end (most recently used)
+            if key in self._access_order:
+                self._access_order.remove(key)
+            self._access_order.append(key)
+            return self._cache[key]
+        return default
+
+    def put(self, key: Any, value: Any) -> None:
+        """Put value in cache with memory management."""
+        # Check memory pressure before adding
+        if self.should_evict():
+            self.evict_oldest()
+
+        # Add or update
+        if key not in self._cache:
+            self._access_order.append(key)
+        else:
+            # Move to end
+            if key in self._access_order:
+                self._access_order.remove(key)
+            self._access_order.append(key)
+
+        self._cache[key] = value
+
+        # Limit size as fallback
+        while len(self._cache) > self.fallback_size * 2:
+            self.evict_oldest(0.1)
+
+    def clear(self) -> None:
+        """Clear all cache entries."""
+        self._cache.clear()
+        self._access_order.clear()
+
+
+# Global memory-aware cache
+_memory_cache = MemoryAwareCache()
+
+
+def get_adaptive_cache_size() -> int:
+    """Get adaptive cache size based on memory settings."""
+    cache_enabled = getattr(settings, "cache_enabled", True)
+    if not cache_enabled:
+        return 0
+
+    cache_maxsize = getattr(settings, "cache_maxsize", 10000)
+
+    # Try to get memory information for adaptive sizing
+    try:
+        import psutil
+
+        memory = psutil.virtual_memory()
+        available_mb = memory.available / (1024 * 1024)
+
+        # Use 1% of available memory for caching, max 50MB
+        target_memory_mb = min(50, available_mb * 0.01)
+        # Estimate ~5KB per cache entry
+        estimated_size = int(target_memory_mb * 1024 / 5)
+
+        return min(cache_maxsize, max(100, estimated_size))
+    except ImportError:
+        # Fallback to configured size
+        return cache_maxsize
+
+
+def _get_lru_cache_decorator(maxsize: Optional[int] = None) -> Callable:
+    """Create an LRU cache decorator with adaptive maxsize.
 
     Args:
-        maxsize: Maximum size for the LRU cache
+        maxsize: Maximum size for the LRU cache (adaptive if None)
 
     Returns:
         Configured functools.lru_cache decorator
     """
+    if maxsize is None:
+        maxsize = get_adaptive_cache_size()
+
     return functools.lru_cache(maxsize=maxsize)
 
 
@@ -86,7 +253,8 @@ def _get_cached_process_value() -> Callable[
     Returns:
         Cached function for processing values
     """
-    lru_decorator = _get_lru_cache_decorator()
+    cache_size = get_adaptive_cache_size()
+    lru_decorator = _get_lru_cache_decorator(cache_size)
 
     @lru_decorator
     def _cached_func(
@@ -108,15 +276,18 @@ _process_value_cached = _get_cached_process_value()
 
 def refresh_cache_config() -> None:
     """Refresh the cache configuration based on settings."""
-    global _process_value_cached
+    global _process_value_cached, _memory_cache
     clear_caches()
     _process_value_cached = _get_cached_process_value()
+    _memory_cache = MemoryAwareCache()
 
 
 def clear_caches() -> None:
     """Clear all processing caches."""
+    global _memory_cache
     if hasattr(_process_value_cached, "cache_clear"):
         _process_value_cached.cache_clear()
+    _memory_cache.clear()
 
 
 def _process_value_wrapper(
@@ -163,13 +334,17 @@ def _process_value_wrapper(
         return _process_value(value, cast_to_string, include_empty, skip_null)
     except Exception as e:
         # Handle errors based on recovery strategy
-        if recovery_strategy == "skip":
-            return None
-        elif recovery_strategy == "partial":
-            return f"_error_{str(e)}"
-        else:
-            # Re-raise for strict handling
-            raise ProcessingError(f"Failed to process value: {value!r}") from e
+        strategy = get_recovery_strategy(recovery_strategy)
+        context = build_error_context(operation="value processing", value=repr(value))
+
+        try:
+            return strategy.recover(e, **context)
+        except Exception:
+            # If recovery fails, raise with formatted message
+            error_msg = format_error_message(
+                "type_conversion", e, **context, target_type="processed"
+            )
+            raise ProcessingError(error_msg) from e
 
 
 def _flatten_json_core(
@@ -184,7 +359,7 @@ def _flatten_json_core(
     path_parts: Optional[list[str]],
     path_parts_optimization: bool,
     max_depth: Optional[int],
-    deeply_nested_threshold: Optional[int],
+    nested_threshold: Optional[int],
     current_depth: int,
     in_place: bool,
     context: Literal["standard", "streaming"],
@@ -205,7 +380,7 @@ def _flatten_json_core(
         path_parts: Components of the path for optimization
         path_parts_optimization: Whether to use path parts optimization
         max_depth: Maximum nesting depth
-        deeply_nested_threshold: Threshold for when to consider a path deeply nested
+        nested_threshold: Threshold for when to consider a path deeply nested
         current_depth: Current nesting depth
         in_place: Whether to modify data in place
         context: Processing context
@@ -229,11 +404,28 @@ def _flatten_json_core(
         )
         return result
 
-    # Initialize path parts if optimization is enabled
-    if path_parts_optimization and path_parts is None:
-        path_parts = parent_path.split(separator) if parent_path else []
+    # Initialize efficient path building
+    path_builder = None
+    depth_tracker = None
 
-    # Process each key in the data
+    if path_parts_optimization:
+        if path_parts is not None:
+            path_builder = PathBuilder(separator)
+            path_builder.parts = path_parts.copy()
+        elif parent_path:
+            path_builder = PathBuilder(separator)
+            path_builder.parts = parent_path.split(separator)
+        else:
+            path_builder = PathBuilder(separator)
+
+    if nested_threshold is not None:
+        depth_tracker = DepthTracker(nested_threshold)
+        depth_tracker.current_depth = current_depth
+
+    # Track keys to remove when not in-place
+    keys_to_remove = []
+
+    # Process each key in the data (create list to avoid iteration issues during modification)
     for key, value in list(data.items()):
         # Skip internal metadata fields from processing
         if key.startswith("__"):
@@ -242,22 +434,22 @@ def _flatten_json_core(
                 result[key] = value
             continue
 
-        # Build the path for this field
-        if path_parts_optimization and path_parts is not None:
-            # Efficient path building without string concatenation
-            current_parts = path_parts + [key]
-            current_path = separator.join(current_parts)
+        # Build the path for this field efficiently
+        if path_builder is not None:
+            # Use PathBuilder for efficient path construction
+            current_path_builder = path_builder.copy()
+            current_path_builder.append(key)
+            current_path = current_path_builder.build()
+            current_parts = current_path_builder.parts
         else:
-            # Direct string concatenation for path building
+            # Fallback to direct string concatenation
             current_path = f"{parent_path}{separator}{key}" if parent_path else key
+            current_parts = None
 
-        # Apply deep nesting simplification if threshold is provided
-        if (
-            deeply_nested_threshold is not None
-            and current_path.count(separator) >= deeply_nested_threshold
-        ):
+        # Apply deep nesting simplification using depth tracker
+        if depth_tracker is not None and depth_tracker.at_threshold():
             current_path = handle_deeply_nested_path(
-                current_path, separator, deeply_nested_threshold
+                current_path, separator, nested_threshold
             )
 
         # Skip empty dictionaries and arrays
@@ -271,10 +463,10 @@ def _flatten_json_core(
         if isinstance(value, dict):
             # Recursively flatten nested dictionary
             try:
-                # Use path parts for optimization in recursive calls if enabled
-                nested_path_parts = current_parts if path_parts_optimization else None
+                # Use current parts for optimization in recursive calls
+                nested_path_parts = current_parts if current_parts is not None else None
 
-                # Process the nested dictionary
+                # Process the nested dictionary with safe in-place optimization
                 flattened = flatten_func(
                     value,
                     separator=separator,
@@ -287,9 +479,9 @@ def _flatten_json_core(
                     path_parts=nested_path_parts,
                     path_parts_optimization=path_parts_optimization,
                     max_depth=max_depth,
-                    deeply_nested_threshold=deeply_nested_threshold,
+                    nested_threshold=nested_threshold,
                     current_depth=current_depth + 1,
-                    in_place=False,  # Always create dict for nested objects
+                    in_place=True,  # Safe to use in-place for nested objects
                     context=context,
                     recovery_strategy=recovery_strategy,
                 )
@@ -303,21 +495,31 @@ def _flatten_json_core(
                         # Regular field, apply path prefix
                         result[flattened_key] = flattened_value
 
-                # Remove the original key to avoid duplication, but only if not in_place
-                if key in result and not in_place:
-                    result.pop(key, None)
+                # Mark key for removal if not in-place
+                if not in_place:
+                    keys_to_remove.append(key)
 
             except Exception as e:
-                if recovery_strategy == "skip":
-                    # Skip the problematic nested object
+                # Handle errors using standardized recovery strategy
+                strategy = get_recovery_strategy(recovery_strategy)
+                context = build_error_context(
+                    entity_name=key,
+                    entity_type="nested object",
+                    operation="flattening",
+                    source=current_path,
+                )
+
+                try:
+                    recovery_result = strategy.recover(e, **context)
+                    if recovery_result is not None:
+                        # Add recovery result to output
+                        result[f"{current_path}{separator}__error"] = recovery_result
+                    # Continue processing other fields
                     continue
-                elif recovery_strategy == "partial":
-                    # Keep partial results and add error indicator
-                    result[f"{current_path}{separator}__error"] = str(e)
-                    continue
-                else:
-                    # Re-raise the exception
-                    raise
+                except Exception:
+                    # Re-raise with formatted message
+                    error_msg = format_error_message("processing", e, **context)
+                    raise ProcessingError(error_msg) from e
         elif isinstance(value, list) and visit_arrays:
             # Process array based on configuration
             if skip_arrays:
@@ -337,9 +539,9 @@ def _flatten_json_core(
                 )
                 if processed_value is not None:
                     result[current_path] = processed_value
-                    # Remove original array field, but only if not in_place
-                    if key in result and not in_place:
-                        result.pop(key, None)
+                    # Mark key for removal if not in-place
+                    if not in_place:
+                        keys_to_remove.append(key)
             else:
                 # Array contains complex objects, stringify it
                 processed_value = _process_value_wrapper(
@@ -352,9 +554,9 @@ def _flatten_json_core(
                 )
                 if processed_value is not None:
                     result[current_path] = processed_value
-                    # Remove original array field, but only if not in_place
-                    if key in result and not in_place:
-                        result.pop(key, None)
+                    # Mark key for removal if not in-place
+                    if not in_place:
+                        keys_to_remove.append(key)
         else:
             # For scalar values, process and add to the result
             processed_value = _process_value_wrapper(
@@ -366,7 +568,15 @@ def _flatten_json_core(
                 recovery_strategy=recovery_strategy,
             )
             if processed_value is not None:
-                result[current_path] = processed_value
+                # For top-level scalar values, use original key name if no parent path
+                if parent_path:
+                    result[current_path] = processed_value
+                else:
+                    result[key] = processed_value
+
+    # Remove original keys after processing to avoid modification during iteration
+    for key in keys_to_remove:
+        result.pop(key, None)
 
     # Return the flattened result
     return result
@@ -385,7 +595,7 @@ def flatten_json(
     path_parts: Optional[list[str]] = None,
     path_parts_optimization: Optional[bool] = None,
     max_depth: Optional[int] = None,
-    deeply_nested_threshold: Optional[int] = None,
+    nested_threshold: Optional[int] = None,
     current_depth: int = 0,
     in_place: bool = False,
     mode: FlattenMode = "standard",
@@ -406,7 +616,7 @@ def flatten_json(
         path_parts: Components of the path for optimization
         path_parts_optimization: Whether to use path parts optimization
         max_depth: Maximum nesting depth
-        deeply_nested_threshold: Threshold for when to consider a path deeply nested
+        nested_threshold: Threshold for when to consider a path deeply nested
         current_depth: Current nesting depth
         in_place: Whether to modify data in place
         mode: Processing mode ("standard" or "streaming")
@@ -443,8 +653,8 @@ def flatten_json(
     if max_depth is None:
         max_depth = getattr(settings, "max_depth", 100)
 
-    if deeply_nested_threshold is None:
-        deeply_nested_threshold = getattr(settings, "deeply_nested_threshold", 4)
+    if nested_threshold is None:
+        nested_threshold = getattr(settings, "nested_threshold", 4)
 
     # Empty data case
     if data is None:
@@ -458,19 +668,32 @@ def flatten_json(
         for key, value in data.items():
             try:
                 json.dumps(value)
-            except (TypeError, ValueError, OverflowError):
-                # If the value is not serializable and we're using a recovery strategy
-                if recovery_strategy == "skip":
-                    # Skip this field
+            except (TypeError, ValueError, OverflowError) as serialization_error:
+                # Handle non-serializable values using standardized recovery
+                strategy = get_recovery_strategy(recovery_strategy)
+                context = build_error_context(
+                    entity_name=key,
+                    entity_type="field",
+                    operation="serialization check",
+                    value=repr(value),
+                )
+
+                try:
+                    recovery_result = strategy.recover(serialization_error, **context)
+                    if recovery_result is not None:
+                        # Replace with recovery result
+                        data[key] = recovery_result
+                    # Continue with other fields
                     continue
-                elif recovery_strategy == "partial":
-                    # Replace with error message
-                    data[key] = f"_error_non_serializable_{type(value).__name__}"
-                else:
-                    # Strict mode - raise an error
-                    raise ProcessingError(
-                        f"Non-serializable object found in key '{key}': {value!r}"
-                    ) from None
+                except Exception:
+                    # Re-raise with formatted message
+                    error_msg = format_error_message(
+                        "type_conversion",
+                        serialization_error,
+                        **context,
+                        target_type="serializable",
+                    )
+                    raise ProcessingError(error_msg) from serialization_error
     except Exception as e:
         if not isinstance(e, ProcessingError):
             raise ProcessingError(f"Failed to process data: {e}") from e
@@ -495,7 +718,7 @@ def flatten_json(
             path_parts=path_parts,
             path_parts_optimization=path_parts_optimization,
             max_depth=max_depth,
-            deeply_nested_threshold=deeply_nested_threshold,
+            nested_threshold=nested_threshold,
             current_depth=current_depth,
             in_place=False,  # Never modify in place for streaming
             context=context,
@@ -503,7 +726,7 @@ def flatten_json(
             recovery_strategy=recovery_strategy,
         )
 
-    # Standard mode
+    # Standard mode - only use in_place for nested calls, not top level
     return _flatten_json_core(
         data,
         separator=separator,
@@ -516,9 +739,9 @@ def flatten_json(
         path_parts=path_parts,
         path_parts_optimization=path_parts_optimization,
         max_depth=max_depth,
-        deeply_nested_threshold=deeply_nested_threshold,
+        nested_threshold=nested_threshold,
         current_depth=current_depth,
-        in_place=in_place,
+        in_place=False,  # Never modify original data at top level
         context=context,
         flatten_func=flatten_json,
         recovery_strategy=recovery_strategy,

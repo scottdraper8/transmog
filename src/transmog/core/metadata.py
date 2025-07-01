@@ -133,7 +133,7 @@ def annotate_with_metadata(
     parent_field: str = "__parent_transmog_id",
     time_field: str = "__transmog_datetime",
     extra_fields: Optional[dict[str, Any]] = None,
-    in_place: bool = False,
+    in_place: bool = True,  # Default to in-place for better performance
     source_field: Optional[str] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     id_field_patterns: Optional[list[str]] = None,
@@ -152,7 +152,7 @@ def annotate_with_metadata(
         parent_field: Field name for parent ID
         time_field: Field name for timestamp
         extra_fields: Additional metadata fields to add
-        in_place: Whether to modify the record in place
+        in_place: Whether to modify the record in place (default True for performance)
         source_field: Field name to use for deterministic ID generation
         id_generation_strategy: Custom function to generate ID
         id_field_patterns: List of field names to check for natural IDs
@@ -163,7 +163,7 @@ def annotate_with_metadata(
     Returns:
         Annotated record
     """
-    # Create copy if not modifying in-place
+    # Use in-place modification by default for better memory efficiency
     annotated = record if in_place else record.copy()
 
     # Check if transmog ID should be added
@@ -189,8 +189,9 @@ def annotate_with_metadata(
             transmog_time = get_current_timestamp()
         annotated[time_field] = transmog_time
 
-    # Add extra fields
+    # Add extra fields efficiently
     if extra_fields:
+        # Use update for in-place efficiency
         annotated.update(extra_fields)
 
     return annotated

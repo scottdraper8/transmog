@@ -1,18 +1,20 @@
 """CSV writer for Transmog output.
 
-This module provides a CSV writer with PyArrow and standard library implementations.
+This module provides a CSV writer with PyArrow and standard library implementations
+and unified interface with optional compression support.
 """
 
 import csv
+import gzip
 import io
 import logging
 import os
 import pathlib
+import sys
 from typing import Any, BinaryIO, Optional, TextIO, Union, cast
 
-from transmog.error import MissingDependencyError, OutputError
-from transmog.io.writer_factory import register_streaming_writer, register_writer
-from transmog.io.writer_interface import DataWriter, StreamingWriter
+from transmog.error import OutputError
+from transmog.io.writer_interface import DataWriter, StreamingWriter, WriterUtils
 from transmog.types.base import JsonDict
 
 # Setup logger
@@ -31,7 +33,8 @@ except ImportError:
 class CsvWriter(DataWriter):
     """CSV format writer.
 
-    This writer handles writing flattened data to CSV format files.
+    This writer handles writing flattened data to CSV format files with
+    consistent interface and optional compression support.
     """
 
     @classmethod
@@ -42,7 +45,6 @@ class CsvWriter(DataWriter):
     @classmethod
     def is_available(cls) -> bool:
         """Check if this writer's dependencies are available."""
-        # CSV is available in the standard library
         return True
 
     def __init__(
@@ -52,6 +54,7 @@ class CsvWriter(DataWriter):
         quotechar: str = '"',
         quoting: int = csv.QUOTE_MINIMAL,
         escapechar: Optional[str] = None,
+        compression: Optional[str] = None,
         **options: Any,
     ):
         """Initialize the CSV writer.
@@ -62,6 +65,7 @@ class CsvWriter(DataWriter):
             quotechar: Character to use for quoting
             quoting: Quoting mode (from csv module)
             escapechar: Character to use for escaping
+            compression: Compression method ("gzip" supported)
             **options: CSV formatting options
         """
         self.include_header = include_header
@@ -69,55 +73,37 @@ class CsvWriter(DataWriter):
         self.quotechar = quotechar
         self.quoting = quoting
         self.escapechar = escapechar
+        self.compression = compression
         self.options = options
 
-    def write(
-        self,
-        data: Any,
-        destination: Union[str, pathlib.Path, BinaryIO, TextIO],
-        **options: Any,
-    ) -> Union[str, pathlib.Path, BinaryIO, TextIO]:
-        """Write data to the specified destination.
-
-        Args:
-            data: Data to write
-            destination: Path or file-like object to write to
-            **options: Format-specific options
+    def supports_compression(self) -> bool:
+        """Check if this writer supports compression.
 
         Returns:
-            Path to the written file or file-like object
-
-        Raises:
-            OutputError: If writing fails
+            bool: True as CSV writer supports gzip compression
         """
-        # Combine constructor options with per-call options
-        combined_options = {**self.options, **options}
+        return True
 
-        # Delegate to write_table for implementation
-        return self.write_table(data, destination, **combined_options)
+    def get_supported_codecs(self) -> list[str]:
+        """Get list of supported compression codecs.
+
+        Returns:
+            list[str]: List of supported compression methods
+        """
+        return ["gzip"]
 
     def write_table(
         self,
         table_data: list[JsonDict],
-        output_path: Union[str, pathlib.Path, BinaryIO, TextIO],
-        include_header: Optional[bool] = None,
-        delimiter: Optional[str] = None,
-        quotechar: Optional[str] = None,
-        quoting: Optional[int] = None,
-        escapechar: Optional[str] = None,
-        **options: Any,
-    ) -> Union[str, pathlib.Path, BinaryIO, TextIO]:
+        output_path: Union[str, BinaryIO, TextIO],
+        **format_options: Any,
+    ) -> Union[str, BinaryIO, TextIO]:
         """Write a table to a CSV file.
 
         Args:
             table_data: The table data to write
             output_path: Path or file-like object to write to
-            include_header: Whether to include column headers
-            delimiter: Column delimiter character
-            quotechar: Character to use for quoting
-            quoting: Quoting mode (from csv module)
-            escapechar: Character to use for escaping
-            **options: Additional options
+            **format_options: Format-specific options (include_header, delimiter, etc.)
 
         Returns:
             Path to the written file or file-like object
@@ -127,150 +113,167 @@ class CsvWriter(DataWriter):
         """
         try:
             # Use provided options or instance defaults
-            use_header = (
-                include_header if include_header is not None else self.include_header
-            )
-            use_delimiter = delimiter if delimiter is not None else self.delimiter
-            use_quotechar = quotechar if quotechar is not None else self.quotechar
-            use_quoting = quoting if quoting is not None else self.quoting
-            use_escapechar = escapechar if escapechar is not None else self.escapechar
+            use_header = format_options.get("include_header", self.include_header)
+            use_delimiter = format_options.get("delimiter", self.delimiter)
+            use_quotechar = format_options.get("quotechar", self.quotechar)
+            use_quoting = format_options.get("quoting", self.quoting)
+            use_escapechar = format_options.get("escapechar", self.escapechar)
+            compression = format_options.get("compression", self.compression)
 
             # Handle empty data case
             if not table_data:
                 if isinstance(output_path, (str, pathlib.Path)):
-                    # Create directory and empty file
                     path_str = str(output_path)
+
+                    # Add .gz extension for compressed files
+                    if compression == "gzip" and not path_str.endswith(".gz"):
+                        path_str += ".gz"
+
                     os.makedirs(os.path.dirname(path_str) or ".", exist_ok=True)
-                    with open(path_str, "w") as f:
-                        pass
-                    return output_path
+
+                    # Create empty file
+                    if compression == "gzip":
+                        with gzip.open(path_str, "wt", encoding="utf-8") as f:
+                            pass
+                    else:
+                        with open(path_str, "w") as f:
+                            pass
+
+                    return (
+                        pathlib.Path(path_str)
+                        if isinstance(output_path, pathlib.Path)
+                        else path_str
+                    )
                 else:
-                    # For file-like objects, just return without writing
                     return output_path
 
-            # Extract field names from all records to handle varying schemas
+            # Extract field names from all records
             field_names = set()
             for record in table_data:
                 field_names.update(record.keys())
-            field_names = sorted(field_names)  # Sort for consistent ordering
+            field_names = sorted(field_names)
 
-            # Determine whether writing to a file or file-like object
+            # Generate CSV content
+            csv_content = self._generate_csv_content(
+                table_data,
+                field_names,
+                use_header,
+                use_delimiter,
+                use_quotechar,
+                use_quoting,
+                use_escapechar,
+            )
+
+            # Apply compression if requested
+            if compression == "gzip":
+                csv_bytes = gzip.compress(csv_content.encode("utf-8"))
+            else:
+                csv_bytes = csv_content.encode("utf-8")
+
+            # Handle file path destination
             if isinstance(output_path, (str, pathlib.Path)):
-                # Convert to string if Path
                 path_str = str(output_path)
 
-                # Ensure directory exists
+                # Add .gz extension for compressed files
+                if compression == "gzip" and not path_str.endswith(".gz"):
+                    path_str += ".gz"
+
                 os.makedirs(os.path.dirname(path_str) or ".", exist_ok=True)
 
-                # Write to file
-                with open(path_str, "w", newline="") as f:
-                    writer_binary: csv.DictWriter = csv.DictWriter(
-                        f,
-                        fieldnames=field_names,
-                        delimiter=use_delimiter,
-                        quotechar=use_quotechar,
-                        quoting=use_quoting,
-                        escapechar=use_escapechar if use_escapechar else None,
-                    )
+                with open(path_str, "wb") as f:
+                    f.write(csv_bytes)
 
-                    if use_header:
-                        writer_binary.writeheader()
-
-                    writer_binary.writerows(table_data)
-
-                return output_path
-            else:
-                # For file-like objects, determine if it's a binary stream
-                is_binary = isinstance(output_path, io.BufferedIOBase) or isinstance(
-                    output_path, io.BytesIO
+                return (
+                    pathlib.Path(path_str)
+                    if isinstance(output_path, pathlib.Path)
+                    else path_str
                 )
 
-                # Additional check for file objects with mode attribute
-                if not is_binary and hasattr(output_path, "mode"):
-                    is_binary = "b" in output_path.mode
-
-                if is_binary:
-                    # For binary streams, generate CSV in memory and write as bytes
-                    csv_buffer = io.StringIO(newline="")
-                    writer_params_binary = {
-                        "fieldnames": field_names,
-                        "delimiter": use_delimiter,
-                        "quotechar": use_quotechar,
-                        "quoting": use_quoting,
-                    }
-
-                    if use_escapechar:
-                        writer_params_binary["escapechar"] = use_escapechar
-
-                    writer_binary_stream: csv.DictWriter = csv.DictWriter(
-                        csv_buffer,
-                        fieldnames=field_names,
-                        delimiter=use_delimiter,
-                        quotechar=use_quotechar,
-                        quoting=use_quoting,
-                        escapechar=use_escapechar if use_escapechar else None,
-                    )
-
-                    if use_header:
-                        writer_binary_stream.writeheader()
-
-                    writer_binary_stream.writerows(table_data)
-
-                    # Convert to bytes and write to the binary stream
-                    binary_data = csv_buffer.getvalue().encode("utf-8")
-
-                    # Handle binary or text IO appropriately
+            # Handle file-like object destination
+            elif hasattr(output_path, "write"):
+                # For compressed data, always write as binary
+                if compression:
                     if hasattr(output_path, "mode") and "b" not in getattr(
                         output_path, "mode", ""
                     ):
-                        # For text streams, decode binary data
-                        text_output = cast(TextIO, output_path)
-                        text_output.write(binary_data.decode("utf-8"))
-                    else:
-                        # For binary streams
-                        binary_output = cast(BinaryIO, output_path)
-                        binary_output.write(binary_data)
+                        raise OutputError("Cannot write compressed CSV to text stream")
+                    binary_output = cast(BinaryIO, output_path)
+                    binary_output.write(csv_bytes)
                 else:
-                    # Text stream
-                    text_output = cast(TextIO, output_path)
-                    writer_params_text = {
-                        "fieldnames": field_names,
-                        "delimiter": use_delimiter,
-                        "quotechar": use_quotechar,
-                        "quoting": use_quoting,
-                    }
-
-                    if use_escapechar:
-                        writer_params_text["escapechar"] = use_escapechar
-
-                    writer_text: csv.DictWriter = csv.DictWriter(
-                        text_output,
-                        fieldnames=field_names,
-                        delimiter=use_delimiter,
-                        quotechar=use_quotechar,
-                        quoting=use_quoting,
-                        escapechar=use_escapechar if use_escapechar else None,
-                    )
-
-                    if use_header:
-                        writer_text.writeheader()
-
-                    writer_text.writerows(table_data)
+                    # Write as text or binary based on stream type
+                    if (
+                        hasattr(output_path, "mode")
+                        and "b" not in getattr(output_path, "mode", "")
+                    ) or (
+                        not hasattr(output_path, "mode")
+                        and hasattr(output_path, "read")
+                        and not hasattr(output_path, "readinto")
+                    ):
+                        text_output = cast(TextIO, output_path)
+                        text_output.write(csv_content)
+                    else:
+                        binary_output = cast(BinaryIO, output_path)
+                        binary_output.write(csv_bytes)
 
                 return output_path
+            else:
+                raise OutputError(f"Invalid destination type: {type(output_path)}")
 
         except Exception as e:
             logger.error(f"Error writing CSV: {e}")
             raise OutputError(f"Failed to write CSV file: {e}") from e
 
+    def _generate_csv_content(
+        self,
+        table_data: list[JsonDict],
+        field_names: list[str],
+        include_header: bool,
+        delimiter: str,
+        quotechar: str,
+        quoting: int,
+        escapechar: Optional[str],
+    ) -> str:
+        """Generate CSV content as a string.
+
+        Args:
+            table_data: The table data
+            field_names: List of field names
+            include_header: Whether to include headers
+            delimiter: Column delimiter
+            quotechar: Quote character
+            quoting: Quoting mode
+            escapechar: Escape character
+
+        Returns:
+            str: CSV content
+        """
+        csv_buffer = io.StringIO(newline="")
+        writer_params = {
+            "fieldnames": field_names,
+            "delimiter": delimiter,
+            "quotechar": quotechar,
+            "quoting": quoting,
+        }
+
+        if escapechar:
+            writer_params["escapechar"] = escapechar
+
+        writer = csv.DictWriter(csv_buffer, **writer_params)
+
+        if include_header:
+            writer.writeheader()
+
+        writer.writerows(table_data)
+        return csv_buffer.getvalue()
+
     def write_all_tables(
         self,
         main_table: list[JsonDict],
         child_tables: dict[str, list[JsonDict]],
-        base_path: Union[str, pathlib.Path],
+        base_path: Union[str],
         entity_name: str,
         **options: Any,
-    ) -> dict[str, Union[str, pathlib.Path]]:
+    ) -> dict[str, str]:
         """Write main and child tables to CSV files.
 
         Args:
@@ -286,248 +289,34 @@ class CsvWriter(DataWriter):
         Raises:
             OutputError: If writing fails
         """
-        results: dict[str, Union[str, pathlib.Path]] = {}
-
-        # Combine constructor options with per-call options
-        combined_options = {**self.options, **options}
-
-        # Ensure base directory exists
-        base_path_str = str(base_path)
-        os.makedirs(base_path_str, exist_ok=True)
-
-        # Write main table
-        main_path: Union[str, pathlib.Path]
-        if isinstance(base_path, pathlib.Path):
-            main_path = base_path / f"{entity_name}.csv"
-        else:
-            main_path = os.path.join(base_path_str, f"{entity_name}.csv")
-
-        self.write_table(main_table, main_path, **combined_options)
-        results["main"] = main_path
-
-        # Write child tables
-        for table_name, table_data in child_tables.items():
-            # Replace dots and slashes with underscores for file names
-            safe_name = table_name.replace(".", "_").replace("/", "_")
-
-            table_path: Union[str, pathlib.Path]
-            if isinstance(base_path, pathlib.Path):
-                table_path = base_path / f"{safe_name}.csv"
-            else:
-                table_path = os.path.join(base_path_str, f"{safe_name}.csv")
-
-            self.write_table(table_data, table_path, **combined_options)
-            results[table_name] = table_path
-
-        return results
-
-    def _write_table_with_pyarrow(
-        self,
-        table_data: list[dict[str, Any]],
-        output_path: str,
-        include_header: bool,
-        delimiter: str,
-    ) -> None:
-        """Write table data to a file using PyArrow CSV writer.
-
-        Args:
-            table_data: List of records to write
-            output_path: Path to write the CSV file
-            include_header: Whether to include a header row
-            delimiter: CSV field delimiter
-        """
-        if not PYARROW_AVAILABLE:
-            raise MissingDependencyError(
-                "PyArrow is required for this operation", package="pyarrow"
-            )
-
-        # Extract field names from the first record
-        fields = list(table_data[0].keys())
-
-        # Convert list of dicts to dict of lists
-        columns: dict[str, list[Any]] = {field: [] for field in fields}
-        for record in table_data:
-            for field in fields:
-                columns[field].append(record.get(field, None))
-
-        # Create PyArrow arrays for each column
-        arrays = []
-        for field in fields:
-            arrays.append(pa.array(columns[field]))
-
-        # Create PyArrow table
-        table = pa.Table.from_arrays(arrays, names=fields)
-
-        # Write to CSV file
-        with open(output_path, "wb") as f:
-            pa_csv.write_csv(
-                table,
-                f,
-                write_options=pa_csv.WriteOptions(
-                    include_header=include_header, delimiter=delimiter
-                ),
-            )
-
-    def _write_table_with_stdlib(
-        self,
-        table_data: list[dict[str, Any]],
-        output_path: str,
-        include_header: bool,
-        delimiter: str,
-        quotechar: str,
-    ) -> None:
-        """Write table data to a file using standard library CSV writer.
-
-        Args:
-            table_data: List of records to write
-            output_path: Path to write the CSV file
-            include_header: Whether to include a header row
-            delimiter: CSV field delimiter
-            quotechar: CSV quote character
-        """
-        with open(output_path, "w", newline="", encoding="utf-8") as f:
-            if not table_data:
-                return
-
-            # Extract field names from the first record
-            fieldnames = list(table_data[0].keys())
-
-            # Create CSV writer
-            writer = csv.DictWriter(
-                f,
-                fieldnames=fieldnames,
-                delimiter=delimiter,
-                quotechar=quotechar,
-                quoting=csv.QUOTE_MINIMAL,
-            )
-
-            # Write header if requested
-            if include_header:
-                writer.writeheader()
-
-            # Write all records
-            for record in table_data:
-                writer.writerow(record)
-
-    def _write_with_pyarrow(
-        self, table_data: list[dict[str, Any]], include_header: bool, delimiter: str
-    ) -> bytes:
-        """Write table data using PyArrow CSV writer.
-
-        Args:
-            table_data: List of records to write
-            include_header: Whether to include a header row
-            delimiter: CSV field delimiter
-
-        Returns:
-            CSV data as bytes
-        """
-        if not PYARROW_AVAILABLE:
-            raise MissingDependencyError(
-                "PyArrow is required for this operation", package="pyarrow"
-            )
-
-        try:
-            # Convert to PyArrow Table
-            if not table_data:
-                return b""
-
-            # Extract field names from the first record
-            fields = list(table_data[0].keys())
-
-            # Convert list of dicts to dict of lists
-            columns: dict[str, list[Any]] = {field: [] for field in fields}
-            for record in table_data:
-                for field in fields:
-                    columns[field].append(record.get(field, None))
-
-            # Create PyArrow arrays for each column
-            arrays = []
-            for field in fields:
-                arrays.append(pa.array(columns[field]))
-
-            # Create PyArrow table
-            table = pa.Table.from_arrays(arrays, names=fields)
-
-            # Write to CSV
-            output = io.BytesIO()
-            pa_csv.write_csv(
-                table,
-                output,
-                write_options=pa_csv.WriteOptions(
-                    include_header=include_header, delimiter=delimiter
-                ),
-            )
-            return output.getvalue()
-        except Exception as e:
-            logger.error(f"Error writing CSV with PyArrow: {str(e)}")
-            raise OutputError(f"Failed to write CSV: {str(e)}") from e
-
-    def _write_with_stdlib(
-        self,
-        table_data: list[dict[str, Any]],
-        include_header: bool,
-        delimiter: str,
-        quotechar: str,
-    ) -> bytes:
-        """Write table data using standard library CSV writer.
-
-        Args:
-            table_data: List of records to write
-            include_header: Whether to include a header row
-            delimiter: CSV field delimiter
-            quotechar: CSV quote character
-
-        Returns:
-            CSV data as bytes
-        """
-        try:
-            # Use StringIO for text operations, then convert to bytes
-            output = io.StringIO()
-            if not table_data:
-                return b""
-
-            # Extract field names from the first record
-            fieldnames = list(table_data[0].keys())
-
-            # Create CSV writer
-            writer = csv.DictWriter(
-                output,
-                fieldnames=fieldnames,
-                delimiter=delimiter,
-                quotechar=quotechar,
-                quoting=csv.QUOTE_MINIMAL,
-            )
-
-            # Write header if requested
-            if include_header:
-                writer.writeheader()
-
-            # Write all records
-            for record in table_data:
-                writer.writerow(record)
-
-            # Convert to bytes and return
-            return output.getvalue().encode("utf-8")
-        except Exception as e:
-            logger.error(f"Error writing CSV with stdlib: {str(e)}")
-            raise OutputError(f"Failed to write CSV: {str(e)}") from e
-
-    def close(self) -> None:
-        """Close the writer (no-op for CSV).
-
-        Returns:
-            None
-        """
-        pass
+        # Use the consolidated write pattern
+        return WriterUtils.write_all_tables_pattern(
+            main_table=main_table,
+            child_tables=child_tables,
+            base_path=base_path,
+            entity_name=entity_name,
+            format_name="csv",
+            write_table_func=self.write_table,
+            compression=options.get("compression", self.compression),
+            **options,
+        )
 
 
 class CsvStreamingWriter(StreamingWriter):
-    """Streaming writer for CSV output.
+    """Streaming writer for CSV format.
 
-    Supports writing flattened tables to CSV format in a streaming manner,
-    minimizing memory usage for large datasets.
+    This writer allows incremental writing of data to CSV files
+    without keeping the entire dataset in memory, with unified interface.
     """
+
+    @classmethod
+    def format_name(cls) -> str:
+        """Get the format name for this writer.
+
+        Returns:
+            str: The format name ("csv")
+        """
+        return "csv"
 
     def __init__(
         self,
@@ -536,144 +325,142 @@ class CsvStreamingWriter(StreamingWriter):
         include_header: bool = True,
         delimiter: str = ",",
         quotechar: str = '"',
+        compression: Optional[str] = None,
+        buffer_size: int = 1000,
         **options: Any,
     ):
         """Initialize the CSV streaming writer.
 
         Args:
             destination: Output file path or file-like object
-            entity_name: Name of the entity (used for file naming)
-            include_header: Whether to include header row
-            delimiter: CSV column delimiter
+            entity_name: Name of the entity
+            include_header: Whether to include column headers
+            delimiter: Column delimiter character
             quotechar: Character to use for quoting
-            **options: Additional CSV formatting options
+            compression: Compression method ("gzip" supported)
+            buffer_size: Number of records to buffer before writing
+            **options: Additional CSV writer options
         """
-        self.entity_name = entity_name
+        super().__init__(destination, entity_name, buffer_size, **options)
         self.include_header = include_header
-        self.options = {
-            "delimiter": delimiter,
-            "quotechar": quotechar,
-            **options,
-        }
-
-        # For file tracking
-        self.writers: dict[str, csv.DictWriter] = {}
-        self.text_wrappers: dict[str, io.TextIOWrapper] = {}
-        self.headers: dict[str, list[str]] = {}
+        self.delimiter = delimiter
+        self.quotechar = quotechar
+        self.compression = compression
         self.file_objects: dict[str, TextIO] = {}
-        self.file_paths: dict[str, str] = {}
-        self.should_close = True
+        self.writers: dict[str, csv.DictWriter] = {}
+        self.fieldnames: dict[str, list[str]] = {}
+        self.headers_written: set[str] = set()
+        self.should_close_files: bool = False
+        self.base_dir: Optional[str] = None
 
-        # Use file path if string
-        if isinstance(destination, str):
-            self.base_dir = os.path.dirname(destination) or "."
-            os.makedirs(self.base_dir, exist_ok=True)
-            file_name = os.path.basename(destination) or f"{entity_name}.csv"
+        # Initialize destination
+        if destination is None:
+            # Default to stdout
+            self.file_objects["main"] = cast(TextIO, sys.stdout)
+            self.should_close_files = False
+        elif isinstance(destination, str):
+            # Check if it's a single file path (has .csv extension) or directory
+            if destination.endswith(".csv") or destination.endswith(".csv.gz"):
+                # Single file destination
+                os.makedirs(os.path.dirname(destination) or ".", exist_ok=True)
 
-            # Check if destination is a directory
-            if os.path.isdir(destination):
-                # Use the directory as base_dir and create a default filename
+                # Open file in appropriate mode
+                if self.compression == "gzip" or destination.endswith(".csv.gz"):
+                    file_obj = gzip.open(
+                        destination, "wt", encoding="utf-8", newline=""
+                    )
+                else:
+                    file_obj = open(destination, "w", encoding="utf-8", newline="")
+
+                self.file_objects["main"] = file_obj
+                self.should_close_files = True
+            else:
+                # Directory path
                 self.base_dir = destination
-                file_path = os.path.join(self.base_dir, f"{entity_name}.csv")
-            else:
-                # Use the provided path
-                file_path = os.path.join(self.base_dir, file_name)
-
-            self.file_paths = {"main": file_path}
-            self.file_objects = {
-                "main": open(file_path, "w", newline="", encoding="utf-8")
-            }
-        elif destination is not None:
-            # Handle binary streams by wrapping them in TextIOWrapper
-            if isinstance(destination, (io.BufferedIOBase, io.BytesIO)) or (
-                hasattr(destination, "mode") and "b" in destination.mode
-            ):
-                # Binary stream - wrap it for text use
-                binary_dest = cast(BinaryIO, destination)
-                text_wrapper = io.TextIOWrapper(
-                    binary_dest,
-                    encoding="utf-8",
-                    write_through=True,
-                    line_buffering=True,
+                os.makedirs(self.base_dir, exist_ok=True)
+                self.should_close_files = True
+        else:
+            # File-like object - ensure it's text mode for CSV
+            if hasattr(destination, "mode") and "b" in getattr(destination, "mode", ""):
+                # Binary stream - wrap in TextIOWrapper
+                text_dest = io.TextIOWrapper(
+                    cast(BinaryIO, destination), encoding="utf-8"
                 )
-                self.text_wrappers["main"] = text_wrapper
-                self.file_objects = {"main": text_wrapper}
+                self.file_objects["main"] = text_dest
             else:
-                # Text stream
-                self.file_objects = {"main": cast(TextIO, destination)}
-            self.should_close = False
+                self.file_objects["main"] = cast(TextIO, destination)
+            self.should_close_files = False
 
     def _get_file_for_table(self, table_name: str) -> TextIO:
-        """Get or create a file object for the given table.
+        """Get or create a text file object for the given table.
 
         Args:
             table_name: Name of the table
 
         Returns:
-            File object for writing
+            TextIO: Text file object for writing
         """
         if table_name in self.file_objects:
             return self.file_objects[table_name]
 
-        # Create a file
-        if hasattr(self, "base_dir"):
-            # Make sure paths are safe
-            safe_name = table_name.replace("/", "_").replace("\\", "_")
-            file_path = os.path.join(self.base_dir, f"{safe_name}.csv")
-            self.file_paths[table_name] = file_path
-            file_obj = open(file_path, "w", newline="", encoding="utf-8")
+        # Create new file for table
+        if self.base_dir:
+            if table_name == "main":
+                filename = self.entity_name
+            else:
+                filename = WriterUtils.sanitize_filename(table_name)
+
+            file_path = WriterUtils.build_output_path(
+                self.base_dir, filename, "csv", self.compression
+            )
+
+            # Open file with appropriate compression
+            file_obj = WriterUtils.open_output_file(
+                file_path, "w", self.compression, encoding="utf-8"
+            )
+
+            # Ensure we have a TextIO object
+            if not isinstance(file_obj, TextIO):
+                # For gzip files, we need to ensure text mode
+                if self.compression == "gzip":
+                    import gzip
+
+                    file_obj = gzip.open(file_path, "wt", encoding="utf-8", newline="")
+                else:
+                    file_obj = open(file_path, "w", encoding="utf-8", newline="")
+
             self.file_objects[table_name] = file_obj
             return file_obj
         else:
-            raise OutputError(
-                f"Cannot create file for table {table_name}: "
-                f"no base directory specified"
-            )
+            raise OutputError(f"Cannot create file for table {table_name}")
 
     def _get_writer_for_table(
         self, table_name: str, fieldnames: list[str]
     ) -> csv.DictWriter:
-        """Get a CSV DictWriter for a table.
+        """Get or create a CSV writer for the given table.
 
         Args:
             table_name: Name of the table
-            fieldnames: Field names for the CSV header
+            fieldnames: List of field names for the CSV
 
         Returns:
-            CSV DictWriter instance
+            csv.DictWriter: CSV writer for the table
         """
         if table_name in self.writers:
             return self.writers[table_name]
 
         file_obj = self._get_file_for_table(table_name)
 
-        # Determine if working with a binary stream
-        is_binary = (hasattr(file_obj, "mode") and "b" in file_obj.mode) or isinstance(
-            file_obj, io.BytesIO
+        # Create CSV writer
+        writer = csv.DictWriter(
+            file_obj,
+            fieldnames=fieldnames,
+            delimiter=self.delimiter,
+            quotechar=self.quotechar,
         )
 
-        # For binary mode files, use TextIOWrapper for text-based CSV writing
-        if is_binary:
-            binary_file = cast(BinaryIO, file_obj)
-            text_file = io.TextIOWrapper(
-                binary_file, encoding="utf-8", write_through=True, line_buffering=True
-            )
-
-            # Create the CSV writer with the text wrapper
-            writer = csv.DictWriter(text_file, fieldnames=fieldnames, **self.options)
-
-            # Store both objects to prevent garbage collection
-            self.text_wrappers[table_name] = text_file
-        else:
-            # Standard text mode file
-            writer = csv.DictWriter(file_obj, fieldnames=fieldnames, **self.options)
-
-        if self.include_header:
-            writer.writeheader()
-
-        # Store the writer and headers
         self.writers[table_name] = writer
-        self.headers[table_name] = fieldnames
+        self.fieldnames[table_name] = fieldnames
 
         return writer
 
@@ -682,11 +469,8 @@ class CsvStreamingWriter(StreamingWriter):
 
         Args:
             **options: Format-specific options
-
-        Returns:
-            None
         """
-        # Nothing to do here - writer will be created when first records are written
+        # Main table initialization happens when first records are written
         pass
 
     def initialize_child_table(self, table_name: str, **options: Any) -> None:
@@ -695,38 +479,40 @@ class CsvStreamingWriter(StreamingWriter):
         Args:
             table_name: Name of the child table
             **options: Format-specific options
-
-        Returns:
-            None
         """
-        # Nothing to do here - writer will be created when first records are written
+        # Child table initialization happens when first records are written
         pass
 
     def write_main_records(self, records: list[dict[str, Any]], **options: Any) -> None:
         """Write a batch of main records.
 
         Args:
-            records: Batch of records to write
+            records: List of main table records to write
             **options: Format-specific options
-
-        Returns:
-            None
         """
         if not records:
             return
 
-        # Get fieldnames from the first record
-        fieldnames = list(records[0].keys())
-
-        # Get or create the writer
-        writer = self._get_writer_for_table("main", fieldnames)
-
-        # Write all records
+        # Extract field names from records
+        field_names = set()
         for record in records:
-            writer.writerow(record)
+            field_names.update(record.keys())
+        field_names = sorted(field_names)
 
-        # Flush to ensure data is written
-        self.file_objects["main"].flush()
+        # Get or create writer
+        writer = self._get_writer_for_table("main", field_names)
+
+        # Write header if needed
+        if "main" not in self.headers_written and self.include_header:
+            writer.writeheader()
+            self.headers_written.add("main")
+
+        # Write records
+        writer.writerows(records)
+
+        # Update record count and report progress
+        self.record_counts["main"] = self.record_counts.get("main", 0) + len(records)
+        self._report_progress("main", len(records))
 
     def write_child_records(
         self, table_name: str, records: list[dict[str, Any]], **options: Any
@@ -735,58 +521,64 @@ class CsvStreamingWriter(StreamingWriter):
 
         Args:
             table_name: Name of the child table
-            records: Batch of records to write
+            records: List of child records to write
             **options: Format-specific options
-
-        Returns:
-            None
         """
         if not records:
             return
 
-        # Get fieldnames from the first record
-        fieldnames = list(records[0].keys())
-
-        # Get or create the writer
-        writer = self._get_writer_for_table(table_name, fieldnames)
-
-        # Write all records
+        # Extract field names from records
+        field_names = set()
         for record in records:
-            writer.writerow(record)
+            field_names.update(record.keys())
 
-        # Flush to ensure data is written
-        self.file_objects[table_name].flush()
+        # Merge with existing field names if table already exists
+        if table_name in self.fieldnames:
+            field_names.update(self.fieldnames[table_name])
+
+        field_names = sorted(field_names)
+
+        # Get or create writer
+        writer = self._get_writer_for_table(table_name, field_names)
+
+        # Write header if needed
+        if table_name not in self.headers_written and self.include_header:
+            writer.writeheader()
+            self.headers_written.add(table_name)
+
+        # Write records
+        writer.writerows(records)
+
+        # Update record count and report progress
+        self.record_counts[table_name] = self.record_counts.get(table_name, 0) + len(
+            records
+        )
+        self._report_progress(table_name, len(records))
 
     def finalize(self, **options: Any) -> None:
-        """Finalize all tables.
+        """Finalize the output and flush all writers.
 
         Args:
             **options: Format-specific options
-
-        Returns:
-            None
         """
-        # Just flush all files
+        # Flush all file objects
         for file_obj in self.file_objects.values():
-            file_obj.flush()
+            if hasattr(file_obj, "flush"):
+                file_obj.flush()
 
     def close(self) -> None:
-        """Close any resources used by the writer.
+        """Clean up resources and close all files."""
+        if not getattr(self, "_finalized", False):
+            self.finalize()
+            self._finalized = True
 
-        Returns:
-            None
-        """
-        if self.should_close:
+        # Close all file objects if we opened them
+        if self.should_close_files:
             for file_obj in self.file_objects.values():
-                try:
+                if hasattr(file_obj, "close"):
                     file_obj.close()
-                except Exception as e:
-                    logger.debug(f"Error closing file: {e}")
 
-        self.writers = {}
-        self.headers = {}
-
-
-# Register the writers
-register_writer("csv", CsvWriter)
-register_streaming_writer("csv", CsvStreamingWriter)
+        # Clear references
+        self.file_objects.clear()
+        self.writers.clear()
+        self.fieldnames.clear()

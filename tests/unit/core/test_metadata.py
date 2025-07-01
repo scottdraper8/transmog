@@ -181,13 +181,13 @@ class TestMetadataAnnotation:
         assert id_found
 
     def test_annotate_with_metadata_preserves_original(self):
-        """Test that annotation preserves original record."""
+        """Test that annotation preserves original record when in_place=False."""
         original = {"name": "test", "value": 42}
         record = original.copy()
 
-        annotated = annotate_with_metadata(record)
+        annotated = annotate_with_metadata(record, in_place=False)
 
-        # Original should be unchanged
+        # Original should be unchanged when in_place=False
         assert record == original
         assert annotated != original
 

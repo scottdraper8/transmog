@@ -60,7 +60,7 @@ from .file_handling import (
 from .result import ConversionMode, ProcessingResult
 
 # Processing strategies
-from .strategy import (
+from .strategies import (
     BatchStrategy,
     ChunkedStrategy,
     CSVStrategy,

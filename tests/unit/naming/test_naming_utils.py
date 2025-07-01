@@ -43,7 +43,7 @@ class TestGetTableNameForArray:
             array_name="items",
             parent_path="level1_level2",
             separator="_",
-            deeply_nested_threshold=3,
+            nested_threshold=3,
         )
         # With threshold of 3, this should be simplified
         assert result == "org_level1_nested_items"
@@ -106,7 +106,7 @@ class TestGetTableNameForArray:
             array_name="items",
             parent_path="a_b_c",  # 3 components + entity + array = 5 total
             separator="_",
-            deeply_nested_threshold=4,
+            nested_threshold=4,
         )
         assert result == "org_a_nested_items"
 
@@ -116,6 +116,6 @@ class TestGetTableNameForArray:
             array_name="items",
             parent_path="a_b",  # 2 components + entity + array = 4 total
             separator="_",
-            deeply_nested_threshold=4,
+            nested_threshold=4,
         )
         assert result == "org_a_b_items"

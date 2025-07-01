@@ -29,13 +29,18 @@ from transmog.error.exceptions import (
 
 # Load recovery strategy with fallback placeholder
 try:
-    from ..error.recovery import RecoveryStrategy
+    from ..error.recovery import DEFAULT, LENIENT, STRICT, RecoveryStrategy
 except (ImportError, ModuleNotFoundError):
     # Placeholder class for type hinting
     class RecoveryStrategy:  # type: ignore
         """Placeholder for RecoveryStrategy."""
 
         pass
+
+    # Placeholder constants
+    STRICT = None  # type: ignore
+    DEFAULT = None  # type: ignore
+    LENIENT = None  # type: ignore
 
 
 # Type variables for return type preservation
@@ -363,3 +368,138 @@ def validate_input(
             if error_msg:
                 message += f": {error_msg}"
             raise ValidationError(message)
+
+
+# Error message templates for consistent formatting
+ERROR_TEMPLATES = {
+    "processing": "Error processing {entity_type} '{entity_name}': {error}",
+    "parsing": "Parsing error in {source} for {entity_type} '{entity_name}': {error}",
+    "validation": "Validation error for parameter '{param_name}': {error}",
+    "file_operation": "File operation failed for '{file_path}': {error}",
+    "configuration": "Configuration error in {component}: {error}",
+    "field_access": "Field access error for '{field_name}' in {entity_type}: {error}",
+    "type_conversion": "Type conversion error for value '{value}' to {target_type}: {error}",
+    "array_processing": "Array processing error in {entity_type} '{entity_name}': {error}",
+    "generic": "Error in {operation}: {error}",
+}
+
+# Recovery strategy mapping for consistent usage
+STRATEGY_MAP = {
+    "strict": STRICT,
+    "skip": DEFAULT,
+    "partial": LENIENT,
+    # API-level mappings
+    "raise": STRICT,
+    "warn": LENIENT,
+}
+
+
+def get_recovery_strategy(
+    strategy_identifier: Union[str, RecoveryStrategy, None],
+) -> RecoveryStrategy:
+    """Get recovery strategy object from string identifier or return existing strategy.
+
+    Args:
+        strategy_identifier: String identifier, strategy object, or None
+
+    Returns:
+        RecoveryStrategy object
+
+    Raises:
+        ValueError: If strategy identifier is invalid
+    """
+    if strategy_identifier is None:
+        return STRICT
+
+    if isinstance(strategy_identifier, RecoveryStrategy):
+        return strategy_identifier
+
+    if isinstance(strategy_identifier, str):
+        strategy = STRATEGY_MAP.get(strategy_identifier)
+        if strategy is None:
+            valid_strategies = list(STRATEGY_MAP.keys())
+            raise ValueError(
+                f"Invalid recovery strategy: '{strategy_identifier}'. "
+                f"Valid options: {', '.join(valid_strategies)}"
+            )
+        return strategy
+
+    raise ValueError(
+        f"Recovery strategy must be string or RecoveryStrategy object, "
+        f"got {type(strategy_identifier).__name__}"
+    )
+
+
+def build_error_context(
+    entity_name: Optional[str] = None,
+    entity_type: str = "record",
+    source: Optional[str] = None,
+    operation: Optional[str] = None,
+    field_name: Optional[str] = None,
+    file_path: Optional[str] = None,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Build standardized error context for consistent error messages.
+
+    Args:
+        entity_name: Name of the entity being processed
+        entity_type: Type of entity (record, table, field, etc.)
+        source: Source identifier (file path, table name, etc.)
+        operation: Operation being performed
+        field_name: Name of field being processed
+        file_path: Path to file being processed
+        **kwargs: Additional context information
+
+    Returns:
+        Dictionary with standardized error context
+    """
+    context = {"entity_type": entity_type}
+
+    if entity_name:
+        context["entity_name"] = entity_name
+    if source:
+        context["source"] = source
+    if operation:
+        context["operation"] = operation
+    if field_name:
+        context["field_name"] = field_name
+    if file_path:
+        context["file_path"] = file_path
+
+    context.update(kwargs)
+    return context
+
+
+def format_error_message(
+    template_key: str,
+    error: Exception,
+    **context: Any,
+) -> str:
+    """Format error message using standardized templates.
+
+    Args:
+        template_key: Key for error template
+        error: The exception that occurred
+        **context: Context information for the error
+
+    Returns:
+        Formatted error message
+    """
+    template = ERROR_TEMPLATES.get(template_key, ERROR_TEMPLATES["generic"])
+
+    # Ensure required context is present
+    if "operation" not in context and template_key == "generic":
+        context["operation"] = "processing"
+
+    # Format the error message
+    try:
+        return template.format(error=str(error), **context)
+    except KeyError as e:
+        # Fallback to generic template if context is missing
+        missing_key = str(e).strip("'")
+        logger.warning(
+            f"Missing context key '{missing_key}' for error template '{template_key}'"
+        )
+        return ERROR_TEMPLATES["generic"].format(
+            operation=context.get("operation", "processing"), error=str(error)
+        )

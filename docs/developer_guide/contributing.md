@@ -103,7 +103,7 @@ When reporting bugs, include:
 
 ### Feature Requests
 
-For new features:
+For feature requests:
 
 - Describe the use case and problem being solved
 - Provide examples of how the feature would be used
@@ -118,9 +118,45 @@ For new features:
 - Performance optimizations with benchmarks
 
 **Larger contributions:**
-- New data format support
+- Data format support
 - Processing optimizations
 - API enhancements
+
+## Codebase Structure
+
+The Transmog codebase is organized into focused, single-responsibility modules:
+
+### Core Processing Modules
+
+- **`src/transmog/core/`** - Core data transformation logic
+  - `flattener.py` - JSON flattening operations
+  - `extractor.py` - Array extraction logic
+  - `hierarchy.py` - Nested structure handling
+  - `metadata.py` - Metadata annotation
+  - `memory.py` - Memory optimization utilities
+
+- **`src/transmog/process/strategies/`** - Processing strategy implementations
+  - `base.py` - Base strategy class and common utilities
+  - `shared.py` - Shared batch processing logic
+  - `memory.py`, `file.py`, `batch.py`, `chunked.py`, `csv.py` - Specific strategies
+
+- **`src/transmog/process/result/`** - Result handling and output
+  - `core.py` - Core result functionality
+  - `converters.py` - Format conversion methods
+  - `writers.py` - File writing operations
+  - `streaming.py` - Streaming functionality
+
+### Configuration and Validation
+
+- **`src/transmog/config/`** - Configuration management
+- **`src/transmog/validation.py`** - Unified parameter validation system
+- **`src/transmog/error/`** - Error handling and recovery strategies
+
+This modular structure makes it easier to:
+- Navigate and understand specific functionality
+- Write focused tests for individual components
+- Make changes without affecting unrelated code
+- Maintain and extend the codebase
 
 ## Development Standards
 
@@ -137,7 +173,7 @@ No manual formatting is required - just commit changes and the hooks handle the 
 
 ### Testing
 
-- Write tests for new functionality
+- Write tests for added functionality
 - Maintain or improve test coverage
 - Use descriptive test names that explain what is being tested
 - Include both unit tests and integration tests where appropriate
@@ -172,7 +208,7 @@ pytest tests/performance/
 
 ### Documentation
 
-- Update docstrings for new functions and classes
+- Update docstrings for functions and classes
 - Add examples to demonstrate usage
 - Update relevant documentation files in `docs/`
 - Ensure examples are runnable and accurate

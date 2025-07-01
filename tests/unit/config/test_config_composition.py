@@ -24,14 +24,14 @@ class TestConfigurationComposition:
 
     def test_config_from_components(self):
         """Test creating configuration from individual components."""
-        naming = NamingConfig(separator=".", deeply_nested_threshold=3)
+        naming = NamingConfig(separator=".", nested_threshold=3)
         processing = ProcessingConfig(batch_size=500, cast_to_string=False)
         metadata = MetadataConfig(id_field="custom_id", parent_field="custom_parent")
 
         config = TransmogConfig(naming=naming, processing=processing, metadata=metadata)
 
         assert config.naming.separator == "."
-        assert config.naming.deeply_nested_threshold == 3
+        assert config.naming.nested_threshold == 3
         assert config.processing.batch_size == 500
         assert config.processing.cast_to_string is False
         assert config.metadata.id_field == "custom_id"
@@ -57,12 +57,12 @@ class TestConfigurationComposition:
     def test_partial_configuration_composition(self):
         """Test composing configurations with only some components specified."""
         # Create config with only naming specified
-        custom_naming = NamingConfig(separator="__", deeply_nested_threshold=2)
+        custom_naming = NamingConfig(separator="__", nested_threshold=2)
         config = TransmogConfig(naming=custom_naming)
 
         # Other components should use defaults
         assert config.naming.separator == "__"
-        assert config.naming.deeply_nested_threshold == 2
+        assert config.naming.nested_threshold == 2
         assert config.processing.batch_size == 1000  # Default
         assert config.metadata.id_field == "__transmog_id"  # Default
 
@@ -152,7 +152,7 @@ class TestConfigurationTemplates:
     def test_create_template_configuration(self):
         """Test creating a template configuration for reuse."""
         template = TransmogConfig(
-            naming=NamingConfig(separator=".", deeply_nested_threshold=2),
+            naming=NamingConfig(separator=".", nested_threshold=2),
             processing=ProcessingConfig(cast_to_string=False, batch_size=100),
             metadata=MetadataConfig(force_transmog_id=True),
         )
@@ -227,7 +227,7 @@ class TestConfigurationSerialization:
     def test_config_serialization_components(self):
         """Test that composed configurations can be serialized."""
         config = TransmogConfig(
-            naming=NamingConfig(separator=".", deeply_nested_threshold=2),
+            naming=NamingConfig(separator=".", nested_threshold=2),
             processing=ProcessingConfig(batch_size=500, cast_to_string=False),
         )
 

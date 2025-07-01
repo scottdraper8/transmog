@@ -12,6 +12,8 @@ Transmog provides three error handling strategies to manage problematic data:
 | `"skip"` | Skip problematic records and continue | Production, data quality issues |
 | `"warn"` | Log warnings but continue processing | Monitoring, partial data recovery |
 
+The error handling system uses standardized error message templates and context-aware error reporting for consistent behavior across all processing modules.
+
 ## Error Handling Modes
 
 ### Raise Mode (Default)

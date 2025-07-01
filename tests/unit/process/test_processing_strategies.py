@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from transmog.config import TransmogConfig
-from transmog.process.strategy import (
+from transmog.process.strategies import (
     BatchStrategy,
     ChunkedStrategy,
     CSVStrategy,

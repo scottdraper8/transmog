@@ -17,7 +17,7 @@ from typing import (
 
 from ..error import error_context, logger
 from .result import ProcessingResult
-from .strategy import CSVStrategy, FileStrategy
+from .strategies import CSVStrategy, FileStrategy
 
 # Define a return type variable for the decorator's generic type
 R = TypeVar("R")
@@ -240,7 +240,7 @@ def process_chunked(
     Returns:
         ProcessingResult with processed data
     """
-    from .strategy import ChunkedStrategy
+    from .strategies import ChunkedStrategy
 
     chunked_strategy = ChunkedStrategy(processor.config)
 

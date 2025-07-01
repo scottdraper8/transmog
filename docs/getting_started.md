@@ -1,6 +1,6 @@
 # Getting Started
 
-New to Transmog? This guide provides everything needed to get up and running quickly with data transformation.
+This guide provides everything needed to get up and running quickly with data transformation.
 
 ## What is Transmog?
 
@@ -212,18 +212,20 @@ if "products_tags" in result:
 
 ## Error Handling
 
-Configure how errors are handled:
+Configure how errors are handled using the unified error handling system:
 
 ```python
-# Raise errors (default)
+# Raise errors (default) - stops on first error
 result = tm.flatten(data, errors="raise")
 
-# Skip problematic records
+# Skip problematic records - continues processing
 result = tm.flatten(data, errors="skip")
 
-# Warn about issues but continue
+# Warn about issues but continue - logs warnings
 result = tm.flatten(data, errors="warn")
 ```
+
+The error handling system provides consistent error messages with standardized templates and context information across all processing modules.
 
 ## Common Patterns
 
@@ -285,7 +287,7 @@ result = tm.flatten(config, name="config")
 
 ## Next Steps
 
-Now that you understand the basics:
+Understanding the basics:
 
 1. **[User Guide](user_guide/file-processing.md)** - Comprehensive task-oriented guides
 2. **[API Reference](api_reference/api.md)** - Complete function documentation

@@ -34,13 +34,13 @@ class TestTransmogConfigCreation:
 
     def test_config_with_custom_components(self):
         """Test creating config with custom components."""
-        naming = NamingConfig(separator=".", deeply_nested_threshold=5)
+        naming = NamingConfig(separator=".", nested_threshold=5)
         processing = ProcessingConfig(batch_size=500)
 
         config = TransmogConfig(naming=naming, processing=processing)
 
         assert config.naming.separator == "."
-        assert config.naming.deeply_nested_threshold == 5
+        assert config.naming.nested_threshold == 5
         assert config.processing.batch_size == 500
 
     def test_config_immutability(self):
@@ -118,10 +118,10 @@ class TestConfigWithMethods:
         """Test with_naming method."""
         config = TransmogConfig.default()
 
-        new_config = config.with_naming(separator=".", deeply_nested_threshold=10)
+        new_config = config.with_naming(separator=".", nested_threshold=10)
 
         assert new_config.naming.separator == "."
-        assert new_config.naming.deeply_nested_threshold == 10
+        assert new_config.naming.nested_threshold == 10
         # Original unchanged
         assert config.naming.separator == "_"
 
@@ -322,10 +322,10 @@ class TestConfigComponents:
 
     def test_naming_config(self):
         """Test NamingConfig."""
-        naming = NamingConfig(separator=":", deeply_nested_threshold=3)
+        naming = NamingConfig(separator=":", nested_threshold=3)
 
         assert naming.separator == ":"
-        assert naming.deeply_nested_threshold == 3
+        assert naming.nested_threshold == 3
 
     def test_processing_config(self):
         """Test ProcessingConfig."""

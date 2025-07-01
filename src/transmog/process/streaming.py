@@ -12,6 +12,7 @@ from typing import (
     Union,
 )
 
+from ..config.utils import build_hierarchy_params
 from ..core.metadata import get_current_timestamp
 from ..error import (
     FileError,
@@ -26,7 +27,7 @@ from .data_iterators import (
     get_json_file_iterator,
     get_jsonl_file_iterator,
 )
-from .utils import get_batch_size, get_common_config_params, handle_file_error
+from .utils import get_batch_size, handle_file_error
 
 
 def _get_streaming_params(
@@ -46,17 +47,16 @@ def _get_streaming_params(
     Returns:
         Dictionary of parameters for streaming processing
     """
-    # Get base parameters
-    params: dict[str, Any] = get_common_config_params(processor, extract_time)
-
-    # Add streaming-specific params
+    # Use the hierarchy-specific parameter builder for streaming
+    overrides = {}
     if use_deterministic_ids is not None:
-        params["use_deterministic_ids"] = use_deterministic_ids
-
+        overrides["use_deterministic_ids"] = use_deterministic_ids
     if force_transmog_id is not None:
-        params["force_transmog_id"] = force_transmog_id
+        overrides["force_transmog_id"] = force_transmog_id
 
-    return params
+    return build_hierarchy_params(
+        processor.config, extract_time=extract_time, streaming=True, **overrides
+    )
 
 
 def _stream_process_batch(

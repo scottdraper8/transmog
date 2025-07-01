@@ -8,14 +8,14 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Union
 
-from transmog.api_validation import validate_api_parameters
 from transmog.config import MetadataConfig, ProcessingMode, TransmogConfig
 from transmog.io import initialize_io_features
 from transmog.process import Processor
 from transmog.process.result import ProcessingResult as _ProcessingResult
 from transmog.process.streaming import stream_process
+from transmog.validation import validate_api_parameters
 
-# Initialize IO features on module import
+# Initialize IO features to register writers
 initialize_io_features()
 
 # Type aliases for clarity
@@ -535,7 +535,7 @@ def _build_config(
         metadata=metadata_config,
         # Convenience parameters
         separator=separator,
-        deeply_nested_threshold=nested_threshold,
+        nested_threshold=nested_threshold,
         cast_to_string=not preserve_types,
         include_empty=not skip_empty,
         skip_null=skip_null,

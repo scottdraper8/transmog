@@ -53,6 +53,7 @@ coverage.xml
 
 # Project specific
 logs/
+CLEAN_AND_OPTIMIZE/
 
 # Documentation
 docs/_build/
