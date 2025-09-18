@@ -97,10 +97,25 @@ class Processor:
                 else:
                     strategy = FileStrategy(self.config)
             else:
+                # Convert bytes to string for format detection
                 if isinstance(data, bytes):
-                    # Convert bytes to string for ChunkedStrategy
-                    data = data.decode("utf-8")
-                strategy = ChunkedStrategy(self.config)
+                    data_str = data.decode("utf-8")
+                else:
+                    data_str = data
+
+                # Detect format of string data
+                from .data_iterators import DataIteratorUtils
+
+                format_type = DataIteratorUtils.detect_string_format(data_str)
+
+                if format_type == "csv":
+                    # Use CSV strategy for CSV strings
+                    strategy = CSVStrategy(self.config)
+                    data = data_str  # Ensure we use the string version
+                else:
+                    # Use chunked strategy for JSON/JSONL strings
+                    strategy = ChunkedStrategy(self.config)
+                    data = data_str  # Ensure we use the string version
         else:
             raise ConfigurationError(f"Unsupported data type: {type(data)}")
 

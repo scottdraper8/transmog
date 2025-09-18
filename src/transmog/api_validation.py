@@ -250,7 +250,7 @@ def validate_data_api(data: Any) -> None:
     if data is None:
         raise ValidationError("data cannot be None")
 
-    # If it's a string, check if it's valid JSON or a valid file path
+    # If it's a string, check if it's valid JSON, CSV, or a valid file path
     if isinstance(data, str):
         # Check if it's a file path first
         try:
@@ -258,16 +258,57 @@ def validate_data_api(data: Any) -> None:
             if path.exists():
                 return  # Valid file path
         except (OSError, ValueError):
-            pass  # Not a valid path, continue to JSON check
+            pass  # Not a valid path, continue to format checks
 
         # Check if it's valid JSON
         try:
             json.loads(data)
             return  # Valid JSON string
         except json.JSONDecodeError:
+            # Check if it looks like CSV data
+            if _is_csv_string(data):
+                return  # Valid CSV string
+
             raise ValidationError(
-                "String data must be valid JSON or a valid file path"
+                "String data must be valid JSON, CSV, or a valid file path"
             ) from None
+
+
+def _is_csv_string(data: str) -> bool:
+    """Check if a string appears to be CSV data.
+
+    Args:
+        data: String to check
+
+    Returns:
+        True if the string appears to be CSV data
+    """
+    # Empty string is not CSV
+    if not data or not data.strip():
+        return False
+
+    # Split into lines
+    lines = data.strip().split("\n")
+    if len(lines) < 2:
+        # CSV should have at least header and one data row
+        return False
+
+    # Simple heuristic: check if lines have consistent comma/tab/pipe counts
+    # and at least 2 fields per line
+    delimiters = [",", "\t", "|", ";"]
+
+    for delimiter in delimiters:
+        field_counts = []
+        for line in lines[:5]:  # Check first 5 lines
+            if line.strip():
+                field_counts.append(len(line.split(delimiter)))
+
+        if field_counts and all(c >= 2 for c in field_counts):
+            # Check if field counts are consistent
+            if len(set(field_counts)) == 1:
+                return True
+
+    return False
 
 
 def validate_path_api(path: Any) -> None:

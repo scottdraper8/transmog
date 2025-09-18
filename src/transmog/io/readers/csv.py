@@ -232,7 +232,9 @@ class CSVReader:
             date_format: Optional format string for parsing dates
         """
         # Configuration values from settings or defaults
-        self.delimiter = delimiter or settings.get_option("csv_delimiter", ",")
+        # Keep delimiter as None if not specified to enable auto-detection
+        self.delimiter = delimiter if delimiter is not None else None
+        self._default_delimiter = settings.get_option("csv_delimiter", ",")
         self.has_header = has_header
         self.null_values = null_values or settings.get_option(
             "csv_null_values", ["", "NULL", "null", "NA", "na", "N/A", "n/a"]
@@ -242,8 +244,10 @@ class CSVReader:
         self.skip_rows = skip_rows
         self.quote_char = quote_char or settings.get_option("csv_quote_char", '"')
         self.encoding = encoding
-        self.cast_to_string = cast_to_string or settings.get_option(
-            "cast_to_string", False
+        self.cast_to_string = (
+            cast_to_string
+            if cast_to_string is not None
+            else settings.get_option("cast_to_string", False)
         )
         self.date_format = date_format
 
@@ -253,6 +257,45 @@ class CSVReader:
         # If cast_to_string is True, disable type inference to prevent conversion issues
         if self.cast_to_string:
             self.infer_types = False
+
+    def _get_effective_delimiter(self, sample_data: Optional[str] = None) -> str:
+        """Get the effective delimiter, with auto-detection if needed.
+
+        Args:
+            sample_data: Optional sample data for auto-detection
+
+        Returns:
+            The delimiter to use
+        """
+        if self.delimiter is not None:
+            return self.delimiter
+
+        if sample_data:
+            # Try to auto-detect delimiter
+            import csv
+
+            try:
+                sniffer = csv.Sniffer()
+                return sniffer.sniff(sample_data[:1024], delimiters=",\t|;").delimiter
+            except csv.Error:
+                # Fallback: manual detection
+                lines = sample_data.split("\n")[:3]
+                if len(lines) >= 2:
+                    for test_delimiter in ["\t", ",", "|", ";"]:
+                        counts = [
+                            len(line.split(test_delimiter))
+                            for line in lines
+                            if line.strip()
+                        ]
+                        if (
+                            len(counts) >= 2
+                            and all(c >= 2 for c in counts)
+                            and len(set(counts)) == 1
+                        ):
+                            return test_delimiter
+
+        # Default fallback
+        return str(self._default_delimiter)
 
     def read_records(self, file_path: str) -> Iterator[dict[str, Any]]:
         """Read records one by one from a CSV file.
@@ -321,6 +364,54 @@ class CSVReader:
             FileError: If the file cannot be read
         """
         return list(self.read_records(file_path))
+
+    def _read_records_from_string(self, csv_string: str) -> Iterator[dict[str, Any]]:
+        """Read records from a CSV string using Transmog's processing logic.
+
+        Args:
+            csv_string: CSV data as a string
+
+        Returns:
+            Iterator yielding records as dictionaries
+
+        Raises:
+            ProcessingError: If the CSV data cannot be parsed
+        """
+        import csv
+        from io import StringIO
+
+        try:
+            # Get effective delimiter with auto-detection
+            delimiter = self._get_effective_delimiter(csv_string)
+
+            # Create StringIO from CSV string
+            csv_file = StringIO(csv_string)
+
+            # Use the same logic as _read_records_builtin but with StringIO
+            reader = csv.reader(
+                csv_file, delimiter=delimiter, quotechar=self.quote_char
+            )
+
+            # Skip rows if needed
+            for _ in range(self.skip_rows):
+                next(reader, None)
+
+            # Read header row if present
+            header_row = self._get_header_row(reader, csv_file)
+
+            # Process data rows
+            for row in reader:
+                if not row:  # Skip empty rows
+                    continue
+
+                record = self._process_row(row, header_row)
+                if record:  # Only yield non-empty records
+                    yield record
+
+        except Exception as e:
+            from ...error import ProcessingError
+
+            raise ProcessingError(f"Error parsing CSV string: {str(e)}") from e
 
     def read_in_chunks(
         self, file_path: str, chunk_size: int = 1000
@@ -431,7 +522,7 @@ class CSVReader:
         )
 
         parse_options = pa_csv.ParseOptions(
-            delimiter=self.delimiter,
+            delimiter=self._get_effective_delimiter(),
             quote_char=self.quote_char,
         )
 
@@ -517,7 +608,7 @@ class CSVReader:
         )
 
         parse_options = pa_csv.ParseOptions(
-            delimiter=self.delimiter,
+            delimiter=self._get_effective_delimiter(),
             quote_char=self.quote_char,
         )
 
@@ -686,7 +777,9 @@ class CSVReader:
             if "t" in mode:
                 with open_file() as file:
                     reader = csv.reader(
-                        file, delimiter=self.delimiter, quotechar=self.quote_char
+                        file,
+                        delimiter=self._get_effective_delimiter(),
+                        quotechar=self.quote_char,
                     )
 
                     # Skip rows if needed
@@ -708,7 +801,9 @@ class CSVReader:
                 # Binary mode for compressed files
                 with open_file() as file:
                     reader = csv.reader(
-                        file, delimiter=self.delimiter, quotechar=self.quote_char
+                        file,
+                        delimiter=self._get_effective_delimiter(),
+                        quotechar=self.quote_char,
                     )
 
                     # Skip rows if needed
@@ -758,7 +853,9 @@ class CSVReader:
             if "t" in mode:
                 with open_file() as file:
                     reader = csv.reader(
-                        file, delimiter=self.delimiter, quotechar=self.quote_char
+                        file,
+                        delimiter=self._get_effective_delimiter(),
+                        quotechar=self.quote_char,
                     )
 
                     # Skip rows if needed
@@ -789,7 +886,9 @@ class CSVReader:
                 # Binary mode for compressed files
                 with open_file() as file:
                     reader = csv.reader(
-                        file, delimiter=self.delimiter, quotechar=self.quote_char
+                        file,
+                        delimiter=self._get_effective_delimiter(),
+                        quotechar=self.quote_char,
                     )
 
                     # Skip rows if needed

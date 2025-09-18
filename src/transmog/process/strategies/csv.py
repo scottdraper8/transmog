@@ -57,11 +57,22 @@ class CSVStrategy(ProcessingStrategy):
         chunk_size = kwargs.pop("chunk_size", None)
         date_format = kwargs.pop("date_format", None)
 
-        # Convert data to file path
+        # Handle both file paths and CSV string data
         if not isinstance(data, str):
-            raise TypeError(f"Expected string file path, got {type(data).__name__}")
+            raise TypeError(
+                f"Expected string file path or CSV data, got {type(data).__name__}"
+            )
 
-        file_path = data
+        # Check if data is a file path or CSV string content
+        if os.path.exists(data):
+            # It's a file path
+            file_path = data
+            is_csv_string = False
+        else:
+            # It's CSV string content
+            file_path = None
+            csv_string_data = data
+            is_csv_string = True
 
         # Create result if not provided
         if result is None:
@@ -70,7 +81,10 @@ class CSVStrategy(ProcessingStrategy):
                 child_tables={},
                 entity_name=entity_name,
             )
-            result.source_info["file_path"] = file_path
+            if file_path:
+                result.source_info["file_path"] = file_path
+            else:
+                result.source_info["data_type"] = "csv_string"
 
         # Get extraction timestamp
         extract_time = extract_time or get_current_timestamp()
@@ -78,33 +92,54 @@ class CSVStrategy(ProcessingStrategy):
         # Extract common parameters from kwargs or config
         params = self._get_common_parameters(**kwargs)
 
-        # Set delimiter if not provided
-        delimiter = delimiter or ","
+        # Keep delimiter as None if not provided to enable auto-detection
+        # delimiter = delimiter or ","  # Don't set default, let CSV reader auto-detect
 
         # Get batch size
         batch_size = self._get_batch_size(chunk_size)
 
         try:
-            # Check file exists
-            if not os.path.exists(file_path):
-                raise FileError(f"File not found: {file_path}")
+            if is_csv_string:
+                # Process CSV string data
+                from ..data_iterators import get_csv_data_iterator
 
-            # Process the CSV file in chunks if needed
-            from ...io.readers.csv import CSVReader
+                csv_reader = get_csv_data_iterator(
+                    processor=self,  # Pass self as processor
+                    data=csv_string_data,
+                    delimiter=delimiter,
+                    has_header=has_header,
+                    null_values=null_values,
+                    sanitize_column_names=sanitize_column_names,
+                    infer_types=infer_types,
+                    skip_rows=skip_rows,
+                    quote_char=quote_char,
+                    date_format=date_format,
+                )
+            else:
+                # Process CSV file - file_path is guaranteed to be str here
+                if file_path is None:
+                    raise ValueError("file_path should not be None for file processing")
 
-            # Create CSV reader
-            csv_reader = CSVReader(
-                delimiter=delimiter,
-                has_header=has_header,
-                null_values=null_values,
-                skip_rows=skip_rows,
-                quote_char=quote_char,
-                encoding=encoding,
-                sanitize_column_names=sanitize_column_names,
-                infer_types=infer_types,
-                cast_to_string=self.config.processing.cast_to_string,
-                date_format=date_format,
-            ).read_records(file_path)
+                # Check file exists
+                if not os.path.exists(file_path):
+                    raise FileError(f"File not found: {file_path}")
+
+                # Process the CSV file in chunks if needed
+                from ...io.readers.csv import CSVReader
+
+                # Create CSV reader
+                csv_reader = CSVReader(
+                    delimiter=delimiter,
+                    has_header=has_header,
+                    null_values=null_values,
+                    skip_rows=skip_rows,
+                    quote_char=quote_char,
+                    encoding=encoding,
+                    sanitize_column_names=sanitize_column_names,
+                    infer_types=infer_types,
+                    cast_to_string=self.config.processing.cast_to_string,
+                    date_format=date_format,
+                ).read_records(file_path)
 
             # Get ID fields
             id_field = params.get("id_field", "__transmog_id")

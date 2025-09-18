@@ -105,6 +105,9 @@ def sanitize_name(
 
         sanitized = result
 
+        # Clean up leading and trailing underscores
+        sanitized = sanitized.strip("_")
+
         # Prefix numeric names with "col_"
         if sanitized and sanitized[0].isdigit():
             sanitized = f"col_{sanitized}"

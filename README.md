@@ -37,7 +37,7 @@ print(result.main)
 # Save to files in different formats
 result.save("products.csv")        # Single CSV file
 result.save("products.parquet")    # Single Parquet file
-result.save("output/", "json")     # Multiple JSON files in directory
+result.save("products.json")       # Single JSON file (only main table)
 ```
 
 ## Example: Nested JSON to Multiple Tables
