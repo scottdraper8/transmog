@@ -80,10 +80,12 @@ class TestConfigurationChaining:
 
     def test_chaining_with_profiles(self):
         """Test chaining profile methods."""
+        from transmog.types.base import ArrayMode
+
         config = TransmogConfig.memory_optimized().use_dot_notation().disable_arrays()
 
         assert config.naming.separator == "."
-        assert config.processing.visit_arrays is False
+        assert config.processing.array_mode == ArrayMode.SKIP
         assert config.processing.processing_mode == ProcessingMode.LOW_MEMORY
 
     def test_profile_override_chaining(self):

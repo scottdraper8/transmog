@@ -19,7 +19,6 @@ DEFAULT_OPTIONS = {
     "cast_to_string": True,
     "include_empty": False,
     "skip_null": True,
-    "visit_arrays": True,
     "nested_threshold": 4,
     "preserve_leaf_component": True,
     "path_parts_optimization": True,

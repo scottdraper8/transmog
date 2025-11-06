@@ -191,8 +191,7 @@ class CSVStrategy(ProcessingStrategy):
 
             return result
         except Exception as e:
-            # Handle file errors
-            handle_file_error(file_path, e, "CSV")
+            handle_file_error(file_path or "CSV data", e, "CSV")
 
     def _process_csv_chunk(
         self,

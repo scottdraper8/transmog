@@ -20,7 +20,6 @@ class ProcessingConfig:
     cast_to_string: bool = True
     include_empty: bool = False
     skip_null: bool = True
-    visit_arrays: bool = False
     batch_size: int = 1000
     processing_mode: ProcessingMode = ProcessingMode.STANDARD
     optimize_for_memory: Optional[bool] = None

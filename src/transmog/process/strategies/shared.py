@@ -13,6 +13,7 @@ from ...error import (
     get_recovery_strategy,
     logger,
 )
+from ...types.base import ArrayMode
 from ..result import ProcessingResult
 
 
@@ -51,12 +52,11 @@ def process_batch_main_records(
     memory_monitor = get_global_memory_monitor()
     gc_manager = get_global_gc_manager()
 
-    # Remove array fields from records if not keeping arrays (in-place optimization)
-    if not params.get("keep_arrays", False):
+    array_mode = params.get("array_mode", ArrayMode.SEPARATE)
+    if array_mode == ArrayMode.SEPARATE:
         for record in batch:
             strategy_instance._remove_array_fields_from_record(record)
 
-        # Process records in single pass with memory optimization
     nested_threshold_value = params.get("nested_threshold")
     if nested_threshold_value is not None:
         nested_threshold_value = int(nested_threshold_value)
@@ -139,7 +139,8 @@ def process_batch_arrays(
         id_generation_strategy: Strategy for generating IDs
         params: Processing parameters
     """
-    if not params.get("visit_arrays", True):
+    array_mode = params.get("array_mode", ArrayMode.SEPARATE)
+    if array_mode != ArrayMode.SEPARATE:
         return
 
     parent_field = params["parent_field"]
@@ -154,7 +155,6 @@ def process_batch_arrays(
 
         main_id = main_ids[i]
 
-        # Extract arrays from the record
         try:
             nested_threshold_value = params.get("nested_threshold")
             if nested_threshold_value is not None:

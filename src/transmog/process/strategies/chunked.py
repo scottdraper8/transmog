@@ -9,6 +9,7 @@ import orjson
 from ...core.hierarchy import process_records_in_single_pass, process_structure
 from ...core.metadata import get_current_timestamp
 from ...error import ConfigurationError, logger
+from ...types.base import ArrayMode
 from ..result import ProcessingResult
 from .base import ProcessingStrategy
 
@@ -185,13 +186,12 @@ class ChunkedStrategy(ProcessingStrategy):
             id_field=id_field,
             parent_field=parent_field,
             time_field=time_field,
-            visit_arrays=params.get("visit_arrays", True),
+            array_mode=params.get("array_mode", ArrayMode.SEPARATE),
             nested_threshold=params.get("nested_threshold", 4),
             default_id_field=default_id_field,
             id_generation_strategy=id_generation_strategy,
             recovery_strategy=params.get("recovery_strategy"),
             max_depth=params.get("max_depth", 100),
-            keep_arrays=params.get("keep_arrays", False),
             id_field_patterns=params.get("id_field_patterns"),
             id_field_mapping=params.get("id_field_mapping"),
             force_transmog_id=params.get("force_transmog_id", False),
@@ -241,16 +241,11 @@ class ChunkedStrategy(ProcessingStrategy):
             # Use only as many IDs as available records
             main_ids = main_ids[: len(batch)]
 
-        # Get processing parameters
-        visit_arrays = params.get("visit_arrays", True)
-        keep_arrays = params.get("keep_arrays", False)
-
-        # Only process arrays if enabled
-        if not visit_arrays:
-            logger.debug("Array processing disabled, skipping")
+        array_mode = params.get("array_mode", ArrayMode.SEPARATE)
+        if array_mode != ArrayMode.SEPARATE:
+            logger.debug("Array processing skipped (mode is not SEPARATE)")
             return
 
-        # Process arrays for each record in the batch
         for i, (record, parent_id) in enumerate(zip(batch, main_ids)):
             # Skip if we don't have a valid parent ID
             if parent_id is None:
@@ -259,7 +254,6 @@ class ChunkedStrategy(ProcessingStrategy):
                 )
                 continue
 
-            # Process arrays for this record
             _, arrays = process_structure(
                 data=record,
                 entity_name=entity_name,
@@ -273,7 +267,7 @@ class ChunkedStrategy(ProcessingStrategy):
                 default_id_field=default_id_field,
                 id_generation_strategy=id_generation_strategy,
                 recovery_strategy=params.get("recovery_strategy"),
-                keep_arrays=keep_arrays,
+                array_mode=array_mode,
                 id_field=id_field,
                 parent_field=params.get("parent_field", "__parent_transmog_id"),
                 time_field=params.get("time_field", "__transmog_datetime"),
@@ -295,16 +289,10 @@ class ChunkedStrategy(ProcessingStrategy):
                     for child in records:
                         result.add_child_record(table_name, child)
 
-                # Only remove array fields if keep_arrays is False
-                if not keep_arrays:
-                    # Remove array fields from the original record after they've been
-                    # processed
-                    # This ensures arrays don't exist in both the main table
-                    # and child tables
-                    self._remove_array_fields_from_record(record)
+                self._remove_array_fields_from_record(record)
 
-                    # Also update the main record in the result if it exists
-                    if i < len(result.main_table):
-                        self._remove_array_fields_from_record(result.main_table[i])
+                # Also update the main record in the result if it exists
+                if i < len(result.main_table):
+                    self._remove_array_fields_from_record(result.main_table[i])
             else:
                 logger.warning(f"No arrays found for record at index {i}")

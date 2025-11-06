@@ -220,15 +220,19 @@ class TestConfigSpecializedMethods:
 
     def test_disable_arrays(self):
         """Test disable_arrays convenience method."""
+        from transmog.types.base import ArrayMode
+
         config = TransmogConfig.default().disable_arrays()
 
-        assert config.processing.visit_arrays is False
+        assert config.processing.array_mode == ArrayMode.SKIP
 
-    def test_keep_arrays(self):
-        """Test keep_arrays convenience method."""
-        config = TransmogConfig.default().keep_arrays()
+    def test_keep_arrays_inline(self):
+        """Test keep_arrays_inline convenience method."""
+        from transmog.types.base import ArrayMode
 
-        assert config.processing.keep_arrays is True
+        config = TransmogConfig.default().keep_arrays_inline()
+
+        assert config.processing.array_mode == ArrayMode.INLINE
 
     def test_use_string_format(self):
         """Test use_string_format convenience method."""
@@ -310,11 +314,13 @@ class TestConfigChaining:
             .disable_arrays()
         )
 
+        from transmog.types.base import ArrayMode
+
         assert config.processing.processing_mode == ProcessingMode.LOW_MEMORY
         assert config.naming.separator == "."
         assert config.metadata.id_field == "custom_id"
         assert config.error_handling.recovery_strategy == "skip"
-        assert config.processing.visit_arrays is False
+        assert config.processing.array_mode == ArrayMode.SKIP
 
 
 class TestConfigComponents:
