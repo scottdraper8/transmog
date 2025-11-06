@@ -153,7 +153,7 @@ class ParameterValidator:
             ConfigurationError: For config context
         """
         error_class = ValidationError if context == "api" else ConfigurationError
-        valid_options = ["separate", "inline", "skip"]
+        valid_options = ["smart", "separate", "inline", "skip"]
 
         if value not in valid_options:
             raise error_class(

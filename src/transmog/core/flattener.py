@@ -86,6 +86,25 @@ class DepthTracker:
         return self.current_depth >= self.threshold
 
 
+def _is_simple_array(array: list) -> bool:
+    """Check if an array contains only primitive values (not objects or arrays).
+
+    Args:
+        array: The array to check
+
+    Returns:
+        True if array contains only primitives (str, int, float, bool, None),
+        False otherwise
+    """
+    if not array:
+        return True
+
+    for item in array:
+        if isinstance(item, (dict, list, tuple)):
+            return False
+    return True
+
+
 def _process_value(
     value: Any, cast_to_string: bool, include_empty: bool, skip_null: bool
 ) -> Optional[Any]:
@@ -526,6 +545,15 @@ def _flatten_json_core(
         elif isinstance(value, list):
             if array_mode == ArrayMode.SKIP:
                 continue
+            elif array_mode == ArrayMode.SMART:
+                # Smart mode: preserve simple arrays, explode complex arrays
+                if _is_simple_array(value):
+                    # Simple array - keep as native array
+                    result[current_path] = value
+                else:
+                    # Complex array - will be exploded into child tables
+                    if not in_place:
+                        keys_to_remove.append(key)
             elif array_mode == ArrayMode.INLINE:
                 processed_value = _process_value_wrapper(
                     value,

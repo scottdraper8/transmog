@@ -19,12 +19,15 @@ class ArrayMode(Enum):
     """Defines how arrays are handled during flattening.
 
     Attributes:
+        SMART: Intelligently handle arrays - explode complex arrays (objects/nested)
+            into child tables, preserve simple arrays (primitives) as native arrays
         SEPARATE: Extract arrays into separate child tables with parent-child
             relationships
         INLINE: Keep arrays as JSON strings within the main table
         SKIP: Ignore arrays completely during processing
     """
 
+    SMART = "smart"
     SEPARATE = "separate"
     INLINE = "inline"
     SKIP = "skip"

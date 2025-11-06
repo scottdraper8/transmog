@@ -57,7 +57,7 @@ class ProcessingConfig:
     max_nesting_depth: Optional[int] = None
     max_depth: int = 100  # Maximum recursion depth
     path_parts_optimization: bool = True
-    array_mode: ArrayMode = ArrayMode.SEPARATE
+    array_mode: ArrayMode = ArrayMode.SMART
     batch_size: int = 1000
     processing_mode: ProcessingMode = ProcessingMode.STANDARD
     # Validation settings
@@ -325,7 +325,7 @@ class TransmogConfig:
                 processing_mode=ProcessingMode.LOW_MEMORY,
                 batch_size=100,
                 path_parts_optimization=True,
-                array_mode=ArrayMode.SEPARATE,
+                array_mode=ArrayMode.SMART,
             ),
             cache_config=CacheConfig(
                 enabled=True,
@@ -342,7 +342,7 @@ class TransmogConfig:
                 processing_mode=ProcessingMode.HIGH_PERFORMANCE,
                 batch_size=10000,
                 path_parts_optimization=True,
-                array_mode=ArrayMode.SEPARATE,
+                array_mode=ArrayMode.SMART,
             ),
             cache_config=CacheConfig(
                 enabled=True,

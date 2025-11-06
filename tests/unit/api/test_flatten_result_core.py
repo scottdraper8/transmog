@@ -29,14 +29,16 @@ class TestFlattenResultBasics:
         assert result.main[0]["name"] == "Company"
 
     def test_tables_property(self, result):
-        """Test accessing child tables."""
+        """Test accessing child tables - smart mode keeps simple arrays inline."""
         assert isinstance(result.tables, dict)
-        assert len(result.tables) > 0
 
-        # Should have tables for tags and employees
+        # Smart mode only creates tables for complex arrays (employees), not simple arrays (tags)
         table_names = list(result.tables.keys())
-        assert any("tags" in name.lower() for name in table_names)
         assert any("employees" in name.lower() for name in table_names)
+
+        # Tags should be in the main table as native arrays in smart mode
+        assert "tags" in result.main[0]
+        assert isinstance(result.main[0]["tags"], list)
 
     def test_all_tables_property(self, result):
         """Test accessing all tables including main."""

@@ -221,6 +221,7 @@ def process_structure(
             id_field_patterns=id_field_patterns,
             id_field_mapping=id_field_mapping,
             force_transmog_id=force_transmog_id,
+            array_mode=array_mode,
         )
     else:
         # Batch extraction version
@@ -250,6 +251,7 @@ def process_structure(
             id_field_patterns=id_field_patterns,
             id_field_mapping=id_field_mapping,
             force_transmog_id=force_transmog_id,
+            array_mode=array_mode,
         )
 
         # Log what we found

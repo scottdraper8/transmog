@@ -94,10 +94,12 @@ Employee table:
 
 ### How It Works
 
-The transformation process:
+The transformation process uses **smart mode** by default:
 
 1. **Flattens nested objects** - `location.city` becomes `location_city`
-2. **Extracts arrays** - `employees` array becomes a separate table
+2. **Intelligently handles arrays**:
+   - Simple arrays (primitives) are kept as native arrays
+   - Complex arrays (objects) are extracted into separate tables
 3. **Preserves relationships** - Links parent and child records with IDs
 
 ### Working with Files

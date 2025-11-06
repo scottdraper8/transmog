@@ -32,27 +32,21 @@ class TestFlattenFunction:
         assert "metadata_version" in result.main[0]
 
     def test_flatten_with_arrays(self, array_data):
-        """Test flattening data with arrays."""
+        """Test flattening data with arrays - smart mode handles arrays intelligently."""
         result = tm.flatten(array_data, name="company")
 
         assert_valid_result(result)
         assert len(result.main) == 1
         assert result.main[0]["name"] == "Company"
 
-        # Should have child tables for arrays
+        # Smart mode keeps simple arrays (tags, skills) inline
+        assert "tags" in result.main[0]
+        assert result.main[0]["tags"] == ["tech", "startup", "ai"]
+
+        # Should have child tables for complex arrays (employees)
         assert len(result.tables) > 0
 
-        # Check tags table
-        tags_table = None
-        for table_name, table_data in result.tables.items():
-            if "tags" in table_name.lower():
-                tags_table = table_data
-                break
-
-        assert tags_table is not None
-        assert len(tags_table) == 3  # tech, startup, ai
-
-        # Check employees table
+        # Check employees table (complex array)
         employees_table = None
         for table_name, table_data in result.tables.items():
             if "employees" in table_name.lower() and "skills" not in table_name.lower():
@@ -62,8 +56,13 @@ class TestFlattenFunction:
         assert employees_table is not None
         assert len(employees_table) == 2  # Alice, Bob
 
+        # Skills arrays should be kept inline within employee records
+        for emp in employees_table:
+            assert "skills" in emp
+            assert isinstance(emp["skills"], list)
+
     def test_flatten_batch_data(self, batch_data):
-        """Test flattening a batch of records."""
+        """Test flattening a batch of records - smart mode keeps simple arrays inline."""
         result = tm.flatten(batch_data, name="records")
 
         assert_valid_result(result)
@@ -74,15 +73,10 @@ class TestFlattenFunction:
         assert first_record["name"] == "Record 1"
         assert first_record["value"] == "10"  # Values are cast to strings by default
 
-        # Should have tags table
-        tags_table = None
-        for table_name, table_data in result.tables.items():
-            if "tags" in table_name.lower():
-                tags_table = table_data
-                break
-
-        assert tags_table is not None
-        assert len(tags_table) == 20  # 2 tags per record * 10 records
+        # Smart mode keeps simple tag arrays inline
+        assert "tags" in first_record
+        assert isinstance(first_record["tags"], list)
+        assert len(first_record["tags"]) == 2  # Each record has 2 tags
 
     def test_flatten_with_id_field(self, simple_data):
         """Test flattening with natural ID field."""

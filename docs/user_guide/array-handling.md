@@ -1,19 +1,97 @@
 # Array Handling
 
-This guide covers Transmog's array processing capabilities, including the three handling modes and
+This guide covers Transmog's array processing capabilities, including the four handling modes and
 advanced array processing scenarios.
 
 ## Array Handling Overview
 
-Transmog provides three modes for handling arrays in nested data:
+Transmog provides four modes for handling arrays in nested data:
 
 | Mode | Description | Use Case |
 |------|-------------|----------|
-| `"separate"` | Extract arrays into child tables | Relational analysis, database storage |
-| `"inline"` | Keep arrays as JSON strings in main table | Document storage, minimal processing |
-| `"skip"` | Ignore arrays during processing | Focus on scalar data only |
+| `"smart"` | **Default**. Explode complex arrays, keep simple as native | Optimal for Parquet |
+| `"separate"` | Extract all arrays into child tables | Full relational analysis |
+| `"inline"` | Keep all arrays as JSON strings | Document storage |
+| `"skip"` | Ignore arrays completely | Focus on scalar data |
 
-## Separate Tables Mode (Default)
+## Smart Mode (Default)
+
+Smart mode intelligently determines the best way to handle each array based on its content:
+
+- **Simple arrays** (containing only primitives like strings, numbers, booleans) are preserved as native arrays
+- **Complex arrays** (containing objects, nested arrays, or mixed types) are exploded into child tables
+
+This provides optimal performance and storage, especially for Parquet output.
+
+### Basic Smart Mode Usage
+
+```python
+import transmog as tm
+
+data = {
+    "product": {
+        "name": "Laptop",
+        "tags": ["electronics", "computers", "portable"],  # Simple array
+        "reviews": [  # Complex array
+            {"rating": 5, "comment": "Excellent"},
+            {"rating": 4, "comment": "Good value"}
+        ]
+    }
+}
+
+# Default behavior uses smart mode
+result = tm.flatten(data, name="products")
+
+print("Main table:", result.main)
+# [
+#   {
+#     'product_name': 'Laptop',
+#     'product_tags': ['electronics', 'computers', 'portable'],  # Native array!
+#     '_id': 'generated_id'
+#   }
+# ]
+
+print("Reviews table:", result.tables["products_reviews"])
+# [
+#   {'rating': '5', 'comment': 'Excellent', '_parent_id': 'generated_id'},
+#   {'rating': '4', 'comment': 'Good value', '_parent_id': 'generated_id'}
+# ]
+```
+
+### When to Use Smart Mode
+
+Smart mode is ideal for:
+
+- **Parquet output** - native arrays are efficiently stored and queried
+- **Mixed data** - automatically handles both simple and complex arrays appropriately
+- **Performance** - avoids unnecessary table creation for simple arrays
+- **General use** - provides sensible defaults for most use cases
+
+### Smart Mode with Parquet
+
+```python
+import transmog as tm
+
+data = {
+    "user_id": 123,
+    "tags": ["premium", "verified"],  # Kept as native array
+    "preferences": ["email", "sms"],  # Kept as native array
+    "purchases": [  # Exploded to child table
+        {"item": "Widget", "price": 19.99},
+        {"item": "Gadget", "price": 29.99}
+    ]
+}
+
+result = tm.flatten(data, name="users")
+
+# Save to Parquet - native arrays are efficiently stored
+result.save("users.parquet")
+
+# Query in DuckDB or Polars can use native array operations
+# SELECT user_id FROM users WHERE 'premium' IN tags
+```
+
+## Separate Tables Mode
 
 ### Basic Array Extraction
 

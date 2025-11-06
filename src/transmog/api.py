@@ -22,7 +22,7 @@ initialize_io_features()
 
 # Type aliases for clarity
 DataInput = Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes]
-ArrayHandling = Literal["separate", "inline", "skip"]
+ArrayHandling = Literal["smart", "separate", "inline", "skip"]
 ErrorHandling = Literal["raise", "skip", "warn"]
 IdSource = Union[str, dict[str, str], None]
 
@@ -222,7 +222,7 @@ def flatten(
     parent_id_field: str = "_parent_id",
     add_timestamp: bool = False,
     # Array handling
-    arrays: ArrayHandling = "separate",
+    arrays: ArrayHandling = "smart",
     # Data options
     preserve_types: bool = False,
     skip_null: bool = True,
@@ -256,9 +256,11 @@ def flatten(
 
         Array Handling:
         arrays: How to handle arrays:
-               - "separate": Extract to child tables (default)
-               - "inline": Keep in main record as JSON
-               - "skip": Ignore arrays
+               - "smart": Intelligently handle - explode complex arrays,
+                 preserve simple primitive arrays as native arrays (default)
+               - "separate": Extract all arrays to child tables
+               - "inline": Keep all arrays in main record as JSON strings
+               - "skip": Ignore arrays completely
 
         Data Options:
         preserve_types: Keep original types instead of converting to strings
@@ -389,7 +391,7 @@ def flatten_stream(
     id_field: IdSource = None,
     parent_id_field: str = "_parent_id",
     add_timestamp: bool = False,
-    arrays: ArrayHandling = "separate",
+    arrays: ArrayHandling = "smart",
     preserve_types: bool = False,
     skip_null: bool = True,
     skip_empty: bool = True,
@@ -508,7 +510,9 @@ def _build_config(
     low_memory: bool,
 ) -> TransmogConfig:
     """Build internal configuration from simplified options."""
-    if arrays == "separate":
+    if arrays == "smart":
+        array_mode = ArrayMode.SMART
+    elif arrays == "separate":
         array_mode = ArrayMode.SEPARATE
     elif arrays == "inline":
         array_mode = ArrayMode.INLINE
