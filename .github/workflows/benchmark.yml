@@ -1,8 +1,6 @@
 name: Benchmark
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -12,7 +10,7 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        python-version: ['3.9']
+        python-version: ['3.9', '3.14']
 
     steps:
     - uses: actions/checkout@v3
