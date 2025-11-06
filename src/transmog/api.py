@@ -1,4 +1,4 @@
-"""Simplified public API for Transmog v1.1.0.
+"""Simplified public API for Transmog.
 
 This module provides the primary user-facing functions for flattening
 nested data structures into tabular formats.

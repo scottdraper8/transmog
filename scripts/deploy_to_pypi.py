@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Script to increment all version mentions, clean artifacts, and deploy to PyPI."""
+"""Script to clean artifacts, build package, and deploy to PyPI.
+
+This script is intended to be run by GitHub Actions after merging to main.
+Can also be run manually if needed.
+"""
 
 import os
 import platform
@@ -9,7 +13,6 @@ import shutil
 import subprocess  # nosec
 from pathlib import Path
 
-# Version bumping logic
 VERSION_FILES = [
     "src/transmog/__init__.py",
     "pyproject.toml",
@@ -70,31 +73,6 @@ def find_current_version():
     raise RuntimeError("Version string not found.")
 
 
-def bump_version(version):
-    """Return the next version string by incrementing the smallest component."""
-    major, minor, patch = map(int, version.split("."))
-    if patch < 9:
-        patch += 1
-    else:
-        patch = 0
-        if minor < 9:
-            minor += 1
-        else:
-            minor = 0
-            major += 1
-    return f"{major}.{minor}.{patch}"
-
-
-def update_versions(old_version, new_version):
-    """Replace old_version with new_version in all VERSION_FILES."""
-    for file in VERSION_FILES:
-        with open(file, encoding="utf-8") as f:
-            content = f.read()
-        content = content.replace(old_version, new_version)
-        with open(file, "w", encoding="utf-8") as f:
-            f.write(content)
-
-
 def ensure_tools():
     """Install or upgrade build and twine packages."""
     python_path = get_venv_python()
@@ -128,7 +106,7 @@ def build_and_upload():
 
 
 def create_and_push_git_tag(version):
-    """Create and push a git tag for the new version."""
+    """Create and push a git tag for the deployed version."""
     tag_name = f"v{version}"
     run_command(
         ["git", "tag", tag_name],
@@ -143,15 +121,16 @@ def create_and_push_git_tag(version):
 
 
 def main():
-    """Run the version upgrade, build, and deploy process."""
+    """Run the build and deploy process."""
+    version = find_current_version()
+    print(f"Deploying version {version} to PyPI...")
+
     ensure_tools()
-    old_version = find_current_version()
-    new_version = bump_version(old_version)
-    update_versions(old_version, new_version)
     clean_artifacts()
     build_and_upload()
-    create_and_push_git_tag(new_version)
-    print(f"Upgraded version: {old_version} -> {new_version}")
+    create_and_push_git_tag(version)
+
+    print(f"\n✓ Successfully deployed version {version} to PyPI")
 
 
 if __name__ == "__main__":

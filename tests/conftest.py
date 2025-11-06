@@ -1,5 +1,5 @@
 """
-Pytest configuration for Transmog v1.1.0 tests.
+Pytest configuration for Transmog tests.
 
 This file contains fixtures and configuration for testing the Transmog package.
 All tests use real functionality without mocks.
@@ -12,7 +12,6 @@ from typing import Any
 
 import pytest
 
-# Import the actual v1.1.0 API
 import transmog as tm
 
 # ---- Test Data Fixtures ----

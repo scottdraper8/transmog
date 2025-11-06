@@ -24,7 +24,7 @@ Verify the installation:
 
 ```python
 import transmog as tm
-print(tm.__version__)  # Should print "1.1.0"
+print(tm.__version__)
 ```
 
 ## 10 Minutes to Transmog

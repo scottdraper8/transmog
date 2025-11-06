@@ -1,5 +1,5 @@
 """
-Tests for CSV string handling in Transmog v1.1.0 API.
+Tests for CSV string handling in Transmog API.
 
 Tests the ability to process CSV data directly from strings without file I/O.
 """

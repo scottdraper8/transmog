@@ -20,7 +20,7 @@ except ImportError:
     try:
         from src.transmog import __version__ as release
     except ImportError:
-        release = "1.1.0"
+        release = "1.1.1"
 
 # -- General configuration ---------------------------------------------------
 extensions = [

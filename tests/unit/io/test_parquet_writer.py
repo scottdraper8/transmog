@@ -1,5 +1,5 @@
 """
-Tests for Parquet writer in Transmog v1.1.0.
+Tests for Parquet writer in Transmog.
 
 Tests Parquet file writing functionality, formats, and edge cases.
 """

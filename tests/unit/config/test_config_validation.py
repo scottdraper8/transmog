@@ -1,5 +1,5 @@
 """
-Tests for configuration validation in Transmog v1.1.0.
+Tests for configuration validation in Transmog.
 
 Tests validation of configuration parameters, type checking, and error handling.
 """

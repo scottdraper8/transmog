@@ -1,5 +1,5 @@
 """
-Tests for settings management in Transmog v1.1.0.
+Tests for settings management in Transmog.
 
 Tests settings configuration, environment variables, and global options.
 """

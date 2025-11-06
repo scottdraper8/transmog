@@ -1,5 +1,5 @@
 """
-Integration tests for Transmog v1.1.0.
+Integration tests for Transmog.
 
 Tests complete workflows and real-world scenarios.
 """

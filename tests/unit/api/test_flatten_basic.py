@@ -1,5 +1,5 @@
 """
-Tests for the main Transmog v1.1.0 API.
+Tests for the main Transmog API.
 
 Tests the primary user-facing functions: flatten, flatten_file, and flatten_stream.
 """

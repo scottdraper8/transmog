@@ -416,7 +416,7 @@ IdSource = Union[str, dict[str, str], None]
 
 ```python
 import transmog
-print(transmog.__version__)  # "1.1.0"
+print(transmog.__version__)
 ```
 
 **Available Functions**: Check what's available

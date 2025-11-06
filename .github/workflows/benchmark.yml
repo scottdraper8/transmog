@@ -33,7 +33,7 @@ jobs:
       run: |
         python -m pytest tests/performance/ -xvs
 
-    # Run the main benchmark script with correct arguments for v1.1.0
+    # Run the main benchmark script
     - name: Run standard benchmarks
       run: |
         mkdir -p benchmark_results

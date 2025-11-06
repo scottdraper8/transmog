@@ -1,5 +1,5 @@
 """
-Tests for error handling in Transmog v1.1.0.
+Tests for error handling in Transmog.
 
 Tests various error conditions and recovery strategies.
 """
