@@ -37,17 +37,18 @@ print(result.main)
 # Save to files in different formats
 result.save("products.csv")        # Single CSV file
 result.save("products.parquet")    # Single Parquet file
-result.save("output/", "json")     # Multiple JSON files in directory
+result.save("products.json")       # Single JSON file (only main table)
 ```
 
 ## Example: Nested JSON to Multiple Tables
 
-Transform complex nested data with arrays into relational tables:
+Transform complex nested data with arrays intelligently using smart mode (default):
 
 ```python
 data = {
     "user": {"name": "Alice", "email": "alice@example.com"},
-    "orders": [
+    "tags": ["premium", "verified"],  # Simple array - kept as native array
+    "orders": [  # Complex array - exploded to child table
         {"id": 101, "amount": 99.99, "items": ["laptop", "mouse"]},
         {"id": 102, "amount": 45.50, "items": ["keyboard"]}
     ]
@@ -55,22 +56,22 @@ data = {
 
 result = tm.flatten(data, name="customer")
 
-# Main table - flattened user data
+# Main table - flattened user data with native arrays
 print(result.main)
-# [{'user_name': 'Alice', 'user_email': 'alice@example.com', '_id': 'a1b2c3d4-e5f6-4789-abc1-23456789def0'}]
-
-# Child tables - arrays become separate tables with parent references
-print(result.tables["customer_orders"])
 # [
-#   {'id': '101', 'amount': '99.99', '_parent_id': 'a1b2c3d4-e5f6-4789-abc1-23456789def0', '_id': 'b2c3d4e5-f6a7-489b-bcd2-3456789def01'},
-#   {'id': '102', 'amount': '45.50', '_parent_id': 'a1b2c3d4-e5f6-4789-abc1-23456789def0', '_id': 'c3d4e5f6-a7b8-59cb-cde3-456789def012'}
+#   {
+#     'user_name': 'Alice',
+#     'user_email': 'alice@example.com',
+#     'tags': ['premium', 'verified'],  # Native array!
+#     '_id': 'a1b2c3d4-e5f6-4789-abc1-23456789def0'
+#   }
 # ]
 
-print(result.tables["customer_orders_items"])
+# Complex arrays become separate tables with parent references
+print(result.tables["customer_orders"])
 # [
-#   {'value': 'laptop', '_parent_id': 'b2c3d4e5-f6a7-489b-bcd2-3456789def01', '_id': 'd4e5f6a7-b8c9-6adc-def4-56789def0123'},
-#   {'value': 'mouse', '_parent_id': 'b2c3d4e5-f6a7-489b-bcd2-3456789def01', '_id': 'e5f6a7b8-c9da-7bed-ef45-6789def01234'},
-#   {'value': 'keyboard', '_parent_id': 'c3d4e5f6-a7b8-59cb-cde3-456789def012', '_id': 'f6a7b8c9-daeb-8cfe-f567-89def0123456'}
+#   {'id': '101', 'amount': '99.99', 'items': ['laptop', 'mouse'], '_parent_id': 'a1b2c3d4...', '_id': 'b2c3d4...'},
+#   {'id': '102', 'amount': '45.50', 'items': ['keyboard'], '_parent_id': 'a1b2c3d4...', '_id': 'c3d4...'}
 # ]
 
 # Access all tables in memory
@@ -106,8 +107,8 @@ result = tm.flatten(
     id_field="sku",            # Use existing field as primary ID
     parent_id_field="_parent",  # Customize parent reference field name
     add_timestamp=True,         # Add processing timestamp to records
-    # Array handling
-    arrays="inline",           # Keep arrays as JSON strings (not separate tables)
+    # Array handling (default is "smart")
+    arrays="separate",         # Extract all arrays to child tables (vs "smart", "inline", "skip")
     # Data processing
     preserve_types=True,       # Keep original data types (not strings)
     skip_null=False,           # Include null values in output

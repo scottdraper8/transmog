@@ -1,4 +1,4 @@
-"""Transmog v1.1.0 - Simple data flattening library.
+"""Transmog - Data flattening library.
 
 Transmog transforms complex nested data structures into flat, tabular formats
 while preserving relationships between parent and child records.
@@ -20,7 +20,7 @@ Advanced Usage:
     >>> processor.stream_process(...)
 """
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 # Import the simplified API
 from .api import FlattenResult, flatten, flatten_file, flatten_stream

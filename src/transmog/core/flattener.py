@@ -24,7 +24,7 @@ from ..error import (
 )
 from ..error.exceptions import ProcessingError
 from ..naming.conventions import handle_deeply_nested_path
-from ..types import FlattenMode
+from ..types import ArrayMode, FlattenMode
 
 # Define a return type variable for the decorator's generic type
 R = TypeVar("R")
@@ -84,6 +84,25 @@ class DepthTracker:
     def at_threshold(self) -> bool:
         """Check if currently at the threshold depth."""
         return self.current_depth >= self.threshold
+
+
+def _is_simple_array(array: list) -> bool:
+    """Check if an array contains only primitive values (not objects or arrays).
+
+    Args:
+        array: The array to check
+
+    Returns:
+        True if array contains only primitives (str, int, float, bool, None),
+        False otherwise
+    """
+    if not array:
+        return True
+
+    for item in array:
+        if isinstance(item, (dict, list, tuple)):
+            return False
+    return True
 
 
 def _process_value(
@@ -358,8 +377,7 @@ def _flatten_json_core(
     cast_to_string: bool,
     include_empty: bool,
     skip_null: bool,
-    skip_arrays: bool,
-    visit_arrays: bool,
+    array_mode: ArrayMode,
     parent_path: str,
     path_parts: Optional[list[str]],
     path_parts_optimization: bool,
@@ -379,8 +397,7 @@ def _flatten_json_core(
         cast_to_string: Whether to cast all values to strings
         include_empty: Whether to include empty values
         skip_null: Whether to skip null values
-        skip_arrays: Arrays are not skipped by default
-        visit_arrays: Whether to visit arrays
+        array_mode: How to handle arrays (SEPARATE, INLINE, or SKIP)
         parent_path: Current path from root
         path_parts: Components of the path for optimization
         path_parts_optimization: Whether to use path parts optimization
@@ -479,8 +496,7 @@ def _flatten_json_core(
                     cast_to_string=cast_to_string,
                     include_empty=include_empty,
                     skip_null=skip_null,
-                    skip_arrays=skip_arrays,
-                    visit_arrays=visit_arrays,
+                    array_mode=array_mode,
                     parent_path=current_path,
                     path_parts=nested_path_parts,
                     path_parts_optimization=path_parts_optimization,
@@ -526,33 +542,22 @@ def _flatten_json_core(
                     # Re-raise with formatted message
                     error_msg = format_error_message("processing", e, **error_context)
                     raise ProcessingError(error_msg) from e
-        elif isinstance(value, list) and visit_arrays:
-            # Process array based on configuration
-            if skip_arrays:
-                # Skip arrays when configured to do so
+        elif isinstance(value, list):
+            if array_mode == ArrayMode.SKIP:
                 continue
-
-            # For array values, either stringify them or process them
-            if all(not isinstance(item, (dict, list)) for item in value):
-                # Handle primitive arrays (no objects/arrays inside)
-                processed_value = _process_value_wrapper(
-                    value,
-                    cast_to_string,
-                    include_empty,
-                    skip_null,
-                    context=context,
-                    recovery_strategy=recovery_strategy,
-                )
-                if processed_value is not None:
-                    result[current_path] = processed_value
-                    # Mark key for removal if not in-place
+            elif array_mode == ArrayMode.SMART:
+                # Smart mode: preserve simple arrays, explode complex arrays
+                if _is_simple_array(value):
+                    # Simple array - keep as native array
+                    result[current_path] = value
+                else:
+                    # Complex array - will be exploded into child tables
                     if not in_place:
                         keys_to_remove.append(key)
-            else:
-                # Array contains complex objects, stringify it
+            elif array_mode == ArrayMode.INLINE:
                 processed_value = _process_value_wrapper(
                     value,
-                    cast_to_string=True,  # Force string for complex arrays
+                    cast_to_string=True,
                     include_empty=include_empty,
                     skip_null=skip_null,
                     context=context,
@@ -560,9 +565,9 @@ def _flatten_json_core(
                 )
                 if processed_value is not None:
                     result[current_path] = processed_value
-                    # Mark key for removal if not in-place
-                    if not in_place:
-                        keys_to_remove.append(key)
+            elif array_mode == ArrayMode.SEPARATE:
+                if not in_place:
+                    keys_to_remove.append(key)
         else:
             # For scalar values, process and add to the result
             processed_value = _process_value_wrapper(
@@ -595,8 +600,7 @@ def flatten_json(
     cast_to_string: Optional[bool] = None,
     include_empty: Optional[bool] = None,
     skip_null: Optional[bool] = None,
-    skip_arrays: bool = False,
-    visit_arrays: Optional[bool] = None,
+    array_mode: Optional[ArrayMode] = None,
     parent_path: str = "",
     path_parts: Optional[list[str]] = None,
     path_parts_optimization: Optional[bool] = None,
@@ -616,8 +620,7 @@ def flatten_json(
         cast_to_string: Whether to cast all values to strings
         include_empty: Whether to include empty string values
         skip_null: Whether to skip null values
-        skip_arrays: Whether to skip arrays
-        visit_arrays: Whether to visit array elements
+        array_mode: How to handle arrays (SEPARATE, INLINE, or SKIP)
         parent_path: Current path from root
         path_parts: Components of the path for optimization
         path_parts_optimization: Whether to use path parts optimization
@@ -650,8 +653,8 @@ def flatten_json(
     if skip_null is None:
         skip_null = getattr(settings, "skip_null", True)
 
-    if visit_arrays is None:
-        visit_arrays = getattr(settings, "visit_arrays", True)
+    if array_mode is None:
+        array_mode = ArrayMode.SEPARATE
 
     if path_parts_optimization is None:
         path_parts_optimization = getattr(settings, "path_parts_optimization", True)
@@ -720,8 +723,7 @@ def flatten_json(
             cast_to_string=cast_to_string,
             include_empty=include_empty,
             skip_null=skip_null,
-            skip_arrays=skip_arrays,
-            visit_arrays=visit_arrays,
+            array_mode=array_mode,
             parent_path=parent_path,
             path_parts=path_parts,
             path_parts_optimization=path_parts_optimization,
@@ -741,8 +743,7 @@ def flatten_json(
         cast_to_string=cast_to_string,
         include_empty=include_empty,
         skip_null=skip_null,
-        skip_arrays=skip_arrays,
-        visit_arrays=visit_arrays,
+        array_mode=array_mode,
         parent_path=parent_path,
         path_parts=path_parts,
         path_parts_optimization=path_parts_optimization,

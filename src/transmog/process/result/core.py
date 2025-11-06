@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Any, Optional, Union
 
 from ...types.base import JsonDict
-from ...types.result_types import ConversionModeType, ResultInterface
+from ...types.result_types import ConversionModeType
 
 
 class ConversionMode(Enum):
@@ -15,13 +15,18 @@ class ConversionMode(Enum):
     MEMORY_EFFICIENT = "memory_efficient"  # Discard intermediate data after conversion
 
 
-class ProcessingResult(ResultInterface):
+class ProcessingResult:
     """Container for processing results including main and child tables.
 
     The ProcessingResult manages the outputs of processing, providing
     access to the main table and child tables, as well as methods to
     convert the data to different formats or save to files.
     """
+
+    main_table: list[JsonDict]
+    child_tables: dict[str, list[JsonDict]]
+    entity_name: str
+    source_info: dict[str, Any]
 
     def __init__(
         self,
@@ -397,52 +402,3 @@ class ProcessingResult(ResultInterface):
             f"main_records={main_count}, child_records={child_count}, "
             f"child_tables={len(self.child_tables)})"
         )
-
-    def to_parquet_bytes(self, **kwargs: Any) -> dict[str, bytes]:
-        """Convert to Parquet bytes."""
-        from .converters import ResultConverters
-
-        converter = ResultConverters(self)
-        return converter.to_parquet_bytes(**kwargs)
-
-    def to_csv_bytes(self, **kwargs: Any) -> dict[str, bytes]:
-        """Convert to CSV bytes."""
-        from .converters import ResultConverters
-
-        converter = ResultConverters(self)
-        return converter.to_csv_bytes(**kwargs)
-
-    def to_json_bytes(self, **kwargs: Any) -> dict[str, bytes]:
-        """Convert to JSON bytes."""
-        from .converters import ResultConverters
-
-        converter = ResultConverters(self)
-        return converter.to_json_bytes(**kwargs)
-
-    def write(self, format_name: str, base_path: str, **kwargs: Any) -> dict[str, str]:
-        """Write data to files in the specified format."""
-        from .writers import ResultWriters
-
-        writer = ResultWriters(self)
-        return writer.write(format_name, base_path, **kwargs)
-
-    def write_all_parquet(self, base_path: str, **kwargs: Any) -> dict[str, str]:
-        """Write data to Parquet files."""
-        from .writers import ResultWriters
-
-        writer = ResultWriters(self)
-        return writer.write_all_parquet(base_path, **kwargs)
-
-    def write_all_json(self, base_path: str, **kwargs: Any) -> dict[str, str]:
-        """Write data to JSON files."""
-        from .writers import ResultWriters
-
-        writer = ResultWriters(self)
-        return writer.write_all_json(base_path, **kwargs)
-
-    def write_all_csv(self, base_path: str, **kwargs: Any) -> dict[str, str]:
-        """Write data to CSV files."""
-        from .writers import ResultWriters
-
-        writer = ResultWriters(self)
-        return writer.write_all_csv(base_path, **kwargs)

@@ -16,6 +16,7 @@ from transmog.config.settings import (
     load_profile as load_profile,
 )
 from transmog.error import ConfigurationError
+from transmog.types.base import ArrayMode
 from transmog.validation import (
     ParameterValidator,
     validate_config_parameters,
@@ -56,10 +57,7 @@ class ProcessingConfig:
     max_nesting_depth: Optional[int] = None
     max_depth: int = 100  # Maximum recursion depth
     path_parts_optimization: bool = True
-    visit_arrays: bool = True
-    keep_arrays: bool = (
-        False  # Whether to keep arrays in main table after exploding into child tables
-    )
+    array_mode: ArrayMode = ArrayMode.SMART
     batch_size: int = 1000
     processing_mode: ProcessingMode = ProcessingMode.STANDARD
     # Validation settings
@@ -181,7 +179,7 @@ class TransmogConfig:
         cast_to_string: Optional[bool] = None,
         include_empty: Optional[bool] = None,
         skip_null: Optional[bool] = None,
-        visit_arrays: Optional[bool] = None,
+        array_mode: Optional[ArrayMode] = None,
         nested_threshold: Optional[int] = None,
         id_field: Optional[str] = None,
         parent_field: Optional[str] = None,
@@ -207,7 +205,7 @@ class TransmogConfig:
             cast_to_string: Whether to cast all values to strings
             include_empty: Whether to include empty values
             skip_null: Whether to skip null values
-            visit_arrays: Whether to process arrays into child tables
+            array_mode: How to handle arrays (SEPARATE, INLINE, or SKIP)
             nested_threshold: Threshold for deeply nested paths
             id_field: ID field name for metadata
             parent_field: Parent ID field name for metadata
@@ -252,9 +250,9 @@ class TransmogConfig:
         if skip_null is not None:
             self.processing = dataclasses.replace(self.processing, skip_null=skip_null)
 
-        if visit_arrays is not None:
+        if array_mode is not None:
             self.processing = dataclasses.replace(
-                self.processing, visit_arrays=visit_arrays
+                self.processing, array_mode=array_mode
             )
 
         if nested_threshold is not None:
@@ -327,7 +325,7 @@ class TransmogConfig:
                 processing_mode=ProcessingMode.LOW_MEMORY,
                 batch_size=100,
                 path_parts_optimization=True,
-                visit_arrays=True,
+                array_mode=ArrayMode.SMART,
             ),
             cache_config=CacheConfig(
                 enabled=True,
@@ -344,7 +342,7 @@ class TransmogConfig:
                 processing_mode=ProcessingMode.HIGH_PERFORMANCE,
                 batch_size=10000,
                 path_parts_optimization=True,
-                visit_arrays=True,
+                array_mode=ArrayMode.SMART,
             ),
             cache_config=CacheConfig(
                 enabled=True,
@@ -740,25 +738,24 @@ class TransmogConfig:
     def disable_arrays(self) -> "TransmogConfig":
         """Configure to skip array processing and keep arrays as JSON strings.
 
-        This setting is useful when arrays should be kept as single fields rather
-        than creating child tables.
+        This setting is useful when arrays should be completely ignored during
+        processing.
 
         Returns:
             Updated TransmogConfig with array processing disabled
         """
-        return self.with_processing(visit_arrays=False)
+        return self.with_processing(array_mode=ArrayMode.SKIP)
 
-    def keep_arrays(self) -> "TransmogConfig":
-        """Configure to keep arrays in the main table after processing.
+    def keep_arrays_inline(self) -> "TransmogConfig":
+        """Configure to keep arrays as JSON strings in the main table.
 
-        When enabled, arrays will be processed into child tables but will also
-        remain in the main table. This can be useful for backward compatibility
-        or when the same array data is needed in both forms.
+        When enabled, arrays will be converted to JSON strings and kept in the
+        main table instead of being extracted into separate child tables.
 
         Returns:
-            Updated TransmogConfig with arrays kept in main table after processing
+            Updated TransmogConfig with arrays kept inline as JSON strings
         """
-        return self.with_processing(keep_arrays=True)
+        return self.with_processing(array_mode=ArrayMode.INLINE)
 
     def use_string_format(self) -> "TransmogConfig":
         """Configure all fields to be cast to strings.

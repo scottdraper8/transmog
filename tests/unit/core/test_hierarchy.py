@@ -33,8 +33,12 @@ class TestProcessStructure:
 
     def test_process_nested_structure(self, complex_nested_data):
         """Test processing complex nested structure."""
+        from transmog.types.base import ArrayMode
+
         main_record, child_tables = process_structure(
-            complex_nested_data, entity_name="complex_test", visit_arrays=True
+            complex_nested_data,
+            entity_name="complex_test",
+            array_mode=ArrayMode.SEPARATE,
         )
 
         assert main_record is not None
@@ -49,8 +53,10 @@ class TestProcessStructure:
 
     def test_process_structure_with_arrays(self, array_data):
         """Test processing structure with arrays."""
+        from transmog.types.base import ArrayMode
+
         main_record, child_tables = process_structure(
-            array_data, entity_name="array_test", visit_arrays=True
+            array_data, entity_name="array_test", array_mode=ArrayMode.SEPARATE
         )
 
         assert main_record is not None
@@ -65,8 +71,10 @@ class TestProcessStructure:
 
     def test_process_structure_skip_arrays(self, array_data):
         """Test processing structure with arrays skipped."""
+        from transmog.types.base import ArrayMode
+
         main_record, child_tables = process_structure(
-            array_data, entity_name="skip_test", visit_arrays=False
+            array_data, entity_name="skip_test", array_mode=ArrayMode.SKIP
         )
 
         assert main_record is not None
@@ -140,8 +148,10 @@ class TestProcessRecordBatch:
         """Test processing batch with arrays."""
         batch = [array_data] * 3  # Create batch of 3 identical records
 
+        from transmog.types.base import ArrayMode
+
         main_records, child_tables = process_record_batch(
-            batch, entity_name="array_batch", visit_arrays=True
+            batch, entity_name="array_batch", array_mode=ArrayMode.SEPARATE
         )
 
         assert len(main_records) == 3
@@ -197,8 +207,10 @@ class TestStreamProcessRecords:
         """Test streaming processing with arrays."""
         batch = [array_data] * 2
 
+        from transmog.types.base import ArrayMode
+
         main_records, child_generator = stream_process_records(
-            batch, entity_name="stream_array", visit_arrays=True
+            batch, entity_name="stream_array", array_mode=ArrayMode.SEPARATE
         )
 
         assert len(main_records) == 2

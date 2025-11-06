@@ -57,8 +57,7 @@ class ConfigParameterBuilder:
             "path_parts_optimization": self._get_processing_param(
                 "path_parts_optimization", True
             ),
-            "visit_arrays": self._get_processing_param("visit_arrays", True),
-            "keep_arrays": self._get_processing_param("keep_arrays", False),
+            "array_mode": self._get_processing_param("array_mode", None),
             "max_depth": self._get_processing_param("max_depth", 100),
             # Metadata parameters
             "id_field": self._get_metadata_param("id_field", "__transmog_id"),
@@ -183,7 +182,8 @@ class ConfigParameterBuilder:
         if override is not None:
             return int(override)
 
-        return self._get_processing_param("batch_size", 1000)
+        batch_size = self._get_processing_param("batch_size", 1000)
+        return int(batch_size)
 
     def _get_naming_param(self, param: str, default: Any) -> Any:
         """Get parameter from naming config with fallback."""
@@ -192,21 +192,16 @@ class ConfigParameterBuilder:
             return getattr(naming_config, param)
         return default
 
-    def _get_processing_param(self, param: str, default: int) -> int:
-        """Get parameter from processing config with validation and error reporting.
+    def _get_processing_param(self, param: str, default: Any) -> Any:
+        """Get parameter from processing config with fallback.
 
         Args:
             param: Parameter name to extract
             default: Default value if parameter not found or None
 
         Returns:
-            Validated integer parameter
-
-        Raises:
-            ConfigurationError: If parameter exists but cannot be converted to int
+            Parameter value from processing config or default
         """
-        from ..error import ConfigurationError
-
         processing_config = getattr(self.config, "processing", None)
         if not processing_config or not hasattr(processing_config, param):
             return default
@@ -215,18 +210,7 @@ class ConfigParameterBuilder:
         if value is None:
             return default
 
-        if isinstance(value, int):
-            return value
-
-        # Attempt conversion with clear error reporting
-        try:
-            converted_value = int(value)
-            return converted_value
-        except (ValueError, TypeError) as e:
-            raise ConfigurationError(
-                f"Invalid configuration parameter '{param}': "
-                f"cannot convert {value!r} (type: {type(value).__name__}) to int: {e}"
-            ) from e
+        return value
 
     def _get_metadata_param(self, param: str, default: Any) -> Any:
         """Get parameter from metadata config with fallback."""

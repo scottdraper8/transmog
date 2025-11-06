@@ -20,12 +20,31 @@ from transmog.error import (
 )
 from transmog.naming.conventions import sanitize_name
 from transmog.naming.utils import get_table_name_for_array
-from transmog.types.base import JsonDict
+from transmog.types.base import ArrayMode, JsonDict
 
 # Type aliases for improved code readability
 JsonList = list[dict[str, Any]]
 ExtractResult = dict[str, list[dict[str, Any]]]
 StreamExtractResult = Generator[tuple[str, dict[str, Any]], None, None]
+
+
+def _is_simple_array(array: list) -> bool:
+    """Check if an array contains only primitive values.
+
+    Args:
+        array: The array to check
+
+    Returns:
+        True if array contains only primitives (str, int, float, bool, None),
+        False otherwise
+    """
+    if not array:
+        return True
+
+    for item in array:
+        if isinstance(item, (dict, list, tuple)):
+            return False
+    return True
 
 
 def _extract_arrays_impl(
@@ -51,6 +70,7 @@ def _extract_arrays_impl(
     id_field_patterns: Optional[list[str]] = None,
     id_field_mapping: Optional[dict[str, str]] = None,
     force_transmog_id: bool = False,
+    array_mode: ArrayMode = ArrayMode.SEPARATE,
 ) -> Generator[tuple[str, dict[str, Any]], None, None]:
     """Implementation helper for array extraction.
 
@@ -83,6 +103,7 @@ def _extract_arrays_impl(
         id_field_patterns: List of field names to check for natural IDs
         id_field_mapping: Optional mapping of paths to specific ID fields
         force_transmog_id: If True, always add transmog ID
+        array_mode: How to handle arrays (SMART, SEPARATE, INLINE, or SKIP)
 
     Yields:
         Tuples of (table_name, record) for each extracted record
@@ -115,6 +136,10 @@ def _extract_arrays_impl(
 
         # Array processing
         if isinstance(value, list) and value:
+            # In smart mode, skip simple arrays (they're kept inline by flattener)
+            if array_mode == ArrayMode.SMART and _is_simple_array(value):
+                continue
+
             # Generate table name with proper sanitization
             sanitized_key = sanitize_name(key, separator)
             sanitized_entity = sanitize_name(entity_name) if entity_name else ""
@@ -178,6 +203,7 @@ def _extract_arrays_impl(
                             nested_threshold=nested_threshold,
                             mode="streaming" if streaming_mode else "standard",
                             recovery_strategy=recovery_strategy,
+                            array_mode=array_mode,
                         )
 
                         # Add metadata fields to the record
@@ -243,6 +269,7 @@ def _extract_arrays_impl(
                             id_field_patterns=id_field_patterns,
                             id_field_mapping=id_field_mapping,
                             force_transmog_id=force_transmog_id,
+                            array_mode=array_mode,
                         )
                         # Process nested arrays one by one
                         yield from nested_generator
@@ -330,6 +357,7 @@ def _extract_arrays_impl(
                 id_field_patterns=id_field_patterns,
                 id_field_mapping=id_field_mapping,
                 force_transmog_id=force_transmog_id,
+                array_mode=array_mode,
             )
             # Process nested arrays one by one
             yield from nested_generator
@@ -358,6 +386,7 @@ def extract_arrays(
     id_field_patterns: Optional[list[str]] = None,
     id_field_mapping: Optional[dict[str, str]] = None,
     force_transmog_id: bool = False,
+    array_mode: ArrayMode = ArrayMode.SEPARATE,
 ) -> ExtractResult:
     """Extract nested arrays into flattened tables.
 
@@ -388,6 +417,7 @@ def extract_arrays(
         id_field_patterns: List of field names to check for natural IDs
         id_field_mapping: Optional mapping of paths to specific ID fields
         force_transmog_id: If True, always add transmog ID
+        array_mode: How to handle arrays (SMART, SEPARATE, INLINE, or SKIP)
 
     Returns:
         Dictionary mapping table names to lists of records
@@ -426,6 +456,7 @@ def extract_arrays(
         id_field_patterns=id_field_patterns,
         id_field_mapping=id_field_mapping,
         force_transmog_id=force_transmog_id,
+        array_mode=array_mode,
     ):
         # Accumulate records by table
         if table_name not in result:
@@ -457,6 +488,7 @@ def stream_extract_arrays(
     id_field_patterns: Optional[list[str]] = None,
     id_field_mapping: Optional[dict[str, str]] = None,
     force_transmog_id: bool = False,
+    array_mode: ArrayMode = ArrayMode.SEPARATE,
 ) -> StreamExtractResult:
     """Extract nested arrays into a stream of records for memory-efficient processing.
 
@@ -487,6 +519,7 @@ def stream_extract_arrays(
         id_field_patterns: List of field names to check for natural IDs
         id_field_mapping: Optional mapping of paths to specific ID fields
         force_transmog_id: If True, always add transmog ID
+        array_mode: How to handle arrays (SMART, SEPARATE, INLINE, or SKIP)
 
     Yields:
         Tuples of (table_name, record) for each extracted record
@@ -524,4 +557,5 @@ def stream_extract_arrays(
         id_field_patterns=id_field_patterns,
         id_field_mapping=id_field_mapping,
         force_transmog_id=force_transmog_id,
+        array_mode=array_mode,
     )

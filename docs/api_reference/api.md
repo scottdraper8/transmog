@@ -21,7 +21,7 @@ flatten(
     parent_id_field: str = "_parent_id",
     add_timestamp: bool = False,
     # Array handling
-    arrays: Literal["separate", "inline", "skip"] = "separate",
+    arrays: Literal["smart", "separate", "inline", "skip"] = "smart",
     # Data options
     preserve_types: bool = False,
     skip_null: bool = True,
@@ -57,9 +57,10 @@ flatten(
 
 **Array Handling:**
 
-- **arrays** (*Literal["separate", "inline", "skip"]*, default="separate"): How to process arrays:
-  - "separate": Extract arrays into child tables (default)
-  - "inline": Keep arrays as JSON strings in main table
+- **arrays** (*Literal["smart", "separate", "inline", "skip"]*, default="smart"): How to process arrays:
+  - "smart": Intelligently handle arrays - explode complex arrays, preserve simple arrays as native arrays (default)
+  - "separate": Extract all arrays into child tables
+  - "inline": Keep all arrays as JSON strings in main table
   - "skip": Ignore arrays completely
 
 **Data Options:**
@@ -415,7 +416,7 @@ IdSource = Union[str, dict[str, str], None]
 
 ```python
 import transmog
-print(transmog.__version__)  # "1.1.0"
+print(transmog.__version__)
 ```
 
 **Available Functions**: Check what's available

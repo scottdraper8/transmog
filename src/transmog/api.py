@@ -1,4 +1,4 @@
-"""Simplified public API for Transmog v1.1.0.
+"""Simplified public API for Transmog.
 
 This module provides the primary user-facing functions for flattening
 nested data structures into tabular formats.
@@ -12,9 +12,9 @@ from typing import Any, Literal, Optional, Union
 from transmog.config import MetadataConfig, ProcessingMode, TransmogConfig
 from transmog.io import initialize_io_features
 from transmog.process import Processor
-from transmog.process.result.core import ProcessingResult as _ProcessingResult
+from transmog.process.result import ProcessingResult as _ProcessingResult
 from transmog.process.streaming import stream_process
-from transmog.types.base import JsonDict
+from transmog.types.base import ArrayMode, JsonDict
 from transmog.validation import validate_api_parameters
 
 # Initialize IO features to register writers
@@ -22,7 +22,7 @@ initialize_io_features()
 
 # Type aliases for clarity
 DataInput = Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes]
-ArrayHandling = Literal["separate", "inline", "skip"]
+ArrayHandling = Literal["smart", "separate", "inline", "skip"]
 ErrorHandling = Literal["raise", "skip", "warn"]
 IdSource = Union[str, dict[str, str], None]
 
@@ -222,7 +222,7 @@ def flatten(
     parent_id_field: str = "_parent_id",
     add_timestamp: bool = False,
     # Array handling
-    arrays: ArrayHandling = "separate",
+    arrays: ArrayHandling = "smart",
     # Data options
     preserve_types: bool = False,
     skip_null: bool = True,
@@ -256,9 +256,11 @@ def flatten(
 
         Array Handling:
         arrays: How to handle arrays:
-               - "separate": Extract to child tables (default)
-               - "inline": Keep in main record as JSON
-               - "skip": Ignore arrays
+               - "smart": Intelligently handle - explode complex arrays,
+                 preserve simple primitive arrays as native arrays (default)
+               - "separate": Extract all arrays to child tables
+               - "inline": Keep all arrays in main record as JSON strings
+               - "skip": Ignore arrays completely
 
         Data Options:
         preserve_types: Keep original types instead of converting to strings
@@ -389,7 +391,7 @@ def flatten_stream(
     id_field: IdSource = None,
     parent_id_field: str = "_parent_id",
     add_timestamp: bool = False,
-    arrays: ArrayHandling = "separate",
+    arrays: ArrayHandling = "smart",
     preserve_types: bool = False,
     skip_null: bool = True,
     skip_empty: bool = True,
@@ -508,9 +510,16 @@ def _build_config(
     low_memory: bool,
 ) -> TransmogConfig:
     """Build internal configuration from simplified options."""
-    # Apply array handling
-    visit_arrays = arrays != "skip"
-    keep_arrays = arrays == "inline"
+    if arrays == "smart":
+        array_mode = ArrayMode.SMART
+    elif arrays == "separate":
+        array_mode = ArrayMode.SEPARATE
+    elif arrays == "inline":
+        array_mode = ArrayMode.INLINE
+    elif arrays == "skip":
+        array_mode = ArrayMode.SKIP
+    else:
+        raise ValueError(f"Invalid arrays value: {arrays}")
 
     # Apply error handling
     if errors == "raise":
@@ -561,16 +570,15 @@ def _build_config(
         cast_to_string=not preserve_types,
         include_empty=not skip_empty,
         skip_null=skip_null,
-        visit_arrays=visit_arrays,
+        array_mode=array_mode,
         batch_size=batch_size,
         recovery_strategy=strategy,
         allow_malformed_data=allow_malformed,
     )
 
-    # Set processing mode and keep_arrays which don't have convenience parameters
+    # Set processing mode
     config.processing.processing_mode = (
         ProcessingMode.LOW_MEMORY if low_memory else ProcessingMode.STANDARD
     )
-    config.processing.keep_arrays = keep_arrays
 
     return config

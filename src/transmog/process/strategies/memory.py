@@ -5,6 +5,7 @@ from typing import Any, Optional
 from ...core.hierarchy import process_records_in_single_pass
 from ...core.metadata import get_current_timestamp
 from ...error import error_context
+from ...types.base import ArrayMode
 from ..result import ProcessingResult
 from .base import ProcessingStrategy
 
@@ -79,7 +80,7 @@ class InMemoryStrategy(ProcessingStrategy):
         """
         # Extract recovery strategy if present
         recovery_strategy = params.get("recovery_strategy")
-        keep_arrays = params.get("keep_arrays", False)
+        array_mode = params.get("array_mode", ArrayMode.SEPARATE)
 
         # Get common parameters
         transmog_time = params.get("transmog_time")
@@ -90,7 +91,6 @@ class InMemoryStrategy(ProcessingStrategy):
         id_field = params.get("id_field", "__transmog_id")
         parent_field = params.get("parent_field", "__parent_transmog_id")
         time_field = params.get("time_field", "__transmog_datetime")
-        visit_arrays = params.get("visit_arrays", True)
         nested_threshold = params.get("nested_threshold", 4)
         default_id_field = params.get("default_id_field")
         id_generation_strategy = params.get("id_generation_strategy")
@@ -111,13 +111,12 @@ class InMemoryStrategy(ProcessingStrategy):
             id_field=id_field,
             parent_field=parent_field,
             time_field=time_field,
-            visit_arrays=visit_arrays,
+            array_mode=array_mode,
             nested_threshold=nested_threshold,
             default_id_field=default_id_field,
             id_generation_strategy=id_generation_strategy,
             recovery_strategy=recovery_strategy,
             max_depth=max_depth,
-            keep_arrays=keep_arrays,
             id_field_patterns=id_field_patterns,
             id_field_mapping=id_field_mapping,
             force_transmog_id=force_transmog_id,

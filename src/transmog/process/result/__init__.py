@@ -21,6 +21,11 @@ class ProcessingResult(CoreProcessingResult):
     result.py file.
     """
 
+    _converters: "ResultConverters"
+    _writers: "ResultWriters"
+    _streaming: "ResultStreaming"
+    _utils: "ResultUtils"
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize ProcessingResult with all components."""
         super().__init__(*args, **kwargs)

@@ -218,14 +218,17 @@ class TestFlattenJsonEdgeCases:
         assert len(result) > 100  # Should have many flattened fields
 
     def test_flatten_with_list_values(self):
-        """Test flattening with list values."""
+        """Test flattening with list values in INLINE mode."""
+        from transmog.types import ArrayMode
+
         data = {"simple_list": [1, 2, 3], "nested": {"list": ["a", "b", "c"]}}
 
-        result = flatten_json(data, separator="_")
+        result = flatten_json(data, separator="_", array_mode=ArrayMode.INLINE)
 
         assert isinstance(result, dict)
-        # Lists might be converted to JSON strings or handled specially
-        assert len(result) >= 1
+        assert len(result) == 2
+        assert "simple_list" in result
+        assert "nested_list" in result
 
     def test_flatten_boolean_and_none_handling(self):
         """Test flattening with boolean and None values."""

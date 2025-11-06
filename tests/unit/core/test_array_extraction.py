@@ -194,6 +194,30 @@ class TestArrayExtraction:
 class TestArrayHandlingModes:
     """Test different array handling modes."""
 
+    def test_arrays_smart_mode(self):
+        """Test arrays='smart' mode (default)."""
+        data = {
+            "id": 1,
+            "name": "Test",
+            "tags": ["tag1", "tag2"],  # Simple array - should be kept inline
+            "items": [
+                {"id": 1, "value": "a"},
+                {"id": 2, "value": "b"},
+            ],  # Complex array - should be exploded
+        }
+
+        result = tm.flatten(data, name="test", arrays="smart")
+
+        # Simple array should be kept in main record as native array
+        main_record = result.main[0]
+        assert "tags" in main_record
+        assert isinstance(main_record["tags"], list)
+        assert main_record["tags"] == ["tag1", "tag2"]
+
+        # Complex array should create child tables
+        assert len(result.tables) > 0
+        assert "test_items" in result.tables
+
     def test_arrays_separate_mode(self):
         """Test arrays='separate' mode."""
         data = {"id": 1, "name": "Test", "tags": ["tag1", "tag2"]}
@@ -246,9 +270,17 @@ class TestArrayHandlingModes:
             "items": [{"id": 1, "value": "a"}, {"id": 2, "value": "b"}],
         }
 
+        result_smart = tm.flatten(data, name="test", arrays="smart")
         result_separate = tm.flatten(data, name="test", arrays="separate")
         result_inline = tm.flatten(data, name="test", arrays="inline")
         result_skip = tm.flatten(data, name="test", arrays="skip")
+
+        # Smart should keep simple arrays inline, explode complex arrays
+        assert "tags" in result_smart.main[0]
+        assert isinstance(result_smart.main[0]["tags"], list)
+        assert "test_items" in result_smart.tables
+
+        # Separate should have child tables
 
         # Separate should have child tables
         assert len(result_separate.tables) > 0

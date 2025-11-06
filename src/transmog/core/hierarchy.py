@@ -4,7 +4,6 @@ Provides functions to process complete JSON structures with
 parent-child relationship preservation.
 """
 
-import json
 import logging
 from collections.abc import Generator
 from datetime import datetime
@@ -22,7 +21,7 @@ from transmog.core.metadata import (
     annotate_with_metadata,
     generate_deterministic_id,
 )
-from transmog.types.base import ArrayDict, FlatDict, JsonDict
+from transmog.types.base import ArrayDict, ArrayMode, FlatDict, JsonDict
 
 # Type aliases
 ProcessResult = tuple[FlatDict, ArrayDict]
@@ -50,11 +49,10 @@ def process_structure(
     id_field: str = "__transmog_id",
     parent_field: str = "__parent_transmog_id",
     time_field: str = "__transmog_datetime",
-    visit_arrays: bool = True,
+    array_mode: ArrayMode = ArrayMode.SEPARATE,
     streaming: bool = False,
     recovery_strategy: Optional[Any] = None,
     max_depth: int = 100,
-    keep_arrays: bool = False,
     id_field_patterns: Optional[list[str]] = None,
     id_field_mapping: Optional[dict[str, str]] = None,
     force_transmog_id: bool = False,
@@ -83,11 +81,10 @@ def process_structure(
         id_field: ID field name
         parent_field: Parent ID field name
         time_field: Timestamp field name
-        visit_arrays: Whether to visit and process arrays
+        array_mode: How to handle arrays (SEPARATE, INLINE, or SKIP)
         streaming: Whether to return a generator for child tables
         recovery_strategy: Strategy for handling errors
         max_depth: Maximum recursion depth for nested structures
-        keep_arrays: Whether to keep arrays in the main table after processing
         id_field_patterns: List of field names to check for natural IDs
         id_field_mapping: Optional mapping of paths to specific ID fields
         force_transmog_id: If True, always add transmog ID
@@ -120,31 +117,19 @@ def process_structure(
         else:
             return empty_result, {}
 
-    # Flatten the object
     flattened_obj = flatten_json(
         data,
         parent_path=parent_path,
         separator=separator,
         cast_to_string=cast_to_string,
         include_empty=include_empty,
-        skip_arrays=not keep_arrays,  # If keeping arrays, don't skip them
+        array_mode=array_mode,
         skip_null=skip_null,
         nested_threshold=nested_threshold,
         mode="streaming",
         recovery_strategy=recovery_strategy,
         max_depth=max_depth,
     )
-
-    # Create a copy of the original data for array extraction if keeping arrays
-    if keep_arrays:
-        # Copy arrays from original data to flattened output
-        for key, value in data.items():
-            if isinstance(value, (list, dict)) and key not in flattened_obj:
-                # If it's a complex type and not already flattened, add it to output
-                if cast_to_string:
-                    flattened_obj[key] = json.dumps(value)
-                else:
-                    flattened_obj[key] = value
 
     # Resolve source field for deterministic ID generation
     source_field = None
@@ -184,8 +169,7 @@ def process_structure(
         force_transmog_id=force_transmog_id,
     )
 
-    # Skip array processing if not needed
-    if not visit_arrays:
+    if array_mode == ArrayMode.SKIP or array_mode == ArrayMode.INLINE:
         if streaming:
 
             def empty_generator() -> Generator[tuple[str, dict[str, Any]], None, None]:
@@ -196,7 +180,6 @@ def process_structure(
         else:
             return annotated_obj, {}
 
-    # Get the ID for the parent to pass to child records - use natural ID if available
     parent_id_field, parent_id_value = get_record_id(
         annotated_obj,
         id_field_patterns=id_field_patterns,
@@ -238,6 +221,7 @@ def process_structure(
             id_field_patterns=id_field_patterns,
             id_field_mapping=id_field_mapping,
             force_transmog_id=force_transmog_id,
+            array_mode=array_mode,
         )
     else:
         # Batch extraction version
@@ -267,6 +251,7 @@ def process_structure(
             id_field_patterns=id_field_patterns,
             id_field_mapping=id_field_mapping,
             force_transmog_id=force_transmog_id,
+            array_mode=array_mode,
         )
 
         # Log what we found
@@ -292,13 +277,12 @@ def process_record_batch(
     id_field: str = "__transmog_id",
     parent_field: str = "__parent_transmog_id",
     time_field: str = "__transmog_datetime",
-    visit_arrays: bool = True,
+    array_mode: ArrayMode = ArrayMode.SEPARATE,
     nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     recovery_strategy: Optional[Any] = None,
     max_depth: int = 100,
-    keep_arrays: bool = False,
     batch_size: int = 100,
     id_field_patterns: Optional[list[str]] = None,
     id_field_mapping: Optional[dict[str, str]] = None,
@@ -320,14 +304,13 @@ def process_record_batch(
         id_field: ID field name
         parent_field: Parent ID field name
         time_field: Timestamp field name
-        visit_arrays: Whether to visit and process arrays
+        array_mode: How to handle arrays (SEPARATE, INLINE, or SKIP)
         nested_threshold: Threshold for when to consider a path deeply nested
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
         id_generation_strategy: Custom function for ID generation
         recovery_strategy: Strategy for error recovery
         max_depth: Maximum recursion depth for nested structures
-        keep_arrays: Whether to keep arrays in the main table after processing
         batch_size: Number of records to process in a single batch
         id_field_patterns: List of field names to check for natural IDs
         id_field_mapping: Optional mapping of paths to specific ID fields
@@ -348,13 +331,12 @@ def process_record_batch(
         id_field=id_field,
         parent_field=parent_field,
         time_field=time_field,
-        visit_arrays=visit_arrays,
+        array_mode=array_mode,
         nested_threshold=nested_threshold,
         default_id_field=default_id_field,
         id_generation_strategy=id_generation_strategy,
         recovery_strategy=recovery_strategy,
         max_depth=max_depth,
-        keep_arrays=keep_arrays,
         id_field_patterns=id_field_patterns,
         id_field_mapping=id_field_mapping,
         force_transmog_id=force_transmog_id,
@@ -372,13 +354,12 @@ def process_records_in_single_pass(
     id_field: str = "__transmog_id",
     parent_field: str = "__parent_transmog_id",
     time_field: str = "__transmog_datetime",
-    visit_arrays: bool = True,
+    array_mode: ArrayMode = ArrayMode.SEPARATE,
     nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     recovery_strategy: Optional[Any] = None,
     max_depth: int = 100,
-    keep_arrays: bool = False,
     id_field_patterns: Optional[list[str]] = None,
     id_field_mapping: Optional[dict[str, str]] = None,
     force_transmog_id: bool = False,
@@ -399,7 +380,7 @@ def process_records_in_single_pass(
         id_field: ID field name
         parent_field: Parent ID field name
         time_field: Timestamp field name
-        visit_arrays: Whether to visit and process arrays
+        array_mode: How to handle arrays (SEPARATE, INLINE, or SKIP)
         nested_threshold: Threshold for when to consider a path deeply
             nested (default 4)
         default_id_field: Field name or dict mapping paths to field names for
@@ -407,7 +388,6 @@ def process_records_in_single_pass(
         id_generation_strategy: Custom function for ID generation
         recovery_strategy: Strategy for error recovery
         max_depth: Maximum recursion depth for nested structures
-        keep_arrays: Whether to keep arrays in the main table after processing
         id_field_patterns: List of field names to check for natural IDs
         id_field_mapping: Optional mapping of paths to specific ID fields
         force_transmog_id: If True, always add transmog ID
@@ -438,13 +418,12 @@ def process_records_in_single_pass(
                 id_field=id_field,
                 parent_field=parent_field,
                 time_field=time_field,
-                visit_arrays=visit_arrays,
+                array_mode=array_mode,
                 nested_threshold=nested_threshold,
                 default_id_field=default_id_field,
                 id_generation_strategy=id_generation_strategy,
                 recovery_strategy=recovery_strategy,
                 max_depth=max_depth,
-                keep_arrays=keep_arrays,
                 id_field_patterns=id_field_patterns,
                 id_field_mapping=id_field_mapping,
                 force_transmog_id=force_transmog_id,
@@ -502,12 +481,11 @@ def stream_process_records(
     id_field: str = "__transmog_id",
     parent_field: str = "__parent_transmog_id",
     time_field: str = "__transmog_datetime",
-    visit_arrays: bool = True,
+    array_mode: ArrayMode = ArrayMode.SEPARATE,
     nested_threshold: int = 4,
     default_id_field: Optional[Union[str, dict[str, str]]] = None,
     id_generation_strategy: Optional[Callable[[dict[str, Any]], str]] = None,
     max_depth: int = 100,
-    keep_arrays: bool = False,
     use_deterministic_ids: bool = False,
     id_field_patterns: Optional[list[str]] = None,
     id_field_mapping: Optional[dict[str, str]] = None,
@@ -529,14 +507,13 @@ def stream_process_records(
         id_field: ID field name
         parent_field: Parent ID field name
         time_field: Timestamp field name
-        visit_arrays: Whether to visit and process arrays
+        array_mode: How to handle arrays (SEPARATE, INLINE, or SKIP)
         nested_threshold: Threshold for when to consider a path deeply
             nested (default 4)
         default_id_field: Field name or dict mapping paths to field names for
             deterministic IDs
         id_generation_strategy: Custom function for ID generation
         max_depth: Maximum recursion depth for nested structures
-        keep_arrays: Whether to keep arrays in the main table after processing
         use_deterministic_ids: Whether to use deterministic ID generation
         id_field_patterns: List of field names to check for natural IDs
         id_field_mapping: Optional mapping of paths to specific ID fields
@@ -565,13 +542,12 @@ def stream_process_records(
             id_field=id_field,
             parent_field=parent_field,
             time_field=time_field,
-            visit_arrays=visit_arrays,
+            array_mode=array_mode,
             nested_threshold=nested_threshold,
             default_id_field=default_id_field,
             id_generation_strategy=id_generation_strategy,
             streaming=True,  # Enable streaming mode
             max_depth=max_depth,
-            keep_arrays=keep_arrays,
             id_field_patterns=id_field_patterns,
             id_field_mapping=id_field_mapping,
             force_transmog_id=force_transmog_id,

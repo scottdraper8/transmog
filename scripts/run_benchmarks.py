@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark script for transmog library v1.1.0.
+"""Benchmark script for transmog library.
 
 This script runs comprehensive benchmarks for the transmog library to measure
 performance across different configurations, data sizes, and processing modes.

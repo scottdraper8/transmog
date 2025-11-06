@@ -128,10 +128,12 @@ class TestConfigurationChaining:
 
     def test_chaining_with_profiles(self):
         """Test chaining profile methods."""
+        from transmog.types.base import ArrayMode
+
         config = TransmogConfig.memory_optimized().use_dot_notation().disable_arrays()
 
         assert config.naming.separator == "."
-        assert config.processing.visit_arrays is False
+        assert config.processing.array_mode == ArrayMode.SKIP
         assert config.processing.processing_mode == ProcessingMode.LOW_MEMORY
 
     def test_profile_override_chaining(self):
@@ -146,16 +148,18 @@ class TestConfigurationChaining:
 
     def test_convenience_method_chaining(self):
         """Test chaining convenience methods."""
+        from transmog.types.base import ArrayMode
+
         config = (
             TransmogConfig.default()
             .use_dot_notation()
             .use_string_format()
-            .keep_arrays()
+            .keep_arrays_inline()
         )
 
         assert config.naming.separator == "."
         assert config.processing.cast_to_string is True
-        assert config.processing.keep_arrays is True
+        assert config.processing.array_mode == ArrayMode.INLINE
 
 
 class TestConfigurationValidation:
@@ -241,7 +245,7 @@ class TestConfigurationDocumentation:
         expected_methods = [
             "use_dot_notation",
             "disable_arrays",
-            "keep_arrays",
+            "keep_arrays_inline",
             "use_string_format",
         ]
 
