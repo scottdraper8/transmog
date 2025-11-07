@@ -1,6 +1,6 @@
 # File Processing
 
-This guide covers processing files directly with Transmog, including JSON and CSV files with various options and configurations.
+This guide covers processing files directly with Transmog, including JSON and JSONL files with various options and configurations.
 
 ## File Processing Basics
 
@@ -90,44 +90,6 @@ tm.flatten_stream(
 )
 ```
 
-## CSV File Processing
-
-### Basic CSV Processing
-
-```python
-# Process CSV file
-result = tm.flatten_file("employees.csv", name="employees")
-
-# CSV files typically produce only a main table
-print(f"Processed {len(result.main)} CSV records")
-```
-
-### CSV Configuration Options
-
-The `flatten_file()` function auto-detects CSV format and handles it appropriately:
-
-```python
-# Process CSV with custom entity name
-result = tm.flatten_file("data.csv", name="custom_name")
-
-# All flatten() options work with CSV files
-result = tm.flatten_file(
-    "data.csv",
-    name="records",
-    preserve_types=True,
-    skip_null=False
-)
-```
-
-### CSV File Requirements
-
-CSV files should follow these guidelines:
-
-- First row contains column headers
-- Consistent column structure throughout
-- Standard CSV delimiters (comma, semicolon, tab)
-- UTF-8 encoding preferred
-
 ## File Format Detection
 
 Transmog automatically detects file formats based on extensions:
@@ -136,13 +98,23 @@ Transmog automatically detects file formats based on extensions:
 |-----------|--------|------------|
 | `.json` | JSON | Full nested processing |
 | `.jsonl`, `.ndjson` | JSON Lines | Line-by-line processing |
-| `.csv` | CSV | Tabular processing |
 
 ```python
 # Automatic format detection
 result = tm.flatten_file("data.json")    # Processed as JSON
-result = tm.flatten_file("data.csv")     # Processed as CSV
 result = tm.flatten_file("data.jsonl")   # Processed as JSON Lines
+```
+
+## Output Formats
+
+Transmog supports multiple output formats for the flattened data:
+
+```python
+# Save as CSV files
+result.save("output/", "csv")
+
+# Save as Parquet files
+result.save("output/", "parquet")
 ```
 
 ## Advanced File Processing

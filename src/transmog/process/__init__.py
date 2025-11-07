@@ -29,7 +29,6 @@ from .result import ProcessingResult
 # Processing strategies
 from .strategies import (
     ChunkedStrategy,
-    CSVStrategy,
     FileStrategy,
     InMemoryStrategy,
     ProcessingStrategy,
@@ -82,40 +81,16 @@ class Processor:
         # Create appropriate strategy based on input type
         strategy: ProcessingStrategy
         if isinstance(data, (dict, list)):
-            # In-memory data
             if isinstance(data, dict):
-                # Convert single dict to list for consistency
                 data = [data]
             strategy = InMemoryStrategy(self.config)
         elif isinstance(data, (str, bytes)):
-            # String or bytes data, check if it's a file path
             if isinstance(data, str) and os.path.exists(data):
-                # File path
-                file_ext = os.path.splitext(data)[1].lower()
-                if file_ext == ".csv":
-                    strategy = CSVStrategy(self.config)
-                else:
-                    strategy = FileStrategy(self.config)
+                strategy = FileStrategy(self.config)
             else:
-                # Convert bytes to string for format detection
                 if isinstance(data, bytes):
-                    data_str = data.decode("utf-8")
-                else:
-                    data_str = data
-
-                # Detect format of string data
-                from .data_iterators import DataIteratorUtils
-
-                format_type = DataIteratorUtils.detect_string_format(data_str)
-
-                if format_type == "csv":
-                    # Use CSV strategy for CSV strings
-                    strategy = CSVStrategy(self.config)
-                    data = data_str  # Ensure we use the string version
-                else:
-                    # Use chunked strategy for JSON/JSONL strings
-                    strategy = ChunkedStrategy(self.config)
-                    data = data_str  # Ensure we use the string version
+                    data = data.decode("utf-8")
+                strategy = ChunkedStrategy(self.config)
         else:
             raise ConfigurationError(f"Unsupported data type: {type(data)}")
 

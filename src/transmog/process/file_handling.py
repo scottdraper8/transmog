@@ -17,7 +17,7 @@ from typing import (
 
 from ..error import error_context, logger
 from .result import ProcessingResult
-from .strategies import CSVStrategy, FileStrategy
+from .strategies import FileStrategy
 
 # Define a return type variable for the decorator's generic type
 R = TypeVar("R")
@@ -44,19 +44,10 @@ def process_file(
     Returns:
         ProcessingResult containing processed data
     """
-    file_ext = os.path.splitext(file_path)[1].lower()
-
-    if file_ext == ".csv":
-        csv_strategy = CSVStrategy(processor.config)
-        processed_result = csv_strategy.process(
-            file_path, entity_name=entity_name, extract_time=extract_time
-        )
-    else:
-        file_strategy = FileStrategy(processor.config)
-        processed_result = file_strategy.process(
-            file_path, entity_name=entity_name, extract_time=extract_time
-        )
-
+    file_strategy = FileStrategy(processor.config)
+    processed_result = file_strategy.process(
+        file_path, entity_name=entity_name, extract_time=extract_time
+    )
     return cast(ProcessingResult, processed_result)
 
 
@@ -137,83 +128,14 @@ def detect_input_format(file_path: str) -> str:
         file_path: Path to the file
 
     Returns:
-        Detected format type ('json', 'jsonl', 'csv')
+        Detected format type ('json', 'jsonl')
     """
     extension = os.path.splitext(file_path)[1].lower()
 
     if extension in (".jsonl", ".ndjson"):
         return "jsonl"
-    elif extension == ".csv":
-        return "csv"
     else:
         return "json"
-
-
-@error_context("Failed to process CSV file", log_exceptions=True)  # type: ignore
-def process_csv(
-    processor: Any,
-    file_path: str,
-    entity_name: str,
-    extract_time: Optional[Any] = None,
-    delimiter: Optional[str] = None,
-    has_header: bool = True,
-    null_values: Optional[list[str]] = None,
-    sanitize_column_names: bool = True,
-    infer_types: bool = True,
-    skip_rows: int = 0,
-    quote_char: Optional[str] = None,
-    encoding: str = "utf-8",
-    chunk_size: Optional[int] = None,
-    date_format: Optional[str] = None,
-) -> ProcessingResult:
-    """Process a CSV file.
-
-    Args:
-        processor: Processor instance
-        file_path: Path to the CSV file
-        entity_name: Name of the entity being processed
-        extract_time: Optional extraction timestamp
-        delimiter: CSV delimiter character
-        has_header: Whether the CSV has a header row
-        null_values: List of strings to treat as null values
-        sanitize_column_names: Whether to sanitize column names
-        infer_types: Whether to infer data types
-        skip_rows: Number of rows to skip at the beginning
-        quote_char: Quote character for CSV fields
-        encoding: File encoding
-        chunk_size: Size of chunks to process
-        date_format: Optional format string for parsing dates
-
-    Returns:
-        ProcessingResult containing processed data
-    """
-    strategy = CSVStrategy(processor.config)
-    # Initialize result object with empty structures
-    result = ProcessingResult(
-        main_table=[],
-        child_tables={},
-        entity_name=entity_name,
-    )
-    result.source_info["file_path"] = file_path
-
-    processed_result = strategy.process(
-        file_path,
-        entity_name=entity_name,
-        extract_time=extract_time,
-        result=result,
-        delimiter=delimiter,
-        has_header=has_header,
-        null_values=null_values,
-        sanitize_column_names=sanitize_column_names,
-        infer_types=infer_types,
-        skip_rows=skip_rows,
-        quote_char=quote_char,
-        encoding=encoding,
-        chunk_size=chunk_size,
-        date_format=date_format,
-    )
-
-    return cast(ProcessingResult, processed_result)
 
 
 @error_context("Failed to process in chunks", log_exceptions=True)  # type: ignore

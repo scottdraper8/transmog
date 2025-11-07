@@ -177,20 +177,6 @@ def jsonl_file(tmp_path, batch_data) -> str:
 
 
 @pytest.fixture
-def csv_file(tmp_path) -> str:
-    """Create a temporary CSV file."""
-    file_path = tmp_path / "test.csv"
-    csv_content = """id,name,value,active
-1,Alice,100,true
-2,Bob,200,false
-3,Charlie,300,true
-"""
-    with open(file_path, "w") as f:
-        f.write(csv_content)
-    return str(file_path)
-
-
-@pytest.fixture
 def large_json_file(tmp_path) -> str:
     """Create a large JSON file for streaming tests."""
     file_path = tmp_path / "large.json"

@@ -22,7 +22,6 @@ from ..io.writer_factory import create_streaming_writer
 from ..types.base import JsonDict
 from ..types.io_types import StreamingWriterProtocol
 from .data_iterators import (
-    get_csv_file_iterator,
     get_data_iterator,
     get_json_file_iterator,
     get_jsonl_file_iterator,
@@ -232,7 +231,7 @@ def stream_process_file_with_format(
         file_path: Path to the file
         entity_name: Name of the entity
         output_format: Output format
-        format_type: Input file format ('json', 'jsonl', 'csv')
+        format_type: Input file format ('json', 'jsonl')
         output_destination: Output destination
         extract_time: Optional extraction timestamp
         use_deterministic_ids: Whether to use deterministic IDs
@@ -251,10 +250,6 @@ def stream_process_file_with_format(
             data_iterator = get_json_file_iterator(file_path)
         elif format_type in ("jsonl", "ndjson"):
             data_iterator = get_jsonl_file_iterator(processor, file_path)
-        elif format_type == "csv":
-            data_iterator = get_csv_file_iterator(
-                processor, file_path, **format_options
-            )
         else:
             raise ValueError(f"Unsupported file format: {format_type}")
 
@@ -302,8 +297,6 @@ def stream_process_file(
 
     if extension in (".jsonl", ".ndjson"):
         format_type = "jsonl"
-    elif extension == ".csv":
-        format_type = "csv"
     else:
         format_type = "json"
 
@@ -316,80 +309,6 @@ def stream_process_file(
         output_destination=output_destination,
         extract_time=extract_time,
         **format_options,
-    )
-
-
-@error_context("Failed to stream process CSV file", log_exceptions=True)  # type: ignore
-def stream_process_csv(
-    processor: Any,
-    file_path: str,
-    entity_name: str,
-    output_format: str,
-    output_destination: Optional[Union[str, BinaryIO]] = None,
-    extract_time: Optional[Any] = None,
-    delimiter: Optional[str] = None,
-    has_header: bool = True,
-    null_values: Optional[list[str]] = None,
-    sanitize_column_names: bool = True,
-    infer_types: bool = True,
-    skip_rows: int = 0,
-    quote_char: Optional[str] = None,
-    encoding: str = "utf-8",
-    date_format: Optional[str] = None,
-    **format_options: Any,
-) -> None:
-    """Stream process a CSV file directly to the specified output format.
-
-    Args:
-        processor: Processor instance
-        file_path: Path to the CSV file
-        entity_name: Name of the entity being processed
-        output_format: Output format ("json", "csv", "parquet", etc)
-        output_destination: File path or file-like object to write to
-        extract_time: Optional extraction timestamp
-        delimiter: Column delimiter
-        has_header: Whether file has a header row
-        null_values: Values to interpret as NULL
-        sanitize_column_names: Whether to sanitize column names
-        infer_types: Whether to infer types from values
-        skip_rows: Number of rows to skip
-        quote_char: Quote character for CSV
-        encoding: File encoding
-        date_format: Optional format string for parsing dates
-        **format_options: Format-specific options for the writer
-
-    Returns:
-        None - data is written directly to output_destination
-    """
-    csv_options = {
-        "has_header": has_header,
-        "null_values": null_values,
-        "sanitize_column_names": sanitize_column_names,
-        "infer_types": infer_types,
-        "skip_rows": skip_rows,
-        "encoding": encoding,
-    }
-
-    if delimiter is not None:
-        csv_options["delimiter"] = delimiter
-    if quote_char is not None:
-        csv_options["quote_char"] = quote_char
-    if date_format is not None:
-        csv_options["date_format"] = date_format
-
-    csv_options.update(format_options)
-
-    # Use the helper method
-    return stream_process_file_with_format(
-        processor=processor,
-        file_path=file_path,
-        entity_name=entity_name,
-        output_format=output_format,
-        format_type="csv",
-        output_destination=output_destination,
-        extract_time=extract_time,
-        use_deterministic_ids=False,
-        **csv_options,
     )
 
 

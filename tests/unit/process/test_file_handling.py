@@ -15,7 +15,6 @@ from transmog.error import FileError, ParsingError, ProcessingError
 from transmog.process import Processor
 from transmog.process.file_handling import (
     detect_input_format,
-    process_csv,
     process_file,
     process_file_to_format,
 )
@@ -44,17 +43,6 @@ class TestFileFormatDetection:
         try:
             format_detected = detect_input_format(tmp_path)
             assert format_detected == "jsonl"
-        finally:
-            Path(tmp_path).unlink()
-
-    def test_detect_csv_format(self):
-        """Test detection of CSV files."""
-        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-            tmp_path = tmp.name
-
-        try:
-            format_detected = detect_input_format(tmp_path)
-            assert format_detected == "csv"
         finally:
             Path(tmp_path).unlink()
 
@@ -106,51 +94,10 @@ class TestFileProcessing:
         finally:
             Path(tmp_path).unlink()
 
-    def test_process_csv_file(self, processor):
-        """Test processing CSV files."""
-        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-            tmp.write(b"name,age,city\nAlice,30,NYC\nBob,25,LA\n")
-            tmp_path = tmp.name
-
-        try:
-            result = process_file(processor, tmp_path, "test_entity")
-            assert result is not None
-            assert result.entity_name == "test_entity"
-            assert len(result.main_table) > 0
-        finally:
-            Path(tmp_path).unlink()
-
     def test_process_nonexistent_file(self, processor):
         """Test processing nonexistent file."""
         with pytest.raises((FileError, ProcessingError)):
             process_file(processor, "/path/that/does/not/exist.json", "test")
-
-    def test_process_csv_with_options(self, processor):
-        """Test processing CSV with custom options."""
-        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-            tmp.write(b"name|age|city\nAlice|30|NYC\nBob|25|LA\n")
-            tmp_path = tmp.name
-
-        try:
-            result = process_csv(
-                processor, tmp_path, "test_entity", delimiter="|", has_header=True
-            )
-            assert result is not None
-            assert result.entity_name == "test_entity"
-        finally:
-            Path(tmp_path).unlink()
-
-    def test_process_csv_no_header(self, processor):
-        """Test processing CSV without header."""
-        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-            tmp.write(b"Alice,30,NYC\nBob,25,LA\n")
-            tmp_path = tmp.name
-
-        try:
-            result = process_csv(processor, tmp_path, "test_entity", has_header=False)
-            assert result is not None
-        finally:
-            Path(tmp_path).unlink()
 
 
 class TestFileToFormatProcessing:
@@ -268,33 +215,3 @@ class TestFileHandlingEdgeCases:
 
             result = process_file(processor, str(file_path), "unicode_test")
             assert result is not None
-
-    def test_csv_with_special_characters(self, processor):
-        """Test CSV processing with special characters."""
-        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-            tmp.write(b"name,description\n")
-            tmp.write(b'Test,"Hello, world!"\n')
-            tmp.write('Unicode,"测试 🌍"\n'.encode())
-            tmp_path = tmp.name
-
-        try:
-            result = process_csv(processor, tmp_path, "special_chars_test")
-            assert result is not None
-            assert len(result.main_table) > 0
-        finally:
-            Path(tmp_path).unlink()
-
-    def test_csv_with_null_values(self, processor):
-        """Test CSV processing with null values."""
-        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-            tmp.write(b"name,age,city\nAlice,30,NYC\nBob,,LA\nCharlie,25,\n")
-            tmp_path = tmp.name
-
-        try:
-            result = process_csv(
-                processor, tmp_path, "null_test", null_values=["", "NULL", "null"]
-            )
-            assert result is not None
-            assert len(result.main_table) > 0
-        finally:
-            Path(tmp_path).unlink()

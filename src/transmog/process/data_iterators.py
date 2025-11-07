@@ -1,7 +1,7 @@
 """Data iteration functionality for Transmog package.
 
 This module contains functions for creating iterators over different data sources
-such as JSON files, JSONL files, CSV files, and in-memory data structures.
+such as JSON files, JSONL files, and in-memory data structures.
 """
 
 import json
@@ -164,17 +164,13 @@ class DataIteratorUtils:
             file_path: Path to the file
 
         Returns:
-            Detected format ('json', 'jsonl', 'csv', etc.)
+            Detected format ('json', 'jsonl')
         """
         extension = os.path.splitext(file_path)[1].lower()
         if extension in (".jsonl", ".ndjson"):
             return "jsonl"
-        elif extension == ".csv":
-            return "csv"
-        elif extension == ".json":
-            return "json"
         else:
-            return "unknown"
+            return "json"
 
     @staticmethod
     def wrap_file_error(file_path: str, operation: str, error: Exception) -> None:
@@ -194,89 +190,47 @@ class DataIteratorUtils:
 
     @staticmethod
     def detect_string_format(data: str) -> str:
-        """Detect the format of string data (JSON, JSONL, or CSV).
+        """Detect the format of string data (JSON or JSONL).
 
         Args:
             data: String data to analyze
 
         Returns:
-            Format type: 'json', 'jsonl', or 'csv'
+            Format type: 'json' or 'jsonl'
         """
         import json
 
-        # Check for empty data
         if not data or not data.strip():
-            return "json"  # Default to JSON
+            return "json"
 
         sample = data[:1000].strip()
 
-        # Try JSON first, but be more careful about CSV with quotes
-        try:
-            # Only try JSON if it looks like JSON (starts with { or [)
-            if sample.startswith(("{", "[")):
+        if sample.startswith(("{", "[")):
+            try:
                 json.loads(data)
                 return "json"
+            except json.JSONDecodeError:
+                pass
+
+        lines = [line.strip() for line in sample.split("\n")[:5] if line.strip()]
+        json_line_count = sum(
+            1
+            for line in lines
+            if line.startswith(("{", "[")) and DataIteratorUtils._is_valid_json(line)
+        )
+
+        return "jsonl" if json_line_count >= 2 else "json"
+
+    @staticmethod
+    def _is_valid_json(line: str) -> bool:
+        """Check if a line is valid JSON."""
+        import json
+
+        try:
+            json.loads(line)
+            return True
         except json.JSONDecodeError:
-            pass
-
-        # Check for JSONL (newlines with JSON objects)
-        lines = sample.split("\n")
-        if len(lines) >= 2:
-            # Check if lines look like JSON objects
-            json_line_count = 0
-            for line in lines[:5]:
-                line = line.strip()
-                if line and (line.startswith("{") or line.startswith("[")):
-                    try:
-                        json.loads(line)
-                        json_line_count += 1
-                    except json.JSONDecodeError:
-                        pass
-
-            if json_line_count >= 2:
-                return "jsonl"
-
-        # Check for CSV (consistent delimited structure)
-        # First, try a more sophisticated CSV detection
-        import csv
-        from io import StringIO
-
-        # Try to parse as CSV with different delimiters
-        delimiters = [",", "\t", "|", ";"]
-        for delimiter in delimiters:
-            try:
-                # Use CSV sniffer and reader to validate
-                csv_file = StringIO(sample)
-                reader = csv.reader(csv_file, delimiter=delimiter)
-                rows = []
-                for i, row in enumerate(reader):
-                    if i >= 5:  # Check first 5 rows
-                        break
-                    rows.append(row)
-
-                # Check if we have at least 2 rows with consistent field counts
-                if len(rows) >= 2:
-                    field_counts = [len(row) for row in rows if row]
-                    if (
-                        field_counts
-                        and all(c >= 2 for c in field_counts)
-                        and len(set(field_counts)) == 1
-                    ):
-                        return "csv"
-            except (csv.Error, Exception):
-                # If CSV parsing fails, try simple split method
-                field_counts = []
-                for line in lines[:5]:
-                    if line.strip():
-                        field_counts.append(len(line.split(delimiter)))
-
-                if len(field_counts) >= 2 and all(c >= 2 for c in field_counts):
-                    # Check if field counts are consistent
-                    if len(set(field_counts)) == 1:
-                        return "csv"
-
-        # Default to JSON
-        return "json"
+            return False
 
 
 def get_data_iterator(
@@ -307,23 +261,15 @@ def get_data_iterator(
     # Handle file paths (only if it's a string that exists as a file)
     if isinstance(data, str) and os.path.exists(data):
         if input_format == "auto":
-            # Use consolidated format detection
             detected_format = DataIteratorUtils.detect_file_format(data)
             if detected_format == "jsonl":
                 return get_jsonl_file_iterator(processor, data)
-            elif detected_format == "csv":
-                return get_csv_file_iterator(processor, data)
-            elif detected_format == "json":
-                return get_json_file_iterator(data)
             else:
-                # Default to JSON for unknown extensions
                 return get_json_file_iterator(data)
         elif input_format == "json":
             return get_json_file_iterator(data)
         elif input_format in ("jsonl", "ndjson"):
             return get_jsonl_file_iterator(processor, data)
-        elif input_format == "csv":
-            return get_csv_file_iterator(processor, data)
         else:
             raise ValueError(f"Unsupported input format: {input_format}")
 
@@ -335,17 +281,13 @@ def get_data_iterator(
     # Handle JSON strings and bytes (including format detection for auto mode)
     elif isinstance(data, (str, bytes)):
         if input_format == "auto":
-            # Auto-detect format for string/bytes data
             if isinstance(data, bytes):
                 sample = data[:1000].decode("utf-8", errors="ignore")
                 format_type = DataIteratorUtils.detect_string_format(sample)
             else:
                 format_type = DataIteratorUtils.detect_string_format(data)
 
-            # Return appropriate iterator based on detected format
-            if format_type == "csv":
-                return get_csv_data_iterator(processor, data)
-            elif format_type == "jsonl":
+            if format_type == "jsonl":
                 return get_jsonl_data_iterator(processor, data)
             else:
                 return get_json_data_iterator(data)
@@ -353,8 +295,6 @@ def get_data_iterator(
             return get_json_data_iterator(data)
         elif input_format in ("jsonl", "ndjson"):
             return get_jsonl_data_iterator(processor, data)
-        elif input_format == "csv":
-            return get_csv_data_iterator(processor, data)
         else:
             raise ValueError(f"Unsupported input format: {input_format}")
     else:
@@ -513,130 +453,3 @@ def get_jsonl_data_iterator(
         if isinstance(e, (ProcessingError, FileError, ParsingError)):
             raise
         raise ParsingError(f"Error processing JSONL data: {str(e)}") from e
-
-
-def get_csv_file_iterator(
-    processor: Any,
-    file_path: str,
-    delimiter: Optional[str] = None,
-    has_header: bool = True,
-    null_values: Optional[list[str]] = None,
-    sanitize_column_names: bool = True,
-    infer_types: bool = True,
-    skip_rows: int = 0,
-    quote_char: Optional[str] = None,
-    encoding: str = "utf-8",
-    date_format: Optional[str] = None,
-) -> Iterator[dict[str, Any]]:
-    """Create an iterator for a CSV file.
-
-    Args:
-        processor: Processor instance
-        file_path: Path to CSV file
-        delimiter: Column delimiter
-        has_header: Whether file has a header row
-        null_values: Values to interpret as NULL
-        sanitize_column_names: Whether to sanitize column names
-        infer_types: Whether to infer types from values
-        skip_rows: Number of rows to skip
-        quote_char: Quote character
-        encoding: File encoding
-        date_format: Optional format string for parsing dates
-
-    Returns:
-        Iterator that yields dictionaries
-
-    Raises:
-        FileError: If file cannot be read
-    """
-    from ..io.readers.csv import CSVReader
-
-    if not os.path.exists(file_path):
-        raise FileError(f"File not found: {file_path}")
-
-    try:
-        # Configure CSV reader
-        reader = CSVReader(
-            delimiter=delimiter,
-            has_header=has_header,
-            null_values=null_values,
-            sanitize_column_names=sanitize_column_names,
-            infer_types=infer_types,
-            skip_rows=skip_rows,
-            quote_char=quote_char,
-            encoding=encoding,
-            cast_to_string=processor.config.processing.cast_to_string,
-            date_format=date_format,
-        )
-
-        yield from reader.read_records(file_path)
-
-    except Exception as e:
-        if isinstance(e, (ProcessingError, FileError)):
-            raise
-        raise FileError(f"Error reading CSV file {file_path}: {str(e)}") from e
-
-
-def get_csv_data_iterator(
-    processor: Any,
-    data: Union[str, bytes],
-    delimiter: Optional[str] = None,
-    has_header: bool = True,
-    null_values: Optional[list[str]] = None,
-    sanitize_column_names: bool = True,
-    infer_types: bool = True,
-    skip_rows: int = 0,
-    quote_char: Optional[str] = None,
-    date_format: Optional[str] = None,
-) -> Iterator[dict[str, Any]]:
-    """Create an iterator for CSV data from string or bytes.
-
-    Args:
-        processor: Processor instance
-        data: CSV data as string or bytes
-        delimiter: Column delimiter (auto-detected if None)
-        has_header: Whether data has a header row
-        null_values: Values to interpret as NULL
-        sanitize_column_names: Whether to sanitize column names
-        infer_types: Whether to infer types from values
-        skip_rows: Number of rows to skip
-        quote_char: Quote character
-        date_format: Optional format string for parsing dates
-
-    Returns:
-        Iterator that yields dictionaries
-
-    Raises:
-        ProcessingError: If data cannot be parsed as CSV
-    """
-    from ..io.readers.csv import CSVReader
-
-    try:
-        # Convert bytes to string if needed
-        if isinstance(data, bytes):
-            csv_string = data.decode("utf-8")
-        else:
-            csv_string = data
-
-        # Create CSVReader instance - pass None for delimiter to enable auto-detection
-        reader_kwargs = {
-            "delimiter": delimiter,  # This will be None for auto-detection
-            "has_header": has_header,
-            "null_values": null_values,
-            "sanitize_column_names": sanitize_column_names,
-            "infer_types": infer_types,
-            "skip_rows": skip_rows,
-            "quote_char": quote_char,
-            "cast_to_string": processor.config.processing.cast_to_string,
-            "date_format": date_format,
-        }
-        reader = CSVReader(**reader_kwargs)
-
-        # Use the CSVReader's internal processing logic with StringIO
-        # This leverages Transmog's CSV processing capabilities
-        yield from reader._read_records_from_string(csv_string)
-
-    except Exception as e:
-        if isinstance(e, ProcessingError):
-            raise
-        raise ProcessingError(f"Error parsing CSV data: {str(e)}") from e

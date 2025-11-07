@@ -155,19 +155,6 @@ class TestFileErrorHandling:
         except Exception:
             pass  # Empty file handling is implementation-specific
 
-    def test_malformed_csv_file(self, tmp_path):
-        """Test handling malformed CSV files."""
-        malformed_csv = tmp_path / "malformed.csv"
-        with open(malformed_csv, "w") as f:
-            f.write("id,name,value\n")
-            f.write("1,Alice,100\n")
-            f.write("2,Bob,200,extra_field\n")  # Extra field
-            f.write("3,Charlie\n")  # Missing field
-
-        # Should handle malformed CSV gracefully depending on error mode
-        result = tm.flatten_file(str(malformed_csv), errors="skip")
-        assert len(result.main) >= 1  # At least one good record
-
     def test_permission_denied_file(self, tmp_path):
         """Test handling permission denied errors."""
         restricted_file = tmp_path / "restricted.json"

@@ -220,32 +220,6 @@ class TestFileProcessingPerformance:
         assert processing_time < 15.0
         print(f"JSON file processing (1000 records): {processing_time:.4f}s")
 
-    def test_csv_file_processing_performance(self):
-        """Test CSV file processing performance."""
-        # Create large CSV file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
-            f.write("id,name,value,category,active\n")
-            for i in range(5000):
-                f.write(f"{i},Name_{i},{i * 10},cat_{i % 10},{i % 2 == 0}\n")
-            csv_file = f.name
-
-        try:
-            start_time = time.time()
-
-            result = tm.flatten_file(csv_file, name="csv_perf")
-
-            end_time = time.time()
-            processing_time = end_time - start_time
-
-            assert result is not None
-            assert len(result.main) == 5000
-
-            # CSV processing should be efficient
-            assert processing_time < 20.0
-            print(f"CSV file processing (5000 records): {processing_time:.4f}s")
-        finally:
-            Path(csv_file).unlink()
-
     def test_streaming_performance(self):
         """Test streaming processing performance."""
         # Create large dataset for streaming

@@ -14,7 +14,6 @@ from transmog.config import TransmogConfig
 from transmog.process.strategies import (
     BatchStrategy,
     ChunkedStrategy,
-    CSVStrategy,
     FileStrategy,
     InMemoryStrategy,
     ProcessingStrategy,
@@ -197,29 +196,6 @@ class TestChunkedStrategy:
         assert result is not None
         assert hasattr(result, "main_table")
         assert len(result.main_table) == 1000
-
-
-class TestCSVStrategy:
-    """Test the CSVStrategy class."""
-
-    def test_csv_strategy_init(self):
-        """Test CSVStrategy initialization."""
-        config = TransmogConfig()
-        strategy = CSVStrategy(config)
-
-        assert isinstance(strategy, ProcessingStrategy)
-        assert strategy.config == config
-
-    def test_csv_strategy_process_file(self, csv_file):
-        """Test processing a CSV file."""
-        config = TransmogConfig()
-        strategy = CSVStrategy(config)
-
-        result = strategy.process(csv_file, entity_name="test_csv")
-
-        assert result is not None
-        assert hasattr(result, "main_table")
-        assert len(result.main_table) >= 1
 
 
 class TestStrategyComparison:

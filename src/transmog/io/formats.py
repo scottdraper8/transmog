@@ -142,36 +142,29 @@ def detect_format(data_source: Any) -> str:
     """
     import os
 
-    # File path detection
     if isinstance(data_source, str) and os.path.isfile(data_source):
-        _, ext = os.path.splitext(data_source)
-        ext = ext.lower()
-
+        ext = os.path.splitext(data_source)[1].lower()
         if ext == ".json":
             return "json"
-        elif ext == ".jsonl":
+        elif ext in (".jsonl", ".ndjson"):
             return "jsonl"
-        elif ext in (".csv", ".tsv"):
-            return "csv"
         elif ext == ".parquet":
             return "parquet"
+        return "unknown"
 
-    # Content-based detection
     if isinstance(data_source, (dict, list)):
         return "json"
-    elif isinstance(data_source, (str, bytes)):
-        # Try to determine if it's JSON or JSONL
+
+    if isinstance(data_source, (str, bytes)):
         if isinstance(data_source, bytes):
             sample = data_source[:1000].decode("utf-8", errors="ignore")
         else:
             sample = data_source[:1000]
 
         sample = sample.strip()
-        if sample.startswith("{") and sample.find("\n{") == -1:
+        if sample.startswith(("{", "[")):
+            if "\n{" in sample or "\n[" in sample:
+                return "jsonl"
             return "json"
-        elif sample.startswith("[") and sample.find("\n[") == -1:
-            return "json"
-        elif sample.startswith("{") and sample.find("\n{") > -1:
-            return "jsonl"
 
     return "unknown"

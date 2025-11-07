@@ -134,7 +134,7 @@ flatten_file(
 **Supported Formats:**
 
 - JSON (.json)
-- CSV (.csv) - for files containing JSON in cells
+- JSON Lines (.jsonl, .ndjson)
 
 **Returns:**
 

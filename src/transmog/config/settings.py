@@ -88,13 +88,6 @@ class TransmogSettings:
     DEFAULT_NATURAL_ID_FIELD = None  # Will use ID discovery by default
     DEFAULT_ID_FIELD_MAPPING = None  # Optional per-table mapping
 
-    # CSV settings
-    DEFAULT_CSV_DELIMITER = ","
-    DEFAULT_CSV_QUOTE_CHAR = '"'
-    DEFAULT_CSV_NULL_VALUES = ["", "NULL", "null", "NA", "na", "N/A", "n/a"]
-    DEFAULT_CSV_INFER_TYPES = True
-    DEFAULT_CSV_SANITIZE_COLUMN_NAMES = True
-
     # Performance settings
     DEFAULT_LRU_CACHE_SIZE = 1024
     DEFAULT_MAX_WORKERS = 4
@@ -162,44 +155,6 @@ class TransmogSettings:
         },
         "compact_naming": {
             "nested_threshold": 3,
-        },
-        "csv_strict": {
-            "csv_delimiter": ",",
-            "csv_quote_char": '"',
-            "csv_null_values": ["", "NULL", "null"],
-            "csv_infer_types": False,
-            "cast_to_string": True,
-        },
-        "csv_flexible": {
-            "csv_delimiter": None,  # Auto-detect
-            "csv_quote_char": '"',
-            "csv_null_values": [
-                "",
-                "NULL",
-                "null",
-                "NA",
-                "na",
-                "N/A",
-                "n/a",
-                "#N/A",
-                "#N/A N/A",
-                "#NA",
-                "-1.#IND",
-                "-1.#QNAN",
-                "-NaN",
-                "-nan",
-                "1.#IND",
-                "1.#QNAN",
-                "N/A",
-                "NA",
-                "NULL",
-                "NaN",
-                "n/a",
-                "nan",
-                "null",
-            ],
-            "csv_infer_types": True,
-            "cast_to_string": False,
         },
         "deterministic_ids": {
             # Define deterministic ID field for the root level

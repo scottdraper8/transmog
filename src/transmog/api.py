@@ -354,7 +354,7 @@ def flatten_file(
 
     Examples:
         >>> result = flatten_file("products.json")
-        >>> result = flatten_file("data.csv", separator=".")
+        >>> result = flatten_file("data.jsonl", separator=".")
     """
     # Validate API parameters
     validate_api_parameters(format=file_format)
@@ -427,8 +427,8 @@ def flatten_stream(
         >>> flatten_stream(data, "output/", output_format="parquet",
         ...                compression="snappy")
 
-        >>> # Stream CSV file processing
-        >>> flatten_stream("large_file.csv", "output/", output_format="csv")
+        >>> # Stream JSON file processing
+        >>> flatten_stream("large_file.json", "output/", output_format="csv")
     """
     # Validate API parameters
     validate_api_parameters(

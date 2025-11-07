@@ -191,18 +191,6 @@ class TestFlattenFileFunction:
         assert_valid_result(result)
         assert len(result.main) == 10  # 10 records in batch_data
 
-    def test_flatten_csv_file(self, csv_file):
-        """Test flattening a CSV file."""
-        result = tm.flatten_file(csv_file, name="from_csv")
-
-        assert_valid_result(result)
-        assert len(result.main) == 3  # 3 records in CSV
-
-        # Check first record
-        first_record = result.main[0]
-        assert first_record["name"] == "Alice"
-        assert first_record["value"] == "100"
-
     def test_flatten_file_auto_name(self, json_file):
         """Test auto-naming from filename."""
         result = tm.flatten_file(json_file)  # No name specified

@@ -72,24 +72,6 @@ class FileStrategy(ProcessingStrategy):
                     kwargs.get("chunk_size"),
                     result,
                 )
-            elif file_ext == ".csv":
-                # Import here to avoid circular imports
-                from .csv import CSVStrategy
-
-                # CSVStrategy, but provide a fallback to avoid errors
-                logger.warning(
-                    f"CSV file {file_path} being processed by FileStrategy "
-                    f"instead of CSVStrategy"
-                )
-
-                # Create a CSV strategy for this file
-                csv_strategy = CSVStrategy(self.config)
-                return csv_strategy.process(
-                    file_path,
-                    entity_name=entity_name,
-                    extract_time=extract_time,
-                    result=result,
-                )
             else:
                 # Default to JSON (it will raise appropriate errors if it's
                 # not valid JSON)

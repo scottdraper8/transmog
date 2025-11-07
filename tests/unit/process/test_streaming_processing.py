@@ -20,7 +20,6 @@ from transmog.error import ConfigurationError, FileError, ProcessingError
 from transmog.process import Processor
 from transmog.process.streaming import (
     stream_process,
-    stream_process_csv,
     stream_process_file,
     stream_process_file_with_format,
 )
@@ -316,95 +315,6 @@ class TestStreamProcessFile:
 
         main_file = output_dir / "users.csv"
         assert main_file.exists()
-
-
-class TestStreamProcessCSV:
-    """Test CSV-specific streaming processing."""
-
-    def test_stream_process_csv_basic(self, tmp_path):
-        """Test basic CSV streaming processing."""
-        input_file = tmp_path / "input.csv"
-        with open(input_file, "w") as f:
-            f.write("id,name,age\n")
-            f.write("1,Alice,30\n")
-            f.write("2,Bob,25\n")
-
-        processor = Processor()
-        output_dir = tmp_path / "output"
-
-        stream_process_csv(
-            processor=processor,
-            file_path=str(input_file),
-            entity_name="users",
-            output_format="csv",
-            output_destination=str(output_dir),
-        )
-
-        main_file = output_dir / "users.csv"
-        assert main_file.exists()
-
-        with open(main_file) as f:
-            reader = csv.DictReader(f)
-            result = list(reader)
-        assert len(result) == 2
-        assert result[0]["name"] == "Alice"
-
-    def test_stream_process_csv_custom_delimiter(self, tmp_path):
-        """Test CSV streaming with custom delimiter."""
-        input_file = tmp_path / "input.csv"
-        with open(input_file, "w") as f:
-            f.write("id;name;age\n")
-            f.write("1;Alice;30\n")
-            f.write("2;Bob;25\n")
-
-        processor = Processor()
-        output_dir = tmp_path / "output"
-
-        stream_process_csv(
-            processor=processor,
-            file_path=str(input_file),
-            entity_name="users",
-            output_format="csv",
-            output_destination=str(output_dir),
-            delimiter=";",
-        )
-
-        main_file = output_dir / "users.csv"
-        assert main_file.exists()
-
-        with open(main_file) as f:
-            reader = csv.DictReader(f)
-            result = list(reader)
-        assert len(result) == 2
-
-    def test_stream_process_csv_no_header(self, tmp_path):
-        """Test CSV streaming without header."""
-        input_file = tmp_path / "input.csv"
-        with open(input_file, "w") as f:
-            f.write("1,Alice,30\n")
-            f.write("2,Bob,25\n")
-
-        processor = Processor()
-        output_dir = tmp_path / "output"
-
-        stream_process_csv(
-            processor=processor,
-            file_path=str(input_file),
-            entity_name="users",
-            output_format="csv",
-            output_destination=str(output_dir),
-            has_header=False,
-        )
-
-        main_file = output_dir / "users.csv"
-        assert main_file.exists()
-
-        with open(main_file) as f:
-            reader = csv.DictReader(f)
-            result = list(reader)
-        assert len(result) == 2
-        # Should have generic column names starting from column_1
-        assert "column_1" in result[0]
 
 
 class TestStreamingMemoryOptimization:
