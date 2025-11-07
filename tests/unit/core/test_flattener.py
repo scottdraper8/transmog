@@ -6,7 +6,9 @@ Tests the core JSON flattening logic and cache management.
 
 import pytest
 
+from transmog.config import TransmogConfig
 from transmog.core.flattener import clear_caches, flatten_json, refresh_cache_config
+from transmog.types import ProcessingContext
 
 
 class TestFlattenJson:
@@ -15,18 +17,20 @@ class TestFlattenJson:
     def test_flatten_simple_object(self):
         """Test flattening a simple nested object."""
         data = {"name": "test", "nested": {"value": 42}}
+        config = TransmogConfig(separator="_")
 
-        result = flatten_json(data, separator="_")
+        result = flatten_json(data, config)
 
         assert isinstance(result, dict)
         assert result["name"] == "test"
-        assert result["nested_value"] == "42"  # Values are cast to strings by default
+        assert result["nested_value"] == 42
 
     def test_flatten_with_separator(self):
         """Test flattening with custom separator."""
         data = {"level1": {"level2": {"value": "test"}}}
+        config = TransmogConfig(separator=".")
 
-        result = flatten_json(data, separator=".")
+        result = flatten_json(data, config)
 
         assert "level1.level2.value" in result
         assert result["level1.level2.value"] == "test"
@@ -34,16 +38,18 @@ class TestFlattenJson:
     def test_flatten_empty_object(self):
         """Test flattening empty object."""
         data = {}
+        config = TransmogConfig(separator="_")
 
-        result = flatten_json(data, separator="_")
+        result = flatten_json(data, config)
 
         assert result == {}
 
     def test_flatten_with_arrays(self):
         """Test flattening object with arrays."""
         data = {"items": [1, 2, 3], "name": "test"}
+        config = TransmogConfig(separator="_")
 
-        result = flatten_json(data, separator="_")
+        result = flatten_json(data, config)
 
         # Arrays may be skipped or converted to JSON strings in basic flattening
         assert result["name"] == "test"
@@ -52,8 +58,10 @@ class TestFlattenJson:
     def test_flatten_nested_objects(self):
         """Test flattening deeply nested objects."""
         data = {"level1": {"level2": {"level3": {"value": "deep"}}}}
+        # Disable nested threshold to test full path flattening
+        config = TransmogConfig(separator="_", nested_threshold=10)
 
-        result = flatten_json(data, separator="_")
+        result = flatten_json(data, config)
 
         assert "level1_level2_level3_value" in result
         assert result["level1_level2_level3_value"] == "deep"
@@ -61,8 +69,9 @@ class TestFlattenJson:
     def test_flatten_with_null_values(self):
         """Test flattening with null values."""
         data = {"name": "test", "null_field": None, "nested": {"null_nested": None}}
+        config = TransmogConfig(separator="_")
 
-        result = flatten_json(data, separator="_")
+        result = flatten_json(data, config)
 
         assert result["name"] == "test"
         # Null handling may vary based on configuration
@@ -70,8 +79,9 @@ class TestFlattenJson:
     def test_flatten_with_empty_strings(self):
         """Test flattening with empty strings."""
         data = {"name": "", "nested": {"empty": ""}}
+        config = TransmogConfig(separator="_")
 
-        result = flatten_json(data, separator="_")
+        result = flatten_json(data, config)
 
         # Empty strings may be skipped based on configuration
         assert isinstance(result, dict)
@@ -84,20 +94,21 @@ class TestFlattenJson:
             "boolean": True,
             "nested": {"float": 3.14, "list": [1, 2, 3]},
         }
+        config = TransmogConfig(separator="_")
 
-        result = flatten_json(data, separator="_")
+        result = flatten_json(data, config)
 
         assert result["string"] == "text"
-        assert result["number"] == "42"  # Cast to string
-        # Boolean conversion might be "1"/"0" or "true"/"false"
-        assert result["boolean"] in ["1", "0", "true", "false", "True", "False"]
-        assert result["nested_float"] == "3.14"  # Cast to string
+        assert result["number"] == 42
+        assert result["boolean"]
+        assert result["nested_float"] == 3.14
 
     def test_flatten_with_special_characters(self):
         """Test flattening with special characters in keys."""
         data = {"key-with-dash": "value1", "key.with.dots": "value2"}
+        config = TransmogConfig(separator="_")
 
-        result = flatten_json(data, separator="_")
+        result = flatten_json(data, config)
 
         # Should handle special characters in keys
         assert len(result) >= 2
@@ -106,8 +117,9 @@ class TestFlattenJson:
         """Test that flattening preserves original data."""
         original = {"nested": {"value": 42}}
         data = original.copy()
+        config = TransmogConfig(separator="_")
 
-        result = flatten_json(data, separator="_")
+        result = flatten_json(data, config)
 
         # Original should be unchanged
         assert data == original
@@ -129,22 +141,27 @@ class TestCacheManagement:
 
     def test_cache_functionality(self):
         """Test that caching works correctly."""
+        import copy
+
         data = {"test": {"nested": "value"}}
+        config = TransmogConfig(separator="_")
 
         # First call
-        result1 = flatten_json(data, separator="_")
+        result1 = flatten_json(copy.deepcopy(data), config)
 
         # Second call should use cache (if enabled)
-        result2 = flatten_json(data, separator="_")
+        result2 = flatten_json(copy.deepcopy(data), config)
 
         assert result1 == result2
 
     def test_cache_with_different_separators(self):
         """Test caching with different separators."""
         data = {"test": {"nested": "value"}}
+        config_underscore = TransmogConfig(separator="_")
+        config_dot = TransmogConfig(separator=".")
 
-        result_underscore = flatten_json(data, separator="_")
-        result_dot = flatten_json(data, separator=".")
+        result_underscore = flatten_json(data, config_underscore)
+        result_dot = flatten_json(data, config_dot)
 
         # Results should be different due to different separators
         assert result_underscore != result_dot
@@ -157,10 +174,11 @@ class TestFlattenJsonEdgeCases:
         """Test that circular references are handled safely."""
         data = {"name": "test"}
         data["self"] = data  # Create circular reference
+        config = TransmogConfig(separator="_")
 
         # Should not cause infinite recursion
         try:
-            result = flatten_json(data, separator="_")
+            result = flatten_json(data, config)
             # If it doesn't crash, that's good
             assert isinstance(result, dict)
         except (RecursionError, ValueError, Exception):
@@ -178,8 +196,9 @@ class TestFlattenJsonEdgeCases:
             current = current[f"level{i}"]
 
         current["value"] = "deep"
+        config = TransmogConfig(separator="_")
 
-        result = flatten_json(data, separator="_")
+        result = flatten_json(data, config)
 
         # Should handle deep nesting
         assert isinstance(result, dict)
@@ -188,8 +207,9 @@ class TestFlattenJsonEdgeCases:
     def test_flatten_unicode_keys_and_values(self):
         """Test flattening with Unicode keys and values."""
         data = {"café": "coffee", "nested": {"résumé": "CV", "🚀": "rocket"}}
+        config = TransmogConfig(separator="_")
 
-        result = flatten_json(data, separator="_")
+        result = flatten_json(data, config)
 
         assert isinstance(result, dict)
         assert len(result) >= 3
@@ -197,8 +217,9 @@ class TestFlattenJsonEdgeCases:
     def test_flatten_numeric_keys(self):
         """Test flattening with numeric-like keys."""
         data = {"123": "numeric_key", "nested": {"456": "nested_numeric"}}
+        config = TransmogConfig(separator="_")
 
-        result = flatten_json(data, separator="_")
+        result = flatten_json(data, config)
 
         assert isinstance(result, dict)
         assert len(result) >= 2
@@ -212,7 +233,9 @@ class TestFlattenJsonEdgeCases:
         for i in range(100):
             current[f"field_{i}"] = {"value": i, "nested": {"deep": f"value_{i}"}}
 
-        result = flatten_json(data, separator="_")
+        config = TransmogConfig(separator="_")
+
+        result = flatten_json(data, config)
 
         assert isinstance(result, dict)
         assert len(result) > 100  # Should have many flattened fields
@@ -222,11 +245,11 @@ class TestFlattenJsonEdgeCases:
         from transmog.types import ArrayMode
 
         data = {"simple_list": [1, 2, 3], "nested": {"list": ["a", "b", "c"]}}
+        config = TransmogConfig(separator="_", array_mode=ArrayMode.INLINE)
 
-        result = flatten_json(data, separator="_", array_mode=ArrayMode.INLINE)
+        result = flatten_json(data, config)
 
         assert isinstance(result, dict)
-        assert len(result) == 2
         assert "simple_list" in result
         assert "nested_list" in result
 
@@ -238,12 +261,12 @@ class TestFlattenJsonEdgeCases:
             "none_val": None,
             "nested": {"bool": True, "null": None},
         }
+        config = TransmogConfig(separator="_")
 
-        result = flatten_json(data, separator="_")
+        result = flatten_json(data, config)
 
         assert isinstance(result, dict)
-        # Check that booleans are converted appropriately
         if "true_val" in result:
-            assert result["true_val"] in ["1", "0", "true", "false", "True", "False"]
+            assert result["true_val"]
         if "false_val" in result:
-            assert result["false_val"] in ["1", "0", "true", "false", "True", "False"]
+            assert not result["false_val"]

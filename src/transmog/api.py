@@ -4,27 +4,22 @@ This module provides the primary user-facing functions for flattening
 nested data structures into tabular formats.
 """
 
-import os
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Literal, Optional, Union
+from typing import Any, Optional, Union
 
-from transmog.config import MetadataConfig, ProcessingMode, TransmogConfig
+from transmog.config import TransmogConfig
 from transmog.io import initialize_io_features
 from transmog.process import Processor
 from transmog.process.result import ProcessingResult as _ProcessingResult
 from transmog.process.streaming import stream_process
-from transmog.types.base import ArrayMode, JsonDict
-from transmog.validation import validate_api_parameters
+from transmog.types.base import JsonDict
 
-# Initialize IO features to register writers
+# Initialize IO features
 initialize_io_features()
 
-# Type aliases for clarity
+# Type aliases
 DataInput = Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes]
-ArrayHandling = Literal["smart", "separate", "inline", "skip"]
-ErrorHandling = Literal["raise", "skip", "warn"]
-IdSource = Union[str, dict[str, str], None]
 
 
 class FlattenResult:
@@ -72,28 +67,22 @@ class FlattenResult:
         """
         path = Path(path)
 
-        # Auto-detect format from extension
         if output_format is None:
             output_format = path.suffix.lower().lstrip(".")
             if not output_format:
-                output_format = "csv"  # Default to CSV
+                output_format = "csv"
 
-        # Validate format
         valid_formats = ["csv", "parquet"]
         if output_format not in valid_formats:
             raise ValueError(
                 f"Unsupported format: {output_format}. Must be one of {valid_formats}"
             )
 
-        # Handle directory vs file output
         if len(self.tables) > 0:
-            # Multiple tables - use directory
             if path.suffix:
-                # Remove extension if provided
                 path = path.parent / path.stem
             return self._save_all_tables(path, output_format)
         else:
-            # Single table - can use file
             if not path.suffix:
                 path = path.with_suffix(f".{output_format}")
             return self._save_single_table(path, output_format)
@@ -175,24 +164,23 @@ class FlattenResult:
         elif output_format == "parquet":
             return self._result.write_all_parquet(str(base_path))
         else:
-            # Return empty dict for unknown formats
             return {}
 
     def _save_single_table(self, file_path: Path, output_format: str) -> list[str]:
         """Save single table to a file."""
+        import os
+
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         if output_format == "csv":
             paths = self._result.write("csv", str(file_path.parent))
             if paths:
-                # paths is a dict, get the first file path
                 first_path = next(iter(paths.values()))
                 os.rename(first_path, str(file_path))
                 return [str(file_path)]
         elif output_format == "parquet":
             paths = self._result.write("parquet", str(file_path.parent))
             if paths:
-                # paths is a dict, get the first file path
                 first_path = next(iter(paths.values()))
                 os.rename(first_path, str(file_path))
                 return [str(file_path)]
@@ -202,26 +190,8 @@ class FlattenResult:
 
 def flatten(
     data: DataInput,
-    *,
     name: str = "data",
-    # Naming options
-    separator: str = "_",
-    nested_threshold: int = 4,
-    # ID options
-    id_field: IdSource = None,
-    parent_id_field: str = "_parent_id",
-    add_timestamp: bool = False,
-    # Array handling
-    arrays: ArrayHandling = "smart",
-    # Data options
-    preserve_types: bool = False,
-    skip_null: bool = True,
-    skip_empty: bool = True,
-    # Error handling
-    errors: ErrorHandling = "raise",
-    # Performance
-    batch_size: int = 1000,
-    low_memory: bool = False,
+    config: Optional[TransmogConfig] = None,
 ) -> FlattenResult:
     """Flatten nested data structures into tabular format.
 
@@ -231,113 +201,45 @@ def flatten(
     Args:
         data: Input data - can be dict, list of dicts, file path, or JSON string
         name: Base name for the flattened tables
-
-        Naming Options:
-        separator: Character to separate nested field names (default: "_")
-        nested_threshold: Depth at which to simplify deeply nested names (default: 4)
-
-        ID Options:
-        id_field: Field to use as ID. Can be:
-                 - None: Generate unique IDs
-                 - String: Field name to use as ID
-                 - Dict: Mapping of table names to ID fields
-        parent_id_field: Name for parent reference field (default: "_parent_id")
-        add_timestamp: Add timestamp field to records (default: False)
-
-        Array Handling:
-        arrays: How to handle arrays:
-               - "smart": Intelligently handle - explode complex arrays,
-                 preserve simple primitive arrays as native arrays (default)
-               - "separate": Extract all arrays to child tables
-               - "inline": Keep all arrays in main record as JSON strings
-               - "skip": Ignore arrays completely
-
-        Data Options:
-        preserve_types: Keep original types instead of converting to strings
-                       (default: False)
-        skip_null: Skip null values in output (default: True)
-        skip_empty: Skip empty strings/lists/dicts (default: True)
-
-        Error Handling:
-        errors: How to handle errors:
-               - "raise": Raise exception on error (default)
-               - "skip": Skip problematic records
-               - "warn": Log warnings and continue
-
-        Performance:
-        batch_size: Number of records to process at once (default: 1000)
-        low_memory: Optimize for low memory usage (default: False)
+        config: Optional configuration (uses defaults if not provided)
 
     Returns:
         FlattenResult with flattened tables
 
     Examples:
-        >>> # Basic usage
+        >>> # Basic usage with defaults
         >>> result = flatten({"name": "Product", "tags": ["sale", "clearance"]})
         >>> result.main
         [{'name': 'Product', '_id': '...'}]
-        >>> result.tables['data_tags']
-        [{'value': 'sale', '_parent_id': '...'},
-         {'value': 'clearance', '_parent_id': '...'}]
+
+        >>> # Custom configuration
+        >>> config = TransmogConfig(separator=".", cast_to_string=False)
+        >>> result = flatten(data, config=config)
+
+        >>> # Use factory methods
+        >>> result = flatten(data, config=TransmogConfig.for_performance())
 
         >>> # Save to file
         >>> result.save("output.csv")
-
-        >>> # Use existing ID field
-        >>> result = flatten(data, id_field="product_id")
-
-        >>> # Custom separator for nested fields
-        >>> result = flatten(nested_data, separator=".")
     """
-    # Validate API parameters
-    validate_api_parameters(
-        data=data,
-        name=name,
-        separator=separator,
-        nested_threshold=nested_threshold,
-        id_field=id_field,
-        parent_id_field=parent_id_field,
-        arrays=arrays,
-        errors=errors,
-        batch_size=batch_size,
-    )
+    if config is None:
+        config = TransmogConfig()
 
-    # Build configuration from simplified options
-    config = _build_config(
-        separator=separator,
-        nested_threshold=nested_threshold,
-        id_field=id_field,
-        parent_id_field=parent_id_field,
-        add_timestamp=add_timestamp,
-        arrays=arrays,
-        preserve_types=preserve_types,
-        skip_null=skip_null,
-        skip_empty=skip_empty,
-        errors=errors,
-        batch_size=batch_size,
-        low_memory=low_memory,
-    )
-
-    # Create processor and process data
     processor = Processor(config)
 
-    # Handle file paths
     if isinstance(data, Path):
         data = str(data)
 
-    # Process the data
     processing_result = processor.process(data, entity_name=name)
 
-    # Return wrapped result
     return FlattenResult(processing_result)
 
 
 def flatten_file(
     path: Union[str, Path],
-    *,
     name: Optional[str] = None,
     file_format: Optional[str] = None,
-    **options: Any,
+    config: Optional[TransmogConfig] = None,
 ) -> FlattenResult:
     """Flatten data from a file.
 
@@ -347,50 +249,32 @@ def flatten_file(
         path: Path to input file
         name: Base name for tables (defaults to filename without extension)
         file_format: File format (auto-detected if not specified)
-        **options: Same options as flatten()
+        config: Optional configuration
 
     Returns:
         FlattenResult with flattened tables
 
     Examples:
         >>> result = flatten_file("products.json")
-        >>> result = flatten_file("data.jsonl", separator=".")
+        >>> result = flatten_file("data.jsonl", config=TransmogConfig(separator="."))
     """
-    # Validate API parameters
-    validate_api_parameters(format=file_format)
-
     path = Path(path)
 
-    # Auto-detect name from filename
     if name is None:
         name = path.stem
 
-    # Pass to main flatten function
-    return flatten(str(path), name=name, **options)
+    return flatten(str(path), name=name, config=config)
 
 
 def flatten_stream(
     data: DataInput,
     output_path: Union[str, Path],
-    *,
     name: str = "data",
     output_format: str = "csv",
-    # All the same options as flatten()
-    separator: str = "_",
-    nested_threshold: int = 4,
-    id_field: IdSource = None,
-    parent_id_field: str = "_parent_id",
-    add_timestamp: bool = False,
-    arrays: ArrayHandling = "smart",
-    preserve_types: bool = False,
-    skip_null: bool = True,
-    skip_empty: bool = True,
-    errors: ErrorHandling = "raise",
-    batch_size: int = 1000,
-    # Streaming-specific options
+    config: Optional[TransmogConfig] = None,
     **format_options: Any,
 ) -> None:
-    """Stream flatten data directly to files for memory-efficient processing.
+    r"""Stream flatten data directly to files for memory-efficient processing.
 
     This function processes data and writes directly to output files without
     keeping results in memory, making it ideal for very large datasets.
@@ -400,175 +284,65 @@ def flatten_stream(
         output_path: Directory path where output files will be written
         name: Base name for the flattened tables
         output_format: Output format ("csv", "parquet")
+        config: Optional configuration (optimized for memory if not provided)
+        **format_options: Format-specific writer options:
 
-        # Same options as flatten() function
-        separator: Character to separate nested field names
-        nested_threshold: Depth at which to simplify deeply nested names
-        id_field: Field to use as ID
-        parent_id_field: Name for parent reference field
-        add_timestamp: Add timestamp field to records
-        arrays: How to handle arrays ("separate", "inline", "skip")
-        preserve_types: Keep original types instead of converting to strings
-        skip_null: Skip null values in output
-        skip_empty: Skip empty strings/lists/dicts
-        errors: How to handle errors ("raise", "skip", "warn")
-        batch_size: Number of records to process at once
+            CSV options:
+                - compression: str - Compression type (None, "gzip", "bz2", "xz")
+                - encoding: str - Text encoding (default: "utf-8")
+                - line_terminator: str - Line ending (default: "\n")
 
-        **format_options: Format-specific options (compression, etc.)
+            Parquet options:
+                - compression: str - Compression codec
+                  ("snappy", "gzip", "brotli", "lz4", "zstd", None)
+                - row_group_size: int - Rows per row group (default: 10000)
+                - coerce_timestamps: str - Timestamp resolution ("ms", "us")
 
-    Returns:
-        None - data is written directly to files
+            Universal options:
+                - buffer_size: int - Write buffer size in bytes
+                - progress_callback: Callable[[int], None] - Progress function
 
     Examples:
         >>> # Stream large dataset to CSV files
         >>> flatten_stream(large_data, "output/", output_format="csv")
 
-        >>> # Stream to compressed Parquet
+        >>> # Stream with custom config
+        >>> config = TransmogConfig.for_memory()
+        >>> flatten_stream(data, "output/", config=config)
+
+        >>> # Stream to compressed Parquet with specific row group size
         >>> flatten_stream(data, "output/", output_format="parquet",
-        ...                compression="snappy")
+        ...                compression="snappy", row_group_size=50000)
 
-        >>> # Stream JSON file processing
-        >>> flatten_stream("large_file.json", "output/", output_format="csv")
+        >>> # Stream CSV with gzip compression
+        >>> flatten_stream(data, "output/", output_format="csv",
+        ...                compression="gzip")
     """
-    # Validate API parameters
-    validate_api_parameters(
-        data=data,
-        name=name,
-        format=output_format,
-        separator=separator,
-        nested_threshold=nested_threshold,
-        id_field=id_field,
-        parent_id_field=parent_id_field,
-        arrays=arrays,
-        errors=errors,
-        batch_size=batch_size,
-    )
+    if config is None:
+        config = TransmogConfig.for_memory()
 
-    # Build configuration from options
-    config = _build_config(
-        separator=separator,
-        nested_threshold=nested_threshold,
-        id_field=id_field,
-        parent_id_field=parent_id_field,
-        add_timestamp=add_timestamp,
-        arrays=arrays,
-        preserve_types=preserve_types,
-        skip_null=skip_null,
-        skip_empty=skip_empty,
-        errors=errors,
-        batch_size=batch_size,
-        low_memory=True,  # Always use low memory for streaming
-    )
-
-    # Use the advanced streaming API
     processor = Processor(config)
 
-    # Handle file paths
     if isinstance(data, Path):
         data = str(data)
 
-    # Create output directory
     output_path = Path(output_path)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Import and use streaming function
-
-    # Stream process the data
     stream_process(
         processor=processor,
         data=data,
         entity_name=name,
         output_format=output_format,
         output_destination=str(output_path),
-        batch_size=batch_size,
         **format_options,
     )
 
 
-def _build_config(
-    separator: str,
-    nested_threshold: int,
-    id_field: IdSource,
-    parent_id_field: str,
-    add_timestamp: bool,
-    arrays: ArrayHandling,
-    preserve_types: bool,
-    skip_null: bool,
-    skip_empty: bool,
-    errors: ErrorHandling,
-    batch_size: int,
-    low_memory: bool,
-) -> TransmogConfig:
-    """Build internal configuration from simplified options."""
-    if arrays == "smart":
-        array_mode = ArrayMode.SMART
-    elif arrays == "separate":
-        array_mode = ArrayMode.SEPARATE
-    elif arrays == "inline":
-        array_mode = ArrayMode.INLINE
-    elif arrays == "skip":
-        array_mode = ArrayMode.SKIP
-    else:
-        raise ValueError(f"Invalid arrays value: {arrays}")
-
-    # Apply error handling
-    if errors == "raise":
-        strategy = "strict"
-        allow_malformed = False
-    elif errors == "skip":
-        strategy = "skip"
-        allow_malformed = True
-    elif errors == "warn":
-        strategy = "partial"
-        allow_malformed = True
-    else:
-        raise ValueError(f"Invalid error handling option: {errors}")
-
-        # Build metadata configuration with proper timestamp handling
-    metadata_config = MetadataConfig(
-        id_field="_id",
-        parent_field=parent_id_field,
-        time_field="_timestamp" if add_timestamp else None,
-    )
-
-    # Handle ID field configuration by creating a new metadata config
-    if id_field is not None:
-        if isinstance(id_field, str):
-            # Single field name - use for natural ID discovery
-            metadata_config = MetadataConfig(
-                id_field=metadata_config.id_field,
-                parent_field=metadata_config.parent_field,
-                time_field=metadata_config.time_field,
-                id_field_patterns=[id_field],
-            )
-        elif isinstance(id_field, dict):
-            # Mapping of table to field names
-            metadata_config = MetadataConfig(
-                id_field=metadata_config.id_field,
-                parent_field=metadata_config.parent_field,
-                time_field=metadata_config.time_field,
-                id_field_mapping=id_field,
-            )
-
-    # Create configuration with explicit metadata
-    config = TransmogConfig(
-        # Component configs
-        metadata=metadata_config,
-        # Convenience parameters
-        separator=separator,
-        nested_threshold=nested_threshold,
-        cast_to_string=not preserve_types,
-        include_empty=not skip_empty,
-        skip_null=skip_null,
-        array_mode=array_mode,
-        batch_size=batch_size,
-        recovery_strategy=strategy,
-        allow_malformed_data=allow_malformed,
-    )
-
-    # Set processing mode
-    config.processing.processing_mode = (
-        ProcessingMode.LOW_MEMORY if low_memory else ProcessingMode.STANDARD
-    )
-
-    return config
+__all__ = [
+    "flatten",
+    "flatten_file",
+    "flatten_stream",
+    "FlattenResult",
+    "TransmogConfig",
+]

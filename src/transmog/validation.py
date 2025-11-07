@@ -5,9 +5,12 @@ ensuring consistent error messages and validation logic across the entire codeba
 """
 
 import re
-from typing import Any, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from transmog.error import ConfigurationError, ValidationError
+
+if TYPE_CHECKING:
+    from transmog.types.base import RecoveryMode
 
 # Type aliases for validation
 ArrayHandling = Literal["separate", "inline", "skip"]
@@ -185,24 +188,27 @@ class ParameterValidator:
             )
 
     @staticmethod
-    def validate_recovery_strategy(value: str, context: str = "parameter") -> None:
-        """Validate recovery strategy.
+    def validate_recovery_mode(
+        value: "RecoveryMode", context: str = "parameter"
+    ) -> None:
+        """Validate recovery mode.
 
         Args:
-            value: Recovery strategy to validate
+            value: Recovery mode to validate
             context: Context for error messages (api/config/parameter)
 
         Raises:
             ValidationError: For API context
             ConfigurationError: For config context
         """
-        error_class = ValidationError if context == "api" else ConfigurationError
-        valid_strategies = ["strict", "skip", "partial"]
+        from transmog.types.base import RecoveryMode
 
-        if value not in valid_strategies:
+        error_class = ValidationError if context == "api" else ConfigurationError
+
+        if not isinstance(value, RecoveryMode):
             raise error_class(
-                f"Invalid recovery strategy: '{value}'. "
-                f"Must be one of: {', '.join(valid_strategies)}"
+                f"recovery_mode must be a RecoveryMode enum value, "
+                f"got {type(value).__name__}"
             )
 
     @staticmethod
@@ -414,8 +420,8 @@ def validate_config_parameters(**params: Any) -> None:
     if "batch_size" in params:
         validator.validate_batch_size(params["batch_size"], "config")
 
-    if "recovery_strategy" in params:
-        validator.validate_recovery_strategy(params["recovery_strategy"], "config")
+    if "recovery_mode" in params:
+        validator.validate_recovery_mode(params["recovery_mode"], "config")
 
     if "id_field" in params:
         validator.validate_field_name(params["id_field"], "config")

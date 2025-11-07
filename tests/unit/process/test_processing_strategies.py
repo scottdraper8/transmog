@@ -349,6 +349,7 @@ class TestStrategyConfiguration:
         # Create circular reference
         problematic_data[0]["circular"] = problematic_data[0]
 
-        # Should raise an error for circular references
-        with pytest.raises(Exception):  # ProcessingError
-            strategy.process(problematic_data, entity_name="error_test")
+        # Should handle circular references with max_depth protection
+        result = strategy.process(problematic_data, entity_name="error_test")
+        assert result is not None
+        assert len(result.main_table) == 1

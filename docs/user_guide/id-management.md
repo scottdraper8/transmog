@@ -78,7 +78,8 @@ data = {
 }
 
 # Use existing product_id field
-result = tm.flatten(data, name="products", id_field="product_id")
+config = tm.TransmogConfig(id_field="product_id")
+result = tm.flatten(data, name="products", config=config)
 
 print("Main record:", result.main[0])
 # {'product_id': 'PROD123', 'product_name': 'Gaming Laptop', '_id': 'PROD123'}
@@ -90,9 +91,9 @@ print("Review records:", result.tables["products_reviews"])
 # ]
 ```
 
-### Table-Specific ID Fields
+### Natural ID Discovery
 
-Different tables can use different ID fields:
+Transmog can automatically discover common ID fields in your data:
 
 ```python
 data = {
@@ -110,17 +111,16 @@ data = {
     }
 }
 
-# Different ID fields for different tables
-result = tm.flatten(data, name="company", id_field={
-    "": "company_id",                    # Main table uses company_id
-    "company_employees": "employee_id",   # Employee table uses employee_id
-    "company_offices": "office_id"       # Office table uses office_id
-})
+# Specify which fields to check for natural IDs
+config = tm.TransmogConfig(
+    id_patterns=["company_id", "employee_id", "office_id"]
+)
+result = tm.flatten(data, name="company", config=config)
 
 print("Employee records:", result.tables["company_employees"])
 # [
-#   {'employee_id': 'EMP001', 'name': 'Alice', '_parent_id': 'COMP123', '_id': 'EMP001'},
-#   {'employee_id': 'EMP002', 'name': 'Bob', '_parent_id': 'COMP123', '_id': 'EMP002'}
+#   {'employee_id': 'EMP001', 'name': 'Alice', '_parent_id': 'COMP123'},
+#   {'employee_id': 'EMP002', 'name': 'Bob', '_parent_id': 'COMP123'}
 # ]
 ```
 
@@ -135,7 +135,8 @@ data = [
     {"product_id": "PROD456", "name": "Keyboard"}    # Has ID field
 ]
 
-result = tm.flatten(data, name="products", id_field="product_id")
+config = tm.TransmogConfig(id_field="product_id")
+result = tm.flatten(data, name="products", config=config)
 
 # Records with missing ID fields get generated IDs
 for record in result.main:
@@ -198,11 +199,10 @@ data = {
     }
 }
 
-result = tm.flatten(data, name="company", id_field={
-    "": "company_id",
-    "company_departments": "dept_id",
-    "company_departments_teams": "team_id"
-})
+config = tm.TransmogConfig(
+    id_patterns=["company_id", "dept_id", "team_id"]
+)
+result = tm.flatten(data, name="company", config=config)
 
 # Three-level hierarchy
 print("Company:", result.main[0]["_id"])           # COMP123
@@ -221,8 +221,9 @@ Natural IDs provide deterministic, reproducible results:
 data1 = {"product_id": "PROD123", "name": "Laptop"}
 data2 = {"product_id": "PROD123", "name": "Laptop"}
 
-result1 = tm.flatten(data1, name="products", id_field="product_id")
-result2 = tm.flatten(data2, name="products", id_field="product_id")
+config = tm.TransmogConfig(id_field="product_id")
+result1 = tm.flatten(data1, name="products", config=config)
+result2 = tm.flatten(data2, name="products", config=config)
 
 # IDs are deterministic
 assert result1.main[0]["_id"] == result2.main[0]["_id"]
@@ -347,7 +348,8 @@ def create_composite_id(record):
 for record in data:
     record["composite_id"] = create_composite_id(record)
 
-result = tm.flatten(data, name="sales", id_field="composite_id")
+config = tm.TransmogConfig(id_field="composite_id")
+result = tm.flatten(data, name="sales", config=config)
 print("Composite IDs:", [r["_id"] for r in result.main])
 # ['US_001_laptop', 'EU_002_mouse']
 ```
@@ -371,7 +373,8 @@ def determine_id_field(data):
 
 # Determine ID field dynamically
 id_field = determine_id_field(data)
-result = tm.flatten(data, name="records", id_field=id_field)
+config = tm.TransmogConfig(id_field=id_field) if id_field else tm.TransmogConfig()
+result = tm.flatten(data, name="records", config=config)
 ```
 
 ## Metadata Enhancement
@@ -381,13 +384,9 @@ result = tm.flatten(data, name="records", id_field=id_field)
 Add processing timestamps to records:
 
 ```python
-# Add timestamps for audit trails
-result = tm.flatten(
-    data,
-    name="events",
-    id_field="event_id",
-    add_timestamp=True
-)
+# Add timestamps for audit trails (enabled by default)
+config = tm.TransmogConfig(id_field="event_id", time_field="_timestamp")
+result = tm.flatten(data, name="events", config=config)
 
 # Records include timestamp metadata
 print("Record with timestamp:", result.main[0])
@@ -400,7 +399,8 @@ Add custom metadata during processing:
 
 ```python
 # Custom metadata can be added post-processing
-result = tm.flatten(data, name="records", id_field="record_id")
+config = tm.TransmogConfig(id_field="record_id")
+result = tm.flatten(data, name="records", config=config)
 
 # Add processing metadata
 processing_info = {
@@ -421,17 +421,17 @@ Choose ID fields based on requirements:
 
 ```python
 # For reproducible results
-result = tm.flatten(data, name="products", id_field="product_id")
+config = tm.TransmogConfig(id_field="product_id")
+result = tm.flatten(data, name="products", config=config)
 
 # For simplicity when IDs don't matter
 result = tm.flatten(data, name="products")  # Use generated IDs
 
 # For complex scenarios with multiple entity types
-result = tm.flatten(data, name="entities", id_field={
-    "": "entity_id",
-    "entities_children": "child_id",
-    "entities_metadata": "meta_id"
-})
+config = tm.TransmogConfig(
+    id_patterns=["entity_id", "child_id", "meta_id"]
+)
+result = tm.flatten(data, name="entities", config=config)
 ```
 
 ### ID Validation Pipeline
@@ -448,7 +448,8 @@ def validate_and_process(data, id_config):
             raise ValueError(f"Missing required ID fields: {missing}")
 
     # Process data
-    result = tm.flatten(data, name="validated", **id_config)
+    config = id_config.pop("config", tm.TransmogConfig(**id_config))
+    result = tm.flatten(data, name="validated", config=config)
 
     # Post-validation
     duplicates = validate_id_uniqueness(result)

@@ -12,50 +12,21 @@ from typing import (
     Union,
 )
 
-from ..config.utils import build_hierarchy_params
-from ..core.metadata import get_current_timestamp
-from ..error import (
+from transmog.core.metadata import get_current_timestamp
+from transmog.error import (
     FileError,
     error_context,
 )
-from ..io.writer_factory import create_streaming_writer
-from ..types.base import JsonDict
-from ..types.io_types import StreamingWriterProtocol
+from transmog.io.writer_factory import create_streaming_writer
+from transmog.types import JsonDict, ProcessingContext
+from transmog.types.io_types import StreamingWriterProtocol
+
 from .data_iterators import (
     get_data_iterator,
     get_json_file_iterator,
     get_jsonl_file_iterator,
 )
-from .utils import get_batch_size, handle_file_error
-
-
-def _get_streaming_params(
-    processor: Any,
-    extract_time: Optional[Any] = None,
-    use_deterministic_ids: Optional[bool] = None,
-    force_transmog_id: Optional[bool] = None,
-) -> dict[str, Any]:
-    """Get parameters for streaming processing functions.
-
-    Args:
-        processor: Processor instance
-        extract_time: Optional extraction timestamp
-        use_deterministic_ids: Whether to use deterministic IDs
-        force_transmog_id: Whether to force transmog ID generation
-
-    Returns:
-        Dictionary of parameters for streaming processing
-    """
-    # Use the hierarchy-specific parameter builder for streaming
-    overrides = {}
-    if use_deterministic_ids is not None:
-        overrides["use_deterministic_ids"] = use_deterministic_ids
-    if force_transmog_id is not None:
-        overrides["force_transmog_id"] = force_transmog_id
-
-    return build_hierarchy_params(
-        processor.config, extract_time=extract_time, streaming=True, **overrides
-    )
+from .utils import handle_file_error
 
 
 def _stream_process_batch(
@@ -65,8 +36,6 @@ def _stream_process_batch(
     writer: StreamingWriterProtocol,
     child_tables_registry: dict[str, bool],
     extract_time: Optional[Any] = None,
-    use_deterministic_ids: bool = False,
-    force_transmog_id: bool = False,
 ) -> None:
     """Process a batch of records and write to output directly.
 
@@ -77,25 +46,21 @@ def _stream_process_batch(
         writer: StreamingWriter instance
         child_tables_registry: Registry of discovered child tables
         extract_time: Optional extraction timestamp
-        use_deterministic_ids: Whether to use deterministic ID generation
-        force_transmog_id: Whether to force transmog ID generation
     """
-    # Get processing parameters
-    params = _get_streaming_params(
-        processor=processor,
-        extract_time=extract_time,
-        use_deterministic_ids=use_deterministic_ids,
-        force_transmog_id=force_transmog_id,
-    )
-
-    # Import here to avoid circular imports
     from transmog.core.hierarchy import stream_process_records
+    from transmog.core.metadata import get_current_timestamp
 
-    # Process batch with streaming
+    config = processor.config
+    # Ensure extract_time is a datetime
+    if extract_time is None:
+        extract_time = get_current_timestamp()
+    context = ProcessingContext(extract_time=extract_time)
+
     main_records, child_tables_gen = stream_process_records(
         records=batch_data,
         entity_name=entity_name,
-        **params,
+        config=config,
+        context=context,
     )
 
     # Write main records
@@ -136,8 +101,6 @@ def _stream_process_in_batches(
     writer: StreamingWriterProtocol,
     extract_time: Optional[Any] = None,
     batch_size: Optional[int] = 1000,
-    use_deterministic_ids: bool = False,
-    force_transmog_id: bool = False,
 ) -> None:
     """Stream process data in batches and write directly to output.
 
@@ -148,12 +111,10 @@ def _stream_process_in_batches(
         writer: StreamingWriter to write output
         extract_time: Optional extraction timestamp
         batch_size: Size of batches to process
-        use_deterministic_ids: Whether to use deterministic ID generation
-        force_transmog_id: Whether to force transmog ID generation
     """
     # Process records in batches
     record_buffer = []
-    child_tables_registry: dict[str, bool] = {}  # Track discovered child tables
+    child_tables_registry: dict[str, bool] = {}
 
     for record in data_iterator:
         record_buffer.append(record)
@@ -167,8 +128,6 @@ def _stream_process_in_batches(
                 extract_time=extract_time,
                 writer=writer,
                 child_tables_registry=child_tables_registry,
-                use_deterministic_ids=use_deterministic_ids,
-                force_transmog_id=force_transmog_id,
             )
             record_buffer = []
 
@@ -181,8 +140,6 @@ def _stream_process_in_batches(
             extract_time=extract_time,
             writer=writer,
             child_tables_registry=child_tables_registry,
-            use_deterministic_ids=use_deterministic_ids,
-            force_transmog_id=force_transmog_id,
         )
 
 
@@ -221,7 +178,6 @@ def stream_process_file_with_format(
     format_type: str,
     output_destination: Optional[Union[str, BinaryIO]] = None,
     extract_time: Optional[Any] = None,
-    use_deterministic_ids: bool = False,
     **format_options: Any,
 ) -> None:
     """Stream process a file with known format.
@@ -234,7 +190,6 @@ def stream_process_file_with_format(
         format_type: Input file format ('json', 'jsonl')
         output_destination: Output destination
         extract_time: Optional extraction timestamp
-        use_deterministic_ids: Whether to use deterministic IDs
         **format_options: Format-specific options
     """
     # Check if file exists
@@ -243,7 +198,7 @@ def stream_process_file_with_format(
 
     try:
         # Extract chunk_size before passing to iterators
-        format_options.pop("chunk_size", get_batch_size(processor))
+        format_options.pop("chunk_size", processor.config.batch_size)
 
         # Create appropriate iterator based on format
         if format_type == "json":
@@ -261,7 +216,6 @@ def stream_process_file_with_format(
             output_format=output_format,
             output_destination=output_destination,
             extract_time=extract_time,
-            use_deterministic_ids=use_deterministic_ids,
             **format_options,
         )
     except Exception as e:
@@ -323,8 +277,6 @@ def stream_process(
     output_destination: Optional[Union[str, BinaryIO]] = None,
     extract_time: Optional[Any] = None,
     batch_size: Optional[int] = None,
-    use_deterministic_ids: bool = False,
-    force_transmog_id: bool = False,
     **format_options: Any,
 ) -> None:
     """Stream process data and write directly to output.
@@ -337,8 +289,6 @@ def stream_process(
         output_destination: File path or file-like object to write to
         extract_time: Optional extraction timestamp
         batch_size: Size of batches to process
-        use_deterministic_ids: Whether to use deterministic ID generation
-        force_transmog_id: Whether to force transmog ID generation
         **format_options: Format-specific options for the writer
     """
     # Create streaming writer
@@ -354,7 +304,7 @@ def stream_process(
     data_iterator = get_data_iterator(processor, data)
 
     # Get batch size
-    batch_size = get_batch_size(processor, batch_size)
+    batch_size = batch_size or processor.config.batch_size
 
     # Set extraction timestamp if not provided
     if extract_time is None:
@@ -369,9 +319,8 @@ def stream_process(
             writer=writer,
             extract_time=extract_time,
             batch_size=batch_size,
-            use_deterministic_ids=use_deterministic_ids,
-            force_transmog_id=force_transmog_id,
         )
     finally:
         # Ensure writer is finalized and closed
         writer.finalize()
+        writer.close()

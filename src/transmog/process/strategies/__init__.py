@@ -9,7 +9,7 @@ from .batch import BatchStrategy
 from .chunked import ChunkedStrategy
 from .file import FileStrategy
 from .memory import InMemoryStrategy
-from .shared import process_batch_arrays, process_batch_main_records
+from .shared import process_batch_main_records
 
 __all__ = [
     "ProcessingStrategy",
@@ -18,5 +18,4 @@ __all__ = [
     "BatchStrategy",
     "ChunkedStrategy",
     "process_batch_main_records",
-    "process_batch_arrays",
 ]

@@ -53,14 +53,11 @@ class DataIterator(Protocol[T_co]):
 
 
 class Processor:
-    """Internal processor for flattening nested structures.
-
-    This class is internal only. Use tm.flatten() instead.
-    """
+    """Processor for flattening nested structures."""
 
     def __init__(self, config: Optional[TransmogConfig] = None):
-        """Initialize the processor with the given configuration."""
-        self.config = config or TransmogConfig.default()
+        """Initialize the processor."""
+        self.config = config or TransmogConfig()
         self._configure_cache()
 
     @error_context("Failed to process data", log_exceptions=True)  # type: ignore[misc]
@@ -110,24 +107,5 @@ class Processor:
         return self
 
     def _configure_cache(self) -> None:
-        """Configure the processor's cache settings."""
-        # Apply cache configuration from the processor's config to global settings
-        from .. import config
-
-        # Update global settings with cache configuration
-        if hasattr(self.config, "cache_config"):
-            cache_config = self.config.cache_config
-
-            # Directly update the settings object
-            config.settings.update(
-                cache_enabled=cache_config.enabled,
-                cache_maxsize=cache_config.maxsize,
-                clear_cache_after_batch=cache_config.clear_after_batch,
-            )
-
-            # Refresh the cache configuration to apply settings
-            refresh_cache_config()
-
-
-# The Processor class is internal only - use tm.flatten() instead
-# No __all__ export to keep it internal
+        """Configure cache settings."""
+        refresh_cache_config()

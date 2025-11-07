@@ -1,579 +1,269 @@
-# Custom Configuration Patterns
+# Custom Configuration
 
-Advanced Transmog usage often requires fine-grained control over processing behavior. The
-internal configuration system provides flexible options for customizing data transformation,
-naming conventions, and processing strategies.
-
-## Configuration System Overview
+## Configuration Overview
 
 ### TransmogConfig Class
 
-The `TransmogConfig` class provides the foundation for advanced configuration:
+The `TransmogConfig` class contains all configuration parameters:
 
 ```python
-from transmog.config import TransmogConfig
+from transmog import TransmogConfig, flatten
+
+config = TransmogConfig(
+    separator=".",
+    nested_threshold=5,
+    cast_to_string=False,
+    batch_size=2000,
+    id_field="id",
+    parent_field="parent_id",
+)
+
+result = flatten(data, config=config)
+```
+
+### Configuration Parameters
+
+**Naming (2 parameters):**
+
+- `separator`: Character to separate nested field names (default: `"_"`)
+- `nested_threshold`: Depth at which to simplify deeply nested names (default: `4`)
+
+**Processing (6 parameters):**
+
+- `cast_to_string`: Convert all values to strings (default: `False`)
+- `include_empty`: Include empty values in output (default: `False`)
+- `skip_null`: Skip null values (default: `True`)
+- `array_mode`: How to handle arrays - `ArrayMode.SMART`, `SEPARATE`, `INLINE`,
+  or `SKIP` (default: `SMART`)
+- `batch_size`: Records to process at once (default: `1000`)
+- `max_depth`: Maximum recursion depth (default: `100`)
+
+**Metadata (3 parameters):**
+
+- `id_field`: Field name for record IDs (default: `"_id"`)
+- `parent_field`: Field name for parent references (default: `"_parent_id"`)
+- `time_field`: Field name for timestamps (default: `"_timestamp"`, set to `None` to disable)
+
+**ID Discovery (1 parameter):**
+
+- `id_patterns`: List of field names to check for natural IDs (default: `None`)
+
+**Error Handling (2 parameters):**
+
+- `recovery_strategy`: `"strict"`, `"skip"`, or `"partial"` (default: `"strict"`)
+- `allow_malformed_data`: Allow malformed data (default: `False`)
+
+**Cache (1 parameter):**
+
+- `cache_size`: Maximum cache size, set to 0 to disable (default: `10000`)
+
+**Advanced (1 parameter):**
+
+- `id_generator`: Custom function for ID generation (default: `None`)
+
+## Factory Methods
+
+```python
+# Default: types preserved, optimized for Parquet/analytics
+result = tm.flatten(data)
+
+# CSV: strings, includes empty/null values
+config = TransmogConfig.for_csv()
+
+# Memory: small batches, minimal cache
+config = TransmogConfig.for_memory()
+
+# Performance: large batches, extended cache
+config = TransmogConfig.for_performance()
+
+# Simple: clean field names (id, parent_id, timestamp)
+config = TransmogConfig.simple()
+
+# Error-tolerant: skip malformed records
+config = TransmogConfig.error_tolerant()
+```
+
+## Configuration Examples
+
+### Basic Configuration
+
+```python
+from transmog import TransmogConfig, flatten
+
+config = TransmogConfig(
+    separator=".",
+    cast_to_string=False,
+    batch_size=5000,
+)
+
+result = flatten(data, config=config)
+```
+
+### Performance Configuration
+
+```python
+# Large datasets
+config = TransmogConfig.for_performance()
+
+# Memory-constrained environments
+config = TransmogConfig.for_memory()
+
+# Or customize from scratch
+config = TransmogConfig(
+    batch_size=10000,
+    cache_size=50000,
+)
+```
+
+### ID Management
+
+```python
+# Use existing ID field
+config = TransmogConfig(
+    id_field="product_id",
+    parent_field="category_id",
+)
+
+# Discover natural IDs from data
+config = TransmogConfig(
+    id_patterns=["id", "uuid", "pk"],
+)
+```
+
+### Array Handling
+
+```python
+from transmog.types import ArrayMode
+
+# Smart mode - simple arrays inline, complex arrays extracted
+config = TransmogConfig(array_mode=ArrayMode.SMART)
+
+# Extract all arrays to child tables
+config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
+
+# Keep all arrays as JSON strings
+config = TransmogConfig(array_mode=ArrayMode.INLINE)
+
+# Skip arrays
+config = TransmogConfig(array_mode=ArrayMode.SKIP)
+```
+
+### Error Handling
+
+```python
+# Strict mode
+config = TransmogConfig(
+    recovery_strategy="strict",
+    allow_malformed_data=False,
+)
+
+# Skip errors
+config = TransmogConfig(
+    recovery_strategy="skip",
+    allow_malformed_data=True,
+)
+```
+
+## Loading Configuration
+
+### From File
+
+```python
+# Load from JSON file
+config = TransmogConfig.from_file("config.json")
+
+# Load from YAML file
+config = TransmogConfig.from_file("config.yaml")
+
+# Load from TOML file
+config = TransmogConfig.from_file("config.toml")
+```
+
+Example configuration file (`config.json`):
+
+```json
+{
+    "separator": ".",
+    "cast_to_string": false,
+    "batch_size": 5000,
+    "id_field": "id",
+    "parent_field": "parent_id"
+}
+```
+
+### From Environment Variables
+
+```python
+# Load from environment variables with TRANSMOG_ prefix
+config = TransmogConfig.from_env()
+```
+
+Environment variables:
+
+```bash
+export TRANSMOG_SEPARATOR="."
+export TRANSMOG_BATCH_SIZE=5000
+export TRANSMOG_CAST_TO_STRING=false
+```
+
+## Advanced Usage
+
+### Using with Processor
+
+```python
 from transmog.process import Processor
 
-# Create custom configuration
 config = TransmogConfig(
-    naming_config={
-        "separator": ".",
-        "nested_threshold": 5,
-        "max_field_length": 100
-    },
-    processing_config={
-        "batch_size": 2000,
-        "preserve_types": True,
-        "error_strategy": "warn"
-    },
-    output_config={
-        "include_metadata": True,
-        "timestamp_format": "iso"
-    }
+    batch_size=5000,
+    cache_size=50000,
 )
 
-# Use with processor
 processor = Processor(config)
-result = processor.process(data)
+result = processor.process(data, entity_name="products")
 ```
 
-### Factory Methods
-
-Pre-configured settings for common use cases:
+### Streaming Configuration
 
 ```python
-# Memory-optimized configuration
-memory_config = TransmogConfig.memory_optimized()
+from transmog import flatten_stream
 
-# Performance-optimized configuration
-performance_config = TransmogConfig.performance_optimized()
+config = TransmogConfig.for_memory()
 
-# Simple processing configuration
-simple_config = TransmogConfig.simple_mode()
-
-# Development/debugging configuration
-debug_config = TransmogConfig.debug_mode()
-```
-
-## Builder Pattern Configuration
-
-### Fluent Interface
-
-Build configurations using method chaining:
-
-```python
-config = (
-    TransmogConfig.default()
-    .with_naming(
-        separator="_",
-        nested_threshold=4,
-        preserve_case=True
-    )
-    .with_processing(
-        batch_size=3000,
-        parallel_workers=2,
-        memory_limit="1GB"
-    )
-    .with_output(
-        formats=["json", "parquet"],
-        compression="gzip"
-    )
+flatten_stream(
+    large_data,
+    "output/",
+    output_format="parquet",
+    config=config,
 )
 ```
 
-### Conditional Configuration
+## Configuration Guidelines
 
-Apply different settings based on conditions:
+### Batch Sizes
 
-```python
-def create_config(data_size, memory_available):
-    """Create configuration based on data characteristics."""
-    config = TransmogConfig.default()
+- Small datasets: 1000-2000
+- Large datasets: 5000-10000
+- Memory constrained: 100-500
 
-    if data_size > 100000:
-        config = config.with_processing(
-            batch_size=5000,
-            low_memory=memory_available < 8  # GB
-        )
-    else:
-        config = config.with_processing(
-            batch_size=2000,
-            low_memory=False
-        )
+### Array Modes
 
-    if memory_available < 4:  # GB
-        config = config.with_memory_optimization(
-            aggressive_cleanup=True,
-            type_coercion=True
-        )
+- `SMART`: Default behavior
+- `SEPARATE`: All arrays in child tables
+- `INLINE`: Arrays as JSON strings
+- `SKIP`: Ignore arrays
 
-    return config
+### Error Strategies
 
-# Usage
-data_size = len(dataset)
-available_memory = get_available_memory_gb()
-config = create_config(data_size, available_memory)
-```
+- `strict`: Fail on errors
+- `skip`: Continue processing
+- `partial`: Process what's possible
 
-## Advanced Naming Configuration
-
-### Custom Field Naming
-
-Control how nested fields are named:
+### Output Format Optimization
 
 ```python
-# Custom naming strategy
-naming_config = {
-    "separator": "→",
-    "nested_threshold": 6,
-    "max_field_length": 50,
-    "case_transformation": "snake_case",
-    "reserved_words": ["id", "type", "class"],
-    "field_mapping": {
-        "user_id": "uid",
-        "timestamp": "ts"
-    }
-}
-
-config = TransmogConfig.default().with_naming(**naming_config)
-```
-
-### Path Simplification Rules
-
-Customize how deeply nested paths are simplified:
-
-```python
-# Path simplification configuration
-simplification_config = {
-    "threshold": 4,  # Start simplifying at depth 4
-    "strategy": "intelligent",  # Options: "intelligent", "truncate", "hash"
-    "preserve_terminals": True,  # Keep final field names
-    "common_prefixes": ["data", "info", "meta"]  # Remove common prefixes
-}
-
-config = (
-    TransmogConfig.default()
-    .with_path_simplification(**simplification_config)
-)
-```
-
-## Processing Customization
-
-### Error Handling Strategies
-
-Define custom error handling behavior:
-
-```python
-# Advanced error handling
-error_config = {
-    "strategy": "custom",
-    "max_errors": 100,
-    "error_callback": lambda error, record: log_error(error, record),
-    "recovery_attempts": 3,
-    "fallback_value": "__ERROR__"
-}
-
-config = (
-    TransmogConfig.default()
-    .with_error_handling(**error_config)
-)
-
-def log_error(error, record):
-    """Custom error logging function."""
-    print(f"Error processing record {record.get('id', 'unknown')}: {error}")
-```
-
-### Type Handling Configuration
-
-Customize data type processing:
-
-```python
-# Custom type handling
-type_config = {
-    "preserve_types": True,
-    "type_coercion_rules": {
-        "string_to_number": True,
-        "date_parsing": True,
-        "boolean_conversion": True
-    },
-    "null_handling": {
-        "strategy": "preserve",  # "preserve", "remove", "convert"
-        "null_values": [None, "", "null", "NULL"]
-    },
-    "datetime_formats": [
-        "%Y-%m-%d",
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%dT%H:%M:%SZ"
-    ]
-}
-
-config = (
-    TransmogConfig.default()
-    .with_type_handling(**type_config)
-)
-```
-
-## Array Processing Configuration
-
-### Advanced Array Handling
-
-Fine-tune array processing behavior:
-
-```python
-# Custom array configuration
-array_config = {
-    "default_strategy": "separate",
-    "size_thresholds": {
-        "inline_max": 5,      # Inline arrays with ≤5 items
-        "separate_min": 6     # Separate arrays with ≥6 items
-    },
-    "field_specific": {
-        "tags": "inline",     # Always inline tag arrays
-        "items": "separate",  # Always separate item arrays
-        "metadata": "skip"    # Skip metadata arrays
-    },
-    "nested_array_handling": "flatten"  # How to handle arrays within arrays
-}
-
-config = (
-    TransmogConfig.default()
-    .with_array_processing(**array_config)
-)
-```
-
-### Conditional Array Processing
-
-Process arrays differently based on content:
-
-```python
-def array_strategy_callback(field_name, array_data, context):
-    """Determine array processing strategy based on content."""
-    if len(array_data) <= 3:
-        return "inline"
-    elif all(isinstance(item, str) for item in array_data):
-        return "inline"  # Simple string arrays inline
-    else:
-        return "separate"  # Complex objects in separate tables
-
-config = (
-    TransmogConfig.default()
-    .with_dynamic_array_handling(array_strategy_callback)
-)
-```
-
-## Output Customization
-
-### Multi-Format Output
-
-Configure multiple output formats with different settings:
-
-```python
-# Multi-format configuration
-output_config = {
-    "formats": {
-        "json": {
-            "indent": 2,
-            "ensure_ascii": False,
-            "sort_keys": True
-        },
-        "csv": {
-            "delimiter": ",",
-            "quoting": "minimal",
-            "encoding": "utf-8"
-        },
-        "parquet": {
-            "compression": "snappy",
-            "row_group_size": 10000,
-            "use_dictionary": True
-        }
-    },
-    "file_naming": {
-        "pattern": "{name}_{table}_{timestamp}",
-        "timestamp_format": "%Y%m%d_%H%M%S"
-    }
-}
-
-config = (
-    TransmogConfig.default()
-    .with_output_configuration(**output_config)
-)
-```
-
-### Custom Metadata Generation
-
-Add custom metadata to output:
-
-```python
-def metadata_generator(processing_context):
-    """Generate custom metadata for output."""
-    return {
-        "processing_time": processing_context.duration,
-        "record_count": processing_context.record_count,
-        "configuration_hash": processing_context.config_hash,
-        "data_source": processing_context.source_info,
-        "quality_metrics": calculate_quality_metrics(processing_context)
-    }
-
-config = (
-    TransmogConfig.default()
-    .with_metadata_generation(metadata_generator)
-)
-```
-
-## Performance Tuning Configuration
-
-### Resource Management
-
-Configure resource usage limits:
-
-```python
-# Resource configuration
-resource_config = {
-    "memory_limit": "2GB",
-    "cpu_cores": 4,
-    "io_threads": 2,
-    "batch_size_auto_tune": True,
-    "garbage_collection": {
-        "strategy": "aggressive",
-        "frequency": 1000  # Every 1000 records
-    }
-}
-
-config = (
-    TransmogConfig.default()
-    .with_resource_management(**resource_config)
-)
-```
-
-### Parallel Processing
-
-Configure parallel processing behavior:
-
-```python
-# Parallel processing configuration
-parallel_config = {
-    "enabled": True,
-    "worker_count": 4,
-    "chunk_size": 5000,
-    "coordination_strategy": "work_stealing",
-    "result_aggregation": "streaming"
-}
-
-config = (
-    TransmogConfig.default()
-    .with_parallel_processing(**parallel_config)
-)
-```
-
-## Environment-Specific Configurations
-
-### Development Configuration
-
-Settings optimized for development and debugging:
-
-```python
-def development_config():
-    """Configuration for development environment."""
-    return (
-        TransmogConfig.debug_mode()
-        .with_processing(
-            batch_size=100,  # Small batches for easier debugging
-            preserve_types=True,
-            error_strategy="raise"  # Fail fast
-        )
-        .with_output(
-            include_debug_info=True,
-            verbose_logging=True
-        )
-        .with_validation(
-            strict_mode=True,
-            schema_validation=True
-        )
-    )
-```
-
-### Production Configuration
-
-Settings optimized for production environments:
-
-```python
-def production_config(data_characteristics):
-    """Configuration for production environment."""
-    base_config = TransmogConfig.performance_optimized()
-
-    if data_characteristics.get("high_volume"):
-        config = base_config.with_processing(
-            batch_size=10000,
-            parallel_workers=8,
-            memory_optimization=True
-        )
-    else:
-        config = base_config.with_processing(
-            batch_size=5000,
-            parallel_workers=4
-        )
-
-    return config.with_output(
-        compression="gzip",
-        include_metadata=True,
-        error_logging=True
-    )
-```
-
-### Testing Configuration
-
-Settings for automated testing:
-
-```python
-def testing_config():
-    """Configuration for test environment."""
-    return (
-        TransmogConfig.simple_mode()
-        .with_processing(
-            batch_size=50,  # Small batches for predictable results
-            deterministic_ids=True,  # Consistent output for testing
-            error_strategy="collect"  # Collect all errors
-        )
-        .with_output(
-            sort_output=True,  # Deterministic ordering
-            include_processing_stats=True
-        )
-    )
-```
-
-## Configuration Validation
-
-### Schema Validation
-
-Validate configuration against schema:
-
-```python
-from transmog.config import ConfigValidator
-
-def validate_config(config):
-    """Validate configuration before use."""
-    validator = ConfigValidator()
-
-    # Check for conflicts
-    conflicts = validator.check_conflicts(config)
-    if conflicts:
-        raise ValueError(f"Configuration conflicts: {conflicts}")
-
-    # Validate resource limits
-    if not validator.validate_resource_limits(config):
-        raise ValueError("Resource limits exceed system capacity")
-
-    # Check format compatibility
-    format_issues = validator.check_format_compatibility(config)
-    if format_issues:
-        print(f"Warning: Format compatibility issues: {format_issues}")
-
-    return True
-
-# Usage
-config = create_custom_config()
-validate_config(config)
-```
-
-### Configuration Profiles
-
-Save and load configuration profiles:
-
-```python
-# Save configuration profile
-config = create_custom_config()
-config.save_profile("my_profile", description="Custom config for project X")
-
-# Load configuration profile
-loaded_config = TransmogConfig.load_profile("my_profile")
-
-# List available profiles
-profiles = TransmogConfig.list_profiles()
-for profile in profiles:
-    print(f"{profile.name}: {profile.description}")
-```
-
-## Integration Examples
-
-### Integration with External Systems
-
-Configure for specific external system integration:
-
-```python
-def database_integration_config():
-    """Configuration for database integration."""
-    return (
-        TransmogConfig.default()
-        .with_naming(
-            separator="_",
-            case_transformation="snake_case",
-            reserved_words=["order", "group", "select"]  # SQL keywords
-        )
-        .with_type_handling(
-            preserve_types=True,
-            null_handling="database_null"
-        )
-        .with_output(
-            formats=["csv"],  # Database-friendly format
-            include_headers=True,
-            escape_special_chars=True
-        )
-    )
-```
-
-### API Integration Configuration
-
-Configure for API response processing:
-
-```python
-def api_integration_config():
-    """Configuration for API response processing."""
-    return (
-        TransmogConfig.default()
-        .with_naming(
-            separator=".",
-            preserve_case=True  # Maintain API field naming
-        )
-        .with_array_processing(
-            default_strategy="separate",
-            preserve_order=True
-        )
-        .with_output(
-            formats=["json"],
-            maintain_structure=True
-        )
-        .with_metadata(
-            include_api_metadata=True,
-            timestamp_source="api"
-        )
-    )
-```
-
-### Data Pipeline Configuration
-
-Configure for data pipeline integration:
-
-```python
-def pipeline_config(stage):
-    """Configuration based on pipeline stage."""
-    base_config = TransmogConfig.default()
-
-    if stage == "ingestion":
-        return base_config.with_processing(
-            error_strategy="skip",  # Continue on errors
-            batch_size=10000,
-            preserve_raw_data=True
-        )
-    elif stage == "transformation":
-        return base_config.with_processing(
-            error_strategy="warn",
-            type_coercion=True,
-            data_cleaning=True
-        )
-    elif stage == "output":
-        return base_config.with_output(
-            compression="gzip",
-            include_lineage=True,
-            quality_validation=True
-        )
+# CSV output
+config = TransmogConfig.for_csv()
+
+# Parquet output
+config = TransmogConfig.for_parquet()
 ```

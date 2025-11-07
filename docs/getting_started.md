@@ -92,6 +92,28 @@ Employee table:
 ]
 ```
 
+## Configuration Presets
+
+```python
+# Default: types preserved
+result = tm.flatten(data)
+
+# CSV: strings, includes empty/null values
+config = tm.TransmogConfig.for_csv()
+
+# Memory: small batches, minimal cache
+config = tm.TransmogConfig.for_memory()
+
+# Performance: large batches, extended cache
+config = tm.TransmogConfig.for_performance()
+
+# Simple: clean field names (id, parent_id, timestamp)
+config = tm.TransmogConfig.simple()
+
+# Error-tolerant: skip malformed records
+config = tm.TransmogConfig.error_tolerant()
+```
+
 ### How It Works
 
 The transformation process uses **smart mode** by default:
@@ -113,8 +135,8 @@ result = tm.flatten_file("data.json", name="products")
 # Save results as CSV
 result.save("output", output_format="csv")
 
-# Save results as JSON
-result.save("output", output_format="json")
+# Save results as Parquet
+result.save("output", output_format="parquet")
 ```
 
 ### Streaming Large Data
@@ -148,14 +170,20 @@ Transmog provides three main functions:
 Control how arrays are processed:
 
 ```python
-# Default: arrays become separate tables
-result = tm.flatten(data, arrays="separate")
+# Default: smart mode - simple arrays inline, complex arrays separate
+result = tm.flatten(data)  # Uses ArrayMode.SMART by default
+
+# All arrays become separate tables
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+result = tm.flatten(data, config=config)
 
 # Keep arrays as JSON strings in main table
-result = tm.flatten(data, arrays="inline")
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.INLINE)
+result = tm.flatten(data, config=config)
 
 # Skip arrays entirely
-result = tm.flatten(data, arrays="skip")
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.SKIP)
+result = tm.flatten(data, config=config)
 ```
 
 ### Field Naming
@@ -164,10 +192,12 @@ Customize how nested fields are named:
 
 ```python
 # Use dots instead of underscores
-result = tm.flatten(data, separator=".")
+config = tm.TransmogConfig(separator=".")
+result = tm.flatten(data, config=config)
 
 # Simplify deeply nested paths
-result = tm.flatten(data, nested_threshold=2)
+config = tm.TransmogConfig(nested_threshold=2)
+result = tm.flatten(data, config=config)
 ```
 
 ### ID Management
@@ -176,13 +206,16 @@ Control identifier fields:
 
 ```python
 # Use existing field as ID
-result = tm.flatten(data, id_field="product_id")
+config = tm.TransmogConfig(id_field="product_id")
+result = tm.flatten(data, config=config)
 
 # Custom parent ID field name
-result = tm.flatten(data, parent_id_field="parent_ref")
+config = tm.TransmogConfig(parent_field="parent_ref")
+result = tm.flatten(data, config=config)
 
-# Add timestamp metadata
-result = tm.flatten(data, add_timestamp=True)
+# Disable timestamp metadata
+config = tm.TransmogConfig(time_field=None)
+result = tm.flatten(data, config=config)
 ```
 
 ## Understanding the Results
@@ -217,21 +250,20 @@ if "products_tags" in result:
 
 ## Error Handling
 
-Configure how errors are handled using the unified error handling system:
+Configure error handling through `TransmogConfig`:
 
 ```python
-# Raise errors (default) - stops on first error
-result = tm.flatten(data, errors="raise")
+# Strict mode (default) - stops on first error
+config = tm.TransmogConfig(recovery_strategy="strict")
+result = tm.flatten(data, config=config)
 
-# Skip problematic records - continues processing
-result = tm.flatten(data, errors="skip")
+# Skip mode - skips problematic records
+config = tm.TransmogConfig(recovery_strategy="skip", allow_malformed_data=True)
+result = tm.flatten(data, config=config)
 
-# Warn about issues but continue - logs warnings
-result = tm.flatten(data, errors="warn")
+# Use error-tolerant factory method
+result = tm.flatten(data, config=tm.TransmogConfig.error_tolerant())
 ```
-
-The error handling system provides consistent error messages with standardized templates and
-context information across all processing modules.
 
 ## Common Patterns
 

@@ -10,7 +10,6 @@ import pytest
 
 from transmog.core.id_discovery import (
     DEFAULT_ID_FIELD_PATTERNS,
-    build_id_field_mapping,
     discover_id_field,
     get_record_id,
     should_add_transmog_id,
@@ -46,30 +45,14 @@ class TestDiscoverIdField:
         assert discovered is None
 
         # Should find with custom patterns
-        discovered = discover_id_field(record, id_field_patterns=["custom_id"])
+        discovered = discover_id_field(record, id_patterns=["custom_id"])
         assert discovered == "custom_id"
 
     def test_discover_with_empty_patterns(self):
         """Test discovery with empty patterns list."""
         record = {"id": 123, "name": "test"}
-        discovered = discover_id_field(record, id_field_patterns=[])
+        discovered = discover_id_field(record, id_patterns=[])
         assert discovered is None
-
-    def test_discover_with_path_mapping(self):
-        """Test discovery with path-specific ID field mapping."""
-        record = {"special_key": 456, "name": "test"}
-
-        # Test path-specific mapping
-        mapping = {"users": "special_key"}
-        discovered = discover_id_field(record, path="users", id_field_mapping=mapping)
-        assert discovered == "special_key"
-
-        # Test wildcard mapping
-        mapping = {"*": "special_key"}
-        discovered = discover_id_field(
-            record, path="anything", id_field_mapping=mapping
-        )
-        assert discovered == "special_key"
 
     def test_discover_priority_order(self):
         """Test that discovery follows priority order."""
@@ -135,19 +118,9 @@ class TestGetRecordId:
     def test_get_record_id_with_custom_patterns(self):
         """Test getting ID with custom patterns."""
         record = {"custom_id": 999, "name": "test"}
-        field_name, id_value = get_record_id(record, id_field_patterns=["custom_id"])
+        field_name, id_value = get_record_id(record, id_patterns=["custom_id"])
         assert field_name == "custom_id"
         assert id_value == 999
-
-    def test_get_record_id_with_mapping(self):
-        """Test getting ID with path mapping."""
-        record = {"special_key": 456, "name": "test"}
-        mapping = {"users": "special_key"}
-        field_name, id_value = get_record_id(
-            record, path="users", id_field_mapping=mapping
-        )
-        assert field_name == "special_key"
-        assert id_value == 456
 
     def test_get_record_id_none_value(self):
         """Test getting ID when value is None."""
@@ -200,12 +173,6 @@ class TestShouldAddTransmogId:
         should_add = should_add_transmog_id(record)
         assert should_add is True
 
-    def test_should_add_with_force_flag(self):
-        """Test should add transmog ID when force flag is True."""
-        record = {"id": 123, "name": "test"}
-        should_add = should_add_transmog_id(record, force_transmog_id=True)
-        assert should_add is True
-
     def test_should_add_with_custom_patterns(self):
         """Test should add logic with custom ID patterns."""
         record = {"custom_id": 999, "name": "test"}
@@ -215,68 +182,8 @@ class TestShouldAddTransmogId:
         assert should_add is True
 
         # Should not add with custom patterns
-        should_add = should_add_transmog_id(record, id_field_patterns=["custom_id"])
+        should_add = should_add_transmog_id(record, id_patterns=["custom_id"])
         assert should_add is False
-
-
-class TestBuildIdFieldMapping:
-    """Test ID field mapping construction."""
-
-    def test_build_mapping_from_dict(self):
-        """Test building mapping from dictionary config."""
-        config = {
-            "id_field_mapping": {
-                "users": "user_id",
-                "orders": "order_number",
-                "products": "product_code",
-            }
-        }
-
-        mapping = build_id_field_mapping(config)
-        expected = {
-            "users": "user_id",
-            "orders": "order_number",
-            "products": "product_code",
-        }
-        assert mapping == expected
-
-    def test_build_mapping_from_list(self):
-        """Test building mapping from simple field name."""
-        config = {"natural_id_field": "entity_id"}
-
-        mapping = build_id_field_mapping(config)
-        expected = {"*": "entity_id"}
-        assert mapping == expected
-
-    def test_build_mapping_from_empty_dict(self):
-        """Test building mapping from empty config."""
-        config = {}
-        mapping = build_id_field_mapping(config)
-        assert mapping is None
-
-    def test_build_mapping_from_empty_list(self):
-        """Test building mapping from None config."""
-        mapping = build_id_field_mapping(None)
-        assert mapping is None
-
-    def test_build_mapping_invalid_input(self):
-        """Test building mapping with invalid input types."""
-        # Invalid mapping type
-        config = {"id_field_mapping": "invalid"}
-        mapping = build_id_field_mapping(config)
-        assert mapping is None
-
-        # Invalid natural field type
-        config = {"natural_id_field": 123}
-        mapping = build_id_field_mapping(config)
-        assert mapping is None
-
-    def test_build_mapping_invalid_list_format(self):
-        """Test building mapping with invalid format."""
-        # Test that function handles invalid input gracefully
-        config = {"id_field_mapping": ["invalid", "format"]}
-        mapping = build_id_field_mapping(config)
-        assert mapping is None
 
 
 class TestIdDiscoveryIntegration:
@@ -284,41 +191,17 @@ class TestIdDiscoveryIntegration:
 
     def test_discovery_workflow(self):
         """Test complete ID discovery workflow."""
-        # Record with natural ID
         record_with_id = {"user_id": 123, "name": "John", "email": "john@example.com"}
 
-        # Discover ID field
-        id_field = discover_id_field(record_with_id, id_field_patterns=["user_id"])
+        id_field = discover_id_field(record_with_id, id_patterns=["user_id"])
         assert id_field == "user_id"
 
-        # Get record ID
-        field_name, id_value = get_record_id(
-            record_with_id, id_field_patterns=["user_id"]
-        )
+        field_name, id_value = get_record_id(record_with_id, id_patterns=["user_id"])
         assert field_name == "user_id"
         assert id_value == 123
 
-        # Should not add transmog ID
-        should_add = should_add_transmog_id(
-            record_with_id, id_field_patterns=["user_id"]
-        )
+        should_add = should_add_transmog_id(record_with_id, id_patterns=["user_id"])
         assert should_add is False
-
-    def test_discovery_with_mapping_workflow(self):
-        """Test ID discovery with path-specific mapping."""
-        record = {"order_number": "ORD-123", "customer": "John"}
-        mapping = {"orders": "order_number"}
-
-        # Discover with mapping
-        id_field = discover_id_field(record, path="orders", id_field_mapping=mapping)
-        assert id_field == "order_number"
-
-        # Get ID with mapping
-        field_name, id_value = get_record_id(
-            record, path="orders", id_field_mapping=mapping
-        )
-        assert field_name == "order_number"
-        assert id_value == "ORD-123"
 
     def test_discovery_fallback_behavior(self):
         """Test fallback behavior when no natural ID found."""

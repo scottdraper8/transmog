@@ -10,6 +10,7 @@ import logging
 import traceback
 from logging import FileHandler, StreamHandler
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Optional,
@@ -18,6 +19,9 @@ from typing import (
     cast,
     overload,
 )
+
+if TYPE_CHECKING:
+    from transmog.types.base import RecoveryMode
 
 from transmog.error.exceptions import (
     MissingDependencyError,
@@ -385,24 +389,14 @@ ERROR_TEMPLATES = {
     "generic": "Error in {operation}: {error}",
 }
 
-# Recovery strategy mapping for consistent usage
-STRATEGY_MAP = {
-    "strict": STRICT,
-    "skip": DEFAULT,
-    "partial": LENIENT,
-    # API-level mappings
-    "raise": STRICT,
-    "warn": LENIENT,
-}
-
 
 def get_recovery_strategy(
-    strategy_identifier: Union[str, RecoveryStrategy, None],
+    strategy_identifier: Union["RecoveryMode", RecoveryStrategy, None],
 ) -> RecoveryStrategy:
-    """Get recovery strategy object from string identifier or return existing strategy.
+    """Get recovery strategy object from RecoveryMode enum or return existing strategy.
 
     Args:
-        strategy_identifier: String identifier, strategy object, or None
+        strategy_identifier: RecoveryMode enum, strategy object, or None
 
     Returns:
         RecoveryStrategy object
@@ -410,24 +404,26 @@ def get_recovery_strategy(
     Raises:
         ValueError: If strategy identifier is invalid
     """
+    from transmog.types.base import RecoveryMode
+
     if strategy_identifier is None:
         return STRICT
 
     if isinstance(strategy_identifier, RecoveryStrategy):
         return strategy_identifier
 
-    if isinstance(strategy_identifier, str):
-        strategy = STRATEGY_MAP.get(strategy_identifier)
-        if strategy is None:
-            valid_strategies = list(STRATEGY_MAP.keys())
-            raise ValueError(
-                f"Invalid recovery strategy: '{strategy_identifier}'. "
-                f"Valid options: {', '.join(valid_strategies)}"
-            )
-        return strategy
+    if isinstance(strategy_identifier, RecoveryMode):
+        if strategy_identifier == RecoveryMode.STRICT:
+            return STRICT
+        elif strategy_identifier == RecoveryMode.SKIP:
+            return DEFAULT
+        elif strategy_identifier == RecoveryMode.PARTIAL:
+            return LENIENT
+        else:
+            raise ValueError(f"Unknown RecoveryMode: {strategy_identifier}")
 
     raise ValueError(
-        f"Recovery strategy must be string or RecoveryStrategy object, "
+        f"Recovery strategy must be RecoveryMode enum or RecoveryStrategy object, "
         f"got {type(strategy_identifier).__name__}"
     )
 

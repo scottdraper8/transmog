@@ -16,11 +16,11 @@ result = tm.flatten_file("data.json", name="records")
 result = tm.flatten_file("products.json")  # name="products"
 
 # Process with custom configuration
+config = tm.TransmogConfig(separator=".", array_mode=tm.ArrayMode.SEPARATE)
 result = tm.flatten_file(
     "data.json",
     name="entities",
-    separator=".",
-    arrays="separate"
+    config=config
 )
 ```
 
@@ -80,13 +80,16 @@ For large JSON files, consider streaming:
 
 ```python
 # Stream large JSON files directly to output
+config = tm.TransmogConfig(
+    batch_size=1000,
+    batch_size=100, cache_size=1000
+)
 tm.flatten_stream(
     "large_data.json",
     output_path="processed/",
     name="large_dataset",
     output_format="parquet",
-    batch_size=1000,
-    low_memory=True
+    config=config
 )
 ```
 
@@ -136,15 +139,11 @@ result = tm.flatten_file(file_path, name=name)
 import glob
 
 # Process multiple files with consistent configuration
+config = tm.TransmogConfig(separator="_", array_mode=tm.ArrayMode.SEPARATE)
 results = []
 for file_path in glob.glob("data/*.json"):
     name = Path(file_path).stem
-    result = tm.flatten_file(
-        file_path,
-        name=name,
-        separator="_",
-        arrays="separate"
-    )
+    result = tm.flatten_file(file_path, name=name, config=config)
     results.append(result)
 
 # Combine or process results as needed
@@ -213,10 +212,11 @@ def process_files_with_recovery(file_patterns, output_dir):
     for pattern in file_patterns:
         for file_path in glob.glob(pattern):
             try:
+                config = tm.TransmogConfig.error_tolerant()
                 result = tm.flatten_file(
                     file_path,
                     name=Path(file_path).stem,
-                    errors="skip"  # Skip problematic records
+                    config=config
                 )
 
                 # Save successful results
@@ -240,26 +240,29 @@ process_files_with_recovery(["data/*.json", "backup/*.json"], "output/")
 
 ```python
 # For large files, use low memory mode
-result = tm.flatten_file(
-    "large_file.json",
-    name="large_data",
-    low_memory=True,
+config = tm.TransmogConfig(
+    batch_size=100, cache_size=1000,
     batch_size=500
 )
+result = tm.flatten_file("large_file.json", name="large_data", config=config)
 ```
 
 ### Streaming for Very Large Files
 
 ```python
 # Stream very large files directly to output
+config = tm.TransmogConfig(
+    batch_size=1000,
+    batch_size=100, cache_size=1000,
+    recovery_strategy="skip",
+    allow_malformed_data=True
+)
 tm.flatten_stream(
     "huge_dataset.json",
     output_path="streaming_output/",
     name="huge_data",
     output_format="parquet",
-    batch_size=1000,
-    low_memory=True,
-    errors="skip"
+    config=config
 )
 ```
 
@@ -335,13 +338,11 @@ if issues:
 
 ```python
 # Process for database import
-result = tm.flatten_file(
-    "export.json",
-    name="entities",
+config = tm.TransmogConfig(
     id_field="id",
-    preserve_types=False,    # Convert to strings for SQL
     skip_null=True
 )
+result = tm.flatten_file("export.json", name="entities", config=config)
 
 # Save as CSV for database import
 result.save("db_import", output_format="csv")
@@ -352,12 +353,15 @@ result.save("db_import", output_format="csv")
 ```python
 def file_to_pipeline(input_file, pipeline_config):
     """Process file for data pipeline."""
+    config = tm.TransmogConfig(
+        separator=pipeline_config.get("separator", "_"),
+        array_mode=tm.ArrayMode.SEPARATE if pipeline_config.get("array_handling", "separate") == "separate" else tm.ArrayMode.INLINE,
+        cast_to_string=not pipeline_config.get("preserve_types", False)
+    )
     result = tm.flatten_file(
         input_file,
         name=pipeline_config.get("entity_name", "data"),
-        separator=pipeline_config.get("separator", "_"),
-        arrays=pipeline_config.get("array_handling", "separate"),
-        preserve_types=pipeline_config.get("preserve_types", False)
+        config=config
     )
 
     # Apply pipeline-specific transformations
@@ -400,21 +404,22 @@ def load_processing_config(config_file):
 """
 default:
   separator: "_"
-  arrays: "separate"
-  preserve_types: false
+  array_mode: "separate"
+  cast_to_string: true
 
 products:
   separator: "."
   id_field: "product_id"
 
 orders:
-  arrays: "inline"
-  preserve_types: true
+  array_mode: "inline"
+  cast_to_string: false
 """
 
 # Use configuration
-config = load_processing_config("config.yaml")
-result = tm.flatten_file("products.json", **config["products"])
+config_data = load_processing_config("config.yaml")
+config = tm.TransmogConfig(**config_data["products"])
+result = tm.flatten_file("products.json", config=config)
 ```
 
 ## Next Steps

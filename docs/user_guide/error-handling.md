@@ -5,27 +5,27 @@ robust data processing techniques.
 
 ## Error Handling Overview
 
-Transmog provides three error handling strategies to manage problematic data:
+Transmog provides error handling through the `recovery_strategy` configuration parameter:
 
 | Strategy | Description | Use Case |
 |----------|-------------|----------|
-| `"raise"` | Stop processing and raise exception | Development, strict data validation |
+| `"strict"` | Stop processing and raise exception (default) | Development, strict data validation |
 | `"skip"` | Skip problematic records and continue | Production, data quality issues |
-| `"warn"` | Log warnings but continue processing | Monitoring, partial data recovery |
-
-The error handling system uses standardized error message templates and context-aware error
-reporting for consistent behavior across all processing modules.
+| `"partial"` | Process what's possible, skip errors | Partial data recovery |
+| `"raise"` | Raise exceptions immediately | Strict validation |
+| `"warn"` | Log warnings but continue processing | Monitoring |
 
 ## Error Handling Modes
 
-### Raise Mode (Default)
+### Strict Mode (Default)
 
 ```python
 import transmog as tm
 
 # Default behavior: raise exceptions on errors
+config = tm.TransmogConfig(recovery_strategy="strict")
 try:
-    result = tm.flatten(problematic_data, name="strict", errors="raise")
+    result = tm.flatten(problematic_data, name="strict", config=config)
 except tm.TransmogError as e:
     print(f"Processing failed: {e}")
     # Handle the error appropriately
@@ -35,25 +35,22 @@ except tm.TransmogError as e:
 
 ```python
 # Skip problematic records and continue
-result = tm.flatten(messy_data, name="tolerant", errors="skip")
+config = tm.TransmogConfig(recovery_strategy="skip", allow_malformed_data=True)
+result = tm.flatten(messy_data, name="tolerant", config=config)
 
 print(f"Successfully processed {len(result.main)} records")
 # Some records may have been skipped due to errors
 ```
 
-### Warn Mode
+### Error-Tolerant Configuration
 
 ```python
-import logging
+# Use error-tolerant factory method
+config = tm.TransmogConfig.error_tolerant()
+result = tm.flatten(noisy_data, name="monitored", config=config)
 
-# Configure logging to see warnings
-logging.basicConfig(level=logging.WARNING)
-
-# Log warnings for errors but continue processing
-result = tm.flatten(noisy_data, name="monitored", errors="warn")
-
-# Check logs for warnings about problematic records
-print(f"Processed {len(result.main)} records with warnings")
+# Processed with error tolerance
+print(f"Processed {len(result.main)} records")
 ```
 
 ## Common Error Scenarios
@@ -70,13 +67,13 @@ problematic_data = [
 ]
 
 # Handle with error tolerance
-result = tm.flatten(
-    problematic_data,
-    name="mixed_types",
-    errors="skip",           # Skip problematic records
-    skip_null=True,          # Skip null values
-    preserve_types=True      # Try to preserve types when possible
+config = tm.TransmogConfig(
+    recovery_strategy="skip",
+    allow_malformed_data=True,
+    skip_null=True,
+    cast_to_string=False
 )
+result = tm.flatten(problematic_data, name="mixed_types", config=config)
 
 print(f"Processed {len(result.main)} out of {len(problematic_data)} records")
 ```
@@ -93,13 +90,13 @@ inconsistent_data = [
 ]
 
 # Process with error recovery
-result = tm.flatten(
-    inconsistent_data,
-    name="users",
-    errors="warn",           # Log warnings for issues
-    skip_empty=True,         # Skip empty values
-    nested_threshold=2       # Simplify deep nesting early
+config = tm.TransmogConfig(
+    recovery_strategy="skip",
+    allow_malformed_data=True,
+    include_empty=False,
+    nested_threshold=2
 )
+result = tm.flatten(inconsistent_data, name="users", config=config)
 ```
 
 ### Missing Required Fields
@@ -113,12 +110,12 @@ data_with_missing_ids = [
 ]
 
 # Use natural IDs with fallback
-result = tm.flatten(
-    data_with_missing_ids,
-    name="products",
-    id_field="product_id",   # Use when available
-    errors="skip"            # Skip records that cause ID issues
+config = tm.TransmogConfig(
+    id_field="product_id",
+    recovery_strategy="skip",
+    allow_malformed_data=True
 )
+result = tm.flatten(data_with_missing_ids, name="products", config=config)
 
 # Records without product_id get generated IDs or are skipped
 ```
@@ -151,7 +148,7 @@ def safe_file_processing(file_path, **options):
 result, error = safe_file_processing(
     "data.json",
     name="data",
-    errors="skip"    # Handle data errors gracefully
+    config=tm.TransmogConfig.error_tolerant()
 )
 
 if error:
@@ -174,10 +171,11 @@ def process_files_with_recovery(file_pattern, output_dir, **options):
     for file_path in glob.glob(file_pattern):
         try:
             # Process each file with error tolerance
+            config = options.pop("config", tm.TransmogConfig.error_tolerant())
             result = tm.flatten_file(
                 file_path,
                 name=Path(file_path).stem,
-                errors="skip",       # Skip problematic records
+                config=config,
                 **options
             )
 
@@ -198,9 +196,7 @@ def process_files_with_recovery(file_pattern, output_dir, **options):
 # Process with recovery
 successful, failed = process_files_with_recovery(
     "data/*.json",
-    "output/",
-    preserve_types=True,
-    arrays="separate"
+    "output/"
 )
 ```
 
@@ -210,15 +206,20 @@ successful, failed = process_files_with_recovery(
 
 ```python
 # Stream processing with error tolerance
+config = tm.TransmogConfig(
+    recovery_strategy="skip",
+    allow_malformed_data=True,
+    batch_size=1000,
+    batch_size=100, cache_size=1000
+)
+
 try:
     tm.flatten_stream(
         large_problematic_dataset,
         output_path="streaming_output/",
         name="large_data",
         output_format="parquet",
-        errors="skip",       # Skip problematic records
-        batch_size=1000,
-        low_memory=True
+        config=config
     )
 except tm.TransmogError as e:
     print(f"Streaming failed: {e}")
@@ -238,13 +239,17 @@ def streaming_with_checkpoints(data, output_path, checkpoint_interval=10000):
         chunk_name = f"chunk_{i // checkpoint_interval}"
 
         try:
+            config = tm.TransmogConfig(
+                recovery_strategy="skip",
+                allow_malformed_data=True,
+                batch_size=1000
+            )
             tm.flatten_stream(
                 chunk,
                 output_path=f"{output_path}/{chunk_name}/",
                 name="data",
                 output_format="parquet",
-                errors="skip",       # Skip problematic records in chunk
-                batch_size=1000
+                config=config
             )
             processed_count += len(chunk)
             print(f"Processed chunk {chunk_name}: {len(chunk)} records")
@@ -327,7 +332,8 @@ def validate_results(result, expected_min_records=1):
     return validation_issues
 
 # Validate results
-result = tm.flatten(data, name="validated", errors="skip")
+config = tm.TransmogConfig.error_tolerant()
+result = tm.flatten(data, name="validated", config=config)
 issues = validate_results(result)
 
 for issue in issues:
@@ -401,12 +407,12 @@ def clean_and_process(data, cleaning_steps=None):
 
     # Process cleaned data
     try:
-        return tm.flatten(
-            cleaned_data,
-            name="cleaned",
-            errors="warn",       # Still log any remaining issues
-            preserve_types=True
+        config = tm.TransmogConfig(
+            recovery_strategy="skip",
+            allow_malformed_data=True,
+            cast_to_string=False
         )
+        return tm.flatten(cleaned_data, name="cleaned", config=config)
     except tm.TransmogError as e:
         print(f"Processing failed even after cleaning: {e}")
         raise
@@ -478,7 +484,8 @@ def process_with_monitoring(data, name, **options):
     original_count = len(data) if isinstance(data, list) else 1
 
     try:
-        result = tm.flatten(data, name=name, errors="warn", **options)
+        config = options.pop("config", tm.TransmogConfig.error_tolerant())
+        result = tm.flatten(data, name=name, config=config, **options)
 
         # Log success metrics
         end_time = datetime.now()
@@ -501,12 +508,11 @@ def process_with_monitoring(data, name, **options):
         raise
 
 # Use monitored processing
-result = process_with_monitoring(
-    large_dataset,
-    name="monitored_data",
-    preserve_types=True,
-    arrays="separate"
+config = tm.TransmogConfig(
+    array_mode=tm.ArrayMode.SEPARATE,
+    cast_to_string=False
 )
+result = process_with_monitoring(large_dataset, name="monitored_data", config=config)
 ```
 
 ## Best Practices
@@ -516,54 +522,54 @@ result = process_with_monitoring(
 ```python
 # Development and testing: Use strict error handling
 if environment == "development":
-    error_mode = "raise"
+    config = tm.TransmogConfig(recovery_strategy="strict")
 
-# Production with high data quality: Use warnings
+# Production with high data quality: Use partial recovery
 elif environment == "production" and data_quality == "high":
-    error_mode = "warn"
+    config = tm.TransmogConfig(recovery_strategy="partial")
 
 # Production with poor data quality: Skip errors
 elif environment == "production" and data_quality == "low":
-    error_mode = "skip"
+    config = tm.TransmogConfig.error_tolerant()
 
-result = tm.flatten(data, name="adaptive", errors=error_mode)
+result = tm.flatten(data, name="adaptive", config=config)
 ```
 
 ### Configuration Templates
 
 ```python
 # Error-tolerant configuration for messy data
-MESSY_DATA_CONFIG = {
-    "errors": "skip",
-    "skip_null": True,
-    "skip_empty": True,
-    "nested_threshold": 3,
-    "preserve_types": False,
-    "arrays": "inline"
-}
+MESSY_DATA_CONFIG = tm.TransmogConfig(
+    recovery_strategy="skip",
+    allow_malformed_data=True,
+    skip_null=True,
+    include_empty=False,
+    nested_threshold=3,
+    array_mode=tm.ArrayMode.INLINE
+)
 
 # Strict configuration for clean data
-CLEAN_DATA_CONFIG = {
-    "errors": "raise",
-    "skip_null": False,
-    "skip_empty": False,
-    "preserve_types": True,
-    "arrays": "separate"
-}
+CLEAN_DATA_CONFIG = tm.TransmogConfig(
+    recovery_strategy="strict",
+    skip_null=False,
+    include_empty=False,
+    cast_to_string=False,
+    array_mode=tm.ArrayMode.SEPARATE
+)
 
-# Monitoring configuration for production
-PRODUCTION_CONFIG = {
-    "errors": "warn",
-    "skip_null": True,
-    "skip_empty": True,
-    "preserve_types": True,
-    "arrays": "separate",
-    "add_timestamp": True
-}
+# Production configuration with timestamps
+PRODUCTION_CONFIG = tm.TransmogConfig(
+    recovery_strategy="partial",
+    skip_null=True,
+    include_empty=False,
+    cast_to_string=False,
+    array_mode=tm.ArrayMode.SEPARATE,
+    time_field="_timestamp"
+)
 
 # Use appropriate configuration
 config = MESSY_DATA_CONFIG if data_is_messy else CLEAN_DATA_CONFIG
-result = tm.flatten(data, name="configured", **config)
+result = tm.flatten(data, name="configured", config=config)
 ```
 
 ## Next Steps

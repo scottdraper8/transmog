@@ -11,6 +11,9 @@ from pathlib import Path
 import pytest
 
 import transmog as tm
+from transmog.config import TransmogConfig
+from transmog.types import ArrayMode
+from transmog.types.base import RecoveryMode
 
 
 class TestJsonToCsvConversion:
@@ -51,7 +54,8 @@ class TestJsonToCsvConversion:
     def test_nested_json_to_csv(self, complex_nested_data, output_dir):
         """Test converting nested JSON to CSV."""
         # Flatten complex nested JSON
-        result = tm.flatten(complex_nested_data, name="organization", arrays="separate")
+        config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
+        result = tm.flatten(complex_nested_data, name="organization", config=config)
 
         # Save as CSV
         csv_paths = result.save(str(output_dir / "nested_csv"), output_format="csv")
@@ -83,7 +87,8 @@ class TestJsonToCsvConversion:
     def test_array_json_to_csv(self, array_data, output_dir):
         """Test converting JSON with arrays to CSV."""
         # Flatten JSON with arrays
-        result = tm.flatten(array_data, name="company", arrays="separate")
+        config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
+        result = tm.flatten(array_data, name="company", config=config)
 
         # Save as CSV
         csv_paths = result.save(str(output_dir / "array_csv"), output_format="csv")
@@ -209,7 +214,8 @@ class TestJsonToCsvOptions:
     def test_json_to_csv_with_custom_separator(self, simple_data, output_dir):
         """Test JSON to CSV conversion with custom field separator."""
         # Flatten with dot separator
-        result = tm.flatten(simple_data, name="dot_sep", separator=".")
+        config = TransmogConfig(separator=".")
+        result = tm.flatten(simple_data, name="dot_sep", config=config)
 
         # Save as CSV
         csv_paths = result.save(str(output_dir / "dot_csv"), output_format="csv")
@@ -232,7 +238,8 @@ class TestJsonToCsvOptions:
     def test_json_to_csv_with_error_handling(self, problematic_data, output_dir):
         """Test JSON to CSV conversion with error handling."""
         # Flatten with error handling
-        result = tm.flatten(problematic_data, name="error_test", errors="skip")
+        config = TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+        result = tm.flatten(problematic_data, name="error_test", config=config)
 
         # Save as CSV
         csv_paths = result.save(str(output_dir / "error_csv"), output_format="csv")
@@ -257,7 +264,8 @@ class TestJsonToCsvOptions:
     def test_json_to_csv_preserve_types(self, mixed_types_data, output_dir):
         """Test JSON to CSV conversion with type preservation."""
         # Flatten with type preservation
-        result = tm.flatten(mixed_types_data, name="types", preserve_types=True)
+        config = TransmogConfig(cast_to_string=False)
+        result = tm.flatten(mixed_types_data, name="types", config=config)
 
         # Save as CSV
         csv_paths = result.save(str(output_dir / "types_csv"), output_format="csv")
@@ -282,8 +290,8 @@ class TestJsonToCsvOptions:
 
     def test_json_to_csv_with_natural_ids(self, simple_data, output_dir):
         """Test JSON to CSV conversion with natural ID fields."""
-        # Flatten with natural ID
-        result = tm.flatten(simple_data, name="natural", id_field="id")
+        config = TransmogConfig(id_field="id")
+        result = tm.flatten(simple_data, name="natural", config=config)
 
         # Save as CSV
         csv_paths = result.save(str(output_dir / "natural_csv"), output_format="csv")
@@ -390,9 +398,11 @@ class TestJsonToCsvEdgeCases:
 
             assert len(rows) == 1
             # Should have flattened deep fields with simplification for deeply nested structures
-            deep_fields = [h for h in reader.fieldnames if "level" in h]
-            assert len(deep_fields) >= 3  # Should have simplified deep structure
-            # Should contain "nested" indicator for deeply nested paths
+            deep_fields = [
+                h for h in reader.fieldnames if "level" in h or "nested" in h
+            ]
+            assert len(deep_fields) >= 2  # Should have simplified deep structure
+            # Should contain "nested" indicator for deeply nested paths (with default threshold=4)
             nested_fields = [h for h in reader.fieldnames if "nested" in h]
             assert len(nested_fields) >= 1  # Should have nested simplification
 

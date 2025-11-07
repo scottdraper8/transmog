@@ -1,7 +1,5 @@
 # API Reference
 
-Complete reference for all public Transmog functions, classes, and types.
-
 ## Functions
 
 ### flatten()
@@ -10,80 +8,22 @@ Transform nested data structures into flat tables.
 
 ```python
 flatten(
-    data: Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes],
-    *,
+    data: DataInput,
     name: str = "data",
-    # Naming options
-    separator: str = "_",
-    nested_threshold: int = 4,
-    # ID options
-    id_field: Union[str, dict[str, str], None] = None,
-    parent_id_field: str = "_parent_id",
-    add_timestamp: bool = False,
-    # Array handling
-    arrays: Literal["smart", "separate", "inline", "skip"] = "smart",
-    # Data options
-    preserve_types: bool = False,
-    skip_null: bool = True,
-    skip_empty: bool = True,
-    # Error handling
-    errors: Literal["raise", "skip", "warn"] = "raise",
-    # Performance
-    batch_size: int = 1000,
-    low_memory: bool = False,
+    config: Optional[TransmogConfig] = None,
 ) -> FlattenResult
 ```
 
 **Parameters:**
 
-- **data** (*Union[Dict, list[Dict], str, Path, bytes]*): Input data to transform. Can be:
-  - Dictionary or list of dictionaries
-  - JSON string
-  - File path (str or Path)
-  - Raw bytes containing JSON
-
-- **name** (*str*, default="data"): Base name for generated tables
-
-**Naming Options:**
-
-- **separator** (*str*, default="_"): Character to join nested field names
-- **nested_threshold** (*int*, default=4): Maximum nesting depth before simplifying field names
-
-**ID Options:**
-
-- **id_field** (*str | dict[str, str] | None*, default=None): Field(s) to use as record IDs
-- **parent_id_field** (*str*, default="_parent_id"): Name for parent reference fields
-- **add_timestamp** (*bool*, default=False): Add processing timestamp metadata
-
-**Array Handling:**
-
-- **arrays** (*Literal["smart", "separate", "inline", "skip"]*, default="smart"): How to process arrays:
-  - "smart": Intelligently handle arrays - explode complex arrays, preserve simple arrays as native arrays (default)
-  - "separate": Extract all arrays into child tables
-  - "inline": Keep all arrays as JSON strings in main table
-  - "skip": Ignore arrays completely
-
-**Data Options:**
-
-- **preserve_types** (*bool*, default=False): Maintain original data types vs convert to strings
-- **skip_null** (*bool*, default=True): Exclude null values from output
-- **skip_empty** (*bool*, default=True): Exclude empty strings and collections
-
-**Error Handling:**
-
-- **errors** (*Literal["raise", "skip", "warn"]*, default="raise"): Error handling strategy:
-  - "raise": Stop processing and raise exception
-  - "skip": Skip problematic records and continue
-  - "warn": Log warnings but continue processing
-
-**Performance:**
-
-- **batch_size** (*int*, default=1000): Records to process in each batch
-- **low_memory** (*bool*, default=False): Use memory-efficient processing (slower)
+- **data** (*Union[dict, list[dict], str, Path, bytes]*): Input data. Can be
+  dictionary, list of dictionaries, JSON string, file path, or bytes.
+- **name** (*str*, default="data"): Base name for generated tables.
+- **config** (*Optional[TransmogConfig]*, default=None): Configuration object. Uses defaults if not provided.
 
 **Returns:**
 
-- **FlattenResult**: Object containing transformed tables and metadata
+- **FlattenResult**: Object containing transformed tables.
 
 **Examples:**
 
@@ -91,45 +31,35 @@ flatten(
 import transmog as tm
 
 # Basic usage
-data = {"name": "Product", "price": 99.99}
-result = tm.flatten(data, name="products")
+result = tm.flatten({"name": "Product", "price": 99.99})
 
-# Custom configuration
-result = tm.flatten(
-    data,
-    name="products",
-    separator=".",
-    arrays="inline",
-    preserve_types=True
-)
+# With configuration
+config = tm.TransmogConfig(separator=".", cast_to_string=False)
+result = tm.flatten(data, config=config)
 
-# Using existing ID field
-result = tm.flatten(data, id_field="product_id")
-
-# Error handling
-result = tm.flatten(data, errors="skip")
+# Factory method configuration
+result = tm.flatten(data, config=tm.TransmogConfig.for_performance())
 ```
 
 ### flatten_file()
 
-Process data directly from files.
+Process data from files.
 
 ```python
 flatten_file(
     path: Union[str, Path],
-    *,
     name: Optional[str] = None,
     file_format: Optional[str] = None,
-    **options: Any,
+    config: Optional[TransmogConfig] = None,
 ) -> FlattenResult
 ```
 
 **Parameters:**
 
-- **path** (*Union[str, Path]*): Path to input file
-- **name** (*Optional[str]*, default=None): Table name (defaults to filename without extension)
-- **file_format** (*Optional[str]*, default=None): Input format (auto-detected from extension)
-- **\*\*options**: All options from `flatten()` function
+- **path** (*Union[str, Path]*): Path to input file.
+- **name** (*Optional[str]*, default=None): Table name. Defaults to filename without extension.
+- **file_format** (*Optional[str]*, default=None): Input format. Auto-detected from extension if not specified.
+- **config** (*Optional[TransmogConfig]*, default=None): Configuration object.
 
 **Supported Formats:**
 
@@ -138,109 +68,183 @@ flatten_file(
 
 **Returns:**
 
-- **FlattenResult**: Object containing transformed tables
+- **FlattenResult**: Object containing transformed tables.
 
 **Examples:**
 
 ```python
 # Process JSON file
-result = tm.flatten_file("data.json", name="products")
+result = tm.flatten_file("data.json")
 
-# Auto-detect name from filename
-result = tm.flatten_file("products.json")  # name="products"
-
-# Pass additional options
-result = tm.flatten_file("data.json", arrays="inline", errors="skip")
+# With configuration
+config = tm.TransmogConfig(separator=".")
+result = tm.flatten_file("data.json", config=config)
 ```
 
 ### flatten_stream()
 
-Stream large datasets directly to files without loading into memory.
+Stream data directly to files.
 
 ```python
 flatten_stream(
-    data: Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes],
+    data: DataInput,
     output_path: Union[str, Path],
-    *,
     name: str = "data",
-    output_format: str = "json",
-    # All options from flatten()
-    separator: str = "_",
-    nested_threshold: int = 4,
-    id_field: Union[str, dict[str, str], None] = None,
-    parent_id_field: str = "_parent_id",
-    add_timestamp: bool = False,
-    arrays: Literal["separate", "inline", "skip"] = "separate",
-    preserve_types: bool = False,
-    skip_null: bool = True,
-    skip_empty: bool = True,
-    errors: Literal["raise", "skip", "warn"] = "raise",
-    batch_size: int = 1000,
+    output_format: str = "csv",
+    config: Optional[TransmogConfig] = None,
     **format_options: Any,
 ) -> None
 ```
 
 **Parameters:**
 
-- **data**: Input data (same as `flatten()`)
-- **output_path** (*Union[str, Path]*): Directory or file path for output
-- **name** (*str*, default="data"): Base name for output files
-- **output_format** (*str*, default="json"): Output format ("json", "csv", "parquet")
-- **\*\*format_options**: Format-specific options
+- **data**: Input data (same as `flatten()`).
+- **output_path** (*Union[str, Path]*): Directory path for output files.
+- **name** (*str*, default="data"): Base name for output files.
+- **output_format** (*str*, default="csv"): Output format ("csv", "parquet").
+- **config** (*Optional[TransmogConfig]*, default=None): Configuration object. Uses memory-optimized config if not provided.
+- **\*\*format_options**: Format-specific options.
 
 **Output Formats:**
 
-- **"json"**: JSON Lines format for efficient streaming
-- **"csv"**: CSV files with proper escaping
-- **"parquet"**: Columnar format for analytics (requires pyarrow)
+- **"csv"**: CSV files
+- **"parquet"**: Parquet files (requires pyarrow)
 
 **Returns:**
 
-- **None**: Data is written directly to files
+- **None**: Data is written directly to files.
 
 **Examples:**
 
 ```python
-# Stream to JSON files
-tm.flatten_stream(large_data, "output/", name="products", output_format="json")
+# Stream to CSV
+tm.flatten_stream(large_data, "output/", output_format="csv")
 
-# Stream to Parquet for analytics
-tm.flatten_stream(data, "output/", output_format="parquet", batch_size=5000)
-
-# Stream with custom options
-tm.flatten_stream(
-    data,
-    "output/",
-    name="logs",
-    output_format="csv",
-    arrays="skip",
-    errors="warn"
-)
+# Stream to Parquet with configuration
+config = tm.TransmogConfig(batch_size=5000)
+tm.flatten_stream(data, "output/", output_format="parquet", config=config)
 ```
 
 ## Classes
 
+### TransmogConfig
+
+Configuration class for all processing parameters.
+
+```python
+TransmogConfig(
+    separator: str = "_",
+    nested_threshold: int = 4,
+    cast_to_string: bool = False,
+    include_empty: bool = False,
+    skip_null: bool = True,
+    array_mode: ArrayMode = ArrayMode.SMART,
+    batch_size: int = 1000,
+    max_depth: int = 100,
+    id_field: str = "_id",
+    parent_field: str = "_parent_id",
+    time_field: Optional[str] = "_timestamp",
+    id_patterns: Optional[list[str]] = None,
+    recovery_strategy: str = "strict",
+    allow_malformed_data: bool = False,
+    cache_size: int = 10000,
+    id_generator: Optional[Callable] = None,
+)
+```
+
+**Parameters:**
+
+**Naming:**
+
+- `separator` (str, default="_"): Character to separate nested field names
+- `nested_threshold` (int, default=4): Depth threshold for path simplification
+
+**Processing:**
+
+- `cast_to_string` (bool, default=False): Convert all values to strings
+- `include_empty` (bool, default=False): Include empty values in output
+- `skip_null` (bool, default=True): Skip null values
+- `array_mode` (ArrayMode, default=SMART): How to handle arrays
+- `batch_size` (int, default=1000): Records to process at once
+- `max_depth` (int, default=100): Maximum recursion depth
+
+**Metadata:**
+
+- `id_field` (str, default="_id"): Field name for record IDs
+- `parent_field` (str, default="_parent_id"): Field name for parent references
+- `time_field` (Optional[str], default="_timestamp"): Field name for timestamps (None to disable)
+
+**ID Discovery:**
+
+- `id_patterns` (Optional[list[str]]): Field names to check for natural IDs
+
+**Error Handling:**
+
+- `recovery_strategy` (str, default="strict"): Error recovery strategy
+  ("strict", "skip", "partial", "raise", "warn")
+- `allow_malformed_data` (bool, default=False): Allow malformed data
+
+**Cache:**
+
+- `cache_size` (int, default=10000): Maximum cache size (set to 0 to disable)
+
+**Advanced:**
+
+- `id_generator` (Optional[Callable]): Custom function for ID generation
+
+**Factory Methods:**
+
+```python
+# Memory-optimized
+config = TransmogConfig.for_memory()
+
+# Performance-optimized
+config = TransmogConfig.for_performance()
+
+# CSV-optimized
+config = TransmogConfig.for_csv()
+
+# Parquet-optimized
+config = TransmogConfig.for_parquet()
+
+# Simple configuration
+config = TransmogConfig.simple()
+
+# Error-tolerant
+config = TransmogConfig.error_tolerant()
+```
+
+**Loading Methods:**
+
+```python
+# From file
+config = TransmogConfig.from_file("config.json")
+
+# From environment
+config = TransmogConfig.from_env()
+```
+
 ### FlattenResult
 
-Container for flattened data with convenience methods for access and export.
+Container for flattened data.
 
 #### Properties
 
-**main** (*list[dict[str, Any]]*): Main flattened table
+**main** (*list[dict[str, Any]]*): Main flattened table.
 
 ```python
 result = tm.flatten(data)
 main_table = result.main
 ```
 
-**tables** (*dict[str, list[dict[str, Any]]]*): Child tables dictionary
+**tables** (*dict[str, list[dict[str, Any]]]*): Child tables dictionary.
 
 ```python
 child_tables = result.tables
 reviews = result.tables["products_reviews"]
 ```
 
-**all_tables** (*dict[str, list[dict[str, Any]]]*): All tables including main
+**all_tables** (*dict[str, list[dict[str, Any]]]*): All tables including main.
 
 ```python
 all_data = result.all_tables
@@ -248,9 +252,9 @@ all_data = result.all_tables
 
 #### Methods
 
-##### save(path, output_format=None)
+##### save()
 
-Save all tables to files.
+Save tables to files.
 
 ```python
 save(
@@ -261,29 +265,29 @@ save(
 
 **Parameters:**
 
-- **path**: Output path (file or directory)
-- **output_format**: Output format ("json", "csv", "parquet", auto-detected from extension)
+- **path**: Output path (file or directory).
+- **output_format**: Output format ("csv", "parquet"). Auto-detected from extension if not specified.
 
 **Returns:**
 
-- **Union[list[str], dict[str, str]]**: Created file paths
+- **Union[list[str], dict[str, str]]**: Created file paths.
 
 **Examples:**
 
 ```python
-# Save as JSON files in directory
+# Save to directory
 paths = result.save("output/")
 
-# Save as CSV with explicit format
+# Save with explicit format
 paths = result.save("output/", output_format="csv")
 
-# Save single table as JSON file
+# Save single table
 paths = result.save("data.json")
 ```
 
 ##### table_info()
 
-Get metadata about all tables.
+Get metadata about tables.
 
 ```python
 table_info() -> dict[str, dict[str, Any]]
@@ -291,7 +295,7 @@ table_info() -> dict[str, dict[str, Any]]
 
 **Returns:**
 
-- **Dict**: Table metadata including record counts, fields, and main table indicator
+- **dict**: Table metadata including record counts, fields, and main table indicator.
 
 **Example:**
 
@@ -311,32 +315,30 @@ info = result.table_info()
 # }
 ```
 
-#### Container Methods
-
-FlattenResult supports standard container operations:
+#### Container Operations
 
 ```python
-# Length (main table record count)
+# Length
 count = len(result)
 
-# Iteration (over main table)
+# Iteration
 for record in result:
     print(record)
 
 # Key access
 reviews = result["products_reviews"]
-main = result["main"]  # or result[entity_name]
+main = result["main"]
 
-# Membership testing
+# Membership
 if "products_tags" in result:
     print("Has tags table")
 
-# Keys, values, items
+# Methods
 table_names = list(result.keys())
 table_data = list(result.values())
 table_pairs = list(result.items())
 
-# Safe access with default
+# Safe access
 tags = result.get_table("products_tags", default=[])
 ```
 
@@ -344,7 +346,7 @@ tags = result.get_table("products_tags", default=[])
 
 ### TransmogError
 
-Base exception class for all Transmog errors.
+Base exception class.
 
 ```python
 class TransmogError(Exception):
@@ -353,98 +355,56 @@ class TransmogError(Exception):
 
 ### ValidationError
 
-Raised when input data or configuration is invalid.
+Raised for validation failures.
 
 ```python
 class ValidationError(TransmogError):
     """Raised for validation failures."""
 ```
 
-**Common Causes:**
-
-- Invalid configuration parameters
-- Malformed input data
-- Unsupported data types
-- File format issues
-
 **Example:**
 
 ```python
 try:
-    result = tm.flatten(data, arrays="invalid_option")
+    result = tm.flatten(data, config=invalid_config)
 except tm.ValidationError as e:
-    print(f"Configuration error: {e}")
+    print(f"Validation error: {e}")
 ```
 
-## Type Aliases
+## Type Definitions
 
-### DataInput
-
-Type alias for supported input data formats.
+### ArrayMode
 
 ```python
-DataInput = Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes]
-```
+from transmog.types import ArrayMode
 
-### ArrayHandling
-
-Type alias for array processing options.
-
-```python
-ArrayHandling = Literal["separate", "inline", "skip"]
-```
-
-### ErrorHandling
-
-Type alias for error handling strategies.
-
-```python
-ErrorHandling = Literal["raise", "skip", "warn"]
-```
-
-### IdSource
-
-Type alias for ID field specifications.
-
-```python
-IdSource = Union[str, dict[str, str], None]
+ArrayMode.SMART    # Default: simple arrays inline, complex extracted
+ArrayMode.SEPARATE # All arrays to child tables
+ArrayMode.INLINE   # All arrays as JSON strings
+ArrayMode.SKIP     # Ignore arrays
 ```
 
 ## Module Information
 
-**Version**: Access current version
-
 ```python
 import transmog
+
+# Version
 print(transmog.__version__)
-```
 
-**Available Functions**: Check what's available
-
-```python
+# Exported names
 print(transmog.__all__)
 # ['flatten', 'flatten_file', 'flatten_stream', 'FlattenResult',
-#  'TransmogError', 'ValidationError', '__version__']
+#  'TransmogConfig', 'TransmogError', 'ValidationError', '__version__']
 ```
 
 ## Advanced Usage
 
-For advanced features like custom processing or configuration objects:
-
 ```python
-# Import advanced components directly
+# Direct processor usage
 from transmog.process import Processor
-from transmog.config import TransmogConfig
 
-# Create custom processor
-processor = Processor()
-
-# Use configuration objects
-config = TransmogConfig(
-    separator=".",
-    array_handling="inline",
-    preserve_types=True
-)
+config = tm.TransmogConfig()
+processor = Processor(config)
+result = processor.process(data, entity_name="products")
 ```
-
-See the [Developer Guide](../developer_guide/extending.md) for more advanced usage patterns.

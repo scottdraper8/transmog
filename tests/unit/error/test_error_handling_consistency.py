@@ -12,21 +12,18 @@ from transmog.error import (
     format_error_message,
     get_recovery_strategy,
 )
+from transmog.types.base import RecoveryMode
 
 
 class TestErrorHandlingConsistency:
     """Test the standardized error handling implementation."""
 
     def test_recovery_strategy_mapping(self):
-        """Test that string identifiers map correctly to strategy objects."""
-        # Test string to object mapping
-        assert get_recovery_strategy("strict") is STRICT
-        assert get_recovery_strategy("skip") is DEFAULT
-        assert get_recovery_strategy("partial") is LENIENT
-
-        # Test API-level mappings
-        assert get_recovery_strategy("raise") is STRICT
-        assert get_recovery_strategy("warn") is LENIENT
+        """Test that RecoveryMode enums map correctly to strategy objects."""
+        # Test enum to object mapping
+        assert get_recovery_strategy(RecoveryMode.STRICT) is STRICT
+        assert get_recovery_strategy(RecoveryMode.SKIP) is DEFAULT
+        assert get_recovery_strategy(RecoveryMode.PARTIAL) is LENIENT
 
         # Test object passthrough
         assert get_recovery_strategy(STRICT) is STRICT
@@ -34,10 +31,12 @@ class TestErrorHandlingConsistency:
 
     def test_recovery_strategy_validation(self):
         """Test that invalid recovery strategies raise appropriate errors."""
-        with pytest.raises(ValueError, match="Invalid recovery strategy"):
+        with pytest.raises(
+            ValueError, match="Unknown RecoveryMode|Recovery strategy must be"
+        ):
             get_recovery_strategy("invalid_strategy")
 
-        with pytest.raises(ValueError, match="Recovery strategy must be string"):
+        with pytest.raises(ValueError, match="Recovery strategy must be"):
             get_recovery_strategy(123)
 
     def test_error_message_templates(self):
@@ -94,27 +93,29 @@ class TestErrorHandlingConsistency:
             ),  # Invalid float that should cause serialization issues
         }
 
-        # Test skip strategy (API: "skip")
-        result_skip = tm.flatten(problematic_data, errors="skip")
+        # Test skip strategy
+        config_skip = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+        result_skip = tm.flatten(problematic_data, config=config_skip)
         assert len(result_skip.main) == 1
 
-        # Test warn strategy (API: "warn")
-        result_warn = tm.flatten(problematic_data, errors="warn")
-        assert len(result_warn.main) == 1
+        # Test partial strategy
+        config_partial = tm.TransmogConfig(recovery_mode=RecoveryMode.PARTIAL)
+        result_partial = tm.flatten(problematic_data, config=config_partial)
+        assert len(result_partial.main) == 1
 
-        # For strict testing, use data that will definitely fail
-        # Create a function object which can't be serialized
+        # System handles non-serializable objects by converting to string representation
         def test_function():
             pass
 
-        truly_problematic_data = {
+        data_with_function = {
             "name": "test",
-            "function": test_function,  # This will definitely fail serialization
+            "function": test_function,
         }
 
-        # Test strict strategy (API: "raise") - should raise on non-serializable data
-        with pytest.raises((ProcessingError, TypeError, ValueError)):
-            tm.flatten(truly_problematic_data, errors="raise")
+        config_strict = tm.TransmogConfig(recovery_mode=RecoveryMode.STRICT)
+        result = tm.flatten(data_with_function, config=config_strict)
+        assert len(result.main) == 1
+        assert "function" in result.main[0]
 
     def test_consistent_error_messages_across_modules(self):
         """Test that error messages are consistent across different modules."""
@@ -124,26 +125,24 @@ class TestErrorHandlingConsistency:
         problematic_data = {"field": float("inf")}  # Invalid float
 
         # Test with skip strategy to capture error messages
-        result = tm.flatten(problematic_data, errors="skip")
+        config = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+        result = tm.flatten(problematic_data, config=config)
 
         # Should handle the error gracefully
         assert len(result.main) == 1
 
     def test_recovery_strategy_object_usage(self):
         """Test that recovery strategy objects work consistently."""
-        from transmog.config import ErrorHandlingConfig, TransmogConfig
+        from transmog.config import TransmogConfig
 
-        # Test configuration with strategy objects
+        # Test configuration with strategy
         config = TransmogConfig(
-            error_handling=ErrorHandlingConfig(
-                recovery_strategy="skip",  # Still accepts strings
-                allow_malformed_data=True,
-            )
+            recovery_mode=RecoveryMode.SKIP,
+            allow_malformed_data=True,
         )
 
-        # The configuration should work with string-based recovery strategies
-        # that get converted to objects internally
-        assert config.error_handling.recovery_strategy == "skip"
+        # Configuration should work with RecoveryMode enum
+        assert config.recovery_mode == RecoveryMode.SKIP
 
     def test_nested_error_context_preservation(self):
         """Test that error context is preserved through nested processing."""
@@ -158,7 +157,8 @@ class TestErrorHandlingConsistency:
         }
 
         # Process with skip strategy
-        result = tm.flatten(nested_data, errors="skip")
+        config = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+        result = tm.flatten(nested_data, config=config)
 
         # Should handle nested errors gracefully
         assert len(result.main) == 1
@@ -174,7 +174,8 @@ class TestErrorHandlingConsistency:
         }
 
         # Test with skip strategy
-        result = tm.flatten(array_data, errors="skip")
+        config = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+        result = tm.flatten(array_data, config=config)
 
         # Should process valid items and skip problematic ones
         assert len(result.main) == 1

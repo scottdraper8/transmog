@@ -75,25 +75,15 @@ rating,comment,_parent_id
 ### CSV Best Practices
 
 ```python
-# For database import
-result = tm.flatten(
-    data,
-    name="db_import",
-    id_field="id",           # Use natural IDs for foreign keys
-    preserve_types=False,    # Convert all to strings
-    skip_null=True,          # Clean data for SQL
-    arrays="separate"        # Create relational tables
-)
+# For database import / Excel
+config = tm.TransmogConfig.for_csv()
+result = tm.flatten(data, name="db_import", config=config)
 result.save("database_import", output_format="csv")
 
-# For Excel analysis
-result = tm.flatten(
-    data,
-    name="excel_data",
-    separator="_",           # Excel-friendly field names
-    skip_empty=True,         # Remove empty cells
-    arrays="separate"        # Multiple worksheets concept
-)
+# Customize if needed
+config = tm.TransmogConfig.for_csv()
+config.id_field = "id"
+result = tm.flatten(data, name="excel_data", config=config)
 result.save("excel_analysis", output_format="csv")
 ```
 
@@ -128,25 +118,18 @@ pip install pyarrow
 ### Parquet Best Practices
 
 ```python
-# For analytics workloads
-result = tm.flatten(
-    data,
-    name="analytics",
-    preserve_types=True,     # Keep numeric types for analysis
-    skip_null=False,         # Include nulls for complete picture
-    arrays="separate",       # Enable relational analysis
-    add_timestamp=True       # Add processing metadata
-)
+# Default is already optimized for Parquet (types preserved)
+result = tm.flatten(data, name="analytics")
 result.save("analytics_data", output_format="parquet")
 
-# For data lake storage
-result = tm.flatten(
-    data,
-    name="lake_data",
-    preserve_types=True,     # Maintain type information
-    arrays="separate",       # Normalized structure
-    id_field="natural_id"    # Consistent identification
-)
+# Or use performance preset for large datasets
+config = tm.TransmogConfig.for_performance()
+result = tm.flatten(data, name="analytics", config=config)
+result.save("analytics_data", output_format="parquet")
+
+# For data lake storage with custom ID
+config = tm.TransmogConfig(id_field="natural_id")
+result = tm.flatten(data, name="lake_data", config=config)
 result.save("data_lake", output_format="parquet")
 ```
 
@@ -168,13 +151,15 @@ tm.flatten_stream(
 )
 
 # Stream to CSV for database loading
+config = tm.TransmogConfig(
+    batch_size=2000
+)
 tm.flatten_stream(
     db_data,
     output_path="db_staging/",
     name="staging_data",
     output_format="csv",
-    batch_size=2000,
-    preserve_types=False            # Strings for SQL compatibility
+    config=config
 )
 ```
 
@@ -203,24 +188,20 @@ tm.flatten_stream(
 
 ```python
 # Optimize CSV for database loading
-result = tm.flatten(
-    data,
-    name="db_optimized",
-    preserve_types=False,    # Consistent string types
-    skip_null=True,          # Avoid NULL handling issues
-    id_field="natural_id",   # Use natural foreign keys
-    separator="_"            # Database-friendly column names
+config = tm.TransmogConfig(
+    skip_null=True,
+    id_field="natural_id",
+    separator="_"
 )
+result = tm.flatten(data, name="db_optimized", config=config)
 result.save("database_ready", output_format="csv")
 
 # Optimize CSV for analytics
-result = tm.flatten(
-    data,
-    name="analytics_csv",
-    arrays="separate",       # Enable table joins
-    add_timestamp=True,      # Add time dimensions
-    preserve_types=False     # Consistent for spreadsheet tools
+config = tm.TransmogConfig(
+    array_mode=tm.ArrayMode.SEPARATE,
+    time_field="_timestamp"
 )
+result = tm.flatten(data, name="analytics_csv", config=config)
 result.save("analytics_ready", output_format="csv")
 ```
 
@@ -228,25 +209,27 @@ result.save("analytics_ready", output_format="csv")
 
 ```python
 # Optimize Parquet for query performance
-result = tm.flatten(
-    data,
-    name="query_optimized",
-    preserve_types=True,     # Native type support
-    skip_null=False,         # Preserve data completeness
-    arrays="separate",       # Normalized for joins
-    add_timestamp=True       # Time-based partitioning support
+config = tm.TransmogConfig(
+    cast_to_string=False,
+    skip_null=False,
+    array_mode=tm.ArrayMode.SEPARATE,
+    time_field="_timestamp"
 )
+result = tm.flatten(data, name="query_optimized", config=config)
 result.save("query_ready", output_format="parquet")
 
 # Optimize Parquet for storage efficiency
+config = tm.TransmogConfig(
+    cast_to_string=False,
+    batch_size=5000
+)
 tm.flatten_stream(
     large_data,
     output_path="efficient_storage/",
     name="compressed_data",
     output_format="parquet",
-    preserve_types=True,     # Better compression with types
-    batch_size=5000,         # Larger batches for compression
-    compression="snappy"     # Fast compression algorithm
+    config=config,
+    compression="snappy"
 )
 ```
 
@@ -295,14 +278,12 @@ result.save("output", output_format="csv")
 
 ```python
 # Prepare data for PostgreSQL
-result = tm.flatten(
-    api_data,
-    name="customers",
+config = tm.TransmogConfig(
     id_field="customer_id",
-    preserve_types=False,
     skip_null=True,
-    arrays="separate"
+    array_mode=tm.ArrayMode.SEPARATE
 )
+result = tm.flatten(api_data, name="customers", config=config)
 result.save("postgres_import", output_format="csv")
 
 # SQL import commands
@@ -314,14 +295,17 @@ result.save("postgres_import", output_format="csv")
 
 ```python
 # Prepare data for Spark/Pandas analysis
+config = tm.TransmogConfig(
+    cast_to_string=False,
+    array_mode=tm.ArrayMode.SEPARATE,
+    batch_size=10000
+)
 tm.flatten_stream(
     analytics_data,
     output_path="spark_input/",
     name="events",
     output_format="parquet",
-    preserve_types=True,
-    arrays="separate",
-    batch_size=10000
+    config=config
 )
 
 # Use with Spark

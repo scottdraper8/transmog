@@ -86,9 +86,7 @@ class DataIteratorUtils:
         logger.warning(error_msg)
 
         # Handle error based on recovery strategy
-        strategy = get_recovery_strategy(
-            processor.config.error_handling.recovery_strategy
-        )
+        strategy = get_recovery_strategy(processor.config.recovery_mode)
         try:
             # Attempt recovery
             strategy.recover(

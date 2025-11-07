@@ -26,7 +26,8 @@ class TestFieldNaming:
         """Test dot separator."""
         data = {"level1": {"level2": {"value": "test"}}}
 
-        result = tm.flatten(data, name="test", separator=".")
+        config = tm.TransmogConfig(separator=".", nested_threshold=10)
+        result = tm.flatten(data, name="test", config=config)
 
         main_record = result.main[0]
         assert "level1.level2.value" in main_record
@@ -36,7 +37,8 @@ class TestFieldNaming:
         """Test custom separator."""
         data = {"level1": {"level2": {"value": "test"}}}
 
-        result = tm.flatten(data, name="test", separator="::")
+        config = tm.TransmogConfig(separator="::", nested_threshold=10)
+        result = tm.flatten(data, name="test", config=config)
 
         main_record = result.main[0]
         assert "level1::level2::value" in main_record
@@ -67,10 +69,12 @@ class TestFieldNaming:
         }
 
         # Low threshold should simplify names
-        result_low = tm.flatten(deep_data, name="test", nested_threshold=3)
+        config_low = tm.TransmogConfig(nested_threshold=3)
+        result_low = tm.flatten(deep_data, name="test", config=config_low)
 
         # High threshold should keep full names
-        result_high = tm.flatten(deep_data, name="test", nested_threshold=10)
+        config_high = tm.TransmogConfig(nested_threshold=10)
+        result_high = tm.flatten(deep_data, name="test", config=config_high)
 
         # Both should work
         assert len(result_low.main) == 1
@@ -190,7 +194,8 @@ class TestTableNaming:
             "children": [{"id": 101, "name": "child1"}, {"id": 102, "name": "child2"}],
         }
 
-        result = tm.flatten(data, name="parent_entity", arrays="separate")
+        config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+        result = tm.flatten(data, name="parent_entity", config=config)
 
         # Should have child table with appropriate name
         table_names = list(result.tables.keys())
@@ -210,7 +215,8 @@ class TestTableNaming:
             },
         }
 
-        result = tm.flatten(data, name="company", arrays="separate")
+        config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+        result = tm.flatten(data, name="company", config=config)
 
         table_names = list(result.tables.keys())
         # Should have appropriately named tables
@@ -228,7 +234,8 @@ class TestTableNaming:
         """Test table naming with custom separator."""
         data = {"id": 1, "nested": {"items": [{"id": 1, "value": "test"}]}}
 
-        result = tm.flatten(data, name="test", arrays="separate", separator=".")
+        config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE, separator=".")
+        result = tm.flatten(data, name="test", config=config)
 
         # Table names might use separator or have special handling
         table_names = list(result.tables.keys())
@@ -247,7 +254,8 @@ class TestTableNaming:
             },
         }
 
-        result = tm.flatten(data, name="test", arrays="separate")
+        config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+        result = tm.flatten(data, name="test", config=config)
 
         # Should handle long names (may truncate or simplify)
         table_names = list(result.tables.keys())
@@ -269,7 +277,8 @@ class TestNamingEdgeCases:
             },
         }
 
-        result = tm.flatten(data, name="test", arrays="separate")
+        config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+        result = tm.flatten(data, name="test", config=config)
 
         # Should handle naming conflicts
         main_record = result.main[0]
@@ -324,7 +333,8 @@ class TestNamingEdgeCases:
             "nested": {"field_with_underscore": "value2"},
         }
 
-        result = tm.flatten(data, name="test", separator="_")
+        config = tm.TransmogConfig(separator="_")
+        result = tm.flatten(data, name="test", config=config)
 
         main_record = result.main[0]
         # Should handle separator in field names
@@ -395,9 +405,12 @@ class TestNamingConsistency:
         """Test naming consistency with different separators."""
         data = {"level1": {"level2": {"value": "test"}}}
 
-        result_underscore = tm.flatten(data, name="test", separator="_")
-        result_dot = tm.flatten(data, name="test", separator=".")
-        result_dash = tm.flatten(data, name="test", separator="-")
+        config_underscore = tm.TransmogConfig(separator="_")
+        result_underscore = tm.flatten(data, name="test", config=config_underscore)
+        config_dot = tm.TransmogConfig(separator=".")
+        result_dot = tm.flatten(data, name="test", config=config_dot)
+        config_dash = tm.TransmogConfig(separator="-")
+        result_dash = tm.flatten(data, name="test", config=config_dash)
 
         # Should have same structure but different field names
         assert len(result_underscore.main) == 1

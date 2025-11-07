@@ -79,12 +79,13 @@ class TestEndToEndWorkflows:
         ]
 
         # Stream process to CSV
+        config = tm.TransmogConfig(batch_size=20)
         result = tm.flatten_stream(
             large_data,
             output_path=str(output_dir / "streaming_csv"),
             name="users",
             output_format="csv",
-            batch_size=20,
+            config=config,
         )
 
         assert result is None  # Streaming returns None
@@ -96,10 +97,11 @@ class TestEndToEndWorkflows:
     def test_deterministic_id_consistency(self, array_data):
         """Test that deterministic IDs are consistent across runs."""
         # First run
-        result1 = tm.flatten(array_data, name="test", id_field="id")
+        config = tm.TransmogConfig(id_field="id")
+        result1 = tm.flatten(array_data, name="test", config=config)
 
         # Second run with same data
-        result2 = tm.flatten(array_data, name="test", id_field="id")
+        result2 = tm.flatten(array_data, name="test", config=config)
 
         # IDs should be consistent
         assert result1.main[0]["id"] == result2.main[0]["id"]
@@ -171,7 +173,8 @@ class TestRealWorldScenarios:
             }
         ]
 
-        result = tm.flatten(social_data, name="posts", arrays="separate")
+        config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+        result = tm.flatten(social_data, name="posts", config=config)
 
         # Verify processing
         assert len(result.main) == 1
@@ -210,9 +213,8 @@ class TestPerformanceScenarios:
             large_dataset.append(record)
 
         # Process with memory optimization
-        result = tm.flatten(
-            large_dataset, name="large_data", low_memory=True, batch_size=10
-        )
+        config = tm.TransmogConfig(batch_size=10, cache_size=1000)
+        result = tm.flatten(large_dataset, name="large_data", config=config)
 
         assert len(result.main) == 50
 

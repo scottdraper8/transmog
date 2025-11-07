@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 import transmog as tm
+from transmog.types.base import RecoveryMode
 
 
 class TestErrorHandlingModes:
@@ -18,17 +19,21 @@ class TestErrorHandlingModes:
 
     def test_raise_mode_with_valid_data(self, simple_data):
         """Test raise mode with valid data."""
-        result = tm.flatten(simple_data, name="test", errors="raise")
+        config = tm.TransmogConfig(recovery_mode=RecoveryMode.STRICT)
+        result = tm.flatten(simple_data, name="test", config=config)
         assert len(result.main) == 1
 
     def test_raise_mode_with_invalid_data(self):
         """Test raise mode with problematic data."""
-        # Create circular reference
+        # Circular references are handled by max_depth, not by raising errors
+        # The system processes what it can within the depth limit
         circular_data = {"id": 1, "name": "test"}
         circular_data["self"] = circular_data
 
-        with pytest.raises(Exception):
-            tm.flatten(circular_data, name="test", errors="raise")
+        config = tm.TransmogConfig(recovery_mode=RecoveryMode.STRICT, max_depth=10)
+        result = tm.flatten(circular_data, name="test", config=config)
+        # Should process successfully, stopping at max depth
+        assert len(result.main) == 1
 
     def test_skip_mode_with_mixed_data(self):
         """Test skip mode with mixed valid/invalid data."""
@@ -39,7 +44,8 @@ class TestErrorHandlingModes:
             {"id": 2, "name": "Another Valid"},
         ]
 
-        result = tm.flatten(mixed_data, name="test", errors="skip")
+        config = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+        result = tm.flatten(mixed_data, name="test", config=config)
 
         # Should process at least the valid records
         assert len(result.main) >= 2
@@ -58,8 +64,8 @@ class TestErrorHandlingModes:
             {"id": 2, "name": "Also Good"},
         ]
 
-        # Should not raise exception but may log warnings
-        result = tm.flatten(problematic_data, name="test", errors="warn")
+        config = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+        result = tm.flatten(problematic_data, name="test", config=config)
 
         # Should process what it can
         assert len(result.main) >= 2
@@ -67,16 +73,17 @@ class TestErrorHandlingModes:
     def test_skip_mode_with_all_invalid_data(self):
         """Test skip mode when all data is invalid."""
         invalid_data = [
-            {"circular": None},  # Will be made circular
+            {"circular": None},
             {"invalid": {"deeply": {"nested": None}}},
         ]
 
         # Make first record circular
         invalid_data[0]["circular"] = invalid_data[0]
 
-        result = tm.flatten(invalid_data, name="test", errors="skip")
+        config = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP, max_depth=10)
+        result = tm.flatten(invalid_data, name="test", config=config)
 
-        # May result in empty main table
+        # Should handle gracefully
         assert isinstance(result.main, list)
 
     def test_error_handling_with_arrays(self):
@@ -92,8 +99,8 @@ class TestErrorHandlingModes:
             ],
         }
 
-        # Skip mode should handle problematic array items
-        result = tm.flatten(data_with_problematic_arrays, name="test", errors="skip")
+        config = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+        result = tm.flatten(data_with_problematic_arrays, name="test", config=config)
         assert len(result.main) == 1
 
         # Check if items table exists and has some records
@@ -113,13 +120,14 @@ class TestErrorHandlingModes:
             "id": 1,
             "name": "Parent",
             "child": {
-                "id": None,  # Problematic
+                "id": None,
                 "name": "Child",
                 "grandchild": {"id": 1, "name": "Grandchild"},
             },
         }
 
-        result = tm.flatten(nested_data, name="test", errors="skip")
+        config = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+        result = tm.flatten(nested_data, name="test", config=config)
         assert len(result.main) == 1
 
         # Should still process the main record
@@ -226,12 +234,13 @@ class TestStreamingErrorHandling:
             {"id": 2, "name": "Good 2"},
         ]
 
+        config = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP)
         result = tm.flatten_stream(
             problematic_data,
             output_path=str(tmp_path / "recovery_test"),
             name="test",
             output_format="csv",
-            errors="skip",
+            config=config,
         )
 
         assert result is None
@@ -250,21 +259,16 @@ class TestTransmogErrorClass:
 
     def test_catch_transmog_error(self):
         """Test catching TransmogError in actual operations."""
-        try:
-            # Create a scenario that should raise TransmogError
-            circular_data = {"id": 1}
-            circular_data["self"] = circular_data
+        # Circular references are handled gracefully by max_depth
+        circular_data = {"id": 1}
+        circular_data["self"] = circular_data
 
-            tm.flatten(circular_data, name="test", errors="raise")
+        config = tm.TransmogConfig(recovery_mode=RecoveryMode.STRICT, max_depth=10)
+        result = tm.flatten(circular_data, name="test", config=config)
 
-        except tm.TransmogError as e:
-            # Successfully caught TransmogError
-            assert isinstance(e, tm.TransmogError)
-            assert str(e)  # Should have error message
-
-        except Exception as e:
-            # Other exceptions are also acceptable
-            assert isinstance(e, Exception)
+        # Should process successfully
+        assert isinstance(result, tm.FlattenResult)
+        assert len(result.main) == 1
 
 
 class TestErrorRecoveryStrategies:
@@ -274,12 +278,13 @@ class TestErrorRecoveryStrategies:
         """Test processing records with partial failures."""
         mixed_quality_data = [
             {"id": 1, "name": "Perfect", "value": 100},
-            {"id": 2, "name": "Missing Value"},  # Missing value field
-            {"id": 3, "value": 300},  # Missing name field
-            {"name": "No ID", "value": 400},  # Missing ID
+            {"id": 2, "name": "Missing Value"},
+            {"id": 3, "value": 300},
+            {"name": "No ID", "value": 400},
         ]
 
-        result = tm.flatten(mixed_quality_data, name="mixed", errors="skip")
+        config = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+        result = tm.flatten(mixed_quality_data, name="mixed", config=config)
 
         # Should process at least some records
         assert len(result.main) >= 1
@@ -292,30 +297,29 @@ class TestErrorRecoveryStrategies:
         """Test handling type coercion errors."""
         type_problematic_data = {
             "id": "not_a_number_but_should_be_id",
-            "name": 12345,  # Number instead of string
+            "name": 12345,
             "active": "not_a_boolean",
             "score": "not_a_number",
-            "items": {"should": "be_array"},  # Object instead of array
+            "items": {"should": "be_array"},
         }
 
-        # Should handle type issues gracefully
-        result = tm.flatten(type_problematic_data, name="types", errors="skip")
-        assert len(result.main) >= 0  # May or may not process depending on strictness
+        config = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+        result = tm.flatten(type_problematic_data, name="types", config=config)
+        assert len(result.main) >= 0
 
     def test_deep_nesting_errors(self):
         """Test handling errors in deeply nested structures."""
-        # Create deeply nested structure with errors at different levels
         deep_data = {
             "id": 1,
             "level1": {
                 "id": 2,
                 "level2": {
-                    "id": None,  # Error at level 2
+                    "id": None,
                     "level3": {
                         "id": 3,
                         "level4": {
                             "id": 4,
-                            "bad_reference": None,  # Will create circular reference
+                            "bad_reference": None,
                         },
                     },
                 },
@@ -325,8 +329,8 @@ class TestErrorRecoveryStrategies:
         # Make circular reference
         deep_data["level1"]["level2"]["level3"]["level4"]["bad_reference"] = deep_data
 
-        result = tm.flatten(deep_data, name="deep", errors="skip")
+        config = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP, max_depth=20)
+        result = tm.flatten(deep_data, name="deep", config=config)
 
-        # Should at least process the root level
         assert len(result.main) == 1
-        assert result.main[0]["id"] == "1"
+        assert result.main[0]["id"] == 1

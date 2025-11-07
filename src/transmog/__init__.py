@@ -24,26 +24,19 @@ __version__ = "1.1.1"
 
 # Import the simplified API
 from .api import FlattenResult, flatten, flatten_file, flatten_stream
-
-# Import the main error classes for user convenience
+from .config import TransmogConfig
 from .error import TransmogError, ValidationError
+from .types.base import ArrayMode, RecoveryMode
 
-# Public API - only these are available to users
 __all__ = [
-    # Main functions
     "flatten",
     "flatten_file",
     "flatten_stream",
-    # Result class
     "FlattenResult",
-    # Error handling
+    "TransmogConfig",
+    "ArrayMode",
+    "RecoveryMode",
     "TransmogError",
     "ValidationError",
-    # Version
     "__version__",
 ]
-
-# For users who need advanced features, they can import:
-# from transmog.process import Processor
-# from transmog.config import TransmogConfig
-# etc.

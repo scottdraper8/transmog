@@ -15,7 +15,7 @@ from typing import Any
 
 import pytest
 
-from transmog.config import ProcessingMode, TransmogConfig
+from transmog.config import TransmogConfig
 from transmog.error import ConfigurationError, FileError, ProcessingError
 from transmog.process import Processor
 from transmog.process.streaming import (
@@ -175,7 +175,8 @@ class TestStreamProcessing:
             {"user_id": "u2", "name": "Bob"},
         ]
 
-        processor = Processor()
+        config = TransmogConfig(id_patterns=["user_id"])
+        processor = Processor(config)
         output_dir = tmp_path / "output"
 
         stream_process(
@@ -184,7 +185,6 @@ class TestStreamProcessing:
             entity_name="users",
             output_format="csv",
             output_destination=str(output_dir),
-            use_deterministic_ids=True,
         )
 
         main_file = output_dir / "users.csv"
@@ -195,14 +195,15 @@ class TestStreamProcessing:
             result = list(reader)
         assert "user_id" in result[0]
 
-    def test_stream_process_force_transmog_id(self, tmp_path):
-        """Test streaming processing with forced transmog ID generation."""
+    def test_stream_process_with_id_field(self, tmp_path):
+        """Test streaming processing with ID field."""
         data = [
-            {"id": "existing1", "name": "Alice"},
-            {"id": "existing2", "name": "Bob"},
+            {"name": "Alice"},
+            {"name": "Bob"},
         ]
 
-        processor = Processor()
+        config = TransmogConfig()
+        processor = Processor(config)
         output_dir = tmp_path / "output"
 
         stream_process(
@@ -211,7 +212,6 @@ class TestStreamProcessing:
             entity_name="users",
             output_format="csv",
             output_destination=str(output_dir),
-            force_transmog_id=True,
         )
 
         main_file = output_dir / "users.csv"
@@ -220,7 +220,7 @@ class TestStreamProcessing:
         with open(main_file) as f:
             reader = csv.DictReader(f)
             result = list(reader)
-        assert "__transmog_id" in result[0]
+        assert "_id" in result[0]
 
 
 class TestStreamProcessFile:
@@ -324,7 +324,7 @@ class TestStreamingMemoryOptimization:
         """Test streaming with memory-optimized configuration."""
         data = [{"id": i, "value": f"item_{i}"} for i in range(100)]
 
-        config = TransmogConfig.memory_optimized()
+        config = TransmogConfig.for_memory()
         processor = Processor(config)
         output_dir = tmp_path / "output"
 

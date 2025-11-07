@@ -109,8 +109,9 @@ data = {
     }
 }
 
-# Default behavior: arrays become separate tables
-result = tm.flatten(data, name="products", arrays="separate")
+# Configure to extract all arrays as separate tables
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+result = tm.flatten(data, name="products", config=config)
 
 print("Main table:", result.main)
 # [{'product_name': 'Laptop', '_id': 'generated_id'}]
@@ -153,7 +154,8 @@ data = {
     ]
 }
 
-result = tm.flatten(data, name="company", arrays="separate")
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+result = tm.flatten(data, name="company", config=config)
 
 # Multiple levels of child tables
 print("Tables created:", list(result.all_tables.keys()))
@@ -211,7 +213,8 @@ relationships = build_relationship_map(result)
 
 ```python
 # Keep arrays as JSON strings in the main table
-result = tm.flatten(data, name="products", arrays="inline")
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.INLINE)
+result = tm.flatten(data, name="products", config=config)
 
 print("Main table with inline arrays:", result.main)
 # [
@@ -241,7 +244,8 @@ Inline mode is useful when:
 ```python
 import json
 
-result = tm.flatten(data, name="products", arrays="inline")
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.INLINE)
+result = tm.flatten(data, name="products", config=config)
 
 # Parse inline arrays when needed
 for record in result.main:
@@ -261,7 +265,8 @@ for record in result.main:
 
 ```python
 # Skip arrays entirely during processing
-result = tm.flatten(data, name="products", arrays="skip")
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.SKIP)
+result = tm.flatten(data, name="products", config=config)
 
 print("Main table (arrays skipped):", result.main)
 # [{'product_name': 'Laptop', '_id': 'generated_id'}]
@@ -299,7 +304,8 @@ data = {
     }
 }
 
-result = tm.flatten(data, name="records", arrays="separate")
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+result = tm.flatten(data, name="records", config=config)
 
 # All arrays are extracted consistently
 print("Scalar values table:", result.tables["records_scalar_values"])
@@ -328,15 +334,16 @@ data = {
     }
 }
 
-result = tm.flatten(data, name="items", arrays="separate")
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+result = tm.flatten(data, name="items", config=config)
 
 # Empty and null arrays are handled gracefully
 print("Tables created:", list(result.tables.keys()))
 # ['items_valid_array'] (only non-empty arrays create tables)
 
-# Control empty array handling
-result = tm.flatten(data, name="items", arrays="separate", skip_empty=False)
-# Now empty arrays may create empty tables
+# Control empty array handling with include_empty
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE, include_empty=True)
+result = tm.flatten(data, name="items", config=config)
 ```
 
 ### Array Field Naming
@@ -356,7 +363,8 @@ data = {
     }
 }
 
-result = tm.flatten(data, name="org", arrays="separate")
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+result = tm.flatten(data, name="org", config=config)
 
 # Table naming: {entity_name}_{array_path}
 print("Table names:", list(result.tables.keys()))
@@ -373,15 +381,18 @@ print("Table names:", list(result.tables.keys()))
 
 ```python
 # Separate mode: More tables, distributed memory usage
-result_separate = tm.flatten(data, arrays="separate")
+config_separate = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+result_separate = tm.flatten(data, config=config_separate)
 print(f"Tables: {len(result_separate.all_tables)}")
 
 # Inline mode: Fewer tables, concentrated memory usage
-result_inline = tm.flatten(data, arrays="inline")
+config_inline = tm.TransmogConfig(array_mode=tm.ArrayMode.INLINE)
+result_inline = tm.flatten(data, config=config_inline)
 print(f"Tables: {len(result_inline.all_tables)}")  # Usually 1
 
 # Skip mode: Minimal memory usage
-result_skip = tm.flatten(data, arrays="skip")
+config_skip = tm.TransmogConfig(array_mode=tm.ArrayMode.SKIP)
+result_skip = tm.flatten(data, config=config_skip)
 print(f"Tables: {len(result_skip.all_tables)}")    # Usually 1
 ```
 
@@ -389,23 +400,25 @@ print(f"Tables: {len(result_skip.all_tables)}")    # Usually 1
 
 ```python
 # For large arrays, use streaming with separate mode
+config = tm.TransmogConfig(
+    array_mode=tm.ArrayMode.SEPARATE,
+    batch_size=1000,
+    batch_size=100, cache_size=1000
+)
 tm.flatten_stream(
     large_data_with_arrays,
     output_path="output/",
     name="large_dataset",
     output_format="parquet",
-    arrays="separate",      # Best for large arrays
-    batch_size=1000,
-    low_memory=True
+    config=config
 )
 
 # For very large arrays that don't need analysis, use inline
-result = tm.flatten(
-    data_with_huge_arrays,
-    name="documents",
-    arrays="inline",        # Avoid creating huge child tables
-    low_memory=True
+config = tm.TransmogConfig(
+    array_mode=tm.ArrayMode.INLINE,
+    batch_size=100, cache_size=1000
 )
+result = tm.flatten(data_with_huge_arrays, name="documents", config=config)
 ```
 
 ## Working with Array Results
@@ -427,7 +440,8 @@ def analyze_arrays(result):
     return analysis
 
 # Analyze the arrays
-result = tm.flatten(complex_data, name="analysis", arrays="separate")
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+result = tm.flatten(complex_data, name="analysis", config=config)
 array_info = analyze_arrays(result)
 
 for table, info in array_info.items():
@@ -471,41 +485,37 @@ original_structure = reconstruct_arrays(result)
 
 ```python
 # Configuration for database loading
-result = tm.flatten(
-    data,
-    name="entities",
-    arrays="separate",      # Create relational tables
-    id_field="id",          # Use natural IDs
-    preserve_types=False,   # Convert to strings for SQL
-    skip_null=True         # Clean data for import
+config = tm.TransmogConfig(
+    array_mode=tm.ArrayMode.SEPARATE,
+    id_field="id",
+    skip_null=True
 )
+result = tm.flatten(data, name="entities", config=config)
 ```
 
 ### Document-Optimized Arrays
 
 ```python
 # Configuration for document storage
-result = tm.flatten(
-    data,
-    name="documents",
-    arrays="inline",        # Keep arrays as JSON
-    preserve_types=True,    # Maintain type information
-    skip_empty=False       # Keep structure complete
+config = tm.TransmogConfig(
+    array_mode=tm.ArrayMode.INLINE,
+    cast_to_string=False,
+    include_empty=True
 )
+result = tm.flatten(data, name="documents", config=config)
 ```
 
 ### Analytics-Optimized Arrays
 
 ```python
 # Configuration for data analysis
-result = tm.flatten(
-    data,
-    name="analytics",
-    arrays="separate",      # Enable array analysis
-    preserve_types=True,    # Keep numeric types
-    add_timestamp=True,     # Add processing metadata
-    skip_null=False        # Keep all data points
+config = tm.TransmogConfig(
+    array_mode=tm.ArrayMode.SEPARATE,
+    cast_to_string=False,
+    skip_null=False,
+    time_field="_timestamp"
 )
+result = tm.flatten(data, name="analytics", config=config)
 ```
 
 ## Next Steps

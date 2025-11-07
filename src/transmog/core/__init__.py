@@ -14,7 +14,6 @@ from .hierarchy import (
 )
 from .id_discovery import (
     DEFAULT_ID_FIELD_PATTERNS,
-    build_id_field_mapping,
     discover_id_field,
     get_record_id,
     should_add_transmog_id,
@@ -52,7 +51,6 @@ __all__ = [
     "stream_process_records",
     # ID discovery
     "DEFAULT_ID_FIELD_PATTERNS",
-    "build_id_field_mapping",
     "discover_id_field",
     "get_record_id",
     "should_add_transmog_id",

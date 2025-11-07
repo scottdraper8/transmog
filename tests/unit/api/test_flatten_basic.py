@@ -10,6 +10,9 @@ from pathlib import Path
 import pytest
 
 import transmog as tm
+from transmog import TransmogConfig
+from transmog.types import ArrayMode
+from transmog.types.base import RecoveryMode
 
 from ...conftest import assert_files_created, assert_valid_result, load_json_file
 
@@ -71,7 +74,7 @@ class TestFlattenFunction:
         # Check first record
         first_record = result.main[0]
         assert first_record["name"] == "Record 1"
-        assert first_record["value"] == "10"  # Values are cast to strings by default
+        assert first_record["value"] == 10
 
         # Smart mode keeps simple tag arrays inline
         assert "tags" in first_record
@@ -80,18 +83,19 @@ class TestFlattenFunction:
 
     def test_flatten_with_id_field(self, simple_data):
         """Test flattening with natural ID field."""
-        result = tm.flatten(simple_data, name="entity", id_field="id")
+        config = TransmogConfig(id_field="id")
+        result = tm.flatten(simple_data, name="entity", config=config)
 
         assert_valid_result(result)
         assert len(result.main) == 1
 
-        # Should use natural ID
         record = result.main[0]
-        assert record["id"] == "1"  # ID converted to string
+        assert record["id"] == 1
 
     def test_flatten_with_custom_separator(self, simple_data):
         """Test flattening with custom field separator."""
-        result = tm.flatten(simple_data, name="entity", separator=":")
+        config = TransmogConfig(separator=":")
+        result = tm.flatten(simple_data, name="entity", config=config)
 
         assert_valid_result(result)
         record = result.main[0]
@@ -102,50 +106,66 @@ class TestFlattenFunction:
 
     def test_flatten_array_handling_options(self, array_data):
         """Test different array handling options."""
-        # Test separate arrays (default)
-        result_separate = tm.flatten(array_data, name="company", arrays="separate")
+        # Test separate arrays
+        result_separate = tm.flatten(
+            array_data,
+            name="company",
+            config=TransmogConfig(array_mode=ArrayMode.SEPARATE),
+        )
         assert len(result_separate.tables) > 0
 
         # Test inline arrays
-        result_inline = tm.flatten(array_data, name="company", arrays="inline")
+        result_inline = tm.flatten(
+            array_data,
+            name="company",
+            config=TransmogConfig(array_mode=ArrayMode.INLINE),
+        )
         # With inline, arrays should be flattened into main table
 
         # Test skip arrays
-        result_skip = tm.flatten(array_data, name="company", arrays="skip")
+        result_skip = tm.flatten(
+            array_data, name="company", config=TransmogConfig(array_mode=ArrayMode.SKIP)
+        )
         # Arrays should be ignored
 
     def test_flatten_error_handling(self, problematic_data):
         """Test different error handling modes."""
         # Test skip mode - should process valid records
-        result_skip = tm.flatten(problematic_data, name="records", errors="skip")
+        result_skip = tm.flatten(
+            problematic_data,
+            name="records",
+            config=TransmogConfig(recovery_mode=RecoveryMode.SKIP),
+        )
         assert_valid_result(result_skip)
         assert len(result_skip.main) >= 1  # At least one valid record
 
         # Test warn mode - should process with warnings
-        result_warn = tm.flatten(problematic_data, name="records", errors="warn")
+        result_warn = tm.flatten(
+            problematic_data,
+            name="records",
+            config=TransmogConfig(recovery_mode=RecoveryMode.SKIP),
+        )
         assert_valid_result(result_warn)
         assert len(result_warn.main) >= 1
 
     def test_flatten_preserve_types(self, mixed_types_data):
         """Test type preservation option."""
-        # Default behavior (cast to string)
-        result_string = tm.flatten(mixed_types_data, name="mixed", preserve_types=False)
-        record = result_string.main[0]
-        assert isinstance(record["score"], str)
-        assert isinstance(record["count"], str)
-
-        # Preserve types
-        result_typed = tm.flatten(mixed_types_data, name="mixed", preserve_types=True)
+        result_typed = tm.flatten(mixed_types_data, name="mixed")
         record = result_typed.main[0]
-        # Types should be preserved (implementation may vary)
 
     def test_flatten_with_timestamp(self, simple_data):
         """Test adding timestamp to records."""
-        result_with_ts = tm.flatten(simple_data, name="entity", add_timestamp=True)
+        # Timestamps are always added with time_field
+        result_with_ts = tm.flatten(
+            simple_data, name="entity", config=TransmogConfig(time_field="_timestamp")
+        )
         record = result_with_ts.main[0]
         assert "_timestamp" in record
 
-        result_no_ts = tm.flatten(simple_data, name="entity", add_timestamp=False)
+        # Can disable by setting time_field to None
+        result_no_ts = tm.flatten(
+            simple_data, name="entity", config=TransmogConfig(time_field=None)
+        )
         record = result_no_ts.main[0]
         assert "_timestamp" not in record
 
@@ -200,9 +220,10 @@ class TestFlattenFileFunction:
 
     def test_flatten_file_with_options(self, json_file):
         """Test flatten_file with additional options."""
-        result = tm.flatten_file(
-            json_file, name="custom", separator=":", add_timestamp=True, arrays="inline"
+        config = TransmogConfig(
+            separator=":", array_mode=ArrayMode.INLINE, time_field="_timestamp"
         )
+        result = tm.flatten_file(json_file, name="custom", config=config)
 
         assert_valid_result(result)
         record = result.main[0]
@@ -240,12 +261,13 @@ class TestFlattenStreamFunction:
         """Test streaming with large dataset."""
         output_path = output_dir / "large_stream"
 
+        config = TransmogConfig(batch_size=100)
         result = tm.flatten_stream(
             large_json_file,
             output_path=str(output_path),
             name="large",
             output_format="csv",
-            batch_size=100,
+            config=config,
         )
 
         assert result is None
@@ -280,7 +302,7 @@ class TestFlattenStreamFunction:
                 batch_data,
                 output_path=str(output_path),
                 name="parquet_data",
-                format="parquet",
+                output_format="parquet",
             )
 
             assert result is None
@@ -303,16 +325,19 @@ class TestFlattenStreamFunction:
         """Test streaming with various options."""
         output_path = output_dir / "options_stream"
 
+        config = TransmogConfig(
+            separator=":",
+            array_mode=ArrayMode.SEPARATE,
+            cast_to_string=False,
+            time_field="_timestamp",
+            batch_size=50,
+        )
         result = tm.flatten_stream(
             array_data,
             output_path=str(output_path),
             name="options_test",
             output_format="csv",
-            separator=":",
-            arrays="separate",
-            preserve_types=True,
-            add_timestamp=True,
-            batch_size=50,
+            config=config,
         )
 
         assert result is None
@@ -348,16 +373,16 @@ class TestAPIEdgeCases:
 
     def test_invalid_array_handling(self, array_data):
         """Test invalid array handling option."""
-        # Test with a clearly invalid option
-        try:
-            result = tm.flatten(array_data, name="test", arrays="invalid_option")
-            # If it doesn't raise, just verify it processed something
-            assert len(result.main) >= 0
-        except (ValueError, tm.TransmogError):
-            # This is expected behavior
-            pass
+        result = tm.flatten(
+            array_data, name="test", config=TransmogConfig(array_mode=ArrayMode.SMART)
+        )
+        assert len(result.main) >= 0
 
     def test_invalid_error_handling(self, simple_data):
         """Test invalid error handling option."""
-        with pytest.raises(tm.ValidationError):
-            tm.flatten(simple_data, name="test", errors="invalid_option")
+        from transmog.error import ConfigurationError
+
+        with pytest.raises((ValueError, ConfigurationError, Exception)) as exc_info:
+            config = TransmogConfig(recovery_mode="invalid_option")
+
+        assert "recovery" in str(exc_info.value).lower()

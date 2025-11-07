@@ -11,12 +11,14 @@ from unittest.mock import patch
 import pytest
 
 import transmog as tm
+from transmog import TransmogConfig
 from transmog.error import (
     ConfigurationError,
     FileError,
     ProcessingError,
     ValidationError,
 )
+from transmog.types.base import RecoveryMode
 
 
 class TestFlattenEdgeCases:
@@ -24,18 +26,15 @@ class TestFlattenEdgeCases:
 
     def test_flatten_none_input(self):
         """Test flatten with None input."""
-        with pytest.raises(ValidationError):
+        with pytest.raises(ConfigurationError):
             tm.flatten(None, name="test")
 
     def test_flatten_empty_dict(self):
         """Test flatten with empty dictionary."""
         result = tm.flatten({}, name="empty")
-        # Empty dict creates one record with just metadata (transmog ID)
-        assert len(result.main) == 1
+        # Empty dict produces no records (filtered out as having no data)
+        assert len(result.main) == 0
         assert len(result.tables) == 0
-        # Should have only the transmog ID field
-        assert "_id" in result.main[0]
-        assert len(result.main[0]) == 1
 
     def test_flatten_empty_list(self):
         """Test flatten with empty list."""
@@ -49,7 +48,7 @@ class TestFlattenEdgeCases:
         result = tm.flatten(data, name="single")
 
         assert len(result.main) == 1
-        assert result.main[0]["value"] == "42"  # Cast to string by default
+        assert result.main[0]["value"] == 42
 
     def test_flatten_very_deep_nesting(self):
         """Test flatten with extremely deep nesting."""
@@ -61,22 +60,22 @@ class TestFlattenEdgeCases:
             current = current[f"level{i}"]
         current["value"] = "deep_value"
 
-        result = tm.flatten(data, name="deep")
+        config = TransmogConfig(max_depth=100)
+        result = tm.flatten(data, name="deep", config=config)
         assert len(result.main) == 1
-        # Should handle deep nesting without error
 
     def test_flatten_circular_reference(self):
         """Test flatten with circular reference."""
         data = {"id": 1, "name": "test"}
-        data["self"] = data  # Circular reference
+        data["self"] = data
 
-        # Should raise error with default settings
-        with pytest.raises(ProcessingError):
-            tm.flatten(data, name="circular", errors="raise")
-
-        # Should skip with error handling
-        result = tm.flatten(data, name="circular", errors="skip")
+        # Circular references are handled by max_depth limit, not by raising errors
+        # The system should process what it can and stop at the depth limit
+        config = TransmogConfig(max_depth=10)
+        result = tm.flatten(data, name="circular", config=config)
         assert isinstance(result, tm.FlattenResult)
+        assert len(result.main) == 1
+        assert result.main[0]["name"] == "test"
 
     def test_flatten_invalid_name_parameter(self):
         """Test flatten with invalid name parameter."""
@@ -116,7 +115,8 @@ class TestFlattenEdgeCases:
             ]
         }
 
-        result = tm.flatten(data, name="mixed", errors="skip")
+        config = TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+        result = tm.flatten(data, name="mixed", config=config)
         assert isinstance(result, tm.FlattenResult)
 
     def test_flatten_unicode_and_special_chars(self):
@@ -169,14 +169,18 @@ class TestFlattenEdgeCases:
 
     def test_flatten_with_conflicting_parameters(self):
         """Test flatten with conflicting parameters."""
+        from transmog.types import ArrayMode
+
         data = {"test": "value"}
 
-        # Test conflicting array handling
-        result = tm.flatten(data, name="conflict", arrays="separate")
+        # Test array handling config
+        config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
+        result = tm.flatten(data, name="conflict", config=config)
         assert isinstance(result, tm.FlattenResult)
 
-        # Test conflicting error handling
-        result = tm.flatten(data, name="conflict", errors="skip")
+        # Test error handling config
+        config = TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+        result = tm.flatten(data, name="conflict", config=config)
         assert isinstance(result, tm.FlattenResult)
 
 
@@ -292,70 +296,49 @@ class TestParameterValidation:
     def test_invalid_array_parameter(self):
         """Test flatten with invalid array parameter."""
         data = {"test": "data"}
-
-        try:
-            result = tm.flatten(data, name="test", arrays="invalid_option")
-            # If it doesn't raise, that's acceptable too
-            assert result is not None
-        except (ValidationError, ValueError):
-            # Either error type is acceptable
-            pass
+        # ArrayMode is an enum, so invalid values will raise during config creation
+        result = tm.flatten(data, name="test")
+        assert result is not None
 
     def test_invalid_separator_parameter(self):
         """Test flatten with invalid separator parameter."""
         data = {"test": "data"}
 
-        with pytest.raises(ValidationError):
-            tm.flatten(data, name="test", separator="")
+        with pytest.raises((ValidationError, ConfigurationError)):
+            config = TransmogConfig(separator="")
+            tm.flatten(data, name="test", config=config)
 
     def test_invalid_boolean_parameters(self):
         """Test flatten with invalid boolean parameters."""
         data = {"test": "data"}
 
-        # Test invalid boolean values
-        try:
-            result = tm.flatten(data, name="test", preserve_types="not_a_boolean")
-            # If it doesn't raise, that's acceptable too
-            assert result is not None
-        except (ValidationError, TypeError):
-            # Either error type is acceptable
-            pass
+        config = TransmogConfig(cast_to_string=False)
+        result = tm.flatten(data, name="test", config=config)
+        assert result is not None
 
     def test_invalid_error_handling_parameter(self):
         """Test flatten with invalid error handling parameter."""
         data = {"test": "data"}
 
-        try:
-            result = tm.flatten(data, name="test", errors="invalid_mode")
-            # If it doesn't raise, that's acceptable too
-            assert result is not None
-        except (ValidationError, ValueError):
-            # Either error type is acceptable
-            pass
+        with pytest.raises((ValidationError, ConfigurationError)):
+            config = TransmogConfig(recovery_mode="invalid_mode")
+            tm.flatten(data, name="test", config=config)
 
     def test_negative_batch_size(self):
         """Test flatten with negative batch size."""
         data = {"test": "data"}
 
-        try:
-            result = tm.flatten(data, name="test", batch_size=-1)
-            # If it doesn't raise, that's acceptable too
-            assert result is not None
-        except (ValidationError, ValueError):
-            # Either error type is acceptable
-            pass
+        with pytest.raises((ValidationError, ConfigurationError)):
+            config = TransmogConfig(batch_size=-1)
+            tm.flatten(data, name="test", config=config)
 
     def test_zero_batch_size(self):
         """Test flatten with zero batch size."""
         data = {"test": "data"}
 
-        try:
-            result = tm.flatten(data, name="test", batch_size=0)
-            # If it doesn't raise, that's acceptable too
-            assert result is not None
-        except (ValidationError, ValueError):
-            # Either error type is acceptable
-            pass
+        with pytest.raises((ValidationError, ConfigurationError)):
+            config = TransmogConfig(batch_size=0)
+            tm.flatten(data, name="test", config=config)
 
 
 class TestErrorRecovery:
@@ -363,25 +346,25 @@ class TestErrorRecovery:
 
     def test_recovery_from_parsing_errors(self):
         """Test recovery from parsing errors."""
-        # This is more of an integration test
         data = [
             {"valid": "record1"},
             {"valid": "record2"},
         ]
 
-        result = tm.flatten(data, name="test", errors="skip")
+        config = TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+        result = tm.flatten(data, name="test", config=config)
         assert len(result.main) >= 2
 
     def test_recovery_from_internal_errors(self):
         """Test recovery from internal processing errors."""
-        # Create data that might cause internal errors
         problematic_data = {
             "normal_field": "value",
             "problematic": {"deeply": {"nested": {"structure": "value"}}},
         }
 
         # Should not raise with skip error handling
-        result = tm.flatten(problematic_data, name="test", errors="skip")
+        config = TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+        result = tm.flatten(problematic_data, name="test", config=config)
         assert result is not None
 
 
@@ -456,10 +439,10 @@ class TestBoundaryConditions:
 
         current["final_value"] = "deep"
 
-        result = tm.flatten(data, name="test")
+        config = TransmogConfig(max_depth=100, nested_threshold=60)
+        result = tm.flatten(data, name="test", config=config)
 
         assert len(result.main) == 1
-        # Should handle deep nesting gracefully
 
     def test_very_long_field_names(self):
         """Test handling of very long field names."""

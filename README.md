@@ -69,8 +69,8 @@ print(result.main)
 # Complex arrays become separate tables with parent references
 print(result.tables["customer_orders"])
 # [
-#   {'id': '101', 'amount': '99.99', 'items': ['laptop', 'mouse'], '_parent_id': 'a1b2c3d4...', '_id': 'b2c3d4...'},
-#   {'id': '102', 'amount': '45.50', 'items': ['keyboard'], '_parent_id': 'a1b2c3d4...', '_id': 'c3d4...'}
+#   {'id': 101, 'amount': 99.99, 'items': ['laptop', 'mouse'], '_parent_id': 'a1b2c3d4...', '_id': 'b2c3d4...'},
+#   {'id': 102, 'amount': 45.50, 'items': ['keyboard'], '_parent_id': 'a1b2c3d4...', '_id': 'c3d4...'}
 # ]
 
 # Access all tables in memory
@@ -83,38 +83,79 @@ result.save("analytics/", "csv")       # CSV files for database import
 result.save("warehouse/", "parquet")   # Parquet files for data warehouse
 ```
 
-**Key Options:**
+## Configuration Presets
 
-- Custom field separators: `separator="."`
-- Use existing IDs: `id_field="customer_id"`
-- Error handling: `errors="skip"`
-- File processing: `tm.flatten_file("data.json")`
+```python
+# Default: types preserved, optimized for Parquet/analytics
+result = tm.flatten(data)
 
-## Advanced Options
+# CSV: strings, includes empty/null values
+result = tm.flatten(data, config=tm.TransmogConfig.for_csv())
+
+# Memory: small batches, minimal cache
+result = tm.flatten(data, config=tm.TransmogConfig.for_memory())
+
+# Performance: large batches, extended cache
+result = tm.flatten(data, config=tm.TransmogConfig.for_performance())
+
+# Simple: clean field names (id, parent_id, timestamp)
+result = tm.flatten(data, config=tm.TransmogConfig.simple())
+
+# Error-tolerant: skip malformed records
+result = tm.flatten(data, config=tm.TransmogConfig.error_tolerant())
+
+# Or use RecoveryMode enum directly
+from transmog.types import RecoveryMode
+config = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+result = tm.flatten(data, config=config)
+```
+
+**File Processing:**
+
+```python
+result = tm.flatten_file("data.json")
+```
+
+## Advanced Configuration
 
 For more control over the flattening process:
 
 ```python
-result = tm.flatten(
-    data,
-    name="products",
+# Create custom configuration
+config = tm.TransmogConfig(
     # Naming options
-    separator=".",              # Use dots: user.name instead of user_name
-    nested_threshold=3,         # Simplify deeply nested field names
+    separator=".",                     # Use dots: user.name instead of user_name
+    nested_threshold=3,                # Simplify deeply nested field names
+
     # ID management
-    id_field="sku",            # Use existing field as primary ID
-    parent_id_field="_parent",  # Customize parent reference field name
-    add_timestamp=True,         # Add processing timestamp to records
-    # Array handling (default is "smart")
-    arrays="separate",         # Extract all arrays to child tables (vs "smart", "inline", "skip")
+    id_field="sku",                    # Use existing field as primary ID
+    parent_field="_parent",            # Customize parent reference field name
+    time_field="_timestamp",           # Add processing timestamp to records
+
+    # Array handling
+    array_mode=tm.ArrayMode.SEPARATE,  # Extract all arrays to child tables
+    # Options: SMART (default), SEPARATE, INLINE, SKIP
+
+    # Error handling
+    recovery_mode=tm.RecoveryMode.SKIP,  # Skip records with errors
+    # Options: STRICT (default), SKIP, PARTIAL
+
     # Data processing
-    preserve_types=True,       # Keep original data types (not strings)
-    skip_null=False,           # Include null values in output
-    skip_empty=False,          # Include empty strings/lists
+    cast_to_string=False,              # Preserve native types (default)
+    skip_null=True,                    # Skip null values (default)
+    include_empty=False,               # Skip empty values (default)
+
     # Performance tuning
-    batch_size=5000,           # Process more records per batch
-    low_memory=True,           # Optimize for memory usage over speed
+    batch_size=5000,                   # Process more records per batch
+    processing_mode=tm.ProcessingMode.LOW_MEMORY,  # Optimize for memory
 )
+
+result = tm.flatten(data, name="products", config=config)
+
+# Or start with a preset and customize
+config = tm.TransmogConfig.for_csv()
+config.id_field = "product_id"
+result = tm.flatten(data, config=config)
 ```
 
 ## Documentation

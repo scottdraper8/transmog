@@ -19,6 +19,7 @@ from transmog.error import (
     ProcessingError,
     ValidationError,
 )
+from transmog.types.base import RecoveryMode
 
 
 class TestFlattenResultEdgeCases:
@@ -435,7 +436,8 @@ class TestFlattenResultEdgeCases:
             ],
         }
 
-        result = tm.flatten(data, name="nulls", errors="skip")
+        config = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+        result = tm.flatten(data, name="nulls", config=config)
         assert isinstance(result, tm.FlattenResult)
 
         # Should handle null values in table info

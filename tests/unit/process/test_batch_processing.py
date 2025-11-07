@@ -11,6 +11,7 @@ import pytest
 from transmog.config import TransmogConfig
 from transmog.core.hierarchy import process_record_batch
 from transmog.process import Processor
+from transmog.types.base import RecoveryMode
 
 
 class TestBatchProcessing:
@@ -62,11 +63,10 @@ class TestBatchProcessing:
         assert len(result.main_table) == len(sample_records)
         assert result.entity_name == "users"
 
-        # Check that all records were processed
         for i, record in enumerate(sample_records):
             processed_record = result.main_table[i]
             assert processed_record["name"] == record["name"]
-            assert processed_record["age"] == str(record["age"])  # Cast to string
+            assert processed_record["age"] == record["age"]
             assert processed_record["city"] == record["city"]
 
     def test_batch_processing_different_sizes(self, sample_records):
@@ -86,7 +86,7 @@ class TestBatchProcessing:
     def test_batch_processing_memory_efficiency(self, sample_records):
         """Test batch processing memory efficiency."""
         # Small batch size for memory efficiency
-        config = TransmogConfig(batch_size=2, cache_enabled=True, cache_maxsize=1000)
+        config = TransmogConfig(batch_size=2, cache_size=1000)
         processor = Processor(config)
 
         result = processor.process(sample_records, entity_name="users")
@@ -121,7 +121,7 @@ class TestBatchProcessing:
 
         # Use error tolerant config
         config = TransmogConfig(
-            batch_size=2, recovery_strategy="skip", allow_malformed_data=True
+            batch_size=2, recovery_mode=RecoveryMode.SKIP, allow_malformed_data=True
         )
         processor = Processor(config)
 
@@ -271,7 +271,7 @@ class TestBatchProcessingEdgeCases:
         ]
 
         # Use memory optimized config with small batches
-        config = TransmogConfig(batch_size=5, cache_enabled=True, cache_maxsize=1000)
+        config = TransmogConfig(batch_size=5, cache_size=1000)
         processor = Processor(config)
 
         result = processor.process(stress_records, entity_name="stress_test")

@@ -9,6 +9,7 @@ from datetime import datetime
 
 import pytest
 
+from transmog.config import TransmogConfig
 from transmog.core.metadata import (
     TRANSMOG_NAMESPACE,
     annotate_with_metadata,
@@ -150,44 +151,25 @@ class TestMetadataAnnotation:
     def test_annotate_with_metadata_basic(self):
         """Test basic metadata annotation."""
         record = {"name": "test", "value": 42}
+        config = TransmogConfig()
 
-        annotated = annotate_with_metadata(record)
+        annotated = annotate_with_metadata(record, config)
 
         assert isinstance(annotated, dict)
         assert "name" in annotated
         assert "value" in annotated
         assert annotated["name"] == "test"
         assert annotated["value"] == 42
-
-        # Should have metadata fields
-        has_id = any("id" in key.lower() for key in annotated.keys())
-        assert has_id
-
-    def test_annotate_with_metadata_custom_id(self):
-        """Test metadata annotation with custom ID."""
-        record = {"name": "test", "value": 42}
-        custom_id = "custom_123"
-
-        # Use the correct parameter name
-        annotated = annotate_with_metadata(record, transmog_id=custom_id)
-
-        assert isinstance(annotated, dict)
-        # Should contain the custom ID
-        id_found = False
-        for key, value in annotated.items():
-            if "id" in key.lower() and value == custom_id:
-                id_found = True
-                break
-        assert id_found
+        assert "_id" in annotated
 
     def test_annotate_with_metadata_preserves_original(self):
         """Test that annotation preserves original record when in_place=False."""
         original = {"name": "test", "value": 42}
         record = original.copy()
+        config = TransmogConfig()
 
-        annotated = annotate_with_metadata(record, in_place=False)
+        annotated = annotate_with_metadata(record, config, in_place=False)
 
-        # Original should be unchanged when in_place=False
         assert record == original
         assert annotated != original
 
@@ -195,28 +177,24 @@ class TestMetadataAnnotation:
         """Test metadata annotation with parent ID."""
         record = {"name": "child", "value": 42}
         parent_id = "parent_123"
+        config = TransmogConfig()
 
-        annotated = annotate_with_metadata(record, parent_id=parent_id)
+        annotated = annotate_with_metadata(record, config, parent_id=parent_id)
 
         assert isinstance(annotated, dict)
-        # Should contain parent ID
-        parent_found = False
-        for key, value in annotated.items():
-            if "parent" in key.lower() and value == parent_id:
-                parent_found = True
-                break
-        assert parent_found
+        assert "_parent_id" in annotated
+        assert annotated["_parent_id"] == parent_id
 
     def test_annotate_with_metadata_timestamp(self):
         """Test metadata annotation with timestamp."""
         record = {"name": "test", "value": 42}
+        config = TransmogConfig()
 
-        # Use the correct parameter - pass transmog_time directly
         timestamp = get_current_timestamp()
-        annotated = annotate_with_metadata(record, transmog_time=timestamp)
+        annotated = annotate_with_metadata(record, config, transmog_time=timestamp)
 
         assert isinstance(annotated, dict)
-        # Should contain timestamp
+        assert "_timestamp" in annotated
         timestamp_found = False
         for key, value in annotated.items():
             if ("time" in key.lower() or "timestamp" in key.lower()) and isinstance(
@@ -281,22 +259,23 @@ class TestMetadataEdgeCases:
     def test_annotate_empty_record(self):
         """Test annotating empty record."""
         record = {}
+        config = TransmogConfig()
 
-        annotated = annotate_with_metadata(record)
+        annotated = annotate_with_metadata(record, config)
 
         assert isinstance(annotated, dict)
-        # Should have at least metadata fields
         assert len(annotated) > 0
 
     def test_annotate_record_with_existing_metadata(self):
         """Test annotating record that already has metadata fields."""
         record = {
             "name": "test",
-            "__transmog_id": "existing_id",
-            "__transmog_datetime": "existing_time",
+            "_id": "existing_id",
+            "_timestamp": "existing_time",
         }
+        config = TransmogConfig()
 
-        annotated = annotate_with_metadata(record)
+        annotated = annotate_with_metadata(record, config)
 
         assert isinstance(annotated, dict)
         assert "name" in annotated
