@@ -144,7 +144,7 @@ class TestFlattenEdgeCases:
 
     def test_flatten_nonexistent_file(self):
         """Test flatten with nonexistent file path."""
-        nonexistent_path = "/path/that/does/not/exist.json"
+        nonexistent_path = "/path/that/does/not/exist.csv"
 
         with pytest.raises(ConfigurationError):
             tm.flatten(nonexistent_path, name="test")
@@ -206,7 +206,7 @@ class TestFlattenResultEdgeCases:
     def test_result_save_to_invalid_path(self, single_record_result):
         """Test saving to invalid path."""
         # Try to save to directory that doesn't exist
-        invalid_path = "/invalid/path/that/does/not/exist/output.json"
+        invalid_path = "/invalid/path/that/does/not/exist/output.csv"
 
         with pytest.raises((FileError, OSError)):
             single_record_result.save(invalid_path)

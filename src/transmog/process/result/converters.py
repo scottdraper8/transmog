@@ -1,17 +1,16 @@
 """Data format converters for ProcessingResult.
 
 Contains conversion methods for transforming result data into various formats
-like JSON, CSV, Parquet, and PyArrow tables.
+like CSV, Parquet, and PyArrow tables.
 """
 
 import io
-import json
 import logging
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from transmog.error.exceptions import MissingDependencyError, OutputError
 
-from .utils import _check_orjson_available, _check_pyarrow_available, _get_cache_key
+from .utils import _check_pyarrow_available, _get_cache_key
 
 if TYPE_CHECKING:
     from .core import ProcessingResult
@@ -32,117 +31,6 @@ class ResultConverters:
             result: ProcessingResult instance to convert
         """
         self.result = result
-
-    def to_json_bytes(
-        self, indent: Optional[int] = None, **kwargs: Any
-    ) -> dict[str, bytes]:
-        """Convert all tables to JSON bytes.
-
-        Args:
-            indent: Indentation level for JSON formatting
-            **kwargs: Additional JSON formatting options
-
-        Returns:
-            Dictionary of table names to JSON bytes
-        """
-        # Check cache first
-        cache_key = _get_cache_key(
-            self.result.to_dict(), "json_bytes", indent=indent, **kwargs
-        )
-        if cache_key in _conversion_cache:
-            return cast(dict[str, bytes], _conversion_cache[cache_key])
-
-        # Try orjson first if available
-        if _check_orjson_available():
-            try:
-                result = self._to_json_bytes_orjson(indent, **kwargs)
-
-                # Cache the result if using eager mode
-                if self.result.conversion_mode.value == "eager":
-                    _conversion_cache[cache_key] = result
-
-                return result
-            except Exception as e:
-                logger.debug(f"orjson conversion failed, falling back to stdlib: {e}")
-                # Fall back to stdlib if orjson fails
-
-        # Use Python's standard library json module
-        result = self._to_json_bytes_stdlib(indent, **kwargs)
-
-        # Cache the result if using eager mode
-        if self.result.conversion_mode.value == "eager":
-            _conversion_cache[cache_key] = result
-
-        return result
-
-    def _to_json_bytes_orjson(
-        self, indent: Optional[int] = None, **kwargs: Any
-    ) -> dict[str, bytes]:
-        """Convert tables to JSON bytes using orjson.
-
-        Args:
-            indent: Indentation level (ignored for orjson)
-            **kwargs: Additional orjson options
-
-        Returns:
-            Dictionary of table names to JSON bytes
-
-        Raises:
-            MissingDependencyError: If orjson is not available
-        """
-        if not _check_orjson_available():
-            raise MissingDependencyError(
-                "orjson is required for optimized JSON conversion. "
-                "Falling back to standard library.",
-                package="orjson",
-                feature="json",
-            )
-
-        try:
-            import orjson
-
-            # Convert to JSON-serializable dict
-            tables = self.result.to_json_objects()
-            result: dict[str, bytes] = {}
-
-            # Options for orjson
-            options = orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS
-            if indent is not None:
-                options |= orjson.OPT_INDENT_2
-
-            # Convert each table
-            for table_name, records in tables.items():
-                result[table_name] = orjson.dumps(records, option=options)
-
-            return result
-        except Exception as e:
-            logger.error(f"Error converting to JSON with orjson: {e}")
-            raise OutputError(
-                f"Failed to convert to JSON: {e}", output_format="json"
-            ) from e
-
-    def _to_json_bytes_stdlib(
-        self, indent: Optional[int] = None, **kwargs: Any
-    ) -> dict[str, bytes]:
-        """Convert tables to JSON bytes using standard library.
-
-        Args:
-            indent: Indentation level for JSON formatting
-            **kwargs: Additional JSON formatting options
-
-        Returns:
-            Dictionary of table names to JSON bytes
-        """
-        # Convert to JSON-serializable dict
-        tables = self.result.to_json_objects()
-        result: dict[str, bytes] = {}
-
-        # Convert each table
-        for table_name, records in tables.items():
-            json_str = json.dumps(records, indent=indent, **kwargs)
-            result[table_name] = json_str.encode("utf-8")
-
-        return result
 
     def to_csv_bytes(
         self, include_header: bool = True, **kwargs: Any

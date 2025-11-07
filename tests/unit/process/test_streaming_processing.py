@@ -5,6 +5,7 @@ Tests the streaming processing capabilities including batch processing,
 memory optimization, and direct output to various formats.
 """
 
+import csv
 import json
 import os
 import tempfile
@@ -38,23 +39,21 @@ class TestStreamProcessing:
         processor = Processor()
         output_dir = tmp_path / "output"
 
-        # Stream process to JSON
         stream_process(
             processor=processor,
             data=data,
             entity_name="users",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
         )
 
-        # Check output files were created
         assert output_dir.exists()
-        main_file = output_dir / "users.json"
+        main_file = output_dir / "users.csv"
         assert main_file.exists()
 
-        # Verify content
         with open(main_file) as f:
-            result = json.load(f)
+            reader = csv.DictReader(f)
+            result = list(reader)
         assert len(result) == 2
         assert result[0]["name"] == "Alice"
 
@@ -78,20 +77,19 @@ class TestStreamProcessing:
             processor=processor,
             data=data,
             entity_name="companies",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
         )
 
-        # Check main table
-        main_file = output_dir / "companies.json"
+        main_file = output_dir / "companies.csv"
         assert main_file.exists()
 
-        # Check child table for employees
-        employees_file = output_dir / "companies_employees.json"
+        employees_file = output_dir / "companies_employees.csv"
         assert employees_file.exists()
 
         with open(employees_file) as f:
-            employees = json.load(f)
+            reader = csv.DictReader(f)
+            employees = list(reader)
         assert len(employees) == 2
         assert employees[0]["name"] == "Alice"
 
@@ -109,15 +107,16 @@ class TestStreamProcessing:
             processor=processor,
             data=data_generator(),
             entity_name="items",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
         )
 
-        main_file = output_dir / "items.json"
+        main_file = output_dir / "items.csv"
         assert main_file.exists()
 
         with open(main_file) as f:
-            result = json.load(f)
+            reader = csv.DictReader(f)
+            result = list(reader)
         assert len(result) == 5
 
     def test_stream_process_csv_output(self, tmp_path):
@@ -148,7 +147,6 @@ class TestStreamProcessing:
 
     def test_stream_process_batch_size(self, tmp_path):
         """Test streaming processing with custom batch size."""
-        # Create larger dataset
         data = [{"id": i, "value": f"item_{i}"} for i in range(50)]
 
         processor = Processor()
@@ -158,16 +156,17 @@ class TestStreamProcessing:
             processor=processor,
             data=data,
             entity_name="items",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
-            batch_size=10,  # Small batch size
+            batch_size=10,
         )
 
-        main_file = output_dir / "items.json"
+        main_file = output_dir / "items.csv"
         assert main_file.exists()
 
         with open(main_file) as f:
-            result = json.load(f)
+            reader = csv.DictReader(f)
+            result = list(reader)
         assert len(result) == 50
 
     def test_stream_process_deterministic_ids(self, tmp_path):
@@ -184,17 +183,17 @@ class TestStreamProcessing:
             processor=processor,
             data=data,
             entity_name="users",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
             use_deterministic_ids=True,
         )
 
-        main_file = output_dir / "users.json"
+        main_file = output_dir / "users.csv"
         assert main_file.exists()
 
         with open(main_file) as f:
-            result = json.load(f)
-        # Should use natural IDs from user_id field
+            reader = csv.DictReader(f)
+            result = list(reader)
         assert "user_id" in result[0]
 
     def test_stream_process_force_transmog_id(self, tmp_path):
@@ -211,17 +210,17 @@ class TestStreamProcessing:
             processor=processor,
             data=data,
             entity_name="users",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
             force_transmog_id=True,
         )
 
-        main_file = output_dir / "users.json"
+        main_file = output_dir / "users.csv"
         assert main_file.exists()
 
         with open(main_file) as f:
-            result = json.load(f)
-        # Should have transmog ID field
+            reader = csv.DictReader(f)
+            result = list(reader)
         assert "__transmog_id" in result[0]
 
 
@@ -230,7 +229,6 @@ class TestStreamProcessFile:
 
     def test_stream_process_json_file(self, tmp_path):
         """Test streaming processing of JSON file."""
-        # Create test JSON file
         test_data = [
             {"id": 1, "name": "Alice"},
             {"id": 2, "name": "Bob"},
@@ -246,20 +244,20 @@ class TestStreamProcessFile:
             processor=processor,
             file_path=str(input_file),
             entity_name="users",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
         )
 
-        main_file = output_dir / "users.json"
+        main_file = output_dir / "users.csv"
         assert main_file.exists()
 
         with open(main_file) as f:
-            result = json.load(f)
+            reader = csv.DictReader(f)
+            result = list(reader)
         assert len(result) == 2
 
     def test_stream_process_jsonl_file(self, tmp_path):
         """Test streaming processing of JSONL file."""
-        # Create test JSONL file
         input_file = tmp_path / "input.jsonl"
         with open(input_file, "w") as f:
             f.write('{"id": 1, "name": "Alice"}\n')
@@ -272,15 +270,16 @@ class TestStreamProcessFile:
             processor=processor,
             file_path=str(input_file),
             entity_name="users",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
         )
 
-        main_file = output_dir / "users.json"
+        main_file = output_dir / "users.csv"
         assert main_file.exists()
 
         with open(main_file) as f:
-            result = json.load(f)
+            reader = csv.DictReader(f)
+            result = list(reader)
         assert len(result) == 2
 
     def test_stream_process_nonexistent_file(self):
@@ -292,7 +291,7 @@ class TestStreamProcessFile:
                 processor=processor,
                 file_path="nonexistent.json",
                 entity_name="test",
-                output_format="json",
+                output_format="csv",
             )
 
     def test_stream_process_file_with_format(self, tmp_path):
@@ -310,12 +309,12 @@ class TestStreamProcessFile:
             processor=processor,
             file_path=str(input_file),
             entity_name="users",
-            output_format="json",
+            output_format="csv",
             format_type="json",  # Explicitly specify format
             output_destination=str(output_dir),
         )
 
-        main_file = output_dir / "users.json"
+        main_file = output_dir / "users.csv"
         assert main_file.exists()
 
 
@@ -324,7 +323,6 @@ class TestStreamProcessCSV:
 
     def test_stream_process_csv_basic(self, tmp_path):
         """Test basic CSV streaming processing."""
-        # Create test CSV file
         input_file = tmp_path / "input.csv"
         with open(input_file, "w") as f:
             f.write("id,name,age\n")
@@ -338,21 +336,21 @@ class TestStreamProcessCSV:
             processor=processor,
             file_path=str(input_file),
             entity_name="users",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
         )
 
-        main_file = output_dir / "users.json"
+        main_file = output_dir / "users.csv"
         assert main_file.exists()
 
         with open(main_file) as f:
-            result = json.load(f)
+            reader = csv.DictReader(f)
+            result = list(reader)
         assert len(result) == 2
         assert result[0]["name"] == "Alice"
 
     def test_stream_process_csv_custom_delimiter(self, tmp_path):
         """Test CSV streaming with custom delimiter."""
-        # Create test CSV file with semicolon delimiter
         input_file = tmp_path / "input.csv"
         with open(input_file, "w") as f:
             f.write("id;name;age\n")
@@ -366,21 +364,21 @@ class TestStreamProcessCSV:
             processor=processor,
             file_path=str(input_file),
             entity_name="users",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
             delimiter=";",
         )
 
-        main_file = output_dir / "users.json"
+        main_file = output_dir / "users.csv"
         assert main_file.exists()
 
         with open(main_file) as f:
-            result = json.load(f)
+            reader = csv.DictReader(f)
+            result = list(reader)
         assert len(result) == 2
 
     def test_stream_process_csv_no_header(self, tmp_path):
         """Test CSV streaming without header."""
-        # Create test CSV file without header
         input_file = tmp_path / "input.csv"
         with open(input_file, "w") as f:
             f.write("1,Alice,30\n")
@@ -393,16 +391,17 @@ class TestStreamProcessCSV:
             processor=processor,
             file_path=str(input_file),
             entity_name="users",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
             has_header=False,
         )
 
-        main_file = output_dir / "users.json"
+        main_file = output_dir / "users.csv"
         assert main_file.exists()
 
         with open(main_file) as f:
-            result = json.load(f)
+            reader = csv.DictReader(f)
+            result = list(reader)
         assert len(result) == 2
         # Should have generic column names starting from column_1
         assert "column_1" in result[0]
@@ -423,15 +422,16 @@ class TestStreamingMemoryOptimization:
             processor=processor,
             data=data,
             entity_name="items",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
         )
 
-        main_file = output_dir / "items.json"
+        main_file = output_dir / "items.csv"
         assert main_file.exists()
 
         with open(main_file) as f:
-            result = json.load(f)
+            reader = csv.DictReader(f)
+            result = list(reader)
         assert len(result) == 100
 
     def test_streaming_with_small_batch_size(self, tmp_path):
@@ -445,16 +445,17 @@ class TestStreamingMemoryOptimization:
             processor=processor,
             data=data,
             entity_name="items",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
-            batch_size=3,  # Very small batches
+            batch_size=3,
         )
 
-        main_file = output_dir / "items.json"
+        main_file = output_dir / "items.csv"
         assert main_file.exists()
 
         with open(main_file) as f:
-            result = json.load(f)
+            reader = csv.DictReader(f)
+            result = list(reader)
         assert len(result) == 20
 
 
@@ -478,11 +479,11 @@ class TestStreamingErrorHandling:
             processor=processor,
             data=data,
             entity_name="users",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
         )
 
-        main_file = output_dir / "users.json"
+        main_file = output_dir / "users.csv"
         assert main_file.exists()
 
     def test_streaming_with_invalid_output_format(self, tmp_path):
@@ -522,17 +523,17 @@ class TestStreamingWithComplexData:
             processor=processor,
             data=data,
             entity_name="nested",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
         )
 
-        main_file = output_dir / "nested.json"
+        main_file = output_dir / "nested.csv"
         assert main_file.exists()
 
         with open(main_file) as f:
-            result = json.load(f)
+            reader = csv.DictReader(f)
+            result = list(reader)
         assert len(result) == 1
-        # Should have flattened the nested structure
         flattened_keys = list(result[0].keys())
         assert any("level" in key for key in flattened_keys)
 
@@ -556,17 +557,15 @@ class TestStreamingWithComplexData:
             processor=processor,
             data=data,
             entity_name="mixed",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
         )
 
-        # Check main file
-        main_file = output_dir / "mixed.json"
+        main_file = output_dir / "mixed.csv"
         assert main_file.exists()
 
-        # Check if child tables were created for object arrays
-        files = list(output_dir.glob("*.json"))
-        assert len(files) >= 1  # At least the main file
+        files = list(output_dir.glob("*.csv"))
+        assert len(files) >= 1
 
     def test_streaming_large_dataset_simulation(self, tmp_path):
         """Test streaming processing simulation with larger dataset."""
@@ -591,16 +590,17 @@ class TestStreamingWithComplexData:
             processor=processor,
             data=large_data_generator(),
             entity_name="users",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
             batch_size=50,  # Process in chunks
         )
 
-        main_file = output_dir / "users.json"
+        main_file = output_dir / "users.csv"
         assert main_file.exists()
 
         with open(main_file) as f:
-            result = json.load(f)
+            reader = csv.DictReader(f)
+            result = list(reader)
         assert len(result) == 500
 
 
@@ -622,7 +622,7 @@ class TestStreamingOutputFormats:
             processor=processor,
             data=data,
             entity_name="scores",
-            output_format="json",
+            output_format="csv",
             output_destination=str(json_file),
         )
         assert json_file.exists()
@@ -648,24 +648,21 @@ class TestStreamingOutputFormats:
         processor = Processor()
         output_dir = tmp_path / "output"
 
-        # Stream with JSON formatting options
         stream_process(
             processor=processor,
             data=data,
             entity_name="users",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
-            indent=2,  # JSON-specific option
-            ensure_ascii=False,  # JSON-specific option
         )
 
-        main_file = output_dir / "users.json"
+        main_file = output_dir / "users.csv"
         assert main_file.exists()
 
-        # Verify the JSON is formatted with indentation
         with open(main_file) as f:
-            content = f.read()
-        assert "  " in content  # Should have indentation
+            reader = csv.DictReader(f)
+            result = list(reader)
+        assert len(result) == 2
 
     def test_streaming_to_parquet_format(self, tmp_path):
         """Test streaming to Parquet format with finalization.
@@ -720,7 +717,7 @@ class TestStreamingEdgeCases:
             processor=processor,
             data=data,
             entity_name="empty",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
         )
 
@@ -738,15 +735,16 @@ class TestStreamingEdgeCases:
             processor=processor,
             data=data,
             entity_name="single",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
         )
 
-        main_file = output_dir / "single.json"
+        main_file = output_dir / "single.csv"
         assert main_file.exists()
 
         with open(main_file) as f:
-            result = json.load(f)
+            reader = csv.DictReader(f)
+            result = list(reader)
         assert len(result) == 1
 
     def test_streaming_with_null_values(self, tmp_path):
@@ -763,13 +761,14 @@ class TestStreamingEdgeCases:
             processor=processor,
             data=data,
             entity_name="nulls",
-            output_format="json",
+            output_format="csv",
             output_destination=str(output_dir),
         )
 
-        main_file = output_dir / "nulls.json"
+        main_file = output_dir / "nulls.csv"
         assert main_file.exists()
 
         with open(main_file) as f:
-            result = json.load(f)
+            reader = csv.DictReader(f)
+            result = list(reader)
         assert len(result) == 2

@@ -224,7 +224,7 @@ class TestFlattenFileFunction:
     def test_flatten_nonexistent_file(self):
         """Test handling of nonexistent files."""
         with pytest.raises(Exception):  # Should raise appropriate error
-            tm.flatten_file("nonexistent.json")
+            tm.flatten_file("nonexistent.csv")
 
 
 class TestFlattenStreamFunction:
@@ -236,14 +236,17 @@ class TestFlattenStreamFunction:
 
         # Stream processing returns None
         result = tm.flatten_stream(
-            batch_data, output_path=str(output_path), name="streamed", format="json"
+            batch_data,
+            output_path=str(output_path),
+            name="streamed",
+            output_format="csv",
         )
 
         assert result is None  # Streaming returns None
 
         # Check that output files were created
-        json_files = list(output_dir.glob("**/*.json"))
-        assert len(json_files) > 0
+        csv_files = list(output_dir.glob("**/*.csv"))
+        assert len(csv_files) > 0
 
     def test_flatten_stream_large_data(self, large_json_file, output_dir):
         """Test streaming with large dataset."""
@@ -253,15 +256,15 @@ class TestFlattenStreamFunction:
             large_json_file,
             output_path=str(output_path),
             name="large",
-            format="json",
+            output_format="csv",
             batch_size=100,
         )
 
         assert result is None
 
         # Check output files
-        json_files = list(output_dir.glob("**/*.json"))
-        assert len(json_files) > 0
+        csv_files = list(output_dir.glob("**/*.csv"))
+        assert len(csv_files) > 0
 
     def test_flatten_stream_csv_format(self, batch_data, output_dir):
         """Test streaming to CSV format."""
@@ -316,7 +319,7 @@ class TestFlattenStreamFunction:
             array_data,
             output_path=str(output_path),
             name="options_test",
-            format="json",
+            output_format="csv",
             separator=":",
             arrays="separate",
             preserve_types=True,
@@ -327,8 +330,8 @@ class TestFlattenStreamFunction:
         assert result is None
 
         # Verify files were created
-        json_files = list(output_dir.glob("**/*.json"))
-        assert len(json_files) > 0
+        csv_files = list(output_dir.glob("**/*.csv"))
+        assert len(csv_files) > 0
 
 
 class TestAPIEdgeCases:

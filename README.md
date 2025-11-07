@@ -13,7 +13,7 @@ Transmog transforms nested JSON data into flat, tabular formats while preserving
 **Key Features:**
 
 - Simple one-function API with smart defaults
-- Multiple output formats (JSON, CSV, Parquet)
+- Multiple output formats (CSV, Parquet)
 - Automatic relationship preservation
 - Memory-efficient streaming for large datasets
 
@@ -37,7 +37,6 @@ print(result.main)
 # Save to files in different formats
 result.save("products.csv")        # Single CSV file
 result.save("products.parquet")    # Single Parquet file
-result.save("products.json")       # Single JSON file (only main table)
 ```
 
 ## Example: Nested JSON to Multiple Tables
@@ -82,7 +81,6 @@ print(list(result.all_tables.keys()))
 # Save to different formats for analysis
 result.save("analytics/", "csv")       # CSV files for database import
 result.save("warehouse/", "parquet")   # Parquet files for data warehouse
-result.save("api/", "json")           # JSON files for web applications
 ```
 
 **Key Options:**

@@ -172,12 +172,11 @@ class TestBatchProcessingIntegration:
 
         result = processor.process(large_dataset, entity_name="users")
 
-        # Save to files
         output_dir = tmp_path / "batch_output"
-        output_paths = result.write_all_json(str(output_dir))
+        output_paths = result.write_all_csv(str(output_dir))
 
         assert len(output_paths) > 0
-        assert all(path.endswith(".json") for path in output_paths.values())
+        assert all(path.endswith(".csv") for path in output_paths.values())
 
     def test_batch_processing_performance_comparison(self, large_dataset):
         """Test batch processing performance with different configurations."""

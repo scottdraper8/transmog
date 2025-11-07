@@ -3,7 +3,7 @@
 This module defines interfaces for processing results to break circular dependencies.
 """
 
-from typing import Any, Literal, Optional, Protocol
+from typing import Any, Literal, Protocol
 
 from .base import JsonDict
 
@@ -34,14 +34,6 @@ class ResultInterface(Protocol):
         """Convert to a dictionary representation."""
         ...
 
-    def to_json(self, indent: Optional[int] = None) -> str:
-        """Convert to a JSON string."""
-        ...
-
-    def to_json_objects(self) -> dict[str, list[JsonDict]]:
-        """Convert to a dictionary of JSON-serializable objects."""
-        ...
-
     def to_pyarrow_tables(self) -> dict[str, Any]:
         """Convert to PyArrow tables."""
         ...
@@ -54,20 +46,12 @@ class ResultInterface(Protocol):
         """Convert to CSV bytes."""
         ...
 
-    def to_json_bytes(self, **kwargs: Any) -> dict[str, bytes]:
-        """Convert to JSON bytes."""
-        ...
-
     def write(self, format_name: str, base_path: str, **kwargs: Any) -> dict[str, str]:
         """Write data to files in the specified format."""
         ...
 
     def write_all_parquet(self, base_path: str, **kwargs: Any) -> dict[str, str]:
         """Write data to Parquet files."""
-        ...
-
-    def write_all_json(self, base_path: str, **kwargs: Any) -> dict[str, str]:
-        """Write data to JSON files."""
         ...
 
     def write_all_csv(self, base_path: str, **kwargs: Any) -> dict[str, str]:

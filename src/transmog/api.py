@@ -65,7 +65,7 @@ class FlattenResult:
         Args:
             path: Output path (file or directory depending on format)
             output_format: Output format (auto-detected from extension if not specified)
-                          Options: 'csv', 'json', 'parquet'
+                          Options: 'csv', 'parquet'
 
         Returns:
             List of created file paths
@@ -76,10 +76,10 @@ class FlattenResult:
         if output_format is None:
             output_format = path.suffix.lower().lstrip(".")
             if not output_format:
-                output_format = "json"  # Default to JSON
+                output_format = "csv"  # Default to CSV
 
         # Validate format
-        valid_formats = ["csv", "json", "parquet"]
+        valid_formats = ["csv", "parquet"]
         if output_format not in valid_formats:
             raise ValueError(
                 f"Unsupported format: {output_format}. Must be one of {valid_formats}"
@@ -170,9 +170,7 @@ class FlattenResult:
         """Save all tables to a directory."""
         base_path.mkdir(parents=True, exist_ok=True)
 
-        if output_format == "json":
-            return self._result.write_all_json(str(base_path))
-        elif output_format == "csv":
+        if output_format == "csv":
             return self._result.write_all_csv(str(base_path))
         elif output_format == "parquet":
             return self._result.write_all_parquet(str(base_path))
@@ -184,15 +182,7 @@ class FlattenResult:
         """Save single table to a file."""
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if output_format == "json":
-            paths = self._result.write("json", str(file_path.parent))
-            # Rename to match requested filename
-            if paths:
-                # paths is a dict, get the first file path
-                first_path = next(iter(paths.values()))
-                os.rename(first_path, str(file_path))
-                return [str(file_path)]
-        elif output_format == "csv":
+        if output_format == "csv":
             paths = self._result.write("csv", str(file_path.parent))
             if paths:
                 # paths is a dict, get the first file path
@@ -291,7 +281,7 @@ def flatten(
          {'value': 'clearance', '_parent_id': '...'}]
 
         >>> # Save to file
-        >>> result.save("output.json")
+        >>> result.save("output.csv")
 
         >>> # Use existing ID field
         >>> result = flatten(data, id_field="product_id")
@@ -384,7 +374,7 @@ def flatten_stream(
     output_path: Union[str, Path],
     *,
     name: str = "data",
-    output_format: str = "json",
+    output_format: str = "csv",
     # All the same options as flatten()
     separator: str = "_",
     nested_threshold: int = 4,
@@ -409,7 +399,7 @@ def flatten_stream(
         data: Input data - can be dict, list of dicts, file path, or JSON string
         output_path: Directory path where output files will be written
         name: Base name for the flattened tables
-        output_format: Output format ("json", "csv", "parquet")
+        output_format: Output format ("csv", "parquet")
 
         # Same options as flatten() function
         separator: Character to separate nested field names
@@ -430,8 +420,8 @@ def flatten_stream(
         None - data is written directly to files
 
     Examples:
-        >>> # Stream large dataset to JSON files
-        >>> flatten_stream(large_data, "output/", output_format="json")
+        >>> # Stream large dataset to CSV files
+        >>> flatten_stream(large_data, "output/", output_format="csv")
 
         >>> # Stream to compressed Parquet
         >>> flatten_stream(data, "output/", output_format="parquet",

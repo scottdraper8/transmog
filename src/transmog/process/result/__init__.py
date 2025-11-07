@@ -37,12 +37,6 @@ class ProcessingResult(CoreProcessingResult):
         self._utils = ResultUtils(self)
 
     # Converter methods
-    def to_json_bytes(
-        self, indent: Optional[int] = None, **kwargs: Any
-    ) -> dict[str, bytes]:
-        """Convert all tables to JSON bytes."""
-        return self._converters.to_json_bytes(indent=indent, **kwargs)
-
     def to_csv_bytes(
         self, include_header: bool = True, **kwargs: Any
     ) -> dict[str, bytes]:
@@ -56,12 +50,6 @@ class ProcessingResult(CoreProcessingResult):
         return self._converters.to_parquet_bytes(compression=compression, **kwargs)
 
     # Writer methods
-    def write_all_json(
-        self, base_path: str, indent: Optional[int] = 2, **kwargs: Any
-    ) -> dict[str, str]:
-        """Write all tables to JSON files."""
-        return self._writers.write_all_json(base_path, indent=indent, **kwargs)
-
     def write_all_csv(
         self, base_path: str, include_header: bool = True, **kwargs: Any
     ) -> dict[str, str]:

@@ -162,8 +162,8 @@ class TestFileToFormatProcessing:
         config = TransmogConfig()
         return Processor(config)
 
-    def test_process_file_to_json(self, processor):
-        """Test processing file and outputting to JSON."""
+    def test_process_file_to_csv_format(self, processor):
+        """Test processing file and outputting to CSV."""
         test_data = {"name": "Test", "values": [1, 2, 3]}
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
@@ -173,12 +173,11 @@ class TestFileToFormatProcessing:
         with tempfile.TemporaryDirectory() as output_dir:
             try:
                 result = process_file_to_format(
-                    processor, tmp_path, "test_entity", "json", output_dir
+                    processor, tmp_path, "test_entity", "csv", output_dir
                 )
                 assert result is not None
 
-                # Check that output files were created
-                output_files = list(Path(output_dir).glob("*.json"))
+                output_files = list(Path(output_dir).glob("*.csv"))
                 assert len(output_files) > 0
             finally:
                 Path(tmp_path).unlink()
@@ -206,7 +205,6 @@ class TestFileToFormatProcessing:
 
     def test_process_large_file_streaming(self, processor):
         """Test processing large file uses streaming."""
-        # Create a file larger than the streaming threshold
         large_data = [{"id": i, "value": f"item_{i}"} for i in range(1000)]
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
@@ -216,7 +214,7 @@ class TestFileToFormatProcessing:
         with tempfile.TemporaryDirectory() as output_dir:
             try:
                 result = process_file_to_format(
-                    processor, tmp_path, "test_entity", "json", output_dir
+                    processor, tmp_path, "test_entity", "csv", output_dir
                 )
                 assert result is not None
             finally:

@@ -361,20 +361,22 @@ def stream_process_csv(
     Returns:
         None - data is written directly to output_destination
     """
-    # Gather CSV-specific options
     csv_options = {
-        "delimiter": delimiter,
         "has_header": has_header,
         "null_values": null_values,
         "sanitize_column_names": sanitize_column_names,
         "infer_types": infer_types,
         "skip_rows": skip_rows,
-        "quote_char": quote_char,
         "encoding": encoding,
-        "date_format": date_format,
     }
 
-    # Merge with any other format options
+    if delimiter is not None:
+        csv_options["delimiter"] = delimiter
+    if quote_char is not None:
+        csv_options["quote_char"] = quote_char
+    if date_format is not None:
+        csv_options["date_format"] = date_format
+
     csv_options.update(format_options)
 
     # Use the helper method

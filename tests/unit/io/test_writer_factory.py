@@ -25,12 +25,6 @@ from transmog.io.writer_factory import (
 class TestWriterFactory:
     """Test writer factory functions."""
 
-    def test_create_json_writer(self):
-        """Test creating JSON writer."""
-        writer = create_writer("json")
-        assert writer is not None
-        assert hasattr(writer, "write")
-
     def test_create_csv_writer(self):
         """Test creating CSV writer."""
         writer = create_writer("csv")
@@ -45,9 +39,9 @@ class TestWriterFactory:
 
     def test_create_writer_case_insensitive(self):
         """Test that writer creation is case insensitive."""
-        writer_lower = create_writer("json")
-        writer_upper = create_writer("JSON")
-        writer_mixed = create_writer("Json")
+        writer_lower = create_writer("csv")
+        writer_upper = create_writer("CSV")
+        writer_mixed = create_writer("Csv")
 
         assert writer_lower is not None
         assert writer_upper is not None
@@ -58,12 +52,12 @@ class TestWriterFactory:
 
     def test_create_writer_with_options(self):
         """Test creating writer with options."""
-        # JSON writer with pretty formatting
-        writer = create_writer("json", indent=4)
-        assert writer is not None
-
         # CSV writer with custom delimiter
         writer = create_writer("csv", delimiter=";")
+        assert writer is not None
+
+        # Parquet writer with compression
+        writer = create_writer("parquet", compression="snappy")
         assert writer is not None
 
     def test_create_writer_unsupported_format(self):
@@ -82,13 +76,11 @@ class TestWriterFactory:
         """Test getting supported formats."""
         formats = get_supported_formats()
         assert isinstance(formats, dict)
-        assert "json" in formats
         assert "csv" in formats
         assert "parquet" in formats
 
     def test_is_format_supported(self):
         """Test checking if format is supported."""
-        assert is_format_available("json")
         assert is_format_available("csv")
         assert is_format_available("parquet")
         assert not is_format_available("unsupported_format")
@@ -96,29 +88,6 @@ class TestWriterFactory:
 
 class TestWriterFactoryIntegration:
     """Test writer factory integration with actual writing."""
-
-    def test_factory_writer_json_integration(self, tmp_path):
-        """Test factory-created JSON writer integration."""
-        writer = create_writer("json", indent=2)
-
-        data = [
-            {"id": 1, "name": "Test 1", "value": 100},
-            {"id": 2, "name": "Test 2", "value": 200},
-        ]
-
-        output_file = tmp_path / "factory_test.json"
-        writer.write(data, str(output_file))
-
-        assert output_file.exists()
-
-        # Verify content
-        import json
-
-        with open(output_file, encoding="utf-8") as f:
-            loaded_data = json.load(f)
-
-        assert len(loaded_data) == 2
-        assert loaded_data[0]["name"] == "Test 1"
 
     def test_factory_writer_csv_integration(self, tmp_path):
         """Test factory-created CSV writer integration."""
@@ -174,21 +143,18 @@ class TestWriterFactoryIntegration:
 
     def test_factory_multiple_writers_same_format(self):
         """Test creating multiple writers of same format."""
-        writer1 = create_writer("json", indent=2)
-        writer2 = create_writer("json", indent=4)
+        writer1 = create_writer("csv", delimiter=",")
+        writer2 = create_writer("csv", delimiter=";")
 
-        # Should be different instances
         assert writer1 is not writer2
         assert hasattr(writer1, "write")
         assert hasattr(writer2, "write")
 
     def test_factory_writers_different_formats(self):
         """Test creating writers of different formats."""
-        json_writer = create_writer("json")
         csv_writer = create_writer("csv")
         parquet_writer = create_writer("parquet")
 
-        assert hasattr(json_writer, "write")
         assert hasattr(csv_writer, "write")
         assert hasattr(parquet_writer, "write")
 
@@ -198,15 +164,12 @@ class TestWriterFactoryEdgeCases:
 
     def test_factory_with_invalid_options(self):
         """Test factory with invalid writer options."""
-        # Should still create writer, but may ignore invalid options
-        writer = create_writer("json", invalid_option="value")
+        writer = create_writer("csv", invalid_option="value")
         assert hasattr(writer, "write")
 
     def test_factory_format_detection_from_path(self):
         """Test format detection capabilities."""
-        # Test determining supported formats
         formats = get_supported_formats()
-        assert "json" in formats
         assert "csv" in formats
         assert "parquet" in formats
 
@@ -218,9 +181,9 @@ class TestWriterFactoryEdgeCases:
         def create_writers(thread_id):
             try:
                 for i in range(10):
-                    writer = create_writer("json")
+                    writer = create_writer("csv")
                     results.append((thread_id, i, type(writer).__name__))
-                    time.sleep(0.001)  # Small delay
+                    time.sleep(0.001)
             except Exception as e:
                 errors.append((thread_id, e))
 
@@ -234,28 +197,25 @@ class TestWriterFactoryEdgeCases:
             thread.join()
 
         assert len(errors) == 0, f"Thread errors: {errors}"
-        assert len(results) == 50  # 5 threads * 10 writers each
+        assert len(results) == 50
 
     def test_factory_memory_usage(self):
         """Test factory memory usage with many writers."""
-        # Create many writers
         writers = []
         for i in range(100):
-            format_type = ["json", "csv", "parquet"][i % 3]
+            format_type = ["csv", "parquet"][i % 2]
             writer = create_writer(format_type)
             writers.append(writer)
 
         assert len(writers) == 100
 
-        # Verify all have write method
         for writer in writers:
             assert hasattr(writer, "write")
 
     def test_factory_singleton_behavior(self):
         """Test that factory functions work independently."""
-        # Functions should work independently
-        writer1 = create_writer("json")
-        writer2 = create_writer("json")
+        writer1 = create_writer("csv")
+        writer2 = create_writer("csv")
 
         assert hasattr(writer1, "write")
         assert hasattr(writer2, "write")
@@ -266,27 +226,22 @@ class TestWriterFactoryConfiguration:
 
     def test_factory_default_configuration(self):
         """Test factory with default configuration."""
-        # Should create writers with default settings
-        json_writer = create_writer("json")
         csv_writer = create_writer("csv")
+        parquet_writer = create_writer("parquet")
 
-        assert hasattr(json_writer, "write")
         assert hasattr(csv_writer, "write")
+        assert hasattr(parquet_writer, "write")
 
     def test_factory_custom_writer_registration(self):
         """Test that factory supports the expected formats."""
-        # Test that expected formats are available
-        assert is_format_available("json")
         assert is_format_available("csv")
         assert is_format_available("parquet")
 
     def test_factory_writer_options_validation(self):
         """Test writer options validation."""
-        # Test with various option combinations
         writers = [
-            create_writer("json", indent=2),
             create_writer("csv", delimiter=","),
-            create_writer("parquet"),
+            create_writer("parquet", compression="snappy"),
         ]
 
         for writer in writers:
@@ -294,7 +249,6 @@ class TestWriterFactoryConfiguration:
 
     def test_factory_error_handling_configuration(self):
         """Test factory error handling configuration."""
-        # Test error handling with invalid formats
         invalid_formats = ["", "unknown", "invalid"]
 
         for invalid_format in invalid_formats:

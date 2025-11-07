@@ -40,7 +40,7 @@ def initialize_io_features() -> None:
     available formats and handlers.
     """
     # Check if writers are already registered to avoid duplicate registration
-    if is_format_available("json"):
+    if is_format_available("csv"):
         return
 
     # Manually register writers to avoid circular import issues
@@ -48,21 +48,14 @@ def initialize_io_features() -> None:
         # Import writer modules first
         from . import writers  # noqa: F401
 
-        # Now register them manually
-        from .writers.json import JsonStreamingWriter, JsonWriter
-
-        register_writer(JsonWriter.format_name(), JsonWriter)
-        register_streaming_writer(
-            JsonStreamingWriter.format_name(), JsonStreamingWriter
-        )
-        logger.debug("Registered JSON writers")
-
+        # Register CSV writers
         from .writers.csv import CsvStreamingWriter, CsvWriter
 
         register_writer(CsvWriter.format_name(), CsvWriter)
         register_streaming_writer(CsvStreamingWriter.format_name(), CsvStreamingWriter)
         logger.debug("Registered CSV writers")
 
+        # Register Parquet writers if available
         try:
             from .writers.parquet import ParquetStreamingWriter, ParquetWriter
 

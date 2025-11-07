@@ -251,7 +251,7 @@ class ParameterValidator:
             return  # None is valid for auto-detection
 
         error_class = ValidationError if context == "api" else ConfigurationError
-        valid_formats = ["json", "csv", "parquet"]
+        valid_formats = ["csv", "parquet"]
 
         if not isinstance(value, str):
             raise error_class(f"Format must be a string, got {type(value).__name__}")

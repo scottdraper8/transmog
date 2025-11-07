@@ -239,21 +239,18 @@ class TestStreamingErrorHandling:
             {"id": 2, "name": "Good 2"},
         ]
 
-        # Should not raise exception with skip mode
         result = tm.flatten_stream(
             problematic_data,
             output_path=str(tmp_path / "recovery_test"),
             name="test",
-            format="json",
+            output_format="csv",
             errors="skip",
         )
 
-        # Streaming returns None
         assert result is None
 
-        # Check that some output was created
-        json_files = list(tmp_path.glob("**/*.json"))
-        assert len(json_files) > 0
+        csv_files = list(tmp_path.glob("**/*.csv"))
+        assert len(csv_files) > 0
 
 
 class TestTransmogErrorClass:

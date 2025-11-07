@@ -381,13 +381,10 @@ class CSVReader:
         from io import StringIO
 
         try:
-            # Get effective delimiter with auto-detection
             delimiter = self._get_effective_delimiter(csv_string)
 
-            # Create StringIO from CSV string
             csv_file = StringIO(csv_string)
 
-            # Use the same logic as _read_records_builtin but with StringIO
             reader = csv.reader(
                 csv_file, delimiter=delimiter, quotechar=self.quote_char
             )

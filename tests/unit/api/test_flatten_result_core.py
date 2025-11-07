@@ -130,33 +130,28 @@ class TestFlattenResultSaving:
         """Create a complex result with multiple tables."""
         return tm.flatten(array_data, name="company")
 
-    def test_save_json_single_table(self, simple_result, temp_file):
-        """Test saving single table to JSON."""
-        paths = simple_result.save(str(temp_file))
+    def test_save_csv_single_table(self, simple_result, temp_file):
+        """Test saving single table to CSV."""
+        csv_file = str(temp_file).replace(".json", ".csv")
+        paths = simple_result.save(csv_file, output_format="csv")
 
-        # Save returns a list for single table
         assert isinstance(paths, list)
         assert len(paths) > 0
         assert_files_created(paths)
 
-        # Verify content
-        data = load_json_file(paths[0])
-        assert isinstance(data, list)
-        assert len(data) == 1
-
-    def test_save_json_multiple_tables(self, complex_result, output_dir):
-        """Test saving multiple tables to JSON directory."""
-        paths = complex_result.save(str(output_dir / "json_output"))
+    def test_save_csv_multiple_tables(self, complex_result, output_dir):
+        """Test saving multiple tables to CSV directory."""
+        paths = complex_result.save(str(output_dir / "csv_output"), output_format="csv")
 
         # Save returns a dictionary for multiple tables
         assert isinstance(paths, dict)
         assert len(paths) > 1  # Multiple tables
         assert_files_created(list(paths.values()))
 
-        # Check that JSON files were created in the subdirectory
-        json_output_dir = output_dir / "json_output"
-        json_files = count_files_in_dir(json_output_dir, "*.json")
-        assert json_files > 0
+        # Check that CSV files were created in the subdirectory
+        csv_output_dir = output_dir / "csv_output"
+        csv_files = count_files_in_dir(csv_output_dir, "*.csv")
+        assert csv_files > 0
 
     def test_save_csv_format(self, complex_result, output_dir):
         """Test saving to CSV format."""
@@ -190,15 +185,15 @@ class TestFlattenResultSaving:
 
     def test_save_auto_format_detection(self, simple_result, output_dir):
         """Test automatic format detection from extension."""
-        # Test JSON extension
-        json_path = output_dir / "auto_test.json"
-        paths = simple_result.save(str(json_path))
-        # Single table returns list
-        assert_files_created(paths)
-
         # Test CSV extension
         csv_path = output_dir / "auto_test.csv"
         paths = simple_result.save(str(csv_path))
+        # Single table returns list
+        assert_files_created(paths)
+
+        # Test Parquet extension
+        parquet_path = output_dir / "auto_test.parquet"
+        paths = simple_result.save(str(parquet_path))
         # Single table returns list
         assert_files_created(paths)
 
@@ -210,7 +205,7 @@ class TestFlattenResultSaving:
     def test_save_pathlib_path(self, simple_result, output_dir):
         """Test saving with pathlib.Path objects."""
         output_path = output_dir / "pathlib_test"
-        paths = simple_result.save(output_path, output_format="json")
+        paths = simple_result.save(output_path, output_format="csv")
 
         # Single table returns list
         assert isinstance(paths, list)
@@ -244,7 +239,7 @@ class TestFlattenResultEdgeCases:
         import tempfile
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            paths = result.save(str(Path(temp_dir) / "simple_output.json"))
+            paths = result.save(str(Path(temp_dir) / "simple_output.csv"))
             # Single table save returns list
             if isinstance(paths, list):
                 assert_files_created(paths)
@@ -286,7 +281,7 @@ class TestFlattenResultEdgeCases:
         import tempfile
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            paths = result.save(str(Path(temp_dir) / "special_output.json"))
+            paths = result.save(str(Path(temp_dir) / "special_output.csv"))
             # Handle both list and dict return types
             if isinstance(paths, list):
                 assert_files_created(paths)

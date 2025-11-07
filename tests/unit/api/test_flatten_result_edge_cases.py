@@ -122,7 +122,7 @@ class TestFlattenResultEdgeCases:
         """Test save operations with edge cases."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Test saving empty result
-            empty_paths = empty_result.save(str(Path(temp_dir) / "empty.json"))
+            empty_paths = empty_result.save(str(Path(temp_dir) / "empty.csv"))
             if isinstance(empty_paths, dict):
                 # Multiple files
                 assert len(empty_paths) >= 0
@@ -132,15 +132,15 @@ class TestFlattenResultEdgeCases:
 
             # Test saving with very long filename
             long_name = "x" * 200
-            long_paths = complex_result.save(str(Path(temp_dir) / f"{long_name}.json"))
+            long_paths = complex_result.save(str(Path(temp_dir) / f"{long_name}.csv"))
             assert isinstance(long_paths, (str, dict, list))
 
     def test_result_save_format_detection(self, complex_result):
         """Test format detection in save operations."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Test JSON format detection
-            json_path = Path(temp_dir) / "output.json"
-            result = complex_result.save(str(json_path))
+            csv_path = Path(temp_dir) / "output.csv"
+            result = complex_result.save(str(csv_path))
             assert isinstance(result, (str, dict, list))
 
             # Test CSV format detection
@@ -157,7 +157,7 @@ class TestFlattenResultEdgeCases:
 
             try:
                 readonly_dir.chmod(0o444)  # Read-only
-                readonly_file = readonly_dir / "output.json"
+                readonly_file = readonly_dir / "output.csv"
 
                 with pytest.raises((FileError, PermissionError, OSError)):
                     complex_result.save(str(readonly_file))
@@ -173,7 +173,7 @@ class TestFlattenResultEdgeCases:
     def test_result_save_disk_full_simulation(self, complex_result):
         """Test save operations when disk is full."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            output_path = Path(temp_dir) / "output.json"
+            output_path = Path(temp_dir) / "output.csv"
 
             # Mock open to simulate disk full
             with patch("builtins.open", mock_open()) as mock_file:
@@ -353,7 +353,7 @@ class TestFlattenResultEdgeCases:
 
         # Should handle unicode in save operations
         with tempfile.TemporaryDirectory() as temp_dir:
-            output_path = Path(temp_dir) / "unicode.json"
+            output_path = Path(temp_dir) / "unicode.csv"
             saved_paths = result.save(str(output_path))
             assert isinstance(saved_paths, (str, dict, list))
 
@@ -446,7 +446,7 @@ class TestFlattenResultEdgeCases:
         """Test serialization edge cases."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Test saving with different encodings
-            output_path = Path(temp_dir) / "encoded.json"
+            output_path = Path(temp_dir) / "encoded.csv"
 
             try:
                 saved_paths = complex_result.save(str(output_path))

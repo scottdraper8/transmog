@@ -4,9 +4,8 @@ Contains methods for writing result data to various file formats
 and handling file I/O operations.
 """
 
-import json
 import os
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from transmog.error.exceptions import OutputError
 from transmog.io.writer_factory import create_writer, is_format_available
@@ -28,57 +27,6 @@ class ResultWriters:
         """
         self.result = result
         self.converters = ResultConverters(result)
-
-    def write_all_json(
-        self, base_path: str, indent: Optional[int] = 2, **kwargs: Any
-    ) -> dict[str, str]:
-        """Write all tables to JSON files.
-
-        Args:
-            base_path: Base path for output files
-            indent: Indentation level for JSON formatting
-            **kwargs: Additional JSON writer options
-
-        Returns:
-            Dictionary of table names to file paths
-
-        Raises:
-            OutputError: If writing fails
-        """
-        # Create the base directory if it doesn't exist
-        os.makedirs(base_path, exist_ok=True)
-
-        # Convert to dictionary structure with tables
-        tables = self.result.to_json_objects()
-
-        # Keep track of the paths
-        file_paths: dict[str, str] = {}
-
-        try:
-            # Process each table
-            for table_name, records in tables.items():
-                # Skip empty tables
-                if not records:
-                    continue
-
-                # Create the formatted table name
-                formatted_name = self.result.get_formatted_table_name(table_name)
-                file_path = os.path.join(base_path, f"{formatted_name}.json")
-
-                # Write to JSON file
-                with open(file_path, "w", encoding="utf-8") as f:
-                    json.dump(records, f, indent=indent, **kwargs)
-
-                # Record the file path
-                file_paths[table_name] = file_path
-
-            return file_paths
-        except Exception as e:
-            raise OutputError(
-                f"Failed to write JSON files: {e}",
-                output_format="json",
-                path=base_path,
-            ) from e
 
     def write_all_csv(
         self, base_path: str, include_header: bool = True, **kwargs: Any
@@ -196,7 +144,7 @@ class ResultWriters:
         """Write all tables to files of the specified format.
 
         Args:
-            format_name: Format to write (e.g., 'csv', 'json', 'parquet')
+            format_name: Format to write (e.g., 'csv', 'parquet')
             base_path: Base path for output files
             **format_options: Format-specific options
 
