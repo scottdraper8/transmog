@@ -38,14 +38,8 @@ classifiers = [
   "Topic :: Database :: Database Engines/Servers",
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-dependencies = [
-  "orjson>=3.8",
-  "polars>=0.20",
-  "pyarrow>=7",
-  "typing-extensions>=4",
-]
+dependencies = [ "orjson>=3.8", "pyarrow>=7", "typing-extensions>=4" ]
 
-# Data integration dependencies - Optional packages for working with other data formats (empty now)
 optional-dependencies.dev = [
   "bandit>=1.7.5",
   # Documentation dependencies
@@ -81,8 +75,7 @@ optional-dependencies.dev = [
   "types-toml",
 ]
 
-# For users who want the absolute minimum dependencies
-optional-dependencies.minimal = [  ]
+optional-dependencies.minimal = [ "orjson>=3.8", "typing-extensions>=4" ]
 
 urls."Bug Tracker" = "https://github.com/scottdraper8/transmog/issues"
 urls."Documentation" = "https://scottdraper8.github.io/transmog/"

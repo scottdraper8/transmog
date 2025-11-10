@@ -7,7 +7,7 @@ This module contains interface definitions and type aliases to avoid circular
 # Import specific types from each module rather than using * imports
 from .base import ArrayDict, ArrayMode, FlatDict, JsonDict
 from .context import ProcessingContext
-from .io_types import StreamingWriterProtocol, WriterProtocol, WriterRegistryProtocol
+from .io_types import StreamingWriterProtocol, WriterProtocol
 from .processing_types import FlattenMode
 from .result_types import ConversionModeType, ResultInterface
 
@@ -21,7 +21,6 @@ __all__ = [
     "ProcessingContext",
     # IO interfaces
     "WriterProtocol",
-    "WriterRegistryProtocol",
     "StreamingWriterProtocol",
     # Result interfaces
     "ResultInterface",

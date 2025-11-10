@@ -17,9 +17,9 @@ class TestConfigFactoryMethods:
         assert config.batch_size == 100
         assert config.cache_size == 1000
 
-    def test_for_performance_config(self):
+    def test_for_parquet_config(self):
         """Test performance optimized configuration factory."""
-        config = TransmogConfig.for_performance()
+        config = TransmogConfig.for_parquet()
 
         assert isinstance(config, TransmogConfig)
         assert config.batch_size == 10000
@@ -50,22 +50,14 @@ class TestConfigFactoryMethods:
         assert config.skip_null is False
         assert config.cast_to_string is True
 
-    def test_for_parquet_config(self):
-        """Test Parquet-optimized configuration factory."""
-        config = TransmogConfig.for_parquet()
-
-        assert isinstance(config, TransmogConfig)
-        assert config.batch_size == 10000
-        assert config.cache_size == 50000
-
 
 class TestFactoryMethodsReturnNewInstances:
     """Test that factory methods return new instances."""
 
     def test_factory_returns_new_instance(self):
         """Test that each factory call returns a new instance."""
-        config1 = TransmogConfig.for_performance()
-        config2 = TransmogConfig.for_performance()
+        config1 = TransmogConfig.for_parquet()
+        config2 = TransmogConfig.for_parquet()
 
         assert config1 is not config2
         assert config1.batch_size == config2.batch_size
@@ -73,7 +65,7 @@ class TestFactoryMethodsReturnNewInstances:
     def test_factory_configs_are_independent(self):
         """Test that factory configs don't share state."""
         config1 = TransmogConfig.for_memory()
-        config2 = TransmogConfig.for_performance()
+        config2 = TransmogConfig.for_parquet()
 
         assert config1.batch_size != config2.batch_size
         assert config1.cache_size != config2.cache_size

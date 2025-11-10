@@ -37,16 +37,6 @@ class CsvWriter(DataWriter):
     consistent interface and optional compression support.
     """
 
-    @classmethod
-    def format_name(cls) -> str:
-        """Return the name of the format this writer handles."""
-        return "csv"
-
-    @classmethod
-    def is_available(cls) -> bool:
-        """Check if this writer's dependencies are available."""
-        return True
-
     def __init__(
         self,
         include_header: bool = True,
@@ -75,22 +65,6 @@ class CsvWriter(DataWriter):
         self.escapechar = escapechar
         self.compression = compression
         self.options = options
-
-    def supports_compression(self) -> bool:
-        """Check if this writer supports compression.
-
-        Returns:
-            bool: True as CSV writer supports gzip compression
-        """
-        return True
-
-    def get_supported_codecs(self) -> list[str]:
-        """Get list of supported compression codecs.
-
-        Returns:
-            list[str]: List of supported compression methods
-        """
-        return ["gzip"]
 
     def write_table(
         self,
@@ -153,23 +127,6 @@ class CsvWriter(DataWriter):
                 field_names_set.update(record.keys())
             field_names = sorted(field_names_set)
 
-            # Generate CSV content
-            csv_content = self._generate_csv_content(
-                table_data,
-                field_names,
-                use_header,
-                use_delimiter,
-                use_quotechar,
-                use_quoting,
-                use_escapechar,
-            )
-
-            # Apply compression if requested
-            if compression == "gzip":
-                csv_bytes = gzip.compress(csv_content.encode("utf-8"))
-            else:
-                csv_bytes = csv_content.encode("utf-8")
-
             # Handle file path destination
             if isinstance(output_path, (str, pathlib.Path)):
                 path_str = str(output_path)
@@ -180,8 +137,31 @@ class CsvWriter(DataWriter):
 
                 os.makedirs(os.path.dirname(path_str) or ".", exist_ok=True)
 
-                with open(path_str, "wb") as f:
-                    f.write(csv_bytes)
+                # Write directly to file
+                if compression == "gzip":
+                    with gzip.open(path_str, "wt", encoding="utf-8", newline="") as f:
+                        self._write_csv_to_stream(
+                            f,
+                            table_data,
+                            field_names,
+                            use_header,
+                            use_delimiter,
+                            use_quotechar,
+                            use_quoting,
+                            use_escapechar,
+                        )
+                else:
+                    with open(path_str, "w", encoding="utf-8", newline="") as f:
+                        self._write_csv_to_stream(
+                            f,
+                            table_data,
+                            field_names,
+                            use_header,
+                            use_delimiter,
+                            use_quotechar,
+                            use_quoting,
+                            use_escapechar,
+                        )
 
                 return (
                     pathlib.Path(path_str)
@@ -191,16 +171,28 @@ class CsvWriter(DataWriter):
 
             # Handle file-like object destination
             elif hasattr(output_path, "write"):
-                # For compressed data, always write as binary
-                if compression:
+                # For compressed data, wrap stream in gzip
+                if compression == "gzip":
                     if hasattr(output_path, "mode") and "b" not in getattr(
                         output_path, "mode", ""
                     ):
                         raise OutputError("Cannot write compressed CSV to text stream")
                     binary_output = cast(BinaryIO, output_path)
-                    binary_output.write(csv_bytes)
+                    with gzip.open(
+                        binary_output, "wt", encoding="utf-8", newline=""
+                    ) as gz_file:
+                        self._write_csv_to_stream(
+                            gz_file,
+                            table_data,
+                            field_names,
+                            use_header,
+                            use_delimiter,
+                            use_quotechar,
+                            use_quoting,
+                            use_escapechar,
+                        )
                 else:
-                    # Write as text or binary based on stream type
+                    # Determine if stream is text or binary
                     if (
                         hasattr(output_path, "mode")
                         and "b" not in getattr(output_path, "mode", "")
@@ -210,10 +202,34 @@ class CsvWriter(DataWriter):
                         and not hasattr(output_path, "readinto")
                     ):
                         text_output = cast(TextIO, output_path)
-                        text_output.write(csv_content)
+                        self._write_csv_to_stream(
+                            text_output,
+                            table_data,
+                            field_names,
+                            use_header,
+                            use_delimiter,
+                            use_quotechar,
+                            use_quoting,
+                            use_escapechar,
+                        )
                     else:
+                        # Binary stream, wrap in TextIOWrapper
                         binary_output = cast(BinaryIO, output_path)
-                        binary_output.write(csv_bytes)
+                        text_wrapper = io.TextIOWrapper(
+                            binary_output, encoding="utf-8", newline=""
+                        )
+                        self._write_csv_to_stream(
+                            text_wrapper,
+                            table_data,
+                            field_names,
+                            use_header,
+                            use_delimiter,
+                            use_quotechar,
+                            use_quoting,
+                            use_escapechar,
+                        )
+                        text_wrapper.flush()
+                        text_wrapper.detach()
 
                 return output_path
             else:
@@ -223,8 +239,9 @@ class CsvWriter(DataWriter):
             logger.error(f"Error writing CSV: {e}")
             raise OutputError(f"Failed to write CSV file: {e}") from e
 
-    def _generate_csv_content(
+    def _write_csv_to_stream(
         self,
+        stream: TextIO,
         table_data: list[JsonDict],
         field_names: list[str],
         include_header: bool,
@@ -232,10 +249,11 @@ class CsvWriter(DataWriter):
         quotechar: str,
         quoting: int,
         escapechar: Optional[str],
-    ) -> str:
-        """Generate CSV content as a string.
+    ) -> None:
+        """Write CSV data directly to a stream.
 
         Args:
+            stream: Text stream to write to
             table_data: The table data
             field_names: List of field names
             include_header: Whether to include headers
@@ -243,11 +261,7 @@ class CsvWriter(DataWriter):
             quotechar: Quote character
             quoting: Quoting mode
             escapechar: Escape character
-
-        Returns:
-            str: CSV content
         """
-        csv_buffer = io.StringIO(newline="")
         writer_params: dict[str, Any] = {
             "fieldnames": field_names,
             "delimiter": delimiter,
@@ -258,13 +272,12 @@ class CsvWriter(DataWriter):
         if escapechar:
             writer_params["escapechar"] = escapechar
 
-        writer: csv.DictWriter[str] = csv.DictWriter(csv_buffer, **writer_params)
+        writer: csv.DictWriter[str] = csv.DictWriter(stream, **writer_params)
 
         if include_header:
             writer.writeheader()
 
         writer.writerows(table_data)
-        return csv_buffer.getvalue()
 
     def write_all_tables(
         self,
@@ -289,34 +302,35 @@ class CsvWriter(DataWriter):
         Raises:
             OutputError: If writing fails
         """
-        # Use the consolidated write pattern
-        return WriterUtils.write_all_tables_pattern(
-            main_table=main_table,
-            child_tables=child_tables,
-            base_path=base_path,
-            entity_name=entity_name,
-            format_name="csv",
-            write_table_func=self.write_table,
-            compression=options.get("compression", self.compression),
-            **options,
+        os.makedirs(base_path, exist_ok=True)
+        compression = options.get("compression", self.compression)
+        paths = {}
+
+        # Write main table
+        main_path = WriterUtils.build_output_path(
+            base_path, entity_name, "csv", compression
         )
+        self.write_table(main_table, main_path, **options)
+        paths["main"] = main_path
+
+        # Write child tables
+        for table_name, table_data in child_tables.items():
+            safe_name = WriterUtils.sanitize_filename(table_name)
+            child_path = WriterUtils.build_output_path(
+                base_path, safe_name, "csv", compression
+            )
+            self.write_table(table_data, child_path, **options)
+            paths[table_name] = child_path
+
+        return paths
 
 
 class CsvStreamingWriter(StreamingWriter):
     """Streaming writer for CSV format.
 
     This writer allows incremental writing of data to CSV files
-    without keeping the entire dataset in memory, with unified interface.
+    without keeping the entire dataset in memory.
     """
-
-    @classmethod
-    def format_name(cls) -> str:
-        """Get the format name for this writer.
-
-        Returns:
-            str: The format name ("csv")
-        """
-        return "csv"
 
     def __init__(
         self,
@@ -415,19 +429,10 @@ class CsvStreamingWriter(StreamingWriter):
             )
 
             # Open file with appropriate compression
-            file_obj = WriterUtils.open_output_file(
-                file_path, "w", self.compression, encoding="utf-8"
-            )
-
-            # Ensure we have a TextIO object
-            if not isinstance(file_obj, TextIO):
-                # For gzip files, we need to ensure text mode
-                if self.compression == "gzip":
-                    import gzip
-
-                    file_obj = gzip.open(file_path, "wt", encoding="utf-8", newline="")
-                else:
-                    file_obj = open(file_path, "w", encoding="utf-8", newline="")
+            if self.compression == "gzip":
+                file_obj = gzip.open(file_path, "wt", encoding="utf-8", newline="")
+            else:
+                file_obj = open(file_path, "w", encoding="utf-8", newline="")
 
             self.file_objects[table_name] = file_obj
             return file_obj

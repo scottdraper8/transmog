@@ -229,7 +229,7 @@ class ProcessingResult:
                 feature="pyarrow_tables",
             )
 
-        tables = {"main": self.main_table, **self.child_tables}
+        tables = {self.entity_name: self.main_table, **self.child_tables}
         arrow_tables = {}
 
         for table_name, records in tables.items():

@@ -7,9 +7,9 @@
 The `TransmogConfig` class contains all configuration parameters:
 
 ```python
-from transmog import TransmogConfig, flatten
+import transmog as tm
 
-config = TransmogConfig(
+config = tm.TransmogConfig(
     separator=".",
     nested_threshold=5,
     cast_to_string=False,
@@ -18,7 +18,7 @@ config = TransmogConfig(
     parent_field="parent_id",
 )
 
-result = flatten(data, config=config)
+result = tm.flatten(data, config=config)
 ```
 
 ### Configuration Parameters
@@ -50,12 +50,12 @@ result = flatten(data, config=config)
 
 **Error Handling (2 parameters):**
 
-- `recovery_strategy`: `"strict"`, `"skip"`, or `"partial"` (default: `"strict"`)
+- `recovery_mode`: RecoveryMode enum for error handling (default: `RecoveryMode.STRICT`)
 - `allow_malformed_data`: Allow malformed data (default: `False`)
 
 **Cache (1 parameter):**
 
-- `cache_size`: Maximum cache size, set to 0 to disable (default: `10000`)
+- `cache_size`: Maximum cache size for value processing optimizations, set to 0 to disable (default: `10000`)
 
 **Advanced (1 parameter):**
 
@@ -64,23 +64,25 @@ result = flatten(data, config=config)
 ## Factory Methods
 
 ```python
+import transmog as tm
+
 # Default: types preserved, optimized for Parquet/analytics
-result = tm.flatten(data)
+config = tm.TransmogConfig()
 
 # CSV: strings, includes empty/null values
-config = TransmogConfig.for_csv()
+config = tm.TransmogConfig.for_csv()
 
 # Memory: small batches, minimal cache
-config = TransmogConfig.for_memory()
+config = tm.TransmogConfig.for_memory()
 
-# Performance: large batches, extended cache
-config = TransmogConfig.for_performance()
+# Performance: large batches, extended cache for large datasets
+config = tm.TransmogConfig.for_parquet()
 
 # Simple: clean field names (id, parent_id, timestamp)
-config = TransmogConfig.simple()
+config = tm.TransmogConfig.simple()
 
 # Error-tolerant: skip malformed records
-config = TransmogConfig.error_tolerant()
+config = tm.TransmogConfig.error_tolerant()
 ```
 
 ## Configuration Examples
@@ -88,28 +90,30 @@ config = TransmogConfig.error_tolerant()
 ### Basic Configuration
 
 ```python
-from transmog import TransmogConfig, flatten
+import transmog as tm
 
-config = TransmogConfig(
+config = tm.TransmogConfig(
     separator=".",
     cast_to_string=False,
     batch_size=5000,
 )
 
-result = flatten(data, config=config)
+result = tm.flatten(data, config=config)
 ```
 
 ### Performance Configuration
 
 ```python
+import transmog as tm
+
 # Large datasets
-config = TransmogConfig.for_performance()
+config = tm.TransmogConfig.for_parquet()
 
 # Memory-constrained environments
-config = TransmogConfig.for_memory()
+config = tm.TransmogConfig.for_memory()
 
 # Or customize from scratch
-config = TransmogConfig(
+config = tm.TransmogConfig(
     batch_size=10000,
     cache_size=50000,
 )
@@ -118,14 +122,16 @@ config = TransmogConfig(
 ### ID Management
 
 ```python
+import transmog as tm
+
 # Use existing ID field
-config = TransmogConfig(
+config = tm.TransmogConfig(
     id_field="product_id",
     parent_field="category_id",
 )
 
 # Discover natural IDs from data
-config = TransmogConfig(
+config = tm.TransmogConfig(
     id_patterns=["id", "uuid", "pk"],
 )
 ```
@@ -133,33 +139,35 @@ config = TransmogConfig(
 ### Array Handling
 
 ```python
-from transmog.types import ArrayMode
+import transmog as tm
 
 # Smart mode - simple arrays inline, complex arrays extracted
-config = TransmogConfig(array_mode=ArrayMode.SMART)
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.SMART)
 
 # Extract all arrays to child tables
-config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
 
 # Keep all arrays as JSON strings
-config = TransmogConfig(array_mode=ArrayMode.INLINE)
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.INLINE)
 
 # Skip arrays
-config = TransmogConfig(array_mode=ArrayMode.SKIP)
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.SKIP)
 ```
 
 ### Error Handling
 
 ```python
+import transmog as tm
+
 # Strict mode
-config = TransmogConfig(
-    recovery_strategy="strict",
+config = tm.TransmogConfig(
+    recovery_mode=tm.RecoveryMode.STRICT,
     allow_malformed_data=False,
 )
 
 # Skip errors
-config = TransmogConfig(
-    recovery_strategy="skip",
+config = tm.TransmogConfig(
+    recovery_mode=tm.RecoveryMode.SKIP,
     allow_malformed_data=True,
 )
 ```
@@ -169,14 +177,16 @@ config = TransmogConfig(
 ### From File
 
 ```python
+import transmog as tm
+
 # Load from JSON file
-config = TransmogConfig.from_file("config.json")
+config = tm.TransmogConfig.from_file("config.json")
 
 # Load from YAML file
-config = TransmogConfig.from_file("config.yaml")
+config = tm.TransmogConfig.from_file("config.yaml")
 
 # Load from TOML file
-config = TransmogConfig.from_file("config.toml")
+config = tm.TransmogConfig.from_file("config.toml")
 ```
 
 Example configuration file (`config.json`):
@@ -194,8 +204,10 @@ Example configuration file (`config.json`):
 ### From Environment Variables
 
 ```python
+import transmog as tm
+
 # Load from environment variables with TRANSMOG_ prefix
-config = TransmogConfig.from_env()
+config = tm.TransmogConfig.from_env()
 ```
 
 Environment variables:
@@ -211,9 +223,10 @@ export TRANSMOG_CAST_TO_STRING=false
 ### Using with Processor
 
 ```python
+import transmog as tm
 from transmog.process import Processor
 
-config = TransmogConfig(
+config = tm.TransmogConfig(
     batch_size=5000,
     cache_size=50000,
 )
@@ -225,11 +238,11 @@ result = processor.process(data, entity_name="products")
 ### Streaming Configuration
 
 ```python
-from transmog import flatten_stream
+import transmog as tm
 
-config = TransmogConfig.for_memory()
+config = tm.TransmogConfig.for_memory()
 
-flatten_stream(
+tm.flatten_stream(
     large_data,
     "output/",
     output_format="parquet",
@@ -247,23 +260,25 @@ flatten_stream(
 
 ### Array Modes
 
-- `SMART`: Default behavior
-- `SEPARATE`: All arrays in child tables
-- `INLINE`: Arrays as JSON strings
-- `SKIP`: Ignore arrays
+- `tm.ArrayMode.SMART`: Default behavior
+- `tm.ArrayMode.SEPARATE`: All arrays in child tables
+- `tm.ArrayMode.INLINE`: Arrays as JSON strings
+- `tm.ArrayMode.SKIP`: Ignore arrays
 
 ### Error Strategies
 
-- `strict`: Fail on errors
-- `skip`: Continue processing
-- `partial`: Process what's possible
+- `tm.RecoveryMode.STRICT`: Fail on errors
+- `tm.RecoveryMode.SKIP`: Continue processing
+- `tm.RecoveryMode.PARTIAL`: Process what's possible
 
 ### Output Format Optimization
 
 ```python
+import transmog as tm
+
 # CSV output
-config = TransmogConfig.for_csv()
+config = tm.TransmogConfig.for_csv()
 
 # Parquet output
-config = TransmogConfig.for_parquet()
+config = tm.TransmogConfig.for_parquet()
 ```

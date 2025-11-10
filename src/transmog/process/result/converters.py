@@ -149,7 +149,10 @@ class ResultConverters:
         result: dict[str, bytes] = {}
 
         # Process each table (main table and child tables)
-        tables = {"main": self.result.main_table, **self.result.child_tables}
+        tables = {
+            self.result.entity_name: self.result.main_table,
+            **self.result.child_tables,
+        }
 
         for table_name, records in tables.items():
             # Skip empty tables

@@ -242,7 +242,8 @@ Parameters should have sensible defaults for common use cases:
 result = tm.flatten(data)
 
 # Advanced users can customize as needed
-result = tm.flatten(data, arrays="inline", batch_size=5000)
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.INLINE, batch_size=5000)
+result = tm.flatten(data, config=config)
 ```
 
 ### Backward Compatibility
@@ -324,7 +325,7 @@ Transmog provides several extension points for customization:
    from transmog.error import RecoveryStrategy
 
    class MyRecoveryStrategy(RecoveryStrategy):
-       def recover(self, error, context=None):
+       def recover(self, error, entity_name=None, **kwargs):
            # Custom recovery logic
            return recovery_result
    ```
@@ -332,26 +333,13 @@ Transmog provides several extension points for customization:
 2. **Custom ID Generation**:
 
    ```python
-   def custom_id_strategy(record):
+   def custom_id_generator(record):
        # Generate ID based on record contents
        return f"CUSTOM-{record.get('id', 'unknown')}"
 
-   # Use with processor
-   processor = Processor.with_custom_id_generation(custom_id_strategy)
-   ```
-
-3. **Output Format Extensions**:
-
-   ```python
-   from transmog.io import DataWriter, register_writer
-
-   class MyCustomWriter(DataWriter):
-       def write(self, data, destination):
-           # Custom writing logic
-           pass
-
-   # Register the writer
-   register_writer("custom-format", MyCustomWriter)
+   # Use with configuration
+   config = tm.TransmogConfig(id_generator=custom_id_generator)
+   result = tm.flatten(data, config=config)
    ```
 
 ### Performance Testing

@@ -123,7 +123,7 @@ result = tm.flatten(data, name="analytics")
 result.save("analytics_data", output_format="parquet")
 
 # Or use performance preset for large datasets
-config = tm.TransmogConfig.for_performance()
+config = tm.TransmogConfig.for_parquet()
 result = tm.flatten(data, name="analytics", config=config)
 result.save("analytics_data", output_format="parquet")
 
@@ -141,12 +141,13 @@ For large datasets, use streaming to write directly to files:
 
 ```python
 # Stream large datasets to Parquet
+config = tm.TransmogConfig(batch_size=1000)
 tm.flatten_stream(
     large_dataset,
     output_path="streaming_output/",
     name="large_data",
     output_format="parquet",        # Best for large datasets
-    batch_size=1000,
+    config=config,
     compression="snappy"            # Format-specific option
 )
 
@@ -317,4 +318,3 @@ tm.flatten_stream(
 
 - **[Error Handling](error-handling.md)** - Handle format-specific processing errors
 - **[Streaming Guide](../developer_guide/streaming.md)** - Memory-efficient processing for large outputs
-- **[Performance Guide](../developer_guide/performance.md)** - Optimize output performance for different formats

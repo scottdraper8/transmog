@@ -15,9 +15,9 @@ analytics, and data processing. The system:
 - Flattens nested objects using configurable path notation
 - Extracts arrays into separate relational tables
 - Generates unique identifiers for record tracking
-- Supports multiple output formats (JSON, CSV, Parquet)
+- Supports multiple output formats (CSV, Parquet)
 - Includes unified error handling with consistent recovery strategies
-- Provides memory-efficient processing with adaptive batch sizing
+- Provides memory-efficient processing with configurable batch sizes
 
 ## Quick Example
 
@@ -50,9 +50,9 @@ Start here for installation, basic concepts, and first steps.
 
 Task-oriented guides covering all functionality by topic area. Each guide focuses on specific workflows and practical examples.
 
-- **File Processing** - Working with JSON and CSV files
+- **File Processing** - Working with JSON files
 - **Array Handling** - Controlling how arrays become tables
-- **Output Formats** - Choosing JSON, CSV, or Parquet output
+- **Output Formats** - Choosing CSV or Parquet output
 - **ID Management** - Configuring record identifiers
 - **Error Handling** - Recovery strategies and error modes
 
@@ -71,12 +71,11 @@ Complete technical documentation of all functions, classes, and parameters. Deta
 
 ### Developer Guide
 
-Contributing, extending, and advanced usage patterns. Resources for developers wanting to contribute or customize Transmog.
+Contributing and advanced usage patterns. Resources for developers wanting to contribute or use advanced features.
 
 - **Contributing Guidelines** - How to contribute to the project
-- **Performance Optimization** - Advanced configuration for speed
 - **Streaming Processing** - Memory-efficient processing techniques
-- **Custom Extensions** - Extending functionality
+- **Custom Configuration** - Advanced configuration options
 
 [**→ Developer Guide**](developer_guide/contributing.md)
 
@@ -120,8 +119,6 @@ api_reference/api
 :caption: Developer Guide
 
 developer_guide/contributing
-developer_guide/performance
 developer_guide/streaming
-developer_guide/extending
 developer_guide/custom-configuration
 ```

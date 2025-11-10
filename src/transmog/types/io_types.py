@@ -81,22 +81,6 @@ class StreamingWriterProtocol(Protocol):
         ...
 
 
-class WriterRegistryProtocol(Protocol):
-    """Protocol for writer registries."""
-
-    def register_writer(self, format_name: str, writer_factory: Any) -> None:
-        """Register a writer for a format."""
-        ...
-
-    def get_writer(self, format_name: str) -> Optional[WriterProtocol]:
-        """Get a writer for a format."""
-        ...
-
-    def is_format_available(self, format_name: str) -> bool:
-        """Check if a format has a registered writer."""
-        ...
-
-
-# Type aliases for writer and registry factory functions
+# Type aliases for writer factory functions
 WriterFactory = Callable[..., WriterProtocol]
 StreamingWriterFactory = Callable[..., StreamingWriterProtocol]

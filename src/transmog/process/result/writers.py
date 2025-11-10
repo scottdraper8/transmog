@@ -8,7 +8,7 @@ import os
 from typing import TYPE_CHECKING, Any
 
 from transmog.error.exceptions import OutputError
-from transmog.io.writer_factory import create_writer, is_format_available
+from transmog.io.writer_factory import create_writer
 
 from .converters import ResultConverters
 
@@ -101,7 +101,10 @@ class ResultWriters:
         os.makedirs(base_path, exist_ok=True)
 
         # Get all tables as PyArrow tables
-        tables = {"main": self.result.main_table, **self.result.child_tables}
+        tables = {
+            self.result.entity_name: self.result.main_table,
+            **self.result.child_tables,
+        }
 
         # Keep track of the paths
         file_paths: dict[str, str] = {}
@@ -157,10 +160,6 @@ class ResultWriters:
         # Ensure the output directory exists
         os.makedirs(base_path, exist_ok=True)
 
-        # Check if format is supported
-        if not is_format_available(format_name):
-            raise OutputError(f"Output format {format_name} is not available")
-
         # Get writer for this format
         writer = create_writer(format_name)
 
@@ -204,12 +203,6 @@ class ResultWriters:
         Raises:
             OutputError: If the writer is not available or writing fails
         """
-        if not is_format_available(format_name):
-            raise OutputError(
-                f"Format '{format_name}' is not available",
-                output_format=format_name,
-            )
-
         writer = create_writer(format_name)
         os.makedirs(output_directory, exist_ok=True)
         file_paths: dict[str, str] = {}

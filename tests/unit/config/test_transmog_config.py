@@ -58,9 +58,9 @@ class TestConfigFactoryMethods:
         assert config.batch_size == 100
         assert config.cache_size == 1000
 
-    def test_for_performance_config(self):
+    def test_for_parquet_config(self):
         """Test performance optimized configuration."""
-        config = TransmogConfig.for_performance()
+        config = TransmogConfig.for_parquet()
 
         assert config.batch_size == 10000
         assert config.cache_size == 50000
@@ -80,13 +80,6 @@ class TestConfigFactoryMethods:
         assert config.include_empty is True
         assert config.skip_null is False
         assert config.cast_to_string is True
-
-    def test_for_parquet_config(self):
-        """Test Parquet-optimized configuration."""
-        config = TransmogConfig.for_parquet()
-
-        assert config.batch_size == 10000
-        assert config.cache_size == 50000
 
     def test_error_tolerant_config(self):
         """Test error-tolerant configuration."""

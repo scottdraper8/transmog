@@ -9,14 +9,10 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 from transmog.config import TransmogConfig
-from transmog.io import initialize_io_features
 from transmog.process import Processor
 from transmog.process.result import ProcessingResult as _ProcessingResult
 from transmog.process.streaming import stream_process
 from transmog.types.base import JsonDict
-
-# Initialize IO features
-initialize_io_features()
 
 # Type aliases
 DataInput = Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes]
@@ -217,7 +213,7 @@ def flatten(
         >>> result = flatten(data, config=config)
 
         >>> # Use factory methods
-        >>> result = flatten(data, config=TransmogConfig.for_performance())
+        >>> result = flatten(data, config=TransmogConfig.for_parquet())
 
         >>> # Save to file
         >>> result.save("output.csv")
@@ -238,7 +234,6 @@ def flatten(
 def flatten_file(
     path: Union[str, Path],
     name: Optional[str] = None,
-    file_format: Optional[str] = None,
     config: Optional[TransmogConfig] = None,
 ) -> FlattenResult:
     """Flatten data from a file.
@@ -248,7 +243,6 @@ def flatten_file(
     Args:
         path: Path to input file
         name: Base name for tables (defaults to filename without extension)
-        file_format: File format (auto-detected if not specified)
         config: Optional configuration
 
     Returns:

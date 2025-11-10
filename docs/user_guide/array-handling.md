@@ -9,10 +9,10 @@ Transmog provides four modes for handling arrays in nested data:
 
 | Mode | Description | Use Case |
 |------|-------------|----------|
-| `"smart"` | **Default**. Explode complex arrays, keep simple as native | Optimal for Parquet |
-| `"separate"` | Extract all arrays into child tables | Full relational analysis |
-| `"inline"` | Keep all arrays as JSON strings | Document storage |
-| `"skip"` | Ignore arrays completely | Focus on scalar data |
+| `ArrayMode.SMART` | **Default**. Explode complex arrays, keep simple as native | Optimal for Parquet |
+| `ArrayMode.SEPARATE` | Extract all arrays into child tables | Full relational analysis |
+| `ArrayMode.INLINE` | Keep all arrays as JSON strings | Document storage |
+| `ArrayMode.SKIP` | Ignore arrays completely | Focus on scalar data |
 
 ## Smart Mode (Default)
 
@@ -47,14 +47,15 @@ print("Main table:", result.main)
 #   {
 #     'product_name': 'Laptop',
 #     'product_tags': ['electronics', 'computers', 'portable'],  # Native array!
-#     '_id': 'generated_id'
+#     '_id': 'generated_id',
+#     '_timestamp': '2024-01-15T10:30:00'
 #   }
 # ]
 
 print("Reviews table:", result.tables["products_reviews"])
 # [
-#   {'rating': '5', 'comment': 'Excellent', '_parent_id': 'generated_id'},
-#   {'rating': '4', 'comment': 'Good value', '_parent_id': 'generated_id'}
+#   {'rating': 5, 'comment': 'Excellent', '_parent_id': 'generated_id', '_id': 'generated_id', '_timestamp': '2024-01-15T10:30:00'},
+#   {'rating': 4, 'comment': 'Good value', '_parent_id': 'generated_id', '_id': 'generated_id', '_timestamp': '2024-01-15T10:30:00'}
 # ]
 ```
 
@@ -125,8 +126,8 @@ print("Tags table:", result.tables["products_tags"])
 
 print("Reviews table:", result.tables["products_reviews"])
 # [
-#   {'rating': '5', 'comment': 'Excellent', '_parent_id': 'generated_id'},
-#   {'rating': '4', 'comment': 'Good value', '_parent_id': 'generated_id'}
+#   {'rating': 5, 'comment': 'Excellent', '_parent_id': 'generated_id', '_id': 'generated_id', '_timestamp': '2024-01-15T10:30:00'},
+#   {'rating': 4, 'comment': 'Good value', '_parent_id': 'generated_id', '_id': 'generated_id', '_timestamp': '2024-01-15T10:30:00'}
 # ]
 ```
 
@@ -171,9 +172,9 @@ print("Departments:", result.tables["company_departments"])
 # Teams table (nested array)
 print("Teams:", result.tables["company_departments_teams"])
 # [
-#   {'name': 'Frontend', 'size': '5', '_parent_id': 'dept_1'},
-#   {'name': 'Backend', 'size': '8', '_parent_id': 'dept_1'},
-#   {'name': 'Digital', 'size': '3', '_parent_id': 'dept_2'}
+#   {'name': 'Frontend', 'size': 5, '_parent_id': 'dept_1'},
+#   {'name': 'Backend', 'size': 8, '_parent_id': 'dept_1'},
+#   {'name': 'Digital', 'size': 3, '_parent_id': 'dept_2'}
 # ]
 ```
 
@@ -310,15 +311,15 @@ result = tm.flatten(data, name="records", config=config)
 # All arrays are extracted consistently
 print("Scalar values table:", result.tables["records_scalar_values"])
 # [
-#   {'value': '1', '_parent_id': 'main_id'},
-#   {'value': '2', '_parent_id': 'main_id'},
+#   {'value': 1, '_parent_id': 'main_id'},
+#   {'value': 2, '_parent_id': 'main_id'},
 #   ...
 # ]
 
 print("Object array table:", result.tables["records_object_array"])
 # [
-#   {'id': '1', 'name': 'Item A', '_parent_id': 'main_id'},
-#   {'id': '2', 'name': 'Item B', '_parent_id': 'main_id'}
+#   {'id': 1, 'name': 'Item A', '_parent_id': 'main_id'},
+#   {'id': 2, 'name': 'Item B', '_parent_id': 'main_id'}
 # ]
 ```
 
@@ -402,8 +403,8 @@ print(f"Tables: {len(result_skip.all_tables)}")    # Usually 1
 # For large arrays, use streaming with separate mode
 config = tm.TransmogConfig(
     array_mode=tm.ArrayMode.SEPARATE,
-    batch_size=1000,
-    batch_size=100, cache_size=1000
+    batch_size=100,
+    cache_size=1000
 )
 tm.flatten_stream(
     large_data_with_arrays,
@@ -416,7 +417,8 @@ tm.flatten_stream(
 # For very large arrays that don't need analysis, use inline
 config = tm.TransmogConfig(
     array_mode=tm.ArrayMode.INLINE,
-    batch_size=100, cache_size=1000
+    batch_size=100,
+    cache_size=1000
 )
 result = tm.flatten(data_with_huge_arrays, name="documents", config=config)
 ```
@@ -522,4 +524,3 @@ result = tm.flatten(data, name="analytics", config=config)
 
 - **[ID Management](id-management.md)** - Control record identification
 - **[Output Formats](output-formats.md)** - Choose optimal output formats for array data
-- **[Performance Guide](../developer_guide/performance.md)** - Optimize array processing performance

@@ -38,7 +38,7 @@ config = tm.TransmogConfig(separator=".", cast_to_string=False)
 result = tm.flatten(data, config=config)
 
 # Factory method configuration
-result = tm.flatten(data, config=tm.TransmogConfig.for_performance())
+result = tm.flatten(data, config=tm.TransmogConfig.for_parquet())
 ```
 
 ### flatten_file()
@@ -49,7 +49,6 @@ Process data from files.
 flatten_file(
     path: Union[str, Path],
     name: Optional[str] = None,
-    file_format: Optional[str] = None,
     config: Optional[TransmogConfig] = None,
 ) -> FlattenResult
 ```
@@ -58,7 +57,6 @@ flatten_file(
 
 - **path** (*Union[str, Path]*): Path to input file.
 - **name** (*Optional[str]*, default=None): Table name. Defaults to filename without extension.
-- **file_format** (*Optional[str]*, default=None): Input format. Auto-detected from extension if not specified.
 - **config** (*Optional[TransmogConfig]*, default=None): Configuration object.
 
 **Supported Formats:**
@@ -102,7 +100,7 @@ flatten_stream(
 - **output_path** (*Union[str, Path]*): Directory path for output files.
 - **name** (*str*, default="data"): Base name for output files.
 - **output_format** (*str*, default="csv"): Output format ("csv", "parquet").
-- **config** (*Optional[TransmogConfig]*, default=None): Configuration object. Uses memory-optimized config if not provided.
+- **config** (*Optional[TransmogConfig]*, default=None): Configuration object.
 - **\*\*format_options**: Format-specific options.
 
 **Output Formats:**
@@ -145,7 +143,7 @@ TransmogConfig(
     parent_field: str = "_parent_id",
     time_field: Optional[str] = "_timestamp",
     id_patterns: Optional[list[str]] = None,
-    recovery_strategy: str = "strict",
+    recovery_mode: RecoveryMode = RecoveryMode.STRICT,
     allow_malformed_data: bool = False,
     cache_size: int = 10000,
     id_generator: Optional[Callable] = None,
@@ -164,7 +162,7 @@ TransmogConfig(
 - `cast_to_string` (bool, default=False): Convert all values to strings
 - `include_empty` (bool, default=False): Include empty values in output
 - `skip_null` (bool, default=True): Skip null values
-- `array_mode` (ArrayMode, default=SMART): How to handle arrays
+- `array_mode` (ArrayMode, default=ArrayMode.SMART): How to handle arrays
 - `batch_size` (int, default=1000): Records to process at once
 - `max_depth` (int, default=100): Maximum recursion depth
 
@@ -180,8 +178,10 @@ TransmogConfig(
 
 **Error Handling:**
 
-- `recovery_strategy` (str, default="strict"): Error recovery strategy
-  ("strict", "skip", "partial", "raise", "warn")
+- `recovery_mode` (RecoveryMode, default=RecoveryMode.STRICT): Error recovery strategy:
+  - `tm.RecoveryMode.STRICT`: Stop on first error
+  - `tm.RecoveryMode.SKIP`: Skip problematic records and continue
+  - `tm.RecoveryMode.PARTIAL`: Attempt to extract usable data from partially valid records
 - `allow_malformed_data` (bool, default=False): Allow malformed data
 
 **Cache:**
@@ -190,27 +190,24 @@ TransmogConfig(
 
 **Advanced:**
 
-- `id_generator` (Optional[Callable]): Custom function for ID generation
+- `id_generator` (Optional[Callable[[dict[str, Any]], str]]): Custom function for ID generation
 
 **Factory Methods:**
 
 ```python
-# Memory-optimized
+# Memory-optimized: small batches (100), minimal cache (1000)
 config = TransmogConfig.for_memory()
 
-# Performance-optimized
-config = TransmogConfig.for_performance()
-
-# CSV-optimized
-config = TransmogConfig.for_csv()
-
-# Parquet-optimized
+# Performance-optimized: large batches (10000), extended cache (50000)
 config = TransmogConfig.for_parquet()
 
-# Simple configuration
+# CSV-optimized: strings, includes empty/null values
+config = TransmogConfig.for_csv()
+
+# Simple: clean field names (id, parent_id, timestamp instead of _id, _parent_id, _timestamp)
 config = TransmogConfig.simple()
 
-# Error-tolerant
+# Error-tolerant: skip mode, allows malformed data
 config = TransmogConfig.error_tolerant()
 ```
 
@@ -282,7 +279,7 @@ paths = result.save("output/")
 paths = result.save("output/", output_format="csv")
 
 # Save single table
-paths = result.save("data.json")
+paths = result.save("data.csv")
 ```
 
 ##### table_info()
@@ -346,62 +343,86 @@ tags = result.get_table("products_tags", default=[])
 
 ### TransmogError
 
-Base exception class.
+Base exception class for all Transmog errors.
 
 ```python
 class TransmogError(Exception):
-    """Base exception for Transmog operations."""
+    """Base exception for all Transmog operations."""
 ```
 
 ### ValidationError
 
-Raised for validation failures.
+Raised for data validation failures.
 
 ```python
 class ValidationError(TransmogError):
-    """Raised for validation failures."""
+    """Raised when input data fails validation checks."""
 ```
 
-**Example:**
+**Examples:**
 
 ```python
 try:
-    result = tm.flatten(data, config=invalid_config)
+    result = tm.flatten(invalid_data)
 except tm.ValidationError as e:
-    print(f"Validation error: {e}")
+    print(f"Data validation error: {e}")
 ```
+
+**Note:** Configuration validation errors raise `ConfigurationError` (not exported), handled internally.
 
 ## Type Definitions
 
 ### ArrayMode
 
-```python
-from transmog.types import ArrayMode
+Enumeration for controlling array handling behavior. Available as `tm.ArrayMode` when importing `transmog as tm`.
 
-ArrayMode.SMART    # Default: simple arrays inline, complex extracted
-ArrayMode.SEPARATE # All arrays to child tables
-ArrayMode.INLINE   # All arrays as JSON strings
-ArrayMode.SKIP     # Ignore arrays
+```python
+import transmog as tm
+
+tm.ArrayMode.SMART    # Default: simple arrays inline, complex extracted
+tm.ArrayMode.SEPARATE # All arrays to child tables
+tm.ArrayMode.INLINE   # All arrays as JSON strings
+tm.ArrayMode.SKIP     # Ignore arrays
+```
+
+### RecoveryMode
+
+Enumeration for controlling error recovery behavior. Available as `tm.RecoveryMode` when importing `transmog as tm`.
+
+```python
+import transmog as tm
+
+tm.RecoveryMode.STRICT  # Stop on first error (default)
+tm.RecoveryMode.SKIP    # Skip problematic records
+tm.RecoveryMode.PARTIAL # Extract usable data from partially valid records
 ```
 
 ## Module Information
 
 ```python
-import transmog
+import transmog as tm
 
 # Version
-print(transmog.__version__)
+print(tm.__version__)
 
 # Exported names
-print(transmog.__all__)
+print(tm.__all__)
 # ['flatten', 'flatten_file', 'flatten_stream', 'FlattenResult',
-#  'TransmogConfig', 'TransmogError', 'ValidationError', '__version__']
+#  'TransmogConfig', 'ArrayMode', 'RecoveryMode',
+#  'TransmogError', 'ValidationError', '__version__']
+
+# All exported types are available directly
+result = tm.flatten(data)                    # Main function
+config = tm.TransmogConfig()                 # Configuration
+mode = tm.ArrayMode.SMART                    # Array handling mode
+recovery = tm.RecoveryMode.STRICT            # Error recovery mode
 ```
 
 ## Advanced Usage
 
 ```python
 # Direct processor usage
+import transmog as tm
 from transmog.process import Processor
 
 config = tm.TransmogConfig()

@@ -3,19 +3,16 @@
 This module provides writers for various file formats.
 """
 
-from transmog.dependencies import DependencyManager
+from .csv import CsvStreamingWriter, CsvWriter
 
-from ..formats import FormatRegistry
-from .csv import CsvWriter
+try:
+    from .parquet import ParquetStreamingWriter, ParquetWriter
 
-# Register basic writer formats
-FormatRegistry.register_writer_format("csv")
-
-# Register optional formats if dependencies are available
-if DependencyManager.has_dependency("pyarrow"):
-    FormatRegistry.register_writer_format("parquet")
-    from .parquet import ParquetWriter
-
-    __all__ = ["CsvWriter", "ParquetWriter"]
-else:
-    __all__ = ["CsvWriter"]
+    __all__ = [
+        "CsvWriter",
+        "CsvStreamingWriter",
+        "ParquetWriter",
+        "ParquetStreamingWriter",
+    ]
+except ImportError:
+    __all__ = ["CsvWriter", "CsvStreamingWriter"]

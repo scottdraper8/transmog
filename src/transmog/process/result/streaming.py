@@ -8,7 +8,7 @@ import os
 from typing import TYPE_CHECKING, Any, BinaryIO, Optional, Union
 
 from transmog.error.exceptions import MissingDependencyError, OutputError
-from transmog.io.writer_factory import create_streaming_writer, is_format_available
+from transmog.io.writer_factory import create_streaming_writer
 
 from .utils import _check_pyarrow_available
 
@@ -60,7 +60,10 @@ class ResultStreaming:
         os.makedirs(base_path, exist_ok=True)
 
         # Get all tables
-        tables = {"main": self.result.main_table, **self.result.child_tables}
+        tables = {
+            self.result.entity_name: self.result.main_table,
+            **self.result.child_tables,
+        }
 
         # Keep track of the paths
         file_paths: dict[str, str] = {}
@@ -119,12 +122,6 @@ class ResultStreaming:
         Raises:
             OutputError: If streaming fails
         """
-        if not is_format_available(format_name):
-            raise OutputError(
-                f"Format '{format_name}' is not available",
-                output_format=format_name,
-            )
-
         # Create a writer for the format
         writer = create_streaming_writer(format_name, destination=output_destination)
 

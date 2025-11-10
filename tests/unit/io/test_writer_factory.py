@@ -13,12 +13,10 @@ import pytest
 
 from transmog.error.exceptions import ConfigurationError, MissingDependencyError
 from transmog.io.writer_factory import (
+    FORMATS,
+    STREAMING_FORMATS,
     create_streaming_writer,
     create_writer,
-    get_supported_formats,
-    get_supported_streaming_formats,
-    is_format_available,
-    is_streaming_format_available,
 )
 
 
@@ -65,25 +63,19 @@ class TestWriterFactory:
         with pytest.raises(ConfigurationError) as exc_info:
             create_writer("unsupported_format")
 
-        assert "Unsupported output format" in str(exc_info.value)
+        assert "Unsupported format" in str(exc_info.value)
 
     def test_create_writer_empty_format(self):
         """Test creating writer with empty format."""
         with pytest.raises(ConfigurationError):
             create_writer("")
 
-    def test_get_supported_formats(self):
-        """Test getting supported formats."""
-        formats = get_supported_formats()
-        assert isinstance(formats, dict)
-        assert "csv" in formats
-        assert "parquet" in formats
-
-    def test_is_format_supported(self):
-        """Test checking if format is supported."""
-        assert is_format_available("csv")
-        assert is_format_available("parquet")
-        assert not is_format_available("unsupported_format")
+    def test_supported_formats(self):
+        """Test supported formats dictionary."""
+        assert isinstance(FORMATS, dict)
+        assert "csv" in FORMATS
+        assert "parquet" in FORMATS
+        assert "csv" in STREAMING_FORMATS
 
 
 class TestWriterFactoryIntegration:
@@ -169,9 +161,8 @@ class TestWriterFactoryEdgeCases:
 
     def test_factory_format_detection_from_path(self):
         """Test format detection capabilities."""
-        formats = get_supported_formats()
-        assert "csv" in formats
-        assert "parquet" in formats
+        assert "csv" in FORMATS
+        assert "parquet" in FORMATS
 
     def test_factory_thread_safety(self):
         """Test factory thread safety."""
@@ -234,8 +225,8 @@ class TestWriterFactoryConfiguration:
 
     def test_factory_custom_writer_registration(self):
         """Test that factory supports the expected formats."""
-        assert is_format_available("csv")
-        assert is_format_available("parquet")
+        assert "csv" in FORMATS
+        assert "parquet" in FORMATS
 
     def test_factory_writer_options_validation(self):
         """Test writer options validation."""

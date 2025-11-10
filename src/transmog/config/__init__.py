@@ -18,37 +18,66 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class TransmogConfig:
-    """Configuration for Transmog processing with sensible defaults."""
+    """Configuration for Transmog processing with sensible defaults.
 
-    # Naming (2)
+    All parameters have sensible defaults that work for most use cases.
+    Use factory methods for common scenarios or customize parameters as needed.
+    """
+
+    # Naming configuration (2 parameters)
     separator: str = "_"
+    """Character to join nested field names (e.g., 'user.name' becomes 'user_name')."""
+
     nested_threshold: int = 4
+    """Depth at which to simplify deeply nested field names to prevent long names."""
 
-    # Processing (6)
+    # Processing configuration (6 parameters)
     cast_to_string: bool = False
+    """Convert all values to strings for CSV compatibility."""
+
     include_empty: bool = False
+    """Include empty values in output instead of omitting them."""
+
     skip_null: bool = True
+    """Skip null values instead of including them as empty strings."""
+
     array_mode: ArrayMode = ArrayMode.SMART
+    """Strategy for handling arrays: SMART (default), SEPARATE, INLINE, or SKIP."""
+
     batch_size: int = 1000
+    """Number of records to process at once for memory efficiency."""
+
     max_depth: int = 100
+    """Maximum recursion depth to prevent stack overflow on pathological data."""
 
-    # Metadata (3)
+    # Metadata configuration (3 parameters)
     id_field: str = "_id"
+    """Field name for record IDs in flattened output."""
+
     parent_field: str = "_parent_id"
+    """Field name for parent relationship references."""
+
     time_field: Optional[str] = "_timestamp"
+    """Field name for timestamps. Set to None to disable timestamp tracking."""
 
-    # ID Discovery (1)
+    # ID Discovery configuration (1 parameter)
     id_patterns: Optional[list[str]] = None
+    """List of field name patterns to check for natural IDs."""
 
-    # Error handling (2)
+    # Error handling configuration (2 parameters)
     recovery_mode: RecoveryMode = RecoveryMode.STRICT
+    """Strategy for handling errors: STRICT (default), SKIP, or PARTIAL."""
+
     allow_malformed_data: bool = False
+    """Allow processing of malformed data that would normally cause errors."""
 
-    # Cache (1)
+    # Cache configuration (1 parameter)
     cache_size: int = 10000
+    """Maximum cache size for value processing optimizations. Set to 0 to disable."""
 
-    # Advanced options (1)
+    # Advanced configuration (1 parameter)
     id_generator: Optional[Callable[[dict[str, Any]], str]] = None
+    """Custom function to generate IDs for records that lack natural identifiers."""
 
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
@@ -88,6 +117,52 @@ class TransmogConfig:
                 f"time={self.time_field}"
             )
 
+    def validate_config(self) -> list[str]:
+        """Return list of validation warnings for problematic configurations.
+
+        These are warnings, not errors - the configuration will still work,
+        but may not be optimal for the intended use case.
+
+        Returns:
+            List of warning messages. Empty list means no warnings.
+        """
+        warnings = []
+
+        # Performance warnings
+        if self.batch_size > 50000:
+            warnings.append(
+                f"Large batch_size ({self.batch_size}) may cause memory issues. "
+                "Consider values < 50000 for most use cases."
+            )
+
+        if self.max_depth > 500:
+            warnings.append(
+                f"High max_depth ({self.max_depth}) may cause stack overflow. "
+                "Consider values under 500 for most data structures."
+            )
+
+        if self.cache_size > 100000:
+            warnings.append(
+                f"Large cache_size ({self.cache_size}) may use excessive memory. "
+                "Consider values < 100000 unless processing very large datasets."
+            )
+
+        # Configuration interaction warnings
+        if self.include_empty and not self.skip_null:
+            warnings.append("include_empty=True with skip_null=False may confuse.")
+
+        if self.cast_to_string and self.array_mode == ArrayMode.INLINE:
+            warnings.append(
+                "cast_to_string=True with INLINE may create very long strings."
+            )
+
+        if self.allow_malformed_data and self.recovery_mode == RecoveryMode.STRICT:
+            warnings.append(
+                "allow_malformed_data=True with STRICT may still raise errors."
+            )
+
+        return warnings
+
     @classmethod
     def for_memory(cls) -> "TransmogConfig":
         """Create memory-optimized configuration."""
@@ -97,16 +172,19 @@ class TransmogConfig:
         )
 
     @classmethod
-    def for_performance(cls) -> "TransmogConfig":
-        """Create performance-optimized configuration."""
-        return cls(
-            batch_size=10000,
-            cache_size=50000,
-        )
-
-    @classmethod
     def for_csv(cls) -> "TransmogConfig":
-        """Create configuration optimized for CSV output."""
+        """Create configuration optimized for CSV output.
+
+        Equivalent to:
+            TransmogConfig(
+                include_empty=True,
+                skip_null=False,
+                cast_to_string=True
+            )
+
+        This configuration ensures all values are strings and includes
+        empty/null values to maintain consistent CSV column structure.
+        """
         return cls(
             include_empty=True,
             skip_null=False,
@@ -115,7 +193,17 @@ class TransmogConfig:
 
     @classmethod
     def for_parquet(cls) -> "TransmogConfig":
-        """Create configuration optimized for Parquet output."""
+        """Create performance-optimized configuration for large datasets.
+
+        Equivalent to:
+            TransmogConfig(
+                batch_size=10000,
+                cache_size=50000
+            )
+
+        This configuration optimizes for speed when processing large datasets
+        or Parquet files by using larger batches and cache sizes.
+        """
         return cls(
             batch_size=10000,
             cache_size=50000,
@@ -123,7 +211,18 @@ class TransmogConfig:
 
     @classmethod
     def simple(cls) -> "TransmogConfig":
-        """Create configuration with clean metadata field names."""
+        """Create configuration with clean, readable metadata field names.
+
+        Equivalent to:
+            TransmogConfig(
+                id_field="id",
+                parent_field="parent_id",
+                time_field="timestamp"
+            )
+
+        This configuration uses more conventional field names instead of
+        underscore prefixes, making output more readable.
+        """
         return cls(
             id_field="id",
             parent_field="parent_id",
@@ -132,7 +231,17 @@ class TransmogConfig:
 
     @classmethod
     def error_tolerant(cls) -> "TransmogConfig":
-        """Create configuration that skips errors."""
+        """Create error-tolerant configuration that continues processing on errors.
+
+        Equivalent to:
+            TransmogConfig(
+                recovery_mode=RecoveryMode.SKIP,
+                allow_malformed_data=True
+            )
+
+        This configuration skips malformed records and allows processing
+        to continue even when encountering data quality issues.
+        """
         return cls(
             recovery_mode=RecoveryMode.SKIP,
             allow_malformed_data=True,

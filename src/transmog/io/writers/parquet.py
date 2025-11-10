@@ -38,40 +38,6 @@ class ParquetWriter(DataWriter):
         self.compression = compression
         self.options = options
 
-    @classmethod
-    def format_name(cls) -> str:
-        """Get the format name for this writer.
-
-        Returns:
-            str: The format name ("parquet")
-        """
-        return "parquet"
-
-    @classmethod
-    def is_available(cls) -> bool:
-        """Check if this writer is available.
-
-        Returns:
-            bool: True if PyArrow is available
-        """
-        return pa is not None
-
-    def supports_compression(self) -> bool:
-        """Check if this writer supports compression.
-
-        Returns:
-            bool: True as Parquet writer supports multiple compression codecs
-        """
-        return True
-
-    def get_supported_codecs(self) -> list[str]:
-        """Get list of supported compression codecs.
-
-        Returns:
-            list[str]: List of supported compression methods
-        """
-        return ["snappy", "gzip", "brotli", "lz4", "zstd", "none"]
-
     def write_table(
         self,
         table_data: list[JsonDict],
@@ -223,17 +189,8 @@ class ParquetStreamingWriter(StreamingWriter):
     """Streaming writer for Parquet format using PyArrow.
 
     This writer allows incremental writing of data to Parquet files
-    without keeping the entire dataset in memory, with unified interface.
+    without keeping the entire dataset in memory.
     """
-
-    @classmethod
-    def format_name(cls) -> str:
-        """Get the format name for this writer.
-
-        Returns:
-            str: The format name ("parquet")
-        """
-        return "parquet"
 
     def __init__(
         self,

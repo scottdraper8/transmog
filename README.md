@@ -17,11 +17,21 @@ Transmog transforms nested JSON data into flat, tabular formats while preserving
 - Automatic relationship preservation
 - Memory-efficient streaming for large datasets
 
-## Quick Start
+## Installation
+
+**Standard install** (includes Parquet support):
 
 ```bash
 pip install transmog
 ```
+
+**Minimal install** (CSV only):
+
+```bash
+pip install transmog[minimal]
+```
+
+## Quick Start
 
 ```python
 import transmog as tm
@@ -32,7 +42,7 @@ result = tm.flatten(data, name="products")
 
 # Access flattened data in memory (list of dicts)
 print(result.main)
-# [{'product_id': 'PROD-123', 'name': 'Gaming Laptop', 'specs_cpu': 'i7', 'specs_ram': '16GB'}]
+# [{'product_id': 'PROD-123', 'name': 'Gaming Laptop', 'specs_cpu': 'i7', 'specs_ram': '16GB', '_id': '...', '_timestamp': '...'}]
 
 # Save to files in different formats
 result.save("products.csv")        # Single CSV file
@@ -62,15 +72,16 @@ print(result.main)
 #     'user_name': 'Alice',
 #     'user_email': 'alice@example.com',
 #     'tags': ['premium', 'verified'],  # Native array!
-#     '_id': 'a1b2c3d4-e5f6-4789-abc1-23456789def0'
+#     '_id': '...',
+#     '_timestamp': '...'
 #   }
 # ]
 
 # Complex arrays become separate tables with parent references
 print(result.tables["customer_orders"])
 # [
-#   {'id': 101, 'amount': 99.99, 'items': ['laptop', 'mouse'], '_parent_id': 'a1b2c3d4...', '_id': 'b2c3d4...'},
-#   {'id': 102, 'amount': 45.50, 'items': ['keyboard'], '_parent_id': 'a1b2c3d4...', '_id': 'c3d4...'}
+#   {'id': 101, 'amount': 99.99, 'items': ['laptop', 'mouse'], '_parent_id': '...', '_id': '...', '_timestamp': '...'},
+#   {'id': 102, 'amount': 45.50, 'items': ['keyboard'], '_parent_id': '...', '_id': '...', '_timestamp': '...'}
 # ]
 
 # Access all tables in memory
@@ -95,8 +106,8 @@ result = tm.flatten(data, config=tm.TransmogConfig.for_csv())
 # Memory: small batches, minimal cache
 result = tm.flatten(data, config=tm.TransmogConfig.for_memory())
 
-# Performance: large batches, extended cache
-result = tm.flatten(data, config=tm.TransmogConfig.for_performance())
+# Large datasets: optimized for Parquet/big data processing
+result = tm.flatten(data, config=tm.TransmogConfig.for_parquet())
 
 # Simple: clean field names (id, parent_id, timestamp)
 result = tm.flatten(data, config=tm.TransmogConfig.simple())
@@ -105,8 +116,7 @@ result = tm.flatten(data, config=tm.TransmogConfig.simple())
 result = tm.flatten(data, config=tm.TransmogConfig.error_tolerant())
 
 # Or use RecoveryMode enum directly
-from transmog.types import RecoveryMode
-config = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP)
+config = tm.TransmogConfig(recovery_mode=tm.RecoveryMode.SKIP)
 result = tm.flatten(data, config=config)
 ```
 
@@ -147,7 +157,6 @@ config = tm.TransmogConfig(
 
     # Performance tuning
     batch_size=5000,                   # Process more records per batch
-    processing_mode=tm.ProcessingMode.LOW_MEMORY,  # Optimize for memory
 )
 
 result = tm.flatten(data, name="products", config=config)
@@ -171,7 +180,7 @@ Complete documentation is available at
 ## Contributing
 
 For contribution guidelines, development setup, and coding standards,
-see the [Contributing Guide](https://scottdraper8.github.io/transmog/development/contributing.html)
+see the [Contributing Guide](https://scottdraper8.github.io/transmog/developer_guide/contributing.html)
 in the documentation.
 
 ## License

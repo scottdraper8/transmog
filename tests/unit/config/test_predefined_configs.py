@@ -29,9 +29,9 @@ class TestPredefinedConfigurations:
         assert config.batch_size == 100
         assert config.cache_size == 1000
 
-    def test_for_performance_configuration(self):
+    def test_for_parquet_configuration(self):
         """Test performance-optimized configuration."""
-        config = TransmogConfig.for_performance()
+        config = TransmogConfig.for_parquet()
 
         assert isinstance(config, TransmogConfig)
         assert config.batch_size == 10000
@@ -63,22 +63,14 @@ class TestPredefinedConfigurations:
         assert config.skip_null is False
         assert config.cast_to_string is True
 
-    def test_for_parquet_configuration(self):
-        """Test Parquet-optimized configuration."""
-        config = TransmogConfig.for_parquet()
-
-        assert isinstance(config, TransmogConfig)
-        assert config.batch_size == 10000
-        assert config.cache_size == 50000
-
 
 class TestConfigurationConsistency:
     """Test that configurations are consistent and predictable."""
 
     def test_factory_methods_return_new_instances(self):
         """Test that factory methods return new instances."""
-        config1 = TransmogConfig.for_performance()
-        config2 = TransmogConfig.for_performance()
+        config1 = TransmogConfig.for_parquet()
+        config2 = TransmogConfig.for_parquet()
 
         assert config1 is not config2
 
@@ -87,7 +79,7 @@ class TestConfigurationConsistency:
         configs = [
             TransmogConfig(),
             TransmogConfig.for_memory(),
-            TransmogConfig.for_performance(),
+            TransmogConfig.for_parquet(),
             TransmogConfig.simple(),
             TransmogConfig.error_tolerant(),
             TransmogConfig.for_csv(),

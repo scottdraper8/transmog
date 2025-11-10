@@ -14,11 +14,19 @@ relationships between parent and child records. Perfect for:
 
 ## Installation
 
-Install Transmog using pip:
+**Standard installation** (includes Parquet support):
 
 ```bash
 pip install transmog
 ```
+
+**Minimal installation** (CSV only):
+
+```bash
+pip install transmog[minimal]
+```
+
+The minimal installation excludes PyArrow (~50MB), useful for environments where only CSV output is needed.
 
 Verify the installation:
 
@@ -69,7 +77,8 @@ Main table:
     'company': 'TechCorp',
     'location_city': 'San Francisco',
     'location_country': 'USA',
-    '_id': 'auto_generated_id'
+    '_id': 'auto_generated_id',
+    '_timestamp': '2024-01-15T10:30:00'
 }]
 ```
 
@@ -80,14 +89,18 @@ Employee table:
     {
         'name': 'Alice',
         'role': 'Engineer',
-        'salary': '95000',
-        '_parent_id': 'auto_generated_id'
+        'salary': 95000,
+        '_parent_id': 'auto_generated_id',
+        '_id': 'auto_generated_id',
+        '_timestamp': '2024-01-15T10:30:00'
     },
     {
         'name': 'Bob',
         'role': 'Designer',
-        'salary': '75000',
-        '_parent_id': 'auto_generated_id'
+        'salary': 75000,
+        '_parent_id': 'auto_generated_id',
+        '_id': 'auto_generated_id',
+        '_timestamp': '2024-01-15T10:30:00'
     }
 ]
 ```
@@ -100,18 +113,23 @@ result = tm.flatten(data)
 
 # CSV: strings, includes empty/null values
 config = tm.TransmogConfig.for_csv()
+result = tm.flatten(data, config=config)
 
 # Memory: small batches, minimal cache
 config = tm.TransmogConfig.for_memory()
+result = tm.flatten(data, config=config)
 
 # Performance: large batches, extended cache
-config = tm.TransmogConfig.for_performance()
+config = tm.TransmogConfig.for_parquet()
+result = tm.flatten(data, config=config)
 
 # Simple: clean field names (id, parent_id, timestamp)
 config = tm.TransmogConfig.simple()
+result = tm.flatten(data, config=config)
 
 # Error-tolerant: skip malformed records
 config = tm.TransmogConfig.error_tolerant()
+result = tm.flatten(data, config=config)
 ```
 
 ### How It Works
@@ -171,7 +189,7 @@ Control how arrays are processed:
 
 ```python
 # Default: smart mode - simple arrays inline, complex arrays separate
-result = tm.flatten(data)  # Uses ArrayMode.SMART by default
+result = tm.flatten(data)  # Uses tm.ArrayMode.SMART by default
 
 # All arrays become separate tables
 config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
@@ -254,11 +272,11 @@ Configure error handling through `TransmogConfig`:
 
 ```python
 # Strict mode (default) - stops on first error
-config = tm.TransmogConfig(recovery_strategy="strict")
+config = tm.TransmogConfig(recovery_mode=tm.RecoveryMode.STRICT)
 result = tm.flatten(data, config=config)
 
 # Skip mode - skips problematic records
-config = tm.TransmogConfig(recovery_strategy="skip", allow_malformed_data=True)
+config = tm.TransmogConfig(recovery_mode=tm.RecoveryMode.SKIP, allow_malformed_data=True)
 result = tm.flatten(data, config=config)
 
 # Use error-tolerant factory method
@@ -329,7 +347,7 @@ Understanding the basics:
 
 1. **[User Guide](user_guide/file-processing.md)** - Comprehensive task-oriented guides
 2. **[API Reference](api_reference/api.md)** - Complete function documentation
-3. **[Developer Guide](developer_guide/extending.md)** - Advanced usage and customization
+3. **[Developer Guide](developer_guide/custom-configuration.md)** - Advanced configuration options
 
 ## Quick Reference
 
@@ -347,7 +365,7 @@ tm.flatten_stream(data, "output/", name="table_name", output_format="parquet")
 
 # Save results
 result.save("output", output_format="csv")
-result.save("output.json")  # Single file for simple data
+result.save("output.csv")  # Single file for simple data
 
 # Access data
 main_table = result.main

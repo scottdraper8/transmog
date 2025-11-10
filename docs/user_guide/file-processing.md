@@ -16,7 +16,7 @@ result = tm.flatten_file("data.json", name="records")
 result = tm.flatten_file("products.json")  # name="products"
 
 # Process with custom configuration
-config = tm.TransmogConfig(separator=".", array_mode=tm.ArrayMode.SEPARATE)
+config = tm.TransmogConfig(separator=".")
 result = tm.flatten_file(
     "data.json",
     name="entities",
@@ -29,6 +29,8 @@ result = tm.flatten_file(
 ### Basic JSON Processing
 
 ```python
+import transmog as tm
+
 # Simple JSON file processing
 result = tm.flatten_file("products.json")
 
@@ -81,8 +83,8 @@ For large JSON files, consider streaming:
 ```python
 # Stream large JSON files directly to output
 config = tm.TransmogConfig(
-    batch_size=1000,
-    batch_size=100, cache_size=1000
+    batch_size=100,
+    cache_size=1000
 )
 tm.flatten_stream(
     "large_data.json",
@@ -125,6 +127,7 @@ result.save("output/", "parquet")
 ### Custom Naming from Filename
 
 ```python
+import transmog as tm
 from pathlib import Path
 
 # Auto-extract entity name from filename
@@ -136,7 +139,9 @@ result = tm.flatten_file(file_path, name=name)
 ### Processing Multiple Files
 
 ```python
+import transmog as tm
 import glob
+from pathlib import Path
 
 # Process multiple files with consistent configuration
 config = tm.TransmogConfig(separator="_", array_mode=tm.ArrayMode.SEPARATE)
@@ -154,6 +159,9 @@ print(f"Processed {total_records} total records")
 ### Batch File Processing
 
 ```python
+import transmog as tm
+from pathlib import Path
+
 def process_data_directory(input_dir, output_dir):
     """Process all JSON files in a directory."""
     input_path = Path(input_dir)
@@ -179,6 +187,8 @@ process_data_directory("raw_data/", "processed_data/")
 ### Robust File Processing
 
 ```python
+import transmog as tm
+
 def safe_file_processing(file_path, **options):
     """Process file with comprehensive error handling."""
     try:
@@ -187,7 +197,7 @@ def safe_file_processing(file_path, **options):
     except FileNotFoundError:
         return None, f"File not found: {file_path}"
     except tm.ValidationError as e:
-        return None, f"Configuration error: {e}"
+        return None, f"Data validation error: {e}"
     except tm.TransmogError as e:
         return None, f"Processing error: {e}"
     except Exception as e:
@@ -204,6 +214,10 @@ else:
 ### Skip Problematic Files
 
 ```python
+import transmog as tm
+import glob
+from pathlib import Path
+
 def process_files_with_recovery(file_patterns, output_dir):
     """Process files with error recovery."""
     successful = 0
@@ -241,8 +255,8 @@ process_files_with_recovery(["data/*.json", "backup/*.json"], "output/")
 ```python
 # For large files, use low memory mode
 config = tm.TransmogConfig(
-    batch_size=100, cache_size=1000,
-    batch_size=500
+    batch_size=100,
+    cache_size=1000
 )
 result = tm.flatten_file("large_file.json", name="large_data", config=config)
 ```
@@ -250,11 +264,13 @@ result = tm.flatten_file("large_file.json", name="large_data", config=config)
 ### Streaming for Very Large Files
 
 ```python
+import transmog as tm
+
 # Stream very large files directly to output
 config = tm.TransmogConfig(
-    batch_size=1000,
-    batch_size=100, cache_size=1000,
-    recovery_strategy="skip",
+    batch_size=100,
+    cache_size=1000,
+    recovery_mode=tm.RecoveryMode.SKIP,
     allow_malformed_data=True
 )
 tm.flatten_stream(
@@ -271,6 +287,7 @@ tm.flatten_stream(
 ### Pre-Processing Validation
 
 ```python
+import transmog as tm
 import json
 from pathlib import Path
 
@@ -306,6 +323,8 @@ else:
 ### Post-Processing Validation
 
 ```python
+import transmog as tm
+
 def validate_results(result, expected_min_records=1):
     """Validate processing results."""
     issues = []
@@ -351,12 +370,14 @@ result.save("db_import", output_format="csv")
 ### Data Pipeline Integration
 
 ```python
+import transmog as tm
+
 def file_to_pipeline(input_file, pipeline_config):
     """Process file for data pipeline."""
     config = tm.TransmogConfig(
         separator=pipeline_config.get("separator", "_"),
         array_mode=tm.ArrayMode.SEPARATE if pipeline_config.get("array_handling", "separate") == "separate" else tm.ArrayMode.INLINE,
-        cast_to_string=not pipeline_config.get("preserve_types", False)
+        cast_to_string=pipeline_config.get("cast_to_string", False)
     )
     result = tm.flatten_file(
         input_file,
@@ -364,11 +385,11 @@ def file_to_pipeline(input_file, pipeline_config):
         config=config
     )
 
-    # Apply pipeline-specific transformations
+    # Apply pipeline-specific transformations to the data
     for table_name, records in result.all_tables.items():
         # Apply transformations based on pipeline requirements
-        transformed = apply_pipeline_transforms(records, pipeline_config)
-        result._result.replace_table(table_name, transformed)
+        for record in records:
+            apply_pipeline_transforms(record, pipeline_config)
 
     return result
 ```

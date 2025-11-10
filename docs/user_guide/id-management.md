@@ -37,8 +37,8 @@ print("Main record:", result.main[0])
 
 print("Review records:", result.tables["products_reviews"])
 # [
-#   {'rating': '5', 'comment': 'Great', '_parent_id': 'generated_unique_id'},
-#   {'rating': '4', 'comment': 'Good', '_parent_id': 'generated_unique_id'}
+#   {'rating': 5, 'comment': 'Great', '_parent_id': 'generated_unique_id'},
+#   {'rating': 4, 'comment': 'Good', '_parent_id': 'generated_unique_id'}
 # ]
 ```
 
@@ -48,15 +48,16 @@ Default ID field names can be customized:
 
 ```python
 # Custom parent ID field name
+config = tm.TransmogConfig(parent_field="parent_ref")
 result = tm.flatten(
     data,
     name="products",
-    parent_id_field="parent_ref"
+    config=config
 )
 
 # Child records use custom parent field name
 print(result.tables["products_reviews"][0])
-# {'rating': '5', 'comment': 'Great', 'parent_ref': 'generated_id'}
+# {'rating': 5, 'comment': 'Great', 'parent_ref': 'generated_id'}
 ```
 
 ## Natural ID Fields
@@ -86,8 +87,8 @@ print("Main record:", result.main[0])
 
 print("Review records:", result.tables["products_reviews"])
 # [
-#   {'review_id': 'REV456', 'rating': '5', '_parent_id': 'PROD123'},
-#   {'review_id': 'REV789', 'rating': '4', '_parent_id': 'PROD123'}
+#   {'review_id': 'REV456', 'rating': 5, '_parent_id': 'PROD123'},
+#   {'review_id': 'REV789', 'rating': 4, '_parent_id': 'PROD123'}
 # ]
 ```
 
@@ -467,4 +468,3 @@ def validate_and_process(data, id_config):
 
 - **[Output Formats](output-formats.md)** - Choose formats that preserve ID relationships
 - **[Error Handling](error-handling.md)** - Handle ID-related processing errors
-- **[Performance Guide](../developer_guide/performance.md)** - Optimize ID processing for large datasets
