@@ -188,7 +188,7 @@ config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
 result = tm.flatten(data, config=config)
 ```
 
-See the [Array Handling](user_guide.md#array-handling) section in the User Guide for complete details.
+See the [Array Handling](array-handling) section in the User Guide for complete details.
 
 ### Field Naming
 
@@ -206,7 +206,7 @@ config = tm.TransmogConfig(id_field="product_id")
 result = tm.flatten(data, config=config)
 ```
 
-See [ID Management](user_guide.md#id-management) section in the User Guide for complete details.
+See [ID Management](id-management) section in the User Guide for complete details.
 
 ## Understanding the Results
 
@@ -250,7 +250,7 @@ config = tm.TransmogConfig.error_tolerant()
 result = tm.flatten(data, config=config)
 ```
 
-See [Error Handling](user_guide.md#error-handling) section in the User Guide for complete details.
+See [Error Handling](error-handling) section in the User Guide for complete details.
 
 ## Next Steps
 
