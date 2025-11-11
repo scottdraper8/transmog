@@ -238,10 +238,7 @@ class TestFileProcessingPerformance:
         start_time = time.time()
 
         # Use memory-efficient processing with small batch size
-        config = tm.TransmogConfig(
-            cache_size=1000,
-            batch_size=100,
-        )
+        config = tm.TransmogConfig(batch_size=100)
         result = tm.flatten(
             large_streaming_data,
             name="stream_perf",
@@ -280,10 +277,7 @@ class TestMemoryPerformance:
         start_time = time.time()
 
         # Use memory-efficient processing
-        config = tm.TransmogConfig(
-            cache_size=1000,
-            batch_size=50,
-        )
+        config = tm.TransmogConfig(batch_size=50)
         result = tm.flatten(
             memory_test_data,
             name="memory_perf",
@@ -418,11 +412,6 @@ class TestPerformanceComparisons:
                 "config": tm.TransmogConfig(cast_to_string=False),
             },
             {"name": "custom_separator", "config": tm.TransmogConfig(separator=".")},
-            {"name": "low_threshold", "config": tm.TransmogConfig(nested_threshold=2)},
-            {
-                "name": "high_threshold",
-                "config": tm.TransmogConfig(nested_threshold=10),
-            },
         ]
 
         results = {}

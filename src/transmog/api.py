@@ -9,13 +9,21 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 from transmog.config import TransmogConfig
-from transmog.process import Processor
+from transmog.core.hierarchy import process_record_batch
+from transmog.core.metadata import get_current_timestamp
+from transmog.error import (
+    ConfigurationError,
+    OutputError,
+    ProcessingError,
+    ValidationError,
+    logger,
+)
+from transmog.io.writer_factory import create_writer
+from transmog.io.writer_interface import sanitize_filename
+from transmog.process.data_iterators import get_data_iterator
 from transmog.process.result import ProcessingResult as _ProcessingResult
 from transmog.process.streaming import stream_process
-from transmog.types.base import JsonDict
-
-# Type aliases
-DataInput = Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes]
+from transmog.types import JsonDict, ProcessingContext
 
 
 class FlattenResult:
@@ -42,14 +50,13 @@ class FlattenResult:
     @property
     def all_tables(self) -> dict[str, list[JsonDict]]:
         """Get all tables including main table."""
-        all_tables = {self._result.entity_name: self.main}
-        all_tables.update(self.tables)
-        return all_tables
+        return self._result.all_tables()
 
     def save(
         self,
         path: Union[str, Path],
         output_format: Optional[str] = None,
+        **format_options: Any,
     ) -> Union[list[str], dict[str, str]]:
         """Save all tables to files.
 
@@ -57,6 +64,8 @@ class FlattenResult:
             path: Output path (file or directory depending on format)
             output_format: Output format (auto-detected from extension if not specified)
                           Options: 'csv', 'parquet'
+            **format_options: Additional writer-specific options forwarded to
+                the underlying writer implementation.
 
         Returns:
             List of created file paths
@@ -77,11 +86,11 @@ class FlattenResult:
         if len(self.tables) > 0:
             if path.suffix:
                 path = path.parent / path.stem
-            return self._save_all_tables(path, output_format)
+            return self._save_all_tables(path, output_format, **format_options)
         else:
             if not path.suffix:
                 path = path.with_suffix(f".{output_format}")
-            return self._save_single_table(path, output_format)
+            return self._save_single_table(path, output_format, **format_options)
 
     def __repr__(self) -> str:
         """Provide clear representation for debugging."""
@@ -132,14 +141,6 @@ class FlattenResult:
         """Get all table name-data pairs."""
         return self.all_tables.items()
 
-    def get_table(
-        self, name: str, default: Optional[list[JsonDict]] = None
-    ) -> Optional[list[JsonDict]]:
-        """Get a table by name with optional default."""
-        if name == "main":
-            return self.main
-        return self.all_tables.get(name, default)
-
     def table_info(self) -> dict[str, dict[str, Any]]:
         """Get information about all tables."""
         info = {}
@@ -151,41 +152,132 @@ class FlattenResult:
             }
         return info
 
-    def _save_all_tables(self, base_path: Path, output_format: str) -> dict[str, str]:
+    def _save_all_tables(
+        self,
+        base_path: Path,
+        output_format: str,
+        **format_options: Any,
+    ) -> dict[str, str]:
         """Save all tables to a directory."""
         base_path.mkdir(parents=True, exist_ok=True)
 
-        if output_format == "csv":
-            return self._result.write_all_csv(str(base_path))
-        elif output_format == "parquet":
-            return self._result.write_all_parquet(str(base_path))
-        else:
-            return {}
+        writer = create_writer(output_format, **format_options)
+        extension = ".csv" if output_format == "csv" else f".{output_format}"
+        saved_paths: dict[str, str] = {}
 
-    def _save_single_table(self, file_path: Path, output_format: str) -> list[str]:
+        for table_name, records in self._result.all_tables().items():
+            if not records:
+                continue
+
+            safe_name = sanitize_filename(table_name)
+            destination = base_path / f"{safe_name or 'table'}{extension}"
+
+            try:
+                written_path = writer.write(records, str(destination), **format_options)
+            except Exception as exc:
+                raise OutputError(
+                    f"Failed to write {output_format.upper()} for table '{table_name}' "
+                    f"to '{destination}': {exc}"
+                ) from exc
+
+            saved_paths[table_name] = str(written_path)
+
+        return saved_paths
+
+    def _save_single_table(
+        self,
+        file_path: Path,
+        output_format: str,
+        **format_options: Any,
+    ) -> list[str]:
         """Save single table to a file."""
-        import os
-
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if output_format == "csv":
-            paths = self._result.write("csv", str(file_path.parent))
-            if paths:
-                first_path = next(iter(paths.values()))
-                os.rename(first_path, str(file_path))
-                return [str(file_path)]
-        elif output_format == "parquet":
-            paths = self._result.write("parquet", str(file_path.parent))
-            if paths:
-                first_path = next(iter(paths.values()))
-                os.rename(first_path, str(file_path))
-                return [str(file_path)]
+        writer = create_writer(output_format, **format_options)
+        written_path = writer.write(self.main, str(file_path), **format_options)
+        return [str(written_path)]
 
-        return []
+
+def _build_iterator(
+    config: TransmogConfig,
+    data: Union[
+        dict[str, Any],
+        list[dict[str, Any]],
+        str,
+        bytes,
+        Iterator[dict[str, Any]],
+    ],
+) -> Iterator[JsonDict]:
+    """Build data iterator from various input types."""
+    if isinstance(data, dict):
+        return iter([data])
+    if isinstance(data, list):
+        return iter(data)
+
+    # Create a minimal processor-like object for get_data_iterator
+    class ConfigWrapper:
+        def __init__(self, config: TransmogConfig) -> None:
+            self.config = config
+
+    try:
+        return get_data_iterator(ConfigWrapper(config), data)
+    except (ValidationError, ProcessingError) as exc:
+        raise ConfigurationError(str(exc)) from exc
+
+
+def _consume_iterator(
+    iterator: Iterator[JsonDict],
+    entity_name: str,
+    config: TransmogConfig,
+    context: ProcessingContext,
+    result: _ProcessingResult,
+) -> None:
+    """Consume iterator and process records in batches."""
+    batch: list[JsonDict] = []
+    batch_size = max(1, config.batch_size)
+
+    try:
+        for record in iterator:
+            if not isinstance(record, dict):
+                raise ConfigurationError(
+                    f"Unsupported record type: {type(record).__name__}"
+                )
+
+            batch.append(record)
+            if len(batch) >= batch_size:
+                flattened_records, child_tables = process_record_batch(
+                    records=batch,
+                    entity_name=entity_name,
+                    config=config,
+                    context=context,
+                )
+
+                if child_tables:
+                    result.add_child_tables(child_tables)
+
+                for record in flattened_records:
+                    result.add_main_record(record)
+                batch = []
+
+        if batch:
+            flattened_records, child_tables = process_record_batch(
+                records=batch,
+                entity_name=entity_name,
+                config=config,
+                context=context,
+            )
+
+            if child_tables:
+                result.add_child_tables(child_tables)
+
+            for record in flattened_records:
+                result.add_main_record(record)
+    except ProcessingError as exc:
+        raise ConfigurationError(str(exc)) from exc
 
 
 def flatten(
-    data: DataInput,
+    data: Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes],
     name: str = "data",
     config: Optional[TransmogConfig] = None,
 ) -> FlattenResult:
@@ -213,7 +305,7 @@ def flatten(
         >>> result = flatten(data, config=config)
 
         >>> # Use factory methods
-        >>> result = flatten(data, config=TransmogConfig.for_parquet())
+        >>> result = flatten(data, config=TransmogConfig.for_csv())
 
         >>> # Save to file
         >>> result.save("output.csv")
@@ -221,14 +313,27 @@ def flatten(
     if config is None:
         config = TransmogConfig()
 
-    processor = Processor(config)
-
     if isinstance(data, Path):
         data = str(data)
 
-    processing_result = processor.process(data, entity_name=name)
+    try:
+        result = _ProcessingResult(
+            main_table=[],
+            child_tables={},
+            entity_name=name,
+        )
 
-    return FlattenResult(processing_result)
+        iterator = _build_iterator(config, data)
+        timestamp = get_current_timestamp()
+        context = ProcessingContext(extract_time=timestamp)
+
+        _consume_iterator(iterator, name, config, context, result)
+        return FlattenResult(result)
+    except Exception as e:
+        logger.error(f"Failed to process data: {e}")
+        if not isinstance(e, (ConfigurationError, ProcessingError, ValidationError)):
+            raise ProcessingError(f"Failed to process data: {e}") from e
+        raise
 
 
 def flatten_file(
@@ -261,7 +366,7 @@ def flatten_file(
 
 
 def flatten_stream(
-    data: DataInput,
+    data: Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes],
     output_path: Union[str, Path],
     name: str = "data",
     output_format: str = "csv",
@@ -282,19 +387,12 @@ def flatten_stream(
         **format_options: Format-specific writer options:
 
             CSV options:
-                - compression: str - Compression type (None, "gzip", "bz2", "xz")
-                - encoding: str - Text encoding (default: "utf-8")
-                - line_terminator: str - Line ending (default: "\n")
+                - compression: str - Compression type (None, "gzip")
 
             Parquet options:
                 - compression: str - Compression codec
-                  ("snappy", "gzip", "brotli", "lz4", "zstd", None)
+                  ("snappy", "gzip", "brotli", None)
                 - row_group_size: int - Rows per row group (default: 10000)
-                - coerce_timestamps: str - Timestamp resolution ("ms", "us")
-
-            Universal options:
-                - buffer_size: int - Write buffer size in bytes
-                - progress_callback: Callable[[int], None] - Progress function
 
     Examples:
         >>> # Stream large dataset to CSV files
@@ -315,16 +413,19 @@ def flatten_stream(
     if config is None:
         config = TransmogConfig.for_memory()
 
-    processor = Processor(config)
-
     if isinstance(data, Path):
         data = str(data)
 
     output_path = Path(output_path)
     output_path.mkdir(parents=True, exist_ok=True)
 
+    # Create a minimal processor-like object for stream_process
+    class ConfigWrapper:
+        def __init__(self, config: TransmogConfig) -> None:
+            self.config = config
+
     stream_process(
-        processor=processor,
+        processor=ConfigWrapper(config),
         data=data,
         entity_name=name,
         output_format=output_format,

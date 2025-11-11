@@ -1,8 +1,4 @@
-"""Writer factory for creating writers based on format.
-
-This module provides factory functions for creating writers
-for different output formats.
-"""
+"""Writer factory for creating writers based on format."""
 
 from typing import Any, BinaryIO, Optional, Union
 
@@ -10,7 +6,7 @@ from transmog.error import (
     ConfigurationError,
     MissingDependencyError,
 )
-from transmog.types.io_types import StreamingWriterProtocol, WriterProtocol
+from transmog.io.writer_interface import DataWriter, StreamingWriter
 
 # Import built-in writers
 from .writers.csv import CsvStreamingWriter, CsvWriter
@@ -24,17 +20,15 @@ except ImportError:
 
 
 # Format support
-FORMATS: dict[str, type[WriterProtocol]] = {"csv": CsvWriter}
-STREAMING_FORMATS: dict[str, type[StreamingWriterProtocol]] = {
-    "csv": CsvStreamingWriter
-}
+FORMATS: dict[str, type[DataWriter]] = {"csv": CsvWriter}
+STREAMING_FORMATS: dict[str, type[StreamingWriter]] = {"csv": CsvStreamingWriter}
 
 if PARQUET_AVAILABLE:
     FORMATS["parquet"] = ParquetWriter
     STREAMING_FORMATS["parquet"] = ParquetStreamingWriter
 
 
-def create_writer(format_name: str, **kwargs: Any) -> WriterProtocol:
+def create_writer(format_name: str, **kwargs: Any) -> DataWriter:
     """Create a writer for the given format.
 
     Args:
@@ -73,7 +67,7 @@ def create_streaming_writer(
     destination: Optional[Union[str, BinaryIO]] = None,
     entity_name: str = "entity",
     **kwargs: Any,
-) -> StreamingWriterProtocol:
+) -> StreamingWriter:
     """Create a streaming writer for the given format.
 
     Args:
@@ -106,9 +100,9 @@ def create_streaming_writer(
 
     try:
         return writer_class(destination=destination, entity_name=entity_name, **kwargs)
-    except MissingDependencyError:
-        raise
     except Exception as e:
+        if isinstance(e, MissingDependencyError):
+            raise
         raise ConfigurationError(
             f"Failed to create {format_name} streaming writer: {e}"
         ) from e

@@ -48,15 +48,17 @@ Start here for installation, basic concepts, and first steps.
 
 ### User Guide
 
-Task-oriented guides covering all functionality by topic area. Each guide focuses on specific workflows and practical examples.
+Comprehensive guide covering all functionality with practical examples.
 
-- **File Processing** - Working with JSON files
-- **Array Handling** - Controlling how arrays become tables
-- **Output Formats** - Choosing CSV or Parquet output
-- **ID Management** - Configuring record identifiers
-- **Error Handling** - Recovery strategies and error modes
+- **Core Functions** - `flatten()`, `flatten_file()`, `flatten_stream()`
+- **Configuration** - All parameters and presets
+- **Array Handling** - SMART, SEPARATE, INLINE, SKIP modes
+- **ID Management** - Natural IDs, deterministic IDs, discovery
+- **Error Handling** - STRICT and SKIP recovery modes
+- **Output Formats** - CSV and Parquet
+- **Integration Examples** - Database import, analytics pipelines
 
-[**→ User Guide**](user_guide/file-processing.md)
+[**→ User Guide**](user_guide.md)
 
 ### API Reference
 
@@ -98,11 +100,7 @@ getting_started
 :hidden:
 :caption: User Guide
 
-user_guide/file-processing
-user_guide/array-handling
-user_guide/output-formats
-user_guide/id-management
-user_guide/error-handling
+user_guide
 ```
 
 ```{toctree}

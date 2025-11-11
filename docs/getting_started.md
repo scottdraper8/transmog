@@ -5,7 +5,7 @@ This guide provides everything needed to get up and running quickly with data tr
 ## What is Transmog?
 
 Transmog transforms complex nested data structures into flat, tabular formats while preserving
-relationships between parent and child records. Perfect for:
+relationships between parent and child records. Use cases include:
 
 - Converting JSON data for database storage
 - Preparing API responses for analytics
@@ -78,9 +78,11 @@ Main table:
     'location_city': 'San Francisco',
     'location_country': 'USA',
     '_id': 'auto_generated_id',
-    '_timestamp': '2024-01-15T10:30:00'
+    '_timestamp': '2025-01-15 10:30:00.123456'
 }]
 ```
+
+The `_timestamp` field uses a UTC timestamp in `YYYY-MM-DD HH:MM:SS.ssssss` format.
 
 Employee table:
 
@@ -92,7 +94,7 @@ Employee table:
         'salary': 95000,
         '_parent_id': 'auto_generated_id',
         '_id': 'auto_generated_id',
-        '_timestamp': '2024-01-15T10:30:00'
+        '_timestamp': '2025-01-15 10:30:00.123456'
     },
     {
         'name': 'Bob',
@@ -100,7 +102,7 @@ Employee table:
         'salary': 75000,
         '_parent_id': 'auto_generated_id',
         '_id': 'auto_generated_id',
-        '_timestamp': '2024-01-15T10:30:00'
+        '_timestamp': '2025-01-15 10:30:00.123456'
     }
 ]
 ```
@@ -108,23 +110,15 @@ Employee table:
 ## Configuration Presets
 
 ```python
-# Default: types preserved
+# Default: types preserved, optimized for analytics
 result = tm.flatten(data)
 
 # CSV: strings, includes empty/null values
 config = tm.TransmogConfig.for_csv()
 result = tm.flatten(data, config=config)
 
-# Memory: small batches, minimal cache
+# Memory: small batches (100)
 config = tm.TransmogConfig.for_memory()
-result = tm.flatten(data, config=config)
-
-# Performance: large batches, extended cache
-config = tm.TransmogConfig.for_parquet()
-result = tm.flatten(data, config=config)
-
-# Simple: clean field names (id, parent_id, timestamp)
-config = tm.TransmogConfig.simple()
 result = tm.flatten(data, config=config)
 
 # Error-tolerant: skip malformed records
@@ -185,8 +179,6 @@ Transmog provides three main functions:
 
 ### Array Handling
 
-Control how arrays are processed:
-
 ```python
 # Default: smart mode - simple arrays inline, complex arrays separate
 result = tm.flatten(data)  # Uses tm.ArrayMode.SMART by default
@@ -194,47 +186,27 @@ result = tm.flatten(data)  # Uses tm.ArrayMode.SMART by default
 # All arrays become separate tables
 config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
 result = tm.flatten(data, config=config)
-
-# Keep arrays as JSON strings in main table
-config = tm.TransmogConfig(array_mode=tm.ArrayMode.INLINE)
-result = tm.flatten(data, config=config)
-
-# Skip arrays entirely
-config = tm.TransmogConfig(array_mode=tm.ArrayMode.SKIP)
-result = tm.flatten(data, config=config)
 ```
 
-### Field Naming
+See [Array Handling](user_guide.md#array-handling) section in the User Guide for complete details.
 
-Customize how nested fields are named:
+### Field Naming
 
 ```python
 # Use dots instead of underscores
 config = tm.TransmogConfig(separator=".")
 result = tm.flatten(data, config=config)
-
-# Simplify deeply nested paths
-config = tm.TransmogConfig(nested_threshold=2)
-result = tm.flatten(data, config=config)
 ```
 
 ### ID Management
-
-Control identifier fields:
 
 ```python
 # Use existing field as ID
 config = tm.TransmogConfig(id_field="product_id")
 result = tm.flatten(data, config=config)
-
-# Custom parent ID field name
-config = tm.TransmogConfig(parent_field="parent_ref")
-result = tm.flatten(data, config=config)
-
-# Disable timestamp metadata
-config = tm.TransmogConfig(time_field=None)
-result = tm.flatten(data, config=config)
 ```
+
+See [ID Management](user_guide.md#id-management) section in the User Guide for complete details.
 
 ## Understanding the Results
 
@@ -268,86 +240,25 @@ if "products_tags" in result:
 
 ## Error Handling
 
-Configure error handling through `TransmogConfig`:
-
 ```python
 # Strict mode (default) - stops on first error
 config = tm.TransmogConfig(recovery_mode=tm.RecoveryMode.STRICT)
 result = tm.flatten(data, config=config)
 
 # Skip mode - skips problematic records
-config = tm.TransmogConfig(recovery_mode=tm.RecoveryMode.SKIP, allow_malformed_data=True)
+config = tm.TransmogConfig.error_tolerant()
 result = tm.flatten(data, config=config)
-
-# Use error-tolerant factory method
-result = tm.flatten(data, config=tm.TransmogConfig.error_tolerant())
 ```
 
-## Common Patterns
-
-### JSON API Response Processing
-
-```python
-# API response with nested user data
-api_response = {
-    "users": [
-        {
-            "id": 1,
-            "profile": {"name": "Alice", "email": "alice@example.com"},
-            "preferences": {"theme": "dark", "notifications": True},
-            "posts": [
-                {"title": "Hello World", "likes": 10},
-                {"title": "Python Tips", "likes": 25}
-            ]
-        }
-    ]
-}
-
-result = tm.flatten(api_response["users"], name="users")
-```
-
-### Log File Processing
-
-```python
-# Process log entries
-log_data = [
-    {
-        "timestamp": "2024-01-01T10:00:00Z",
-        "level": "INFO",
-        "source": {"service": "api", "version": "1.2.0"},
-        "metadata": {"request_id": "abc123", "user_id": "user456"}
-    }
-]
-
-result = tm.flatten(log_data, name="logs")
-```
-
-### Configuration Data Normalization
-
-```python
-# Application configuration
-config = {
-    "database": {
-        "host": "localhost",
-        "port": 5432,
-        "credentials": {"username": "admin", "password": "secret"}
-    },
-    "features": {
-        "feature_flags": ["new_ui", "beta_api"],
-        "limits": {"max_users": 1000, "max_requests": 10000}
-    }
-}
-
-result = tm.flatten(config, name="config")
-```
+See [Error Handling](user_guide.md#error-handling) section in the User Guide for complete details.
 
 ## Next Steps
 
 Understanding the basics:
 
-1. **[User Guide](user_guide/file-processing.md)** - Comprehensive task-oriented guides
+1. **[User Guide](user_guide.md)** - Comprehensive guide with practical examples
 2. **[API Reference](api_reference/api.md)** - Complete function documentation
-3. **[Developer Guide](developer_guide/custom-configuration.md)** - Advanced configuration options
+3. **[Developer Guide](developer_guide/streaming.md)** - Advanced streaming and performance optimization
 
 ## Quick Reference
 

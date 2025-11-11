@@ -103,14 +103,11 @@ result = tm.flatten(data)
 # CSV: strings, includes empty/null values
 result = tm.flatten(data, config=tm.TransmogConfig.for_csv())
 
-# Memory: small batches, minimal cache
+# Memory: small batches
 result = tm.flatten(data, config=tm.TransmogConfig.for_memory())
 
-# Large datasets: optimized for Parquet/big data processing
-result = tm.flatten(data, config=tm.TransmogConfig.for_parquet())
-
-# Simple: clean field names (id, parent_id, timestamp)
-result = tm.flatten(data, config=tm.TransmogConfig.simple())
+# Large datasets: customize batch size
+result = tm.flatten(data, config=tm.TransmogConfig(batch_size=10000))
 
 # Error-tolerant: skip malformed records
 result = tm.flatten(data, config=tm.TransmogConfig.error_tolerant())
@@ -135,7 +132,6 @@ For more control over the flattening process:
 config = tm.TransmogConfig(
     # Naming options
     separator=".",                     # Use dots: user.name instead of user_name
-    nested_threshold=3,                # Simplify deeply nested field names
 
     # ID management
     id_field="sku",                    # Use existing field as primary ID
@@ -148,12 +144,12 @@ config = tm.TransmogConfig(
 
     # Error handling
     recovery_mode=tm.RecoveryMode.SKIP,  # Skip records with errors
-    # Options: STRICT (default), SKIP, PARTIAL
+    # Options: STRICT (default), SKIP
 
     # Data processing
     cast_to_string=False,              # Preserve native types (default)
-    skip_null=True,                    # Skip null values (default)
-    include_empty=False,               # Skip empty values (default)
+    null_handling=tm.NullHandling.SKIP,  # Skip null and empty values (default)
+    # Options: SKIP (default), INCLUDE
 
     # Performance tuning
     batch_size=5000,                   # Process more records per batch

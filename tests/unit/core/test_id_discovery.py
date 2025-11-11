@@ -8,80 +8,7 @@ from typing import Any, Optional
 
 import pytest
 
-from transmog.core.id_discovery import (
-    DEFAULT_ID_FIELD_PATTERNS,
-    discover_id_field,
-    get_record_id,
-    should_add_transmog_id,
-)
-
-
-class TestDiscoverIdField:
-    """Test ID field discovery functionality."""
-
-    def test_discover_with_default_patterns(self):
-        """Test discovery using default ID field patterns."""
-        # Record with standard 'id' field
-        record = {"id": 123, "name": "test", "value": "data"}
-        discovered = discover_id_field(record)
-        assert discovered == "id"
-
-        # Record with 'uuid' field
-        record = {"uuid": "550e8400-e29b-41d4-a716-446655440000", "name": "test"}
-        discovered = discover_id_field(record)
-        assert discovered == "uuid"
-
-        # Record with no ID field
-        record = {"name": "test", "value": "data"}
-        discovered = discover_id_field(record)
-        assert discovered is None
-
-    def test_discover_with_custom_patterns(self):
-        """Test discovery using custom ID field patterns."""
-        record = {"custom_id": 999, "name": "test"}
-
-        # Should not find with default patterns
-        discovered = discover_id_field(record)
-        assert discovered is None
-
-        # Should find with custom patterns
-        discovered = discover_id_field(record, id_patterns=["custom_id"])
-        assert discovered == "custom_id"
-
-    def test_discover_with_empty_patterns(self):
-        """Test discovery with empty patterns list."""
-        record = {"id": 123, "name": "test"}
-        discovered = discover_id_field(record, id_patterns=[])
-        assert discovered is None
-
-    def test_discover_priority_order(self):
-        """Test that discovery follows priority order."""
-        # Record with multiple potential ID fields
-        record = {"pk": 1, "id": 2, "uuid": "test-uuid"}
-
-        # Should prefer 'id' over others based on default patterns
-        discovered = discover_id_field(record)
-        assert discovered == "id"
-
-    def test_discover_with_null_values(self):
-        """Test discovery with null/empty values."""
-        # Null value should be skipped
-        record = {"id": None, "uuid": "valid-uuid"}
-        discovered = discover_id_field(record)
-        assert discovered == "uuid"
-
-        # Empty string should be skipped
-        record = {"id": "", "uuid": "valid-uuid"}
-        discovered = discover_id_field(record)
-        assert discovered == "uuid"
-
-    def test_discover_with_invalid_record_types(self):
-        """Test discovery with invalid record types."""
-        # Non-dict should return None
-        assert discover_id_field(None) is None
-        assert discover_id_field("string") is None
-        assert discover_id_field(123) is None
-        assert discover_id_field([]) is None
+from transmog.core.id_discovery import get_record_id
 
 
 class TestGetRecordId:
@@ -164,13 +91,15 @@ class TestShouldAddTransmogId:
     def test_should_add_with_natural_id(self):
         """Test should not add transmog ID when natural ID exists."""
         record = {"id": 123, "name": "test"}
-        should_add = should_add_transmog_id(record)
+        field, _ = get_record_id(record)
+        should_add = field is None
         assert should_add is False
 
     def test_should_add_without_natural_id(self):
         """Test should add transmog ID when no natural ID exists."""
         record = {"name": "test", "value": "data"}
-        should_add = should_add_transmog_id(record)
+        field, _ = get_record_id(record)
+        should_add = field is None
         assert should_add is True
 
     def test_should_add_with_custom_patterns(self):
@@ -178,11 +107,13 @@ class TestShouldAddTransmogId:
         record = {"custom_id": 999, "name": "test"}
 
         # Should add with default patterns (no custom_id recognized)
-        should_add = should_add_transmog_id(record)
+        field, _ = get_record_id(record)
+        should_add = field is None
         assert should_add is True
 
         # Should not add with custom patterns
-        should_add = should_add_transmog_id(record, id_patterns=["custom_id"])
+        field, _ = get_record_id(record, id_patterns=["custom_id"])
+        should_add = field is None
         assert should_add is False
 
 
@@ -193,40 +124,29 @@ class TestIdDiscoveryIntegration:
         """Test complete ID discovery workflow."""
         record_with_id = {"user_id": 123, "name": "John", "email": "john@example.com"}
 
-        id_field = discover_id_field(record_with_id, id_patterns=["user_id"])
-        assert id_field == "user_id"
-
         field_name, id_value = get_record_id(record_with_id, id_patterns=["user_id"])
         assert field_name == "user_id"
         assert id_value == 123
 
-        should_add = should_add_transmog_id(record_with_id, id_patterns=["user_id"])
+        field, _ = get_record_id(record_with_id, id_patterns=["user_id"])
+        should_add = field is None
         assert should_add is False
 
     def test_discovery_fallback_behavior(self):
         """Test fallback behavior when no natural ID found."""
         record = {"name": "test", "description": "no ID field"}
 
-        # No ID discovered
-        id_field = discover_id_field(record)
-        assert id_field is None
-
-        # No ID retrieved
         field_name, id_value = get_record_id(record)
         assert field_name is None
         assert id_value is None
 
-        # Should add transmog ID
-        should_add = should_add_transmog_id(record)
+        field, _ = get_record_id(record)
+        should_add = field is None
         assert should_add is True
 
     def test_discovery_with_multiple_candidates(self):
         """Test discovery when multiple ID candidates exist."""
         record = {"id": 1, "uuid": "test-uuid", "pk": 2, "key": "test-key"}
-
-        # Should select based on priority (id comes first in default patterns)
-        id_field = discover_id_field(record)
-        assert id_field == "id"
 
         field_name, id_value = get_record_id(record)
         assert field_name == "id"

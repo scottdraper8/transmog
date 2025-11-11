@@ -13,7 +13,7 @@ import sys
 import time
 import traceback
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 # Try to import from installed package first, fall back to development setup
 try:
@@ -134,34 +134,30 @@ def get_memory_usage() -> float:
 
 
 def benchmark_configuration(
-    config_name: str, data: list[dict[str, Any]], **config_options: Any
+    config_name: str,
+    data: list[dict[str, Any]],
+    config: Optional[tm.TransmogConfig] = None,
 ) -> dict[str, Union[str, float, int]]:
     """Benchmark a specific configuration.
 
     Args:
         config_name: Name of the configuration being tested
         data: Test data to process
-        **config_options: Configuration options for tm.flatten()
+        config: TransmogConfig object for tm.flatten()
 
     Returns:
         Dictionary containing benchmark metrics
     """
     print(f"\n=== Benchmarking {config_name} ===")
 
-    # Clear caches and collect garbage before test
-    try:
-        from transmog.core.flattener import clear_caches
-
-        clear_caches()
-    except (ImportError, AttributeError):
-        pass
+    # Collect garbage before each test to reduce noise
     gc.collect()
 
     start_time = time.time()
     start_memory = get_memory_usage()
 
     try:
-        result = tm.flatten(data, name="benchmark", **config_options)
+        result = tm.flatten(data, name="benchmark", config=config)
 
         end_time = time.time()
         end_memory = get_memory_usage()
@@ -217,17 +213,19 @@ def run_standard_benchmarks(record_counts: list[int]) -> dict[str, dict[str, Any
 
     # Define configurations to test
     configurations = [
-        ("Default", {}),
-        ("Low Memory", {"low_memory": True}),
-        ("Large Batches", {"batch_size": 5000}),
-        ("Small Batches", {"batch_size": 100}),
-        ("Preserve Types", {"preserve_types": True}),
-        ("Skip Empty", {"skip_empty": True, "skip_null": True}),
-        ("Inline Arrays", {"arrays": "inline"}),
-        ("Skip Arrays", {"arrays": "skip"}),
-        ("Custom Separator", {"separator": "."}),
-        ("Deep Nesting", {"nested_threshold": 8}),
-        ("Shallow Nesting", {"nested_threshold": 2}),
+        ("Default", tm.TransmogConfig()),
+        ("Low Memory", tm.TransmogConfig.for_memory()),
+        ("Large Batches", tm.TransmogConfig(batch_size=5000)),
+        ("Small Batches", tm.TransmogConfig(batch_size=100)),
+        ("Preserve Types", tm.TransmogConfig(cast_to_string=False)),
+        ("Skip Empty", tm.TransmogConfig(null_handling=tm.config.NullHandling.SKIP)),
+        (
+            "Include Empty",
+            tm.TransmogConfig(null_handling=tm.config.NullHandling.INCLUDE),
+        ),
+        ("Inline Arrays", tm.TransmogConfig(array_mode=tm.ArrayMode.INLINE)),
+        ("Skip Arrays", tm.TransmogConfig(array_mode=tm.ArrayMode.SKIP)),
+        ("Custom Separator", tm.TransmogConfig(separator=".")),
     ]
 
     for count in record_counts:
@@ -238,9 +236,9 @@ def run_standard_benchmarks(record_counts: list[int]) -> dict[str, dict[str, Any
         data = generate_random_nested_data(count)
         results[str(count)] = {}
 
-        for config_name, config_options in configurations:
+        for config_name, config in configurations:
             try:
-                result = benchmark_configuration(config_name, data, **config_options)
+                result = benchmark_configuration(config_name, data, config=config)
                 results[str(count)][config_name] = result
             except Exception as e:
                 print(f"  Failed to benchmark {config_name}: {e}")
@@ -271,20 +269,20 @@ def run_memory_benchmarks() -> None:
 
         # Test different memory configurations
         configs = [
-            ("Standard", {}),
-            ("Low Memory", {"low_memory": True}),
-            ("Small Batches", {"batch_size": 50, "low_memory": True}),
-            ("Large Batches", {"batch_size": 2000, "low_memory": False}),
-            ("Performance Optimized", {"batch_size": 1000, "low_memory": False}),
-            ("Memory + Types", {"low_memory": True, "preserve_types": False}),
+            ("Standard", tm.TransmogConfig()),
+            ("Low Memory", tm.TransmogConfig.for_memory()),
+            ("Small Batches", tm.TransmogConfig(batch_size=50)),
+            ("Large Batches", tm.TransmogConfig(batch_size=2000)),
+            ("Performance Optimized", tm.TransmogConfig(batch_size=1000)),
+            ("Memory + Types", tm.TransmogConfig.for_memory()),
             (
                 "Memory + Skip Empty",
-                {"low_memory": True, "skip_empty": True, "skip_null": True},
+                tm.TransmogConfig.for_memory(),
             ),
         ]
 
-        for config_name, config_options in configs:
-            metrics = benchmark_configuration(config_name, data, **config_options)
+        for config_name, config in configs:
+            metrics = benchmark_configuration(config_name, data, config=config)
             results.append(metrics)
 
         # Find best configuration for this dataset size
@@ -303,42 +301,11 @@ def run_memory_benchmarks() -> None:
                 f"({best_memory['memory_used_mb']:.1f} MB)"
             )
 
-    # Test memory optimization features
     print("\n🧠 Memory Optimization Features")
     print("-" * 40)
-
-    try:
-        from transmog.core.flattener import get_adaptive_cache_size
-
-        cache_size = get_adaptive_cache_size()
-        print(f"  Adaptive cache size: {cache_size}")
-    except (ImportError, AttributeError):
-        print("  Adaptive cache sizing: Not available")
-
-    try:
-        from transmog.core.memory import get_global_memory_monitor
-
-        monitor = get_global_memory_monitor()
-        memory_pressure = monitor.get_memory_pressure()
-        print(f"  Current memory pressure: {memory_pressure:.1%}")
-    except (ImportError, AttributeError):
-        print("  Memory monitoring: Not available")
-
-    try:
-        from transmog.core.memory import get_global_batch_sizer
-
-        batch_sizer = get_global_batch_sizer()
-        adaptive_batch_size = batch_sizer.get_batch_size()
-        print(f"  Adaptive batch size: {adaptive_batch_size}")
-    except (ImportError, AttributeError):
-        print("  Adaptive batch sizing: Not available")
-
-    print("\n✅ Memory optimization features tested!")
-    print("Available optimizations:")
-    print("  • Low memory mode with adaptive batch sizing")
-    print("  • Memory-aware caching adapts to available memory")
-    print("  • Strategic garbage collection reduces memory pressure")
-    print("  • Efficient data processing with in-place modifications")
+    print(
+        "  Memory-specific utilities have been removed; relying on batch sizing only."
+    )
 
 
 def run_streaming_benchmarks() -> None:
@@ -382,16 +349,19 @@ def run_streaming_benchmarks() -> None:
                 data,
                 output_path=stream_output,
                 name=f"stream_{size}",
-                output_format="json",
-                low_memory=True,
+                output_format="csv",
+                config=tm.TransmogConfig.for_memory(),
             )
 
             stream_time = time.time() - start_time
             stream_memory = get_memory_usage() - start_memory
 
             print(f"    Streaming: {stream_time:.3f}s, {stream_memory:.1f} MB")
-            memory_savings = (memory_usage - stream_memory) / memory_usage * 100
-            print(f"    Memory savings: {memory_savings:.1f}%")
+            if memory_usage > 0:
+                memory_savings = (memory_usage - stream_memory) / memory_usage * 100
+                print(f"    Memory savings: {memory_savings:.1f}%")
+            else:
+                print("    Memory savings: N/A (no memory used in baseline)")
 
         except Exception as e:
             print(f"    Streaming failed: {e}")
@@ -427,20 +397,22 @@ def run_array_handling_benchmarks() -> None:
         array_heavy_data.append(record)
 
     array_modes = [
-        ("Separate Tables", {"arrays": "separate"}),
-        ("Inline JSON", {"arrays": "inline"}),
-        ("Skip Arrays", {"arrays": "skip"}),
+        ("Separate Tables", tm.TransmogConfig(array_mode=tm.types.ArrayMode.SEPARATE)),
+        ("Inline JSON", tm.TransmogConfig(array_mode=tm.types.ArrayMode.INLINE)),
+        ("Skip Arrays", tm.TransmogConfig(array_mode=tm.types.ArrayMode.SKIP)),
     ]
 
     print(f"Testing array handling with {len(array_heavy_data)} records...")
 
     for mode_name, config in array_modes:
-        result = benchmark_configuration(mode_name, array_heavy_data, **config)
+        result = benchmark_configuration(mode_name, array_heavy_data, config=config)
 
         if result.get("success", False):
             # Get the actual result to analyze table structure
             try:
-                tm_result = tm.flatten(array_heavy_data, name="array_test", **config)
+                tm_result = tm.flatten(
+                    array_heavy_data, name="array_test", config=config
+                )
                 print(f"    Tables created: {len(tm_result.all_tables)}")
 
                 for table_name, table_data in tm_result.all_tables.items():

@@ -9,12 +9,11 @@ import pytest
 import transmog as tm
 from transmog.config import TransmogConfig
 from transmog.core.hierarchy import (
+    _process_structure,
     process_record_batch,
-    process_structure,
     stream_process_records,
 )
-from transmog.types import ProcessingContext
-from transmog.types.base import RecoveryMode
+from transmog.types import ProcessingContext, RecoveryMode
 
 
 class TestProcessStructure:
@@ -24,7 +23,7 @@ class TestProcessStructure:
         """Test processing simple hierarchical structure."""
         config = TransmogConfig()
         context = ProcessingContext()
-        main_record, child_tables = process_structure(
+        main_record, child_tables = _process_structure(
             simple_data, entity_name="simple_test", config=config, context=context
         )
 
@@ -38,11 +37,11 @@ class TestProcessStructure:
 
     def test_process_nested_structure(self, complex_nested_data):
         """Test processing complex nested structure."""
-        from transmog.types.base import ArrayMode
+        from transmog.types import ArrayMode
 
         config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
         context = ProcessingContext()
-        main_record, child_tables = process_structure(
+        main_record, child_tables = _process_structure(
             complex_nested_data,
             entity_name="complex_test",
             config=config,
@@ -62,11 +61,11 @@ class TestProcessStructure:
 
     def test_process_structure_with_arrays(self, array_data):
         """Test processing structure with arrays."""
-        from transmog.types.base import ArrayMode
+        from transmog.types import ArrayMode
 
         config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
         context = ProcessingContext()
-        main_record, child_tables = process_structure(
+        main_record, child_tables = _process_structure(
             array_data, entity_name="array_test", config=config, context=context
         )
 
@@ -82,11 +81,11 @@ class TestProcessStructure:
 
     def test_process_structure_skip_arrays(self, array_data):
         """Test processing structure with arrays skipped."""
-        from transmog.types.base import ArrayMode
+        from transmog.types import ArrayMode
 
         config = TransmogConfig(array_mode=ArrayMode.SKIP)
         context = ProcessingContext()
-        main_record, child_tables = process_structure(
+        main_record, child_tables = _process_structure(
             array_data, entity_name="skip_test", config=config, context=context
         )
 
@@ -103,7 +102,7 @@ class TestProcessStructure:
         """Test processing structure with parent ID."""
         config = TransmogConfig()
         context = ProcessingContext()
-        main_record, child_tables = process_structure(
+        main_record, child_tables = _process_structure(
             simple_data,
             entity_name="child_test",
             config=config,
@@ -121,7 +120,7 @@ class TestProcessStructure:
         """Test processing structure with custom separator."""
         config = TransmogConfig(separator=".")
         context = ProcessingContext()
-        main_record, child_tables = process_structure(
+        main_record, child_tables = _process_structure(
             simple_data, entity_name="sep_test", config=config, context=context
         )
 
@@ -135,7 +134,7 @@ class TestProcessStructure:
         """Test processing empty structure."""
         config = TransmogConfig()
         context = ProcessingContext()
-        main_record, child_tables = process_structure(
+        main_record, child_tables = _process_structure(
             {}, entity_name="empty_test", config=config, context=context
         )
 
@@ -146,7 +145,7 @@ class TestProcessStructure:
         """Test processing null structure."""
         config = TransmogConfig()
         context = ProcessingContext()
-        main_record, child_tables = process_structure(
+        main_record, child_tables = _process_structure(
             None, entity_name="null_test", config=config, context=context
         )
 
@@ -179,7 +178,7 @@ class TestProcessRecordBatch:
         """Test processing batch with arrays."""
         batch = [array_data] * 3
 
-        from transmog.types.base import ArrayMode
+        from transmog.types import ArrayMode
 
         config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
         context = ProcessingContext()
@@ -248,7 +247,7 @@ class TestStreamProcessRecords:
         """Test streaming processing with arrays."""
         batch = [array_data] * 2
 
-        from transmog.types.base import ArrayMode
+        from transmog.types import ArrayMode
 
         config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
         context = ProcessingContext()
@@ -297,22 +296,12 @@ class TestHierarchyIntegration:
         assert len(result.main) == 1
         assert len(result.tables) > 0
 
-    def test_hierarchy_with_different_thresholds(self, complex_nested_data):
-        """Test hierarchy processing with different nesting thresholds."""
-        # Low threshold - more flattening
-        config_low = TransmogConfig(nested_threshold=2)
-        result_low = tm.flatten(
-            complex_nested_data, name="low_threshold", config=config_low
-        )
+    def test_hierarchy_with_nested_paths(self, complex_nested_data):
+        """Test hierarchy processing with nested paths."""
+        config = TransmogConfig()
+        result = tm.flatten(complex_nested_data, name="nested_test", config=config)
 
-        # High threshold - less flattening
-        config_high = TransmogConfig(nested_threshold=10)
-        result_high = tm.flatten(
-            complex_nested_data, name="high_threshold", config=config_high
-        )
-
-        assert len(result_low.main) == 1
-        assert len(result_high.main) == 1
+        assert len(result.main) == 1
 
     def test_hierarchy_with_streaming(self, batch_data):
         """Test hierarchy processing with streaming mode."""
@@ -333,7 +322,7 @@ class TestHierarchyEdgeCases:
 
         config = TransmogConfig(max_depth=5, recovery_mode=RecoveryMode.SKIP)
         context = ProcessingContext()
-        main_record, child_tables = process_structure(
+        main_record, child_tables = _process_structure(
             data,
             entity_name="circular_test",
             config=config,
@@ -355,9 +344,9 @@ class TestHierarchyEdgeCases:
 
         current["value"] = "deep"
 
-        config = TransmogConfig(max_depth=25, nested_threshold=25)
+        config = TransmogConfig(max_depth=25)
         context = ProcessingContext()
-        main_record, child_tables = process_structure(
+        main_record, child_tables = _process_structure(
             data, entity_name="deep_test", config=config, context=context
         )
 
@@ -374,7 +363,7 @@ class TestHierarchyEdgeCases:
         """Test hierarchy processing with mixed data types."""
         config = TransmogConfig()
         context = ProcessingContext()
-        main_record, child_tables = process_structure(
+        main_record, child_tables = _process_structure(
             mixed_types_data, entity_name="mixed_test", config=config, context=context
         )
 

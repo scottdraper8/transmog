@@ -13,11 +13,6 @@ Basic Usage:
 Advanced Usage:
     >>> # For very large datasets, use streaming
     >>> tm.flatten_stream(large_data, "output/", format="parquet")
-
-    >>> # For advanced features, use the Processor directly
-    >>> from transmog.process import Processor
-    >>> processor = Processor()
-    >>> processor.stream_process(...)
 """
 
 __version__ = "1.1.1"
@@ -26,7 +21,7 @@ __version__ = "1.1.1"
 from .api import FlattenResult, flatten, flatten_file, flatten_stream
 from .config import TransmogConfig
 from .error import TransmogError, ValidationError
-from .types.base import ArrayMode, RecoveryMode
+from .types import ArrayMode, NullHandling, RecoveryMode
 
 __all__ = [
     "flatten",
@@ -35,6 +30,7 @@ __all__ = [
     "FlattenResult",
     "TransmogConfig",
     "ArrayMode",
+    "NullHandling",
     "RecoveryMode",
     "TransmogError",
     "ValidationError",

@@ -1,453 +1,257 @@
-"""Data iteration functionality for Transmog package.
+"""Iterators for ingesting JSON-based inputs."""
 
-This module contains functions for creating iterators over different data sources
-such as JSON files, JSONL files, and in-memory data structures.
-"""
+from __future__ import annotations
 
 import json
 import os
-from collections.abc import Iterator
-from typing import (
-    Any,
-    Optional,
-    Union,
-)
+from collections.abc import Iterable, Iterator
+from typing import Any
+
+try:  # pragma: no cover - optional dependency
+    import orjson as _orjson  # type: ignore
+except ImportError:  # pragma: no cover - optional dependency
+    _orjson = None  # type: ignore[assignment]
 
 from ..error import (
-    FileError,
-    ParsingError,
     ProcessingError,
     ValidationError,
-    get_recovery_strategy,
     logger,
 )
+from ..types import RecoveryMode
 
-
-class DataIteratorUtils:
-    """Utility class for common data iteration patterns.
-
-    Consolidates repetitive file reading patterns, iterator creation logic,
-    and error handling patterns used across different data format iterators.
-    """
-
-    @staticmethod
-    def validate_file_exists(file_path: str) -> None:
-        """Validate that a file exists.
-
-        Args:
-            file_path: Path to the file
-
-        Raises:
-            FileError: If file doesn't exist
-        """
-        if not os.path.exists(file_path):
-            raise FileError(f"File not found: {file_path}")
-
-    @staticmethod
-    def get_json_parser() -> tuple[Any, tuple[type[Exception], ...]]:
-        """Get the best available JSON parser.
-
-        Returns:
-            Tuple of (parser_module, decode_error_types)
-        """
-        try:
-            import orjson
-
-            return orjson, (json.JSONDecodeError,)
-        except ImportError:
-            return json, (json.JSONDecodeError,)
-
-    @staticmethod
-    def handle_json_error(
-        error: Exception,
-        processor: Any,
-        context: str,
-        line_number: Optional[int] = None,
-    ) -> bool:
-        """Handle JSON parsing errors with recovery strategy.
-
-        Args:
-            error: The JSON parsing error
-            processor: Processor instance for recovery strategy
-            context: Context description for error
-            line_number: Optional line number for error
-
-        Returns:
-            True if error was handled and processing should continue,
-            False if error should be re-raised
-        """
-        if line_number is not None:
-            error_msg = f"Invalid JSON on line {line_number}: {str(error)}"
-            entity_name = f"line_{line_number}"
-        else:
-            error_msg = f"Invalid JSON in {context}: {str(error)}"
-            entity_name = context
-
-        logger.warning(error_msg)
-
-        # Handle error based on recovery strategy
-        strategy = get_recovery_strategy(processor.config.recovery_mode)
-        try:
-            # Attempt recovery
-            strategy.recover(
-                error,
-                entity_name=entity_name,
-                entity_type="JSON data",
-                source=context,
-            )
-            # Recovery successful, continue processing
-            return True
-        except Exception:
-            # Recovery failed, re-raise original error
-            return False
-
-    @staticmethod
-    def read_file_with_encoding(
-        file_path: str, encoding: str = "utf-8", mode: str = "r"
-    ) -> Any:
-        """Open a file with proper encoding handling.
-
-        Args:
-            file_path: Path to the file
-            encoding: File encoding
-            mode: File open mode
-
-        Returns:
-            File object
-        """
-        try:
-            return open(file_path, mode, encoding=encoding)
-        except Exception as e:
-            raise FileError(f"Error opening file {file_path}: {str(e)}") from e
-
-    @staticmethod
-    def process_jsonl_lines(
-        lines: Iterator[str], processor: Any, context: str = "data"
-    ) -> Iterator[dict[str, Any]]:
-        """Process JSONL lines with error handling.
-
-        Args:
-            lines: Iterator of text lines
-            processor: Processor instance for error handling
-            context: Context description for errors
-
-        Yields:
-            Parsed JSON records
-        """
-        json_parser, json_decode_error = DataIteratorUtils.get_json_parser()
-
-        for line_number, line in enumerate(lines, 1):
-            line = line.strip()
-            if not line:
-                continue
-
-            try:
-                record = json_parser.loads(line)
-                yield record
-            except json_decode_error as e:
-                if not DataIteratorUtils.handle_json_error(
-                    e, processor, context, line_number
-                ):
-                    # Re-raise if recovery failed
-                    error_msg = (
-                        f"Invalid JSON in {context} at line {line_number}: {str(e)}"
-                    )
-                    raise ParsingError(error_msg) from e
-
-    @staticmethod
-    def detect_file_format(file_path: str) -> str:
-        """Detect file format from extension.
-
-        Args:
-            file_path: Path to the file
-
-        Returns:
-            Detected format ('json', 'jsonl')
-        """
-        extension = os.path.splitext(file_path)[1].lower()
-        if extension in (".jsonl", ".ndjson"):
-            return "jsonl"
-        else:
-            return "json"
-
-    @staticmethod
-    def wrap_file_error(file_path: str, operation: str, error: Exception) -> None:
-        """Wrap file operation errors with consistent messaging.
-
-        Args:
-            file_path: Path to the file
-            operation: Description of the operation
-            error: Original error
-
-        Raises:
-            FileError: Wrapped error with consistent messaging
-        """
-        if isinstance(error, (ProcessingError, FileError, ParsingError)):
-            raise
-        raise FileError(f"Error {operation} file {file_path}: {str(error)}") from error
-
-    @staticmethod
-    def detect_string_format(data: str) -> str:
-        """Detect the format of string data (JSON or JSONL).
-
-        Args:
-            data: String data to analyze
-
-        Returns:
-            Format type: 'json' or 'jsonl'
-        """
-        import json
-
-        if not data or not data.strip():
-            return "json"
-
-        sample = data[:1000].strip()
-
-        if sample.startswith(("{", "[")):
-            try:
-                json.loads(data)
-                return "json"
-            except json.JSONDecodeError:
-                pass
-
-        lines = [line.strip() for line in sample.split("\n")[:5] if line.strip()]
-        json_line_count = sum(
-            1
-            for line in lines
-            if line.startswith(("{", "[")) and DataIteratorUtils._is_valid_json(line)
-        )
-
-        return "jsonl" if json_line_count >= 2 else "json"
-
-    @staticmethod
-    def _is_valid_json(line: str) -> bool:
-        """Check if a line is valid JSON."""
-        import json
-
-        try:
-            json.loads(line)
-            return True
-        except json.JSONDecodeError:
-            return False
+if _orjson is not None:
+    JSON_DECODE_ERRORS: tuple[type[Exception], ...] = (
+        json.JSONDecodeError,
+        _orjson.JSONDecodeError,  # type: ignore[attr-defined]
+    )
+else:
+    JSON_DECODE_ERRORS = (json.JSONDecodeError,)
 
 
 def get_data_iterator(
     processor: Any,
-    data: Union[
-        dict[str, Any], list[dict[str, Any]], str, bytes, Iterator[dict[str, Any]]
-    ],
-    input_format: str = "auto",
+    data: (
+        dict[str, Any] | list[dict[str, Any]] | str | bytes | Iterator[dict[str, Any]]
+    ),
 ) -> Iterator[dict[str, Any]]:
-    """Get an iterator for the input data.
-
-    Args:
-        processor: Processor instance
-        data: Input data (various formats)
-        input_format: Format of the data or 'auto' for detection
-
-    Returns:
-        Iterator of data records
-    """
-    # Return existing iterators directly (but not strings, lists, or dicts)
+    """Return an iterator over input records."""
     if (
         hasattr(data, "__iter__")
         and hasattr(data, "__next__")
         and not isinstance(data, (list, dict, str, bytes))
     ):
-        return data
+        return data  # type: ignore[return-value]
 
-    # Handle file paths (only if it's a string that exists as a file)
-    if isinstance(data, str) and os.path.exists(data):
-        if input_format == "auto":
-            detected_format = DataIteratorUtils.detect_file_format(data)
-            if detected_format == "jsonl":
-                return get_jsonl_file_iterator(processor, data)
-            else:
-                return get_json_file_iterator(data)
-        elif input_format == "json":
-            return get_json_file_iterator(data)
-        elif input_format in ("jsonl", "ndjson"):
-            return get_jsonl_file_iterator(processor, data)
-        else:
-            raise ValueError(f"Unsupported input format: {input_format}")
-
-    # Handle in-memory data structures
     if isinstance(data, dict):
-        return iter([data])  # Return iterator instead of yielding
-    elif isinstance(data, list):
-        return iter(data)  # Return iterator instead of yielding
-    # Handle JSON strings and bytes (including format detection for auto mode)
-    elif isinstance(data, (str, bytes)):
-        if input_format == "auto":
-            if isinstance(data, bytes):
-                sample = data[:1000].decode("utf-8", errors="ignore")
-                format_type = DataIteratorUtils.detect_string_format(sample)
-            else:
-                format_type = DataIteratorUtils.detect_string_format(data)
+        return iter([data])
+    if isinstance(data, list):
+        return iter(data)
 
-            if format_type == "jsonl":
-                return get_jsonl_data_iterator(processor, data)
-            else:
-                return get_json_data_iterator(data)
-        elif input_format == "json":
-            return get_json_data_iterator(data)
-        elif input_format in ("jsonl", "ndjson"):
+    if isinstance(data, str) and os.path.exists(data):
+        extension = os.path.splitext(data)[1].lower()
+        if extension in (".jsonl", ".ndjson"):
+            return get_jsonl_file_iterator(processor, data)
+        return get_json_file_iterator(data)
+
+    if isinstance(data, (str, bytes)):
+        text = data if isinstance(data, str) else data.decode("utf-8")
+        if not text.strip():
+            raise ProcessingError("No JSON content provided")
+
+        normalised = _detect_string_format(text)
+
+        if normalised == "jsonl":
             return get_jsonl_data_iterator(processor, data)
-        else:
-            raise ValueError(f"Unsupported input format: {input_format}")
-    else:
-        raise ValidationError(f"Unsupported data type: {type(data)}")
+        if normalised == "json":
+            return get_json_data_iterator(data)
+        raise ValueError(f"Unsupported input format: {normalised}")
+
+    raise ValidationError(f"Unsupported data type: {type(data)}")
 
 
 def get_json_data_iterator(
-    data: Union[dict[str, Any], list[dict[str, Any]], str, bytes],
+    data: dict[str, Any] | list[dict[str, Any]] | str | bytes,
 ) -> Iterator[dict[str, Any]]:
-    """Create an iterator for JSON data.
-
-    Args:
-        data: JSON data as string, bytes, dict, or list
-
-    Returns:
-        Iterator that yields dictionaries
-
-    Raises:
-        ProcessingError: If input contains invalid JSON or unsupported data
-        ValidationError: If input is not a supported type
-    """
-    # Handle dict/list inputs directly
+    """Iterate over JSON data loaded into memory."""
     if isinstance(data, dict):
         yield data
         return
-    elif isinstance(data, list):
-        yield from data
+
+    if isinstance(data, list):
+        for index, item in enumerate(data):
+            if not isinstance(item, dict):
+                raise ProcessingError(
+                    f"Expected JSON object at index {index}, got {type(item).__name__}"
+                )
+            yield item
         return
 
-    # Handle string/bytes inputs
     if not isinstance(data, (str, bytes)):
         raise ValidationError("JSON data must be a string, bytes, dict, or list")
 
+    payload = data
+    if isinstance(data, str) and not data.strip():
+        raise ProcessingError("No JSON content provided")
+
     try:
-        # Use consolidated JSON parser selection
-        json_parser, _ = DataIteratorUtils.get_json_parser()
+        parsed = _loads(payload)
+    except JSON_DECODE_ERRORS as exc:  # type: ignore[arg-type]
+        raise ProcessingError(f"Error parsing JSON data: {exc}") from exc
 
-        # Parse the data
-        parsed_data = json_parser.loads(data)
-
-        # Yield records based on structure
-        if isinstance(parsed_data, dict):
-            yield parsed_data
-        elif isinstance(parsed_data, list):
-            yield from parsed_data
-        else:
-            raise ProcessingError(
-                f"Expected dict or list from JSON data, "
-                f"got {type(parsed_data).__name__}"
-            )
-
-    except Exception as e:
-        if isinstance(e, (ProcessingError, ValidationError)):
-            raise
-        raise ProcessingError(f"Error parsing JSON data: {str(e)}") from e
+    yield from _iter_parsed_json(parsed)
 
 
 def get_json_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
-    """Create an iterator for a JSON file.
-
-    Args:
-        file_path: Path to JSON file
-
-    Returns:
-        Iterator that yields dictionaries
-
-    Raises:
-        FileError: If file cannot be read
-        ParsingError: If file contains invalid JSON
-    """
-    # Use consolidated file validation
-    DataIteratorUtils.validate_file_exists(file_path)
+    """Iterate over records in a JSON file."""
+    if not os.path.exists(file_path):
+        raise ProcessingError(f"File not found: {file_path}")
 
     try:
-        # Use consolidated JSON parser selection
-        json_parser, _ = DataIteratorUtils.get_json_parser()
+        parsed = _load_json_file(file_path)
+    except JSON_DECODE_ERRORS as exc:
+        raise ProcessingError(f"Invalid JSON in file {file_path}: {exc}") from exc
+    except OSError as exc:
+        raise ProcessingError(f"Error reading file {file_path}: {exc}") from exc
 
-        # Read file with appropriate parser
-        if hasattr(json_parser, "load"):
-            # Standard json module
-            with DataIteratorUtils.read_file_with_encoding(file_path) as f:
-                data = json_parser.load(f)
-        else:
-            # orjson module (requires bytes)
-            with open(file_path, "rb") as f:
-                data = json_parser.loads(f.read())
-
-        # Process single object or list
-        if isinstance(data, dict):
-            yield data
-        elif isinstance(data, list):
-            yield from data
-        else:
-            raise ParsingError(
-                f"Expected dict or list from JSON file, got {type(data).__name__}"
-            )
-
-    except Exception as e:
-        DataIteratorUtils.wrap_file_error(file_path, "reading", e)
+    try:
+        yield from _iter_parsed_json(parsed)
+    except ProcessingError as exc:
+        raise ProcessingError(str(exc)) from exc
 
 
 def get_jsonl_file_iterator(processor: Any, file_path: str) -> Iterator[dict[str, Any]]:
-    """Create an iterator for a JSONL file (one JSON object per line).
-
-    Args:
-        processor: Processor instance
-        file_path: Path to JSONL file
-
-    Returns:
-        Iterator that yields dictionaries
-
-    Raises:
-        FileError: If file cannot be read
-        ParsingError: If file contains invalid JSON
-    """
-    # Use consolidated file validation
-    DataIteratorUtils.validate_file_exists(file_path)
+    """Iterate over records in a JSON Lines file."""
+    if not os.path.exists(file_path):
+        raise ProcessingError(f"File not found: {file_path}")
 
     try:
-        with DataIteratorUtils.read_file_with_encoding(file_path) as f:
-            # Use consolidated JSONL processing
-            yield from DataIteratorUtils.process_jsonl_lines(f, processor, file_path)
-    except Exception as e:
-        DataIteratorUtils.wrap_file_error(file_path, "processing JSONL", e)
+        with open(file_path, encoding="utf-8") as handle:
+            yield from _iter_jsonl_lines(processor, handle, file_path)
+    except ProcessingError:
+        raise
+    except OSError as exc:
+        raise ProcessingError(f"Error reading file {file_path}: {exc}") from exc
 
 
 def get_jsonl_data_iterator(
-    processor: Any, data: Union[str, bytes]
+    processor: Any, data: str | bytes
 ) -> Iterator[dict[str, Any]]:
-    """Create an iterator for JSONL data (one JSON object per line).
-
-    Args:
-        processor: Processor instance
-        data: JSONL data as string or bytes
-
-    Returns:
-        Iterator that yields dictionaries
-
-    Raises:
-        ParsingError: If input contains invalid JSON
-    """
+    """Iterate over JSON Lines content."""
     if not isinstance(data, (str, bytes)):
         raise ValidationError("JSONL data must be a string or bytes")
 
-    # Convert bytes to string if needed
-    if isinstance(data, bytes):
-        data = data.decode("utf-8")
+    text = data if isinstance(data, str) else data.decode("utf-8")
+    if not text.strip():
+        return
 
     try:
-        # Split into lines and use consolidated processing
-        lines = data.strip().split("\n")
-        yield from DataIteratorUtils.process_jsonl_lines(
-            iter(lines), processor, "JSONL data"
-        )
-    except Exception as e:
-        if isinstance(e, (ProcessingError, FileError, ParsingError)):
-            raise
-        raise ParsingError(f"Error processing JSONL data: {str(e)}") from e
+        lines = text.splitlines()
+        yield from _iter_jsonl_lines(processor, lines, "JSONL data")
+    except ProcessingError:
+        raise
+    except Exception as exc:
+        raise ProcessingError(f"Error processing JSONL data: {exc}") from exc
+
+
+def _loads(value: str | bytes) -> Any:
+    """Load JSON content using the fastest available parser."""
+    if _orjson is not None:
+        return _orjson.loads(value)
+    if isinstance(value, bytes):
+        return json.loads(value.decode("utf-8"))
+    return json.loads(value)
+
+
+def _load_json_file(path: str) -> Any:
+    """Load JSON payload from disk."""
+    if _orjson is not None:
+        with open(path, "rb") as handle:
+            return _orjson.loads(handle.read())
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def _iter_parsed_json(payload: Any) -> Iterator[dict[str, Any]]:
+    """Yield dictionaries from parsed JSON structures."""
+    if isinstance(payload, dict):
+        yield payload
+        return
+
+    if isinstance(payload, list):
+        for index, item in enumerate(payload):
+            if not isinstance(item, dict):
+                raise ProcessingError(
+                    f"Expected JSON object at index {index}, got {type(item).__name__}"
+                )
+            yield item
+        return
+
+    raise ProcessingError(
+        f"Expected JSON object or list of objects, got {type(payload).__name__}"
+    )
+
+
+def _iter_jsonl_lines(
+    processor: Any, lines: Iterable[str], source: str
+) -> Iterator[dict[str, Any]]:
+    """Yield dictionaries from JSON Lines content."""
+    recovery_mode = (
+        processor.config.recovery_mode
+        if hasattr(processor, "config")
+        else RecoveryMode.STRICT
+    )
+    skip_errors = recovery_mode == RecoveryMode.SKIP
+
+    for index, raw_line in enumerate(lines, 1):
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        try:
+            record = _loads(line)
+        except JSON_DECODE_ERRORS as exc:
+            parsing_error = ProcessingError(
+                f"Invalid JSON on line {index} in {source}: {exc}"
+            )
+            if skip_errors:
+                logger.warning(
+                    f"Skipping record due to parsing error in {source}: {parsing_error}"
+                )
+                continue
+            raise parsing_error from exc
+
+        if not isinstance(record, dict):
+            parsing_error = ProcessingError(
+                f"Expected JSON object on line {index} in {source}, "
+                f"got {type(record).__name__}"
+            )
+            if skip_errors:
+                logger.warning(
+                    f"Skipping record due to parsing error in {source}: {parsing_error}"
+                )
+                continue
+            raise parsing_error
+
+        yield record
+
+
+def _detect_string_format(value: str) -> str:
+    """Detect whether in-memory text is JSON or JSONL."""
+    snippet = value.strip()
+    if not snippet:
+        return "json"
+    if "\n" not in snippet:
+        return "json"
+
+    candidates = [line.strip() for line in snippet.splitlines() if line.strip()]
+    hits = 0
+    for line in candidates[:5]:
+        if not line.startswith("{"):
+            continue
+        try:
+            _loads(line)
+        except JSON_DECODE_ERRORS:
+            continue
+        hits += 1
+
+    return "jsonl" if hits >= 2 else "json"

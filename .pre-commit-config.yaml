@@ -15,7 +15,7 @@ repos:
         args: [--branch, main]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.3
+    rev: v0.14.4
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
@@ -34,6 +34,11 @@ repos:
     hooks:
       - id: interrogate
         args: [--fail-under=80, --quiet, --exclude=docs]
+
+  - repo: https://github.com/jendrikseipp/vulture
+    rev: v2.14
+    hooks:
+      - id: vulture
 
   - repo: https://github.com/PyCQA/bandit
     rev: 1.8.6

@@ -1,23 +1,12 @@
-"""
-Tests for writer factory functionality.
-
-Tests the factory functions for creating writers for different formats.
-"""
+"""Tests for writer factory functionality."""
 
 import threading
 import time
-from io import StringIO
-from pathlib import Path
 
 import pytest
 
-from transmog.error.exceptions import ConfigurationError, MissingDependencyError
-from transmog.io.writer_factory import (
-    FORMATS,
-    STREAMING_FORMATS,
-    create_streaming_writer,
-    create_writer,
-)
+from transmog.error.exceptions import ConfigurationError
+from transmog.io.writer_factory import FORMATS, STREAMING_FORMATS, create_writer
 
 
 class TestWriterFactory:
@@ -36,7 +25,7 @@ class TestWriterFactory:
         assert hasattr(writer, "write")
 
     def test_create_writer_case_insensitive(self):
-        """Test that writer creation is case insensitive."""
+        """Test writer creation is case insensitive."""
         writer_lower = create_writer("csv")
         writer_upper = create_writer("CSV")
         writer_mixed = create_writer("Csv")
@@ -44,19 +33,15 @@ class TestWriterFactory:
         assert writer_lower is not None
         assert writer_upper is not None
         assert writer_mixed is not None
-        assert isinstance(writer_lower, type(writer_upper)) and isinstance(
-            writer_upper, type(writer_mixed)
-        )
+        assert isinstance(writer_lower, type(writer_upper))
 
     def test_create_writer_with_options(self):
-        """Test creating writer with options."""
-        # CSV writer with custom delimiter
-        writer = create_writer("csv", delimiter=";")
-        assert writer is not None
+        """Test creating writer with custom options."""
+        csv_writer = create_writer("csv", delimiter=";")
+        assert csv_writer is not None
 
-        # Parquet writer with compression
-        writer = create_writer("parquet", compression="snappy")
-        assert writer is not None
+        parquet_writer = create_writer("parquet", compression="snappy")
+        assert parquet_writer is not None
 
     def test_create_writer_unsupported_format(self):
         """Test creating writer for unsupported format."""
@@ -71,17 +56,23 @@ class TestWriterFactory:
             create_writer("")
 
     def test_supported_formats(self):
-        """Test supported formats dictionary."""
+        """Test supported formats are defined."""
         assert isinstance(FORMATS, dict)
         assert "csv" in FORMATS
         assert "parquet" in FORMATS
         assert "csv" in STREAMING_FORMATS
 
+    def test_factory_returns_new_instances(self):
+        """Test factory returns new instances."""
+        writer1 = create_writer("csv")
+        writer2 = create_writer("csv")
+        assert writer1 is not writer2
+
 
 class TestWriterFactoryIntegration:
     """Test writer factory integration with actual writing."""
 
-    def test_factory_writer_csv_integration(self, tmp_path):
+    def test_csv_writer_integration(self, tmp_path):
         """Test factory-created CSV writer integration."""
         writer = create_writer("csv", delimiter=";")
 
@@ -95,7 +86,6 @@ class TestWriterFactoryIntegration:
 
         assert output_file.exists()
 
-        # Verify content
         import csv
 
         with open(output_file, encoding="utf-8") as f:
@@ -105,7 +95,7 @@ class TestWriterFactoryIntegration:
         assert len(rows) == 2
         assert rows[0]["name"] == "Test 1"
 
-    def test_factory_writer_parquet_integration(self, tmp_path):
+    def test_parquet_writer_integration(self, tmp_path):
         """Test factory-created Parquet writer integration."""
         pytest.importorskip("pyarrow")
 
@@ -121,51 +111,21 @@ class TestWriterFactoryIntegration:
 
         assert output_file.exists()
 
-        # Verify content
         import pyarrow.parquet as pq
 
         table = pq.read_table(str(output_file))
 
-        # Check PyArrow table structure
         assert table.num_rows == 2
         assert "name" in table.schema.names
-        # Convert to Python objects to verify data
         name_column = table.column("name").to_pylist()
         assert name_column[0] == "Test 1"
 
-    def test_factory_multiple_writers_same_format(self):
-        """Test creating multiple writers of same format."""
-        writer1 = create_writer("csv", delimiter=",")
-        writer2 = create_writer("csv", delimiter=";")
 
-        assert writer1 is not writer2
-        assert hasattr(writer1, "write")
-        assert hasattr(writer2, "write")
-
-    def test_factory_writers_different_formats(self):
-        """Test creating writers of different formats."""
-        csv_writer = create_writer("csv")
-        parquet_writer = create_writer("parquet")
-
-        assert hasattr(csv_writer, "write")
-        assert hasattr(parquet_writer, "write")
-
-
-class TestWriterFactoryEdgeCases:
-    """Test edge cases and error conditions."""
-
-    def test_factory_with_invalid_options(self):
-        """Test factory with invalid writer options."""
-        writer = create_writer("csv", invalid_option="value")
-        assert hasattr(writer, "write")
-
-    def test_factory_format_detection_from_path(self):
-        """Test format detection capabilities."""
-        assert "csv" in FORMATS
-        assert "parquet" in FORMATS
+class TestWriterFactoryThreadSafety:
+    """Test writer factory thread safety."""
 
     def test_factory_thread_safety(self):
-        """Test factory thread safety."""
+        """Test factory is thread-safe."""
         results = []
         errors = []
 
@@ -190,8 +150,8 @@ class TestWriterFactoryEdgeCases:
         assert len(errors) == 0, f"Thread errors: {errors}"
         assert len(results) == 50
 
-    def test_factory_memory_usage(self):
-        """Test factory memory usage with many writers."""
+    def test_factory_handles_many_writers(self):
+        """Test factory handles creating many writers."""
         writers = []
         for i in range(100):
             format_type = ["csv", "parquet"][i % 2]
@@ -202,46 +162,3 @@ class TestWriterFactoryEdgeCases:
 
         for writer in writers:
             assert hasattr(writer, "write")
-
-    def test_factory_singleton_behavior(self):
-        """Test that factory functions work independently."""
-        writer1 = create_writer("csv")
-        writer2 = create_writer("csv")
-
-        assert hasattr(writer1, "write")
-        assert hasattr(writer2, "write")
-
-
-class TestWriterFactoryConfiguration:
-    """Test writer factory configuration and customization."""
-
-    def test_factory_default_configuration(self):
-        """Test factory with default configuration."""
-        csv_writer = create_writer("csv")
-        parquet_writer = create_writer("parquet")
-
-        assert hasattr(csv_writer, "write")
-        assert hasattr(parquet_writer, "write")
-
-    def test_factory_custom_writer_registration(self):
-        """Test that factory supports the expected formats."""
-        assert "csv" in FORMATS
-        assert "parquet" in FORMATS
-
-    def test_factory_writer_options_validation(self):
-        """Test writer options validation."""
-        writers = [
-            create_writer("csv", delimiter=","),
-            create_writer("parquet", compression="snappy"),
-        ]
-
-        for writer in writers:
-            assert hasattr(writer, "write")
-
-    def test_factory_error_handling_configuration(self):
-        """Test factory error handling configuration."""
-        invalid_formats = ["", "unknown", "invalid"]
-
-        for invalid_format in invalid_formats:
-            with pytest.raises(ConfigurationError):
-                create_writer(invalid_format)

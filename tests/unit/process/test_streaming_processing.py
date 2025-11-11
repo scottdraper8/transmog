@@ -16,13 +16,22 @@ from typing import Any
 import pytest
 
 from transmog.config import TransmogConfig
-from transmog.error import ConfigurationError, FileError, ProcessingError
-from transmog.process import Processor
-from transmog.process.streaming import (
-    stream_process,
-    stream_process_file,
-    stream_process_file_with_format,
+from transmog.error import ConfigurationError, ProcessingError
+from transmog.process.data_iterators import (
+    get_json_file_iterator,
+    get_jsonl_file_iterator,
 )
+from transmog.process.streaming import stream_process
+
+
+def _create_processor(config):
+    """Create a processor-like object for streaming tests."""
+
+    class ConfigWrapper:
+        def __init__(self, config):
+            self.config = config
+
+    return ConfigWrapper(config)
 
 
 class TestStreamProcessing:
@@ -35,7 +44,7 @@ class TestStreamProcessing:
             {"id": 2, "name": "Bob", "age": 25},
         ]
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
         stream_process(
@@ -69,7 +78,7 @@ class TestStreamProcessing:
             }
         ]
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
         stream_process(
@@ -99,7 +108,7 @@ class TestStreamProcessing:
             for i in range(5):
                 yield {"id": i, "value": f"item_{i}"}
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
         stream_process(
@@ -125,7 +134,7 @@ class TestStreamProcessing:
             {"id": 2, "name": "Bob", "score": 87.2},
         ]
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_path = tmp_path / "scores.csv"
 
         stream_process(
@@ -148,7 +157,7 @@ class TestStreamProcessing:
         """Test streaming processing with custom batch size."""
         data = [{"id": i, "value": f"item_{i}"} for i in range(50)]
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
         stream_process(
@@ -176,7 +185,7 @@ class TestStreamProcessing:
         ]
 
         config = TransmogConfig(id_patterns=["user_id"])
-        processor = Processor(config)
+        processor = _create_processor(config)
         output_dir = tmp_path / "output"
 
         stream_process(
@@ -203,7 +212,7 @@ class TestStreamProcessing:
         ]
 
         config = TransmogConfig()
-        processor = Processor(config)
+        processor = _create_processor(config)
         output_dir = tmp_path / "output"
 
         stream_process(
@@ -236,12 +245,13 @@ class TestStreamProcessFile:
         with open(input_file, "w") as f:
             json.dump(test_data, f)
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
-        stream_process_file(
+        data_iterator = get_json_file_iterator(str(input_file))
+        stream_process(
             processor=processor,
-            file_path=str(input_file),
+            data=data_iterator,
             entity_name="users",
             output_format="csv",
             output_destination=str(output_dir),
@@ -262,12 +272,13 @@ class TestStreamProcessFile:
             f.write('{"id": 1, "name": "Alice"}\n')
             f.write('{"id": 2, "name": "Bob"}\n')
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
-        stream_process_file(
+        data_iterator = get_jsonl_file_iterator(processor, str(input_file))
+        stream_process(
             processor=processor,
-            file_path=str(input_file),
+            data=data_iterator,
             entity_name="users",
             output_format="csv",
             output_destination=str(output_dir),
@@ -283,38 +294,10 @@ class TestStreamProcessFile:
 
     def test_stream_process_nonexistent_file(self):
         """Test streaming processing with nonexistent file."""
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
 
-        with pytest.raises(FileError):
-            stream_process_file(
-                processor=processor,
-                file_path="nonexistent.json",
-                entity_name="test",
-                output_format="csv",
-            )
-
-    def test_stream_process_file_with_format(self, tmp_path):
-        """Test streaming processing with explicit format specification."""
-        # Create test JSON file
-        test_data = [{"id": 1, "name": "Alice"}]
-        input_file = tmp_path / "input.data"  # Non-standard extension
-        with open(input_file, "w") as f:
-            json.dump(test_data, f)
-
-        processor = Processor()
-        output_dir = tmp_path / "output"
-
-        stream_process_file_with_format(
-            processor=processor,
-            file_path=str(input_file),
-            entity_name="users",
-            output_format="csv",
-            format_type="json",  # Explicitly specify format
-            output_destination=str(output_dir),
-        )
-
-        main_file = output_dir / "users.csv"
-        assert main_file.exists()
+        with pytest.raises(ProcessingError):
+            list(get_json_file_iterator("nonexistent.json"))
 
 
 class TestStreamingMemoryOptimization:
@@ -325,7 +308,7 @@ class TestStreamingMemoryOptimization:
         data = [{"id": i, "value": f"item_{i}"} for i in range(100)]
 
         config = TransmogConfig.for_memory()
-        processor = Processor(config)
+        processor = _create_processor(config)
         output_dir = tmp_path / "output"
 
         stream_process(
@@ -348,7 +331,7 @@ class TestStreamingMemoryOptimization:
         """Test streaming with very small batch size for memory efficiency."""
         data = [{"id": i, "nested": {"value": i * 2}} for i in range(20)]
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
         stream_process(
@@ -381,7 +364,7 @@ class TestStreamingErrorHandling:
             {"id": 3, "name": "Charlie"},
         ]
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
         # Should handle malformed data gracefully
@@ -400,11 +383,11 @@ class TestStreamingErrorHandling:
         """Test streaming with invalid output format."""
         data = [{"id": 1, "name": "Alice"}]
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
-        # Should raise ConfigurationError for unsupported output format
-        with pytest.raises(ConfigurationError):
+        # Should raise ProcessingError for unsupported output format (wrapped by stream_process)
+        with pytest.raises(ProcessingError):
             stream_process(
                 processor=processor,
                 data=data,
@@ -426,7 +409,7 @@ class TestStreamingWithComplexData:
             }
         ]
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
         stream_process(
@@ -460,7 +443,7 @@ class TestStreamingWithComplexData:
             }
         ]
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
         stream_process(
@@ -493,7 +476,7 @@ class TestStreamingWithComplexData:
                     "tags": [f"tag_{j}" for j in range(i % 5)],
                 }
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
         stream_process(
@@ -524,7 +507,7 @@ class TestStreamingOutputFormats:
             {"id": 2, "name": "Bob", "score": 87.2},
         ]
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
 
         # Test JSON output
         json_file = tmp_path / "scores.json"
@@ -555,7 +538,7 @@ class TestStreamingOutputFormats:
             {"id": 2, "name": "Bob"},
         ]
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
         stream_process(
@@ -587,7 +570,7 @@ class TestStreamingOutputFormats:
             {"id": 2, "name": "Bob", "score": 87.2},
         ]
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
         # Stream to Parquet format
@@ -620,7 +603,7 @@ class TestStreamingEdgeCases:
         """Test streaming processing with empty data."""
         data = []
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
         stream_process(
@@ -638,7 +621,7 @@ class TestStreamingEdgeCases:
         """Test streaming processing with single record."""
         data = [{"id": 1, "name": "Single"}]
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
         stream_process(
@@ -664,7 +647,7 @@ class TestStreamingEdgeCases:
             {"id": 2, "name": None, "optional": "value"},
         ]
 
-        processor = Processor()
+        processor = _create_processor(TransmogConfig())
         output_dir = tmp_path / "output"
 
         stream_process(

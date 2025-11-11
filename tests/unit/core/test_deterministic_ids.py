@@ -4,102 +4,97 @@ Tests for deterministic ID generation.
 Tests deterministic ID generation, composite IDs, and reproducible behavior.
 """
 
-import hashlib
-from typing import Any
-
 import pytest
 
-from transmog.core.metadata import (
-    generate_composite_id,
-    generate_deterministic_id,
-)
+import transmog as tm
+from transmog.core.metadata import _generate_deterministic_id_from_value
 
 
 class TestDeterministicIdGeneration:
     """Test deterministic ID generation functions."""
 
-    def test_generate_deterministic_id_simple(self):
+    def test__generate_deterministic_id_from_value_simple(self):
         """Test generating deterministic ID with simple value."""
         value = "test_value"
 
-        id1 = generate_deterministic_id(value)
-        id2 = generate_deterministic_id(value)
+        id1 = _generate_deterministic_id_from_value(value)
+        id2 = _generate_deterministic_id_from_value(value)
 
         assert isinstance(id1, str)
         assert isinstance(id2, str)
         assert id1 == id2  # Same input should produce same output
         assert len(id1) > 0
 
-    def test_generate_deterministic_id_integer(self):
+    def test__generate_deterministic_id_from_value_integer(self):
         """Test generating deterministic ID with integer value."""
         value = 12345
 
-        id1 = generate_deterministic_id(value)
-        id2 = generate_deterministic_id(value)
+        id1 = _generate_deterministic_id_from_value(value)
+        id2 = _generate_deterministic_id_from_value(value)
 
         assert isinstance(id1, str)
         assert id1 == id2
         assert len(id1) > 0
 
-    def test_generate_deterministic_id_float(self):
+    def test__generate_deterministic_id_from_value_float(self):
         """Test generating deterministic ID with float value."""
         value = 3.14159
 
-        id1 = generate_deterministic_id(value)
-        id2 = generate_deterministic_id(value)
+        id1 = _generate_deterministic_id_from_value(value)
+        id2 = _generate_deterministic_id_from_value(value)
 
         assert isinstance(id1, str)
         assert id1 == id2
         assert len(id1) > 0
 
-    def test_generate_deterministic_id_boolean(self):
+    def test__generate_deterministic_id_from_value_boolean(self):
         """Test generating deterministic ID with boolean value."""
         value_true = True
         value_false = False
 
-        id_true1 = generate_deterministic_id(value_true)
-        id_true2 = generate_deterministic_id(value_true)
-        id_false1 = generate_deterministic_id(value_false)
-        id_false2 = generate_deterministic_id(value_false)
+        id_true1 = _generate_deterministic_id_from_value(value_true)
+        id_true2 = _generate_deterministic_id_from_value(value_true)
+        id_false1 = _generate_deterministic_id_from_value(value_false)
+        id_false2 = _generate_deterministic_id_from_value(value_false)
 
         assert id_true1 == id_true2
         assert id_false1 == id_false2
         assert id_true1 != id_false1  # Different values should produce different IDs
 
-    def test_generate_deterministic_id_none(self):
+    def test__generate_deterministic_id_from_value_none(self):
         """Test generating deterministic ID with None value."""
         value = None
 
-        id1 = generate_deterministic_id(value)
-        id2 = generate_deterministic_id(value)
+        id1 = _generate_deterministic_id_from_value(value)
+        id2 = _generate_deterministic_id_from_value(value)
 
         assert isinstance(id1, str)
         assert id1 == id2
         assert len(id1) > 0
 
-    def test_generate_deterministic_id_dict(self):
+    def test__generate_deterministic_id_from_value_dict(self):
         """Test generating deterministic ID with dictionary value."""
         value = {"name": "test", "id": 123, "active": True}
 
-        id1 = generate_deterministic_id(value)
-        id2 = generate_deterministic_id(value)
+        id1 = _generate_deterministic_id_from_value(value)
+        id2 = _generate_deterministic_id_from_value(value)
 
         assert isinstance(id1, str)
         assert id1 == id2
         assert len(id1) > 0
 
-    def test_generate_deterministic_id_list(self):
+    def test__generate_deterministic_id_from_value_list(self):
         """Test generating deterministic ID with list value."""
         value = ["item1", "item2", 123, True]
 
-        id1 = generate_deterministic_id(value)
-        id2 = generate_deterministic_id(value)
+        id1 = _generate_deterministic_id_from_value(value)
+        id2 = _generate_deterministic_id_from_value(value)
 
         assert isinstance(id1, str)
         assert id1 == id2
         assert len(id1) > 0
 
-    def test_generate_deterministic_id_different_values(self):
+    def test__generate_deterministic_id_from_value_different_values(self):
         """Test that different values produce different IDs."""
         values = [
             "test1",
@@ -115,18 +110,18 @@ class TestDeterministicIdGeneration:
             None,
         ]
 
-        ids = [generate_deterministic_id(value) for value in values]
+        ids = [_generate_deterministic_id_from_value(value) for value in values]
 
         # All IDs should be unique
         assert len(set(ids)) == len(ids)
 
-    def test_generate_deterministic_id_order_sensitivity(self):
+    def test__generate_deterministic_id_from_value_order_sensitivity(self):
         """Test that order matters in deterministic ID generation."""
         dict1 = {"a": 1, "b": 2}
         dict2 = {"b": 2, "a": 1}  # Same content, different order
 
-        id1 = generate_deterministic_id(dict1)
-        id2 = generate_deterministic_id(dict2)
+        id1 = _generate_deterministic_id_from_value(dict1)
+        id2 = _generate_deterministic_id_from_value(dict2)
 
         # Implementation might or might not be order-sensitive
         # Just test that both produce valid IDs
@@ -135,47 +130,47 @@ class TestDeterministicIdGeneration:
         assert len(id1) > 0
         assert len(id2) > 0
 
-    def test_generate_deterministic_id_nested_structures(self):
+    def test__generate_deterministic_id_from_value_nested_structures(self):
         """Test deterministic ID generation with nested structures."""
         nested_value = {
             "level1": {"level2": {"level3": ["item1", "item2", {"deep": "value"}]}},
             "other": [1, 2, {"nested": True}],
         }
 
-        id1 = generate_deterministic_id(nested_value)
-        id2 = generate_deterministic_id(nested_value)
+        id1 = _generate_deterministic_id_from_value(nested_value)
+        id2 = _generate_deterministic_id_from_value(nested_value)
 
         assert isinstance(id1, str)
         assert id1 == id2
         assert len(id1) > 0
 
-    def test_generate_deterministic_id_unicode(self):
+    def test__generate_deterministic_id_from_value_unicode(self):
         """Test deterministic ID generation with unicode values."""
         unicode_values = ["Hello 世界", "café", "naïve", "🌟⭐", "Москва", "東京"]
 
         for value in unicode_values:
-            id1 = generate_deterministic_id(value)
-            id2 = generate_deterministic_id(value)
+            id1 = _generate_deterministic_id_from_value(value)
+            id2 = _generate_deterministic_id_from_value(value)
 
             assert isinstance(id1, str)
             assert id1 == id2
             assert len(id1) > 0
 
-    def test_generate_deterministic_id_large_values(self):
+    def test__generate_deterministic_id_from_value_large_values(self):
         """Test deterministic ID generation with large values."""
         large_string = "x" * 10000
         large_dict = {f"key_{i}": f"value_{i}" for i in range(1000)}
         large_list = [f"item_{i}" for i in range(1000)]
 
         for large_value in [large_string, large_dict, large_list]:
-            id1 = generate_deterministic_id(large_value)
-            id2 = generate_deterministic_id(large_value)
+            id1 = _generate_deterministic_id_from_value(large_value)
+            id2 = _generate_deterministic_id_from_value(large_value)
 
             assert isinstance(id1, str)
             assert id1 == id2
             assert len(id1) > 0
 
-    def test_generate_deterministic_id_special_characters(self):
+    def test__generate_deterministic_id_from_value_special_characters(self):
         """Test deterministic ID generation with special characters."""
         special_values = [
             "!@#$%^&*()",
@@ -188,14 +183,14 @@ class TestDeterministicIdGeneration:
         ]
 
         for value in special_values:
-            id1 = generate_deterministic_id(value)
-            id2 = generate_deterministic_id(value)
+            id1 = _generate_deterministic_id_from_value(value)
+            id2 = _generate_deterministic_id_from_value(value)
 
             assert isinstance(id1, str)
             assert id1 == id2
             assert len(id1) > 0
 
-    def test_generate_deterministic_id_consistency_across_calls(self):
+    def test__generate_deterministic_id_from_value_consistency_across_calls(self):
         """Test that deterministic IDs are consistent across multiple calls."""
         test_data = {
             "string": "test_value",
@@ -209,7 +204,7 @@ class TestDeterministicIdGeneration:
 
         # Generate IDs multiple times
         for _key, value in test_data.items():
-            ids = [generate_deterministic_id(value) for _ in range(10)]
+            ids = [_generate_deterministic_id_from_value(value) for _ in range(10)]
 
             # All IDs should be identical
             assert len(set(ids)) == 1
@@ -217,169 +212,8 @@ class TestDeterministicIdGeneration:
             assert all(len(id_val) > 0 for id_val in ids)
 
 
-class TestCompositeIdGeneration:
-    """Test composite ID generation functions."""
-
-    def test_generate_composite_id_simple(self):
-        """Test generating composite ID with simple components."""
-        values = {"field1": "comp1", "field2": "comp2", "field3": "comp3"}
-        fields = ["field1", "field2", "field3"]
-
-        id1 = generate_composite_id(values, fields)
-        id2 = generate_composite_id(values, fields)
-
-        assert isinstance(id1, str)
-        assert isinstance(id2, str)
-        assert id1 == id2
-        assert len(id1) > 0
-
-    def test_generate_composite_id_mixed_types(self):
-        """Test generating composite ID with mixed type components."""
-        values = {
-            "str": "string",
-            "int": 123,
-            "float": 3.14,
-            "bool": True,
-            "none": None,
-        }
-        fields = ["str", "int", "float", "bool", "none"]
-
-        id1 = generate_composite_id(values, fields)
-        id2 = generate_composite_id(values, fields)
-
-        assert isinstance(id1, str)
-        assert id1 == id2
-        assert len(id1) > 0
-
-    def test_generate_composite_id_empty_list(self):
-        """Test generating composite ID with empty components."""
-        values = {}
-        fields = []
-
-        id1 = generate_composite_id(values, fields)
-        id2 = generate_composite_id(values, fields)
-
-        assert isinstance(id1, str)
-        assert id1 == id2
-        assert len(id1) > 0
-
-    def test_generate_composite_id_single_component(self):
-        """Test generating composite ID with single component."""
-        values = {"field": "single_component"}
-        fields = ["field"]
-
-        id1 = generate_composite_id(values, fields)
-        id2 = generate_composite_id(values, fields)
-
-        assert isinstance(id1, str)
-        assert id1 == id2
-        assert len(id1) > 0
-
-    def test_generate_composite_id_order_matters(self):
-        """Test generating composite ID with different field orders."""
-        values = {"a": "a", "b": "b", "c": "c"}
-        fields1 = ["a", "b", "c"]
-        fields2 = ["c", "b", "a"]
-
-        id1 = generate_composite_id(values, fields1)
-        id2 = generate_composite_id(values, fields2)
-
-        assert isinstance(id1, str)
-        assert isinstance(id2, str)
-        # Same values should produce same ID regardless of field order for deterministic behavior
-        assert id1 == id2
-
-    def test_generate_composite_id_with_duplicates(self):
-        """Test generating composite ID with duplicate components."""
-        values = {"a": "a", "b": "b", "c": "c"}
-        fields = ["a", "b", "a", "c", "b"]
-
-        id1 = generate_composite_id(values, fields)
-        id2 = generate_composite_id(values, fields)
-
-        assert isinstance(id1, str)
-        assert id1 == id2
-        assert len(id1) > 0
-
-    def test_generate_composite_id_complex_components(self):
-        """Test generating composite ID with complex components."""
-        values = {
-            "nested": {"nested": {"deep": "value"}},
-            "list": [1, 2, {"inner": "list"}],
-            "simple": "simple_string",
-            "number": 42,
-        }
-        fields = ["nested", "list", "simple", "number"]
-
-        id1 = generate_composite_id(values, fields)
-        id2 = generate_composite_id(values, fields)
-
-        assert isinstance(id1, str)
-        assert id1 == id2
-        assert len(id1) > 0
-
-    def test_generate_composite_id_different_lengths(self):
-        """Test composite IDs with different component lengths."""
-        test_cases = [
-            ({"a": "a"}, ["a"]),
-            ({"a": "a", "b": "b"}, ["a", "b"]),
-            ({"a": "a", "b": "b", "c": "c"}, ["a", "b", "c"]),
-            (
-                {"a": "a", "b": "b", "c": "c", "d": "d", "e": "e"},
-                ["a", "b", "c", "d", "e"],
-            ),
-            (
-                {f"field_{i}": f"value_{i}" for i in range(100)},
-                [f"field_{i}" for i in range(100)],
-            ),  # Long list
-        ]
-
-        ids = []
-        for values, fields in test_cases:
-            composite_id = generate_composite_id(values, fields)
-            assert isinstance(composite_id, str)
-            assert len(composite_id) > 0
-            ids.append(composite_id)
-
-        # All IDs should be unique
-        assert len(set(ids)) == len(ids)
-
-    def test_generate_composite_id_unicode_components(self):
-        """Test composite ID generation with unicode components."""
-        values = {
-            "hello": "Hello",
-            "world": "世界",
-            "cafe": "café",
-            "star": "🌟",
-            "moscow": "Москва",
-        }
-        fields = ["hello", "world", "cafe", "star", "moscow"]
-
-        id1 = generate_composite_id(values, fields)
-        id2 = generate_composite_id(values, fields)
-
-        assert isinstance(id1, str)
-        assert id1 == id2
-        assert len(id1) > 0
-
-
 class TestDeterministicIdIntegration:
     """Test integration of deterministic ID functionality."""
-
-    def test_deterministic_vs_composite_ids(self):
-        """Test relationship between deterministic and composite IDs."""
-        value = {"a": 1, "b": 2}
-        values = {"a": 1, "b": 2}
-        fields = ["a", "b"]
-
-        det_id = generate_deterministic_id(value)
-        comp_id = generate_composite_id(values, fields)
-
-        assert isinstance(det_id, str)
-        assert isinstance(comp_id, str)
-        # They might or might not be equal depending on implementation
-        assert len(det_id) > 0
-        assert len(comp_id) > 0
 
     def test_reproducibility_across_sessions(self):
         """Test that IDs are reproducible across different sessions."""
@@ -394,10 +228,14 @@ class TestDeterministicIdIntegration:
         ]
 
         # Generate IDs in first "session"
-        session1_ids = [generate_deterministic_id(value) for value in test_values]
+        session1_ids = [
+            _generate_deterministic_id_from_value(value) for value in test_values
+        ]
 
         # Generate IDs in second "session" (same values)
-        session2_ids = [generate_deterministic_id(value) for value in test_values]
+        session2_ids = [
+            _generate_deterministic_id_from_value(value) for value in test_values
+        ]
 
         # Should be identical
         assert session1_ids == session2_ids
@@ -409,7 +247,7 @@ class TestDeterministicIdIntegration:
             {"id": i, "name": f"item_{i}", "value": i * 2} for i in range(1000)
         ]
 
-        ids = [generate_deterministic_id(value) for value in similar_values]
+        ids = [_generate_deterministic_id_from_value(value) for value in similar_values]
 
         # All IDs should be unique
         assert len(set(ids)) == len(ids)
@@ -418,7 +256,7 @@ class TestDeterministicIdIntegration:
         """Test that generated IDs have consistent format."""
         test_values = ["string", 123, {"dict": "value"}, ["list", "items"], None, True]
 
-        ids = [generate_deterministic_id(value) for value in test_values]
+        ids = [_generate_deterministic_id_from_value(value) for value in test_values]
 
         for id_val in ids:
             assert isinstance(id_val, str)
@@ -438,7 +276,7 @@ class TestDeterministicIdIntegration:
         }
 
         start_time = time.time()
-        id1 = generate_deterministic_id(large_data)
+        id1 = _generate_deterministic_id_from_value(large_data)
         end_time = time.time()
 
         # Should complete in reasonable time (less than 1 second)
@@ -447,7 +285,7 @@ class TestDeterministicIdIntegration:
         assert len(id1) > 0
 
         # Should be reproducible
-        id2 = generate_deterministic_id(large_data)
+        id2 = _generate_deterministic_id_from_value(large_data)
         assert id1 == id2
 
     def test_thread_safety(self):
@@ -462,7 +300,7 @@ class TestDeterministicIdIntegration:
         def generate_in_thread():
             try:
                 for _ in range(100):
-                    id_val = generate_deterministic_id(test_value)
+                    id_val = _generate_deterministic_id_from_value(test_value)
                     results.append(id_val)
                     time.sleep(0.001)  # Small delay
             except Exception as e:
@@ -498,7 +336,7 @@ class TestDeterministicIdIntegration:
         gc.collect()
 
         # Generate IDs
-        ids = [generate_deterministic_id(value) for value in values]
+        ids = [_generate_deterministic_id_from_value(value) for value in values]
 
         # All IDs should be valid and unique
         assert len(ids) == 10000
@@ -525,8 +363,8 @@ class TestDeterministicIdIntegration:
 
         for case in edge_cases:
             try:
-                id1 = generate_deterministic_id(case)
-                id2 = generate_deterministic_id(case)
+                id1 = _generate_deterministic_id_from_value(case)
+                id2 = _generate_deterministic_id_from_value(case)
 
                 assert isinstance(id1, str)
                 assert isinstance(id2, str)
@@ -547,9 +385,91 @@ class TestDeterministicIdIntegration:
         }
 
         # Generate ID multiple times
-        ids = [generate_deterministic_id(test_data) for _ in range(10)]
+        ids = [_generate_deterministic_id_from_value(test_data) for _ in range(10)]
 
         # Should all be the same
         assert len(set(ids)) == 1
         assert all(isinstance(id_val, str) for id_val in ids)
         assert all(len(id_val) > 0 for id_val in ids)
+
+
+class TestDeterministicIdApiIntegration:
+    """Test deterministic IDs through the API."""
+
+    def test_deterministic_ids_enabled(self):
+        """Test deterministic IDs when enabled in config."""
+        data = {"name": "test", "value": 42}
+        config = tm.TransmogConfig(deterministic_ids=True)
+
+        result1 = tm.flatten(data, name="test", config=config)
+        result2 = tm.flatten(data, name="test", config=config)
+
+        assert result1.main[0]["_id"] == result2.main[0]["_id"]
+        assert isinstance(result1.main[0]["_id"], str)
+        assert len(result1.main[0]["_id"]) > 0
+
+    def test_deterministic_ids_different_data(self):
+        """Test that different data produces different deterministic IDs."""
+        data1 = {"name": "test1", "value": 42}
+        data2 = {"name": "test2", "value": 42}
+        config = tm.TransmogConfig(deterministic_ids=True)
+
+        result1 = tm.flatten(data1, name="test", config=config)
+        result2 = tm.flatten(data2, name="test", config=config)
+
+        assert result1.main[0]["_id"] != result2.main[0]["_id"]
+
+    def test_composite_deterministic_ids(self):
+        """Test composite deterministic IDs from multiple fields."""
+        data1 = {"region": "US", "store": "001", "product": "laptop", "price": 999}
+        data2 = {"region": "US", "store": "001", "product": "laptop", "price": 899}
+        config = tm.TransmogConfig(
+            deterministic_ids=True, id_fields=["region", "store", "product"]
+        )
+
+        result1 = tm.flatten(data1, name="sales", config=config)
+        result2 = tm.flatten(data2, name="sales", config=config)
+
+        # Same composite key should produce same ID
+        assert result1.main[0]["_id"] == result2.main[0]["_id"]
+
+    def test_composite_deterministic_ids_different_keys(self):
+        """Test that different composite keys produce different IDs."""
+        data1 = {"region": "US", "store": "001", "product": "laptop"}
+        data2 = {"region": "EU", "store": "001", "product": "laptop"}
+        config = tm.TransmogConfig(
+            deterministic_ids=True, id_fields=["region", "store", "product"]
+        )
+
+        result1 = tm.flatten(data1, name="sales", config=config)
+        result2 = tm.flatten(data2, name="sales", config=config)
+
+        assert result1.main[0]["_id"] != result2.main[0]["_id"]
+
+    def test_composite_id_missing_fields(self):
+        """Test composite IDs when some fields are missing."""
+        data1 = {"region": "US", "store": "001"}
+        data2 = {"region": "US", "store": "001", "product": None}
+        config = tm.TransmogConfig(
+            deterministic_ids=True, id_fields=["region", "store", "product"]
+        )
+
+        result1 = tm.flatten(data1, name="sales", config=config)
+        result2 = tm.flatten(data2, name="sales", config=config)
+
+        # Missing field should be treated as None, so these should be the same
+        assert result1.main[0]["_id"] == result2.main[0]["_id"]
+
+    def test_deterministic_vs_random_ids(self):
+        """Test that deterministic IDs differ from random IDs."""
+        data = {"name": "test", "value": 42}
+        config_deterministic = tm.TransmogConfig(deterministic_ids=True)
+        config_random = tm.TransmogConfig(deterministic_ids=False)
+
+        result_det = tm.flatten(data, name="test", config=config_deterministic)
+        result_rand = tm.flatten(data, name="test", config=config_random)
+
+        # Both should be valid UUIDs but different
+        assert result_det.main[0]["_id"] != result_rand.main[0]["_id"]
+        assert isinstance(result_det.main[0]["_id"], str)
+        assert isinstance(result_rand.main[0]["_id"], str)

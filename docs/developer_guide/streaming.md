@@ -1,8 +1,7 @@
-# Streaming and Memory-Efficient Processing
+# Streaming Processing
 
-For large datasets that exceed available memory, Transmog provides streaming functionality.
-
-It processes data in batches and writes results directly to files without keeping all data in memory.
+For large datasets that exceed available memory, Transmog processes data in batches
+and writes results directly to files without keeping all data in memory.
 
 ## Streaming Functions
 
@@ -49,15 +48,15 @@ Batch size controls memory usage and processing speed. Configure via `TransmogCo
 import transmog as tm
 
 # Memory-efficient: small batches, minimal cache
-config = tm.TransmogConfig.for_memory()  # batch_size=100, cache_size=1000
+config = tm.TransmogConfig.for_memory()  # batch_size=100
 result = tm.flatten(large_data, config=config)
 
 # Performance-optimized: large batches, extended cache
-config = tm.TransmogConfig.for_parquet()  # batch_size=10000, cache_size=50000
+config = tm.TransmogConfig(batch_size=10000)
 result = tm.flatten(large_data, config=config)
 
 # Custom batch size
-config = tm.TransmogConfig(batch_size=2000, cache_size=10000)
+config = tm.TransmogConfig(batch_size=2000)
 result = tm.flatten(large_data, config=config)
 ```
 
@@ -70,8 +69,6 @@ Different batch sizes impact memory consumption:
 | `batch_size=100` | Minimal | Moderate | Limited memory |
 | `batch_size=1000` | Low | High | Balanced approach |
 | `batch_size=10000` | Variable | Highest | Abundant memory |
-
-## Streaming Input Sources
 
 ## Processing Large Files
 
@@ -117,3 +114,22 @@ tm.flatten_stream(
     compression="gzip"
 )
 ```
+
+## Best Practices
+
+### Choosing Batch Sizes
+
+- Small datasets (< 10K records): Default batch size (1000)
+- Large datasets (10K - 1M records): 5000-10000
+- Very large datasets (> 1M records): Use streaming with batch size 100-1000
+- Memory-constrained environments: Use `TransmogConfig.for_memory()` (batch size 100)
+
+### Output Format Selection
+
+- CSV: Widely compatible, smaller file size for simple data
+- Parquet: Columnar storage, better for analytics, supports native arrays
+
+### Memory Monitoring
+
+Monitor memory usage during processing to optimize batch size selection.
+If memory usage is high, reduce batch size. If processing is slow, increase batch size.

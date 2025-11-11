@@ -26,7 +26,7 @@ class TestFieldNaming:
         """Test dot separator."""
         data = {"level1": {"level2": {"value": "test"}}}
 
-        config = tm.TransmogConfig(separator=".", nested_threshold=10)
+        config = tm.TransmogConfig(separator=".")
         result = tm.flatten(data, name="test", config=config)
 
         main_record = result.main[0]
@@ -37,7 +37,7 @@ class TestFieldNaming:
         """Test custom separator."""
         data = {"level1": {"level2": {"value": "test"}}}
 
-        config = tm.TransmogConfig(separator="::", nested_threshold=10)
+        config = tm.TransmogConfig(separator="::")
         result = tm.flatten(data, name="test", config=config)
 
         main_record = result.main[0]
@@ -62,34 +62,23 @@ class TestFieldNaming:
         # Should contain all path components or be simplified
         assert "a" in deep_field or len(deep_field.split("_")) <= 6
 
-    def test_nested_threshold_effect(self):
-        """Test nested threshold effect on naming."""
+    def test_deeply_nested_simplification(self):
+        """Test that deeply nested paths are simplified."""
         deep_data = {
             "level1": {"level2": {"level3": {"level4": {"level5": {"value": "deep"}}}}}
         }
 
-        # Low threshold should simplify names
-        config_low = tm.TransmogConfig(nested_threshold=3)
-        result_low = tm.flatten(deep_data, name="test", config=config_low)
+        config = tm.TransmogConfig()
+        result = tm.flatten(deep_data, name="test", config=config)
 
-        # High threshold should keep full names
-        config_high = tm.TransmogConfig(nested_threshold=10)
-        result_high = tm.flatten(deep_data, name="test", config=config_high)
+        assert len(result.main) == 1
 
-        # Both should work
-        assert len(result_low.main) == 1
-        assert len(result_high.main) == 1
+        keys = list(result.main[0].keys())
+        value_field = next((k for k in keys if "value" in k), None)
 
-        # Field names might be different
-        low_keys = list(result_low.main[0].keys())
-        high_keys = list(result_high.main[0].keys())
-
-        # Should have value field in both
-        low_value_field = next((k for k in low_keys if "value" in k), None)
-        high_value_field = next((k for k in high_keys if "value" in k), None)
-
-        assert low_value_field is not None
-        assert high_value_field is not None
+        assert value_field is not None
+        # Deep paths include all levels
+        assert value_field == "level1_level2_level3_level4_level5_value"
 
     def test_special_characters_in_keys(self):
         """Test handling special characters in field names."""

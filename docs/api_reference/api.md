@@ -8,7 +8,7 @@ Transform nested data structures into flat tables.
 
 ```python
 flatten(
-    data: DataInput,
+    data: Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes],
     name: str = "data",
     config: Optional[TransmogConfig] = None,
 ) -> FlattenResult
@@ -16,7 +16,7 @@ flatten(
 
 **Parameters:**
 
-- **data** (*Union[dict, list[dict], str, Path, bytes]*): Input data. Can be
+- **data** (*Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes]*): Input data. Can be
   dictionary, list of dictionaries, JSON string, file path, or bytes.
 - **name** (*str*, default="data"): Base name for generated tables.
 - **config** (*Optional[TransmogConfig]*, default=None): Configuration object. Uses defaults if not provided.
@@ -38,7 +38,7 @@ config = tm.TransmogConfig(separator=".", cast_to_string=False)
 result = tm.flatten(data, config=config)
 
 # Factory method configuration
-result = tm.flatten(data, config=tm.TransmogConfig.for_parquet())
+result = tm.flatten(data, config=tm.TransmogConfig(batch_size=10000))
 ```
 
 ### flatten_file()
@@ -85,7 +85,7 @@ Stream data directly to files.
 
 ```python
 flatten_stream(
-    data: DataInput,
+    data: Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes],
     output_path: Union[str, Path],
     name: str = "data",
     output_format: str = "csv",
@@ -96,7 +96,7 @@ flatten_stream(
 
 **Parameters:**
 
-- **data**: Input data (same as `flatten()`).
+- **data** (*Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes]*): Input data (same as `flatten()`).
 - **output_path** (*Union[str, Path]*): Directory path for output files.
 - **name** (*str*, default="data"): Base name for output files.
 - **output_format** (*str*, default="csv"): Output format ("csv", "parquet").
@@ -132,10 +132,8 @@ Configuration class for all processing parameters.
 ```python
 TransmogConfig(
     separator: str = "_",
-    nested_threshold: int = 4,
     cast_to_string: bool = False,
-    include_empty: bool = False,
-    skip_null: bool = True,
+    null_handling: NullHandling = NullHandling.SKIP,
     array_mode: ArrayMode = ArrayMode.SMART,
     batch_size: int = 1000,
     max_depth: int = 100,
@@ -143,10 +141,9 @@ TransmogConfig(
     parent_field: str = "_parent_id",
     time_field: Optional[str] = "_timestamp",
     id_patterns: Optional[list[str]] = None,
+    deterministic_ids: bool = False,
+    id_fields: Optional[list[str]] = None,
     recovery_mode: RecoveryMode = RecoveryMode.STRICT,
-    allow_malformed_data: bool = False,
-    cache_size: int = 10000,
-    id_generator: Optional[Callable] = None,
 )
 ```
 
@@ -155,13 +152,13 @@ TransmogConfig(
 **Naming:**
 
 - `separator` (str, default="_"): Character to separate nested field names
-- `nested_threshold` (int, default=4): Depth threshold for path simplification
 
 **Processing:**
 
 - `cast_to_string` (bool, default=False): Convert all values to strings
-- `include_empty` (bool, default=False): Include empty values in output
-- `skip_null` (bool, default=True): Skip null values
+- `null_handling` (NullHandling, default=NullHandling.SKIP): How to handle null and empty values:
+  - `tm.NullHandling.SKIP`: Skip null values and empty strings (default)
+  - `tm.NullHandling.INCLUDE`: Include null values as empty strings and include empty string values
 - `array_mode` (ArrayMode, default=ArrayMode.SMART): How to handle arrays
 - `batch_size` (int, default=1000): Records to process at once
 - `max_depth` (int, default=100): Maximum recursion depth
@@ -176,49 +173,28 @@ TransmogConfig(
 
 - `id_patterns` (Optional[list[str]]): Field names to check for natural IDs
 
+**Deterministic IDs:**
+
+- `deterministic_ids` (bool, default=False): Generate deterministic IDs based on record content
+- `id_fields` (Optional[list[str]]): List of field names for composite deterministic IDs
+
 **Error Handling:**
 
 - `recovery_mode` (RecoveryMode, default=RecoveryMode.STRICT): Error recovery strategy:
   - `tm.RecoveryMode.STRICT`: Stop on first error
   - `tm.RecoveryMode.SKIP`: Skip problematic records and continue
-  - `tm.RecoveryMode.PARTIAL`: Attempt to extract usable data from partially valid records
-- `allow_malformed_data` (bool, default=False): Allow malformed data
-
-**Cache:**
-
-- `cache_size` (int, default=10000): Maximum cache size (set to 0 to disable)
-
-**Advanced:**
-
-- `id_generator` (Optional[Callable[[dict[str, Any]], str]]): Custom function for ID generation
 
 **Factory Methods:**
 
 ```python
-# Memory-optimized: small batches (100), minimal cache (1000)
+# Memory-optimized: small batches (100)
 config = TransmogConfig.for_memory()
-
-# Performance-optimized: large batches (10000), extended cache (50000)
-config = TransmogConfig.for_parquet()
 
 # CSV-optimized: strings, includes empty/null values
 config = TransmogConfig.for_csv()
 
-# Simple: clean field names (id, parent_id, timestamp instead of _id, _parent_id, _timestamp)
-config = TransmogConfig.simple()
-
-# Error-tolerant: skip mode, allows malformed data
+# Error-tolerant: skip mode, continues on errors
 config = TransmogConfig.error_tolerant()
-```
-
-**Loading Methods:**
-
-```python
-# From file
-config = TransmogConfig.from_file("config.json")
-
-# From environment
-config = TransmogConfig.from_env()
 ```
 
 ### FlattenResult
@@ -334,9 +310,6 @@ if "products_tags" in result:
 table_names = list(result.keys())
 table_data = list(result.values())
 table_pairs = list(result.items())
-
-# Safe access
-tags = result.get_table("products_tags", default=[])
 ```
 
 ## Error Classes
@@ -385,6 +358,17 @@ tm.ArrayMode.INLINE   # All arrays as JSON strings
 tm.ArrayMode.SKIP     # Ignore arrays
 ```
 
+### NullHandling
+
+Enumeration for controlling null and empty value handling. Available as `tm.NullHandling` when importing `transmog as tm`.
+
+```python
+import transmog as tm
+
+tm.NullHandling.SKIP    # Skip null values and empty strings (default)
+tm.NullHandling.INCLUDE # Include null values as empty strings
+```
+
 ### RecoveryMode
 
 Enumeration for controlling error recovery behavior. Available as `tm.RecoveryMode` when importing `transmog as tm`.
@@ -394,7 +378,6 @@ import transmog as tm
 
 tm.RecoveryMode.STRICT  # Stop on first error (default)
 tm.RecoveryMode.SKIP    # Skip problematic records
-tm.RecoveryMode.PARTIAL # Extract usable data from partially valid records
 ```
 
 ## Module Information
@@ -408,24 +391,27 @@ print(tm.__version__)
 # Exported names
 print(tm.__all__)
 # ['flatten', 'flatten_file', 'flatten_stream', 'FlattenResult',
-#  'TransmogConfig', 'ArrayMode', 'RecoveryMode',
+#  'TransmogConfig', 'ArrayMode', 'NullHandling', 'RecoveryMode',
 #  'TransmogError', 'ValidationError', '__version__']
 
 # All exported types are available directly
 result = tm.flatten(data)                    # Main function
 config = tm.TransmogConfig()                 # Configuration
 mode = tm.ArrayMode.SMART                    # Array handling mode
+null_handling = tm.NullHandling.SKIP         # Null value handling mode
 recovery = tm.RecoveryMode.STRICT            # Error recovery mode
 ```
 
 ## Advanced Usage
 
 ```python
-# Direct processor usage
+# Advanced configuration usage
 import transmog as tm
-from transmog.process import Processor
 
-config = tm.TransmogConfig()
-processor = Processor(config)
-result = processor.process(data, entity_name="products")
+config = tm.TransmogConfig(
+    batch_size=1000,
+    array_mode=tm.ArrayMode.SEPARATE,
+    recovery_mode=tm.RecoveryMode.SKIP
+)
+result = tm.flatten(data, name="products", config=config)
 ```

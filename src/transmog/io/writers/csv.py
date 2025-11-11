@@ -14,20 +14,11 @@ import sys
 from typing import Any, BinaryIO, Optional, TextIO, Union, cast
 
 from transmog.error import OutputError
-from transmog.io.writer_interface import DataWriter, StreamingWriter, WriterUtils
-from transmog.types.base import JsonDict
+from transmog.io.writer_interface import DataWriter, StreamingWriter, sanitize_filename
+from transmog.types import JsonDict
 
 # Setup logger
 logger = logging.getLogger(__name__)
-
-# Check for PyArrow availability
-try:
-    import pyarrow as pa  # noqa: F401
-    import pyarrow.csv as pa_csv  # noqa: F401
-
-    PYARROW_AVAILABLE = True
-except ImportError:
-    PYARROW_AVAILABLE = False
 
 
 class CsvWriter(DataWriter):
@@ -66,18 +57,18 @@ class CsvWriter(DataWriter):
         self.compression = compression
         self.options = options
 
-    def write_table(
+    def write(
         self,
-        table_data: list[JsonDict],
-        output_path: Union[str, BinaryIO, TextIO],
-        **format_options: Any,
+        data: list[JsonDict],
+        destination: Union[str, BinaryIO, TextIO],
+        **options: Any,
     ) -> Union[str, BinaryIO, TextIO]:
-        """Write a table to a CSV file.
+        """Write data to a CSV file.
 
         Args:
-            table_data: The table data to write
-            output_path: Path or file-like object to write to
-            **format_options: Format-specific options (include_header, delimiter, etc.)
+            data: The data to write
+            destination: Path or file-like object to write to
+            **options: Format-specific options (include_header, delimiter, etc.)
 
         Returns:
             Path to the written file or file-like object
@@ -86,18 +77,16 @@ class CsvWriter(DataWriter):
             OutputError: If writing fails
         """
         try:
-            # Use provided options or instance defaults
-            use_header = format_options.get("include_header", self.include_header)
-            use_delimiter = format_options.get("delimiter", self.delimiter)
-            use_quotechar = format_options.get("quotechar", self.quotechar)
-            use_quoting = format_options.get("quoting", self.quoting)
-            use_escapechar = format_options.get("escapechar", self.escapechar)
-            compression = format_options.get("compression", self.compression)
+            use_header = options.get("include_header", self.include_header)
+            use_delimiter = options.get("delimiter", self.delimiter)
+            use_quotechar = options.get("quotechar", self.quotechar)
+            use_quoting = options.get("quoting", self.quoting)
+            use_escapechar = options.get("escapechar", self.escapechar)
+            compression = options.get("compression", self.compression)
 
-            # Handle empty data case
-            if not table_data:
-                if isinstance(output_path, (str, pathlib.Path)):
-                    path_str = str(output_path)
+            if not data:
+                if isinstance(destination, (str, pathlib.Path)):
+                    path_str = str(destination)
 
                     # Add .gz extension for compressed files
                     if compression == "gzip" and not path_str.endswith(".gz"):
@@ -115,21 +104,19 @@ class CsvWriter(DataWriter):
 
                     return (
                         pathlib.Path(path_str)
-                        if isinstance(output_path, pathlib.Path)
+                        if isinstance(destination, pathlib.Path)
                         else path_str
                     )
                 else:
-                    return output_path
+                    return destination
 
-            # Extract field names from all records
             field_names_set: set[str] = set()
-            for record in table_data:
+            for record in data:
                 field_names_set.update(record.keys())
             field_names = sorted(field_names_set)
 
-            # Handle file path destination
-            if isinstance(output_path, (str, pathlib.Path)):
-                path_str = str(output_path)
+            if isinstance(destination, (str, pathlib.Path)):
+                path_str = str(destination)
 
                 # Add .gz extension for compressed files
                 if compression == "gzip" and not path_str.endswith(".gz"):
@@ -137,12 +124,11 @@ class CsvWriter(DataWriter):
 
                 os.makedirs(os.path.dirname(path_str) or ".", exist_ok=True)
 
-                # Write directly to file
                 if compression == "gzip":
                     with gzip.open(path_str, "wt", encoding="utf-8", newline="") as f:
                         self._write_csv_to_stream(
                             f,
-                            table_data,
+                            data,
                             field_names,
                             use_header,
                             use_delimiter,
@@ -154,7 +140,7 @@ class CsvWriter(DataWriter):
                     with open(path_str, "w", encoding="utf-8", newline="") as f:
                         self._write_csv_to_stream(
                             f,
-                            table_data,
+                            data,
                             field_names,
                             use_header,
                             use_delimiter,
@@ -165,25 +151,23 @@ class CsvWriter(DataWriter):
 
                 return (
                     pathlib.Path(path_str)
-                    if isinstance(output_path, pathlib.Path)
+                    if isinstance(destination, pathlib.Path)
                     else path_str
                 )
 
-            # Handle file-like object destination
-            elif hasattr(output_path, "write"):
-                # For compressed data, wrap stream in gzip
+            elif hasattr(destination, "write"):
                 if compression == "gzip":
-                    if hasattr(output_path, "mode") and "b" not in getattr(
-                        output_path, "mode", ""
+                    if hasattr(destination, "mode") and "b" not in getattr(
+                        destination, "mode", ""
                     ):
                         raise OutputError("Cannot write compressed CSV to text stream")
-                    binary_output = cast(BinaryIO, output_path)
+                    binary_output = cast(BinaryIO, destination)
                     with gzip.open(
                         binary_output, "wt", encoding="utf-8", newline=""
                     ) as gz_file:
                         self._write_csv_to_stream(
                             gz_file,
-                            table_data,
+                            data,
                             field_names,
                             use_header,
                             use_delimiter,
@@ -192,19 +176,18 @@ class CsvWriter(DataWriter):
                             use_escapechar,
                         )
                 else:
-                    # Determine if stream is text or binary
                     if (
-                        hasattr(output_path, "mode")
-                        and "b" not in getattr(output_path, "mode", "")
+                        hasattr(destination, "mode")
+                        and "b" not in getattr(destination, "mode", "")
                     ) or (
-                        not hasattr(output_path, "mode")
-                        and hasattr(output_path, "read")
-                        and not hasattr(output_path, "readinto")
+                        not hasattr(destination, "mode")
+                        and hasattr(destination, "read")
+                        and not hasattr(destination, "readinto")
                     ):
-                        text_output = cast(TextIO, output_path)
+                        text_output = cast(TextIO, destination)
                         self._write_csv_to_stream(
                             text_output,
-                            table_data,
+                            data,
                             field_names,
                             use_header,
                             use_delimiter,
@@ -213,14 +196,13 @@ class CsvWriter(DataWriter):
                             use_escapechar,
                         )
                     else:
-                        # Binary stream, wrap in TextIOWrapper
-                        binary_output = cast(BinaryIO, output_path)
+                        binary_output = cast(BinaryIO, destination)
                         text_wrapper = io.TextIOWrapper(
                             binary_output, encoding="utf-8", newline=""
                         )
                         self._write_csv_to_stream(
                             text_wrapper,
-                            table_data,
+                            data,
                             field_names,
                             use_header,
                             use_delimiter,
@@ -231,9 +213,9 @@ class CsvWriter(DataWriter):
                         text_wrapper.flush()
                         text_wrapper.detach()
 
-                return output_path
+                return destination
             else:
-                raise OutputError(f"Invalid destination type: {type(output_path)}")
+                raise OutputError(f"Invalid destination type: {type(destination)}")
 
         except Exception as e:
             logger.error(f"Error writing CSV: {e}")
@@ -279,51 +261,6 @@ class CsvWriter(DataWriter):
 
         writer.writerows(table_data)
 
-    def write_all_tables(
-        self,
-        main_table: list[JsonDict],
-        child_tables: dict[str, list[JsonDict]],
-        base_path: Union[str],
-        entity_name: str,
-        **options: Any,
-    ) -> dict[str, str]:
-        """Write main and child tables to CSV files.
-
-        Args:
-            main_table: The main table data
-            child_tables: Dictionary of child tables
-            base_path: Directory to write files to
-            entity_name: Name of the entity (for main table filename)
-            **options: Additional CSV formatting options
-
-        Returns:
-            Dictionary mapping table names to file paths
-
-        Raises:
-            OutputError: If writing fails
-        """
-        os.makedirs(base_path, exist_ok=True)
-        compression = options.get("compression", self.compression)
-        paths = {}
-
-        # Write main table
-        main_path = WriterUtils.build_output_path(
-            base_path, entity_name, "csv", compression
-        )
-        self.write_table(main_table, main_path, **options)
-        paths["main"] = main_path
-
-        # Write child tables
-        for table_name, table_data in child_tables.items():
-            safe_name = WriterUtils.sanitize_filename(table_name)
-            child_path = WriterUtils.build_output_path(
-                base_path, safe_name, "csv", compression
-            )
-            self.write_table(table_data, child_path, **options)
-            paths[table_name] = child_path
-
-        return paths
-
 
 class CsvStreamingWriter(StreamingWriter):
     """Streaming writer for CSV format.
@@ -340,7 +277,6 @@ class CsvStreamingWriter(StreamingWriter):
         delimiter: str = ",",
         quotechar: str = '"',
         compression: Optional[str] = None,
-        buffer_size: int = 1000,
         **options: Any,
     ):
         """Initialize the CSV streaming writer.
@@ -352,10 +288,9 @@ class CsvStreamingWriter(StreamingWriter):
             delimiter: Column delimiter character
             quotechar: Character to use for quoting
             compression: Compression method ("gzip" supported)
-            buffer_size: Number of records to buffer before writing
             **options: Additional CSV writer options
         """
-        super().__init__(destination, entity_name, buffer_size, **options)
+        super().__init__(destination, entity_name, **options)
         self.include_header = include_header
         self.delimiter = delimiter
         self.quotechar = quotechar
@@ -422,11 +357,10 @@ class CsvStreamingWriter(StreamingWriter):
             if table_name == "main":
                 filename = self.entity_name
             else:
-                filename = WriterUtils.sanitize_filename(table_name)
+                filename = sanitize_filename(table_name)
 
-            file_path = WriterUtils.build_output_path(
-                self.base_dir, filename, "csv", self.compression
-            )
+            ext = ".csv.gz" if self.compression == "gzip" else ".csv"
+            file_path = os.path.join(self.base_dir, f"{filename}{ext}")
 
             # Open file with appropriate compression
             if self.compression == "gzip":
@@ -469,31 +403,11 @@ class CsvStreamingWriter(StreamingWriter):
 
         return writer
 
-    def initialize_main_table(self, **options: Any) -> None:
-        """Initialize the main table for streaming.
-
-        Args:
-            **options: Format-specific options
-        """
-        # Main table initialization happens when first records are written
-        pass
-
-    def initialize_child_table(self, table_name: str, **options: Any) -> None:
-        """Initialize a child table for streaming.
-
-        Args:
-            table_name: Name of the child table
-            **options: Format-specific options
-        """
-        # Child table initialization happens when first records are written
-        pass
-
-    def write_main_records(self, records: list[dict[str, Any]], **options: Any) -> None:
+    def write_main_records(self, records: list[dict[str, Any]]) -> None:
         """Write a batch of main records.
 
         Args:
             records: List of main table records to write
-            **options: Format-specific options
         """
         if not records:
             return
@@ -515,19 +429,14 @@ class CsvStreamingWriter(StreamingWriter):
         # Write records
         writer.writerows(records)
 
-        # Update record count and report progress
-        self.record_counts["main"] = self.record_counts.get("main", 0) + len(records)
-        self._report_progress("main", len(records))
-
     def write_child_records(
-        self, table_name: str, records: list[dict[str, Any]], **options: Any
+        self, table_name: str, records: list[dict[str, Any]]
     ) -> None:
         """Write a batch of child records.
 
         Args:
             table_name: Name of the child table
             records: List of child records to write
-            **options: Format-specific options
         """
         if not records:
             return
@@ -554,18 +463,8 @@ class CsvStreamingWriter(StreamingWriter):
         # Write records
         writer.writerows(records)
 
-        # Update record count and report progress
-        self.record_counts[table_name] = self.record_counts.get(table_name, 0) + len(
-            records
-        )
-        self._report_progress(table_name, len(records))
-
-    def finalize(self, **options: Any) -> None:
-        """Finalize the output and flush all writers.
-
-        Args:
-            **options: Format-specific options
-        """
+    def finalize(self) -> None:
+        """Finalize the output and flush all writers."""
         # Flush all file objects
         for file_obj in self.file_objects.values():
             if hasattr(file_obj, "flush"):

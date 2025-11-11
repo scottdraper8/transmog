@@ -11,7 +11,6 @@ import transmog as tm
 
 config = tm.TransmogConfig(
     separator=".",
-    nested_threshold=5,
     cast_to_string=False,
     batch_size=2000,
     id_field="id",
@@ -23,16 +22,14 @@ result = tm.flatten(data, config=config)
 
 ### Configuration Parameters
 
-**Naming (2 parameters):**
+**Naming (1 parameter):**
 
 - `separator`: Character to separate nested field names (default: `"_"`)
-- `nested_threshold`: Depth at which to simplify deeply nested names (default: `4`)
 
-**Processing (6 parameters):**
+**Processing (5 parameters):**
 
 - `cast_to_string`: Convert all values to strings (default: `False`)
-- `include_empty`: Include empty values in output (default: `False`)
-- `skip_null`: Skip null values (default: `True`)
+- `null_handling`: How to handle null and empty values - `NullHandling.SKIP` (default) or `NullHandling.INCLUDE`
 - `array_mode`: How to handle arrays - `ArrayMode.SMART`, `SEPARATE`, `INLINE`,
   or `SKIP` (default: `SMART`)
 - `batch_size`: Records to process at once (default: `1000`)
@@ -48,25 +45,21 @@ result = tm.flatten(data, config=config)
 
 - `id_patterns`: List of field names to check for natural IDs (default: `None`)
 
-**Error Handling (2 parameters):**
+**Deterministic IDs (2 parameters):**
+
+- `deterministic_ids`: Generate deterministic IDs based on record content (default: `False`)
+- `id_fields`: List of field names for composite deterministic IDs (default: `None`)
+
+**Error Handling (1 parameter):**
 
 - `recovery_mode`: RecoveryMode enum for error handling (default: `RecoveryMode.STRICT`)
-- `allow_malformed_data`: Allow malformed data (default: `False`)
-
-**Cache (1 parameter):**
-
-- `cache_size`: Maximum cache size for value processing optimizations, set to 0 to disable (default: `10000`)
-
-**Advanced (1 parameter):**
-
-- `id_generator`: Custom function for ID generation (default: `None`)
 
 ## Factory Methods
 
 ```python
 import transmog as tm
 
-# Default: types preserved, optimized for Parquet/analytics
+# Default: types preserved, optimized for analytics
 config = tm.TransmogConfig()
 
 # CSV: strings, includes empty/null values
@@ -74,12 +67,6 @@ config = tm.TransmogConfig.for_csv()
 
 # Memory: small batches, minimal cache
 config = tm.TransmogConfig.for_memory()
-
-# Performance: large batches, extended cache for large datasets
-config = tm.TransmogConfig.for_parquet()
-
-# Simple: clean field names (id, parent_id, timestamp)
-config = tm.TransmogConfig.simple()
 
 # Error-tolerant: skip malformed records
 config = tm.TransmogConfig.error_tolerant()
@@ -106,17 +93,13 @@ result = tm.flatten(data, config=config)
 ```python
 import transmog as tm
 
-# Large datasets
-config = tm.TransmogConfig.for_parquet()
+# Large datasets - customize batch size
+config = tm.TransmogConfig(
+    batch_size=10000,
+)
 
 # Memory-constrained environments
 config = tm.TransmogConfig.for_memory()
-
-# Or customize from scratch
-config = tm.TransmogConfig(
-    batch_size=10000,
-    cache_size=50000,
-)
 ```
 
 ### ID Management
@@ -162,77 +145,26 @@ import transmog as tm
 # Strict mode
 config = tm.TransmogConfig(
     recovery_mode=tm.RecoveryMode.STRICT,
-    allow_malformed_data=False,
 )
 
 # Skip errors
 config = tm.TransmogConfig(
     recovery_mode=tm.RecoveryMode.SKIP,
-    allow_malformed_data=True,
 )
-```
-
-## Loading Configuration
-
-### From File
-
-```python
-import transmog as tm
-
-# Load from JSON file
-config = tm.TransmogConfig.from_file("config.json")
-
-# Load from YAML file
-config = tm.TransmogConfig.from_file("config.yaml")
-
-# Load from TOML file
-config = tm.TransmogConfig.from_file("config.toml")
-```
-
-Example configuration file (`config.json`):
-
-```json
-{
-    "separator": ".",
-    "cast_to_string": false,
-    "batch_size": 5000,
-    "id_field": "id",
-    "parent_field": "parent_id"
-}
-```
-
-### From Environment Variables
-
-```python
-import transmog as tm
-
-# Load from environment variables with TRANSMOG_ prefix
-config = tm.TransmogConfig.from_env()
-```
-
-Environment variables:
-
-```bash
-export TRANSMOG_SEPARATOR="."
-export TRANSMOG_BATCH_SIZE=5000
-export TRANSMOG_CAST_TO_STRING=false
 ```
 
 ## Advanced Usage
 
-### Using with Processor
+### Using Custom Configuration
 
 ```python
 import transmog as tm
-from transmog.process import Processor
 
 config = tm.TransmogConfig(
     batch_size=5000,
-    cache_size=50000,
 )
 
-processor = Processor(config)
-result = processor.process(data, entity_name="products")
+result = tm.flatten(data, name="products", config=config)
 ```
 
 ### Streaming Configuration
@@ -268,8 +200,7 @@ tm.flatten_stream(
 ### Error Strategies
 
 - `tm.RecoveryMode.STRICT`: Fail on errors
-- `tm.RecoveryMode.SKIP`: Continue processing
-- `tm.RecoveryMode.PARTIAL`: Process what's possible
+- `tm.RecoveryMode.SKIP`: Continue processing, skip problematic records
 
 ### Output Format Optimization
 
@@ -280,5 +211,5 @@ import transmog as tm
 config = tm.TransmogConfig.for_csv()
 
 # Parquet output
-config = tm.TransmogConfig.for_parquet()
+config = tm.TransmogConfig(batch_size=10000)
 ```

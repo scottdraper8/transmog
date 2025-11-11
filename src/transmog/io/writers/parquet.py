@@ -9,8 +9,8 @@ import pathlib
 from typing import Any, BinaryIO, Optional, TextIO, Union
 
 from transmog.error import MissingDependencyError, OutputError, logger
-from transmog.io.writer_interface import DataWriter, StreamingWriter, WriterUtils
-from transmog.types.base import JsonDict
+from transmog.io.writer_interface import DataWriter, StreamingWriter
+from transmog.types import JsonDict
 
 # Import PyArrow conditionally
 try:
@@ -38,18 +38,18 @@ class ParquetWriter(DataWriter):
         self.compression = compression
         self.options = options
 
-    def write_table(
+    def write(
         self,
-        table_data: list[JsonDict],
-        output_path: Union[str, BinaryIO, TextIO],
-        **format_options: Any,
+        data: list[JsonDict],
+        destination: Union[str, BinaryIO, TextIO],
+        **options: Any,
     ) -> Union[str, BinaryIO, TextIO]:
-        """Write table data to a Parquet file.
+        """Write data to a Parquet file.
 
         Args:
-            table_data: Table data to write
-            output_path: Path or file-like object to write to
-            **format_options: Format-specific options (compression, etc.)
+            data: Data to write
+            destination: Path or file-like object to write to
+            **options: Format-specific options (compression, etc.)
 
         Returns:
             Path to the written file or file-like object
@@ -66,123 +66,64 @@ class ParquetWriter(DataWriter):
             )
 
         try:
-            # Use options or fall back to instance defaults
-            compression_val = format_options.get("compression", self.compression)
+            compression_val = options.get("compression", self.compression)
 
-            # Handle empty data
-            if not table_data:
+            if not data:
                 empty_table = pa.table({})
 
-                # Write to file or file-like object
-                if isinstance(output_path, (str, pathlib.Path)):
-                    path_str = str(output_path)
+                if isinstance(destination, (str, pathlib.Path)):
+                    path_str = str(destination)
                     os.makedirs(os.path.dirname(path_str) or ".", exist_ok=True)
                     pq.write_table(empty_table, path_str, compression=compression_val)
                     return (
                         pathlib.Path(path_str)
-                        if isinstance(output_path, pathlib.Path)
+                        if isinstance(destination, pathlib.Path)
                         else path_str
                     )
                 else:
-                    # For file-like objects, TextIO is not supported by PyArrow
-                    if hasattr(output_path, "mode") and "b" not in getattr(
-                        output_path, "mode", ""
+                    if hasattr(destination, "mode") and "b" not in getattr(
+                        destination, "mode", ""
                     ):
                         raise OutputError(
                             "Parquet format requires binary streams, "
                             "text streams not supported"
                         )
                     pq.write_table(
-                        empty_table, output_path, compression=compression_val
+                        empty_table, destination, compression=compression_val
                     )
-                    return output_path
+                    return destination
 
-            # Convert data to PyArrow Table
             columns: dict[str, list[Any]] = {}
-            for key in table_data[0].keys():
-                columns[key] = [record.get(key) for record in table_data]
+            for key in data[0].keys():
+                columns[key] = [record.get(key) for record in data]
 
             table = pa.table(columns)
 
-            # Write to file or file-like object
-            if isinstance(output_path, (str, pathlib.Path)):
-                path_str = str(output_path)
+            if isinstance(destination, (str, pathlib.Path)):
+                path_str = str(destination)
                 os.makedirs(os.path.dirname(path_str) or ".", exist_ok=True)
-                pq.write_table(
-                    table, path_str, compression=compression_val, **format_options
-                )
+                pq.write_table(table, path_str, compression=compression_val, **options)
                 return (
                     pathlib.Path(path_str)
-                    if isinstance(output_path, pathlib.Path)
+                    if isinstance(destination, pathlib.Path)
                     else path_str
                 )
             else:
-                # For file-like objects, TextIO is not supported by PyArrow
-                if hasattr(output_path, "mode") and "b" not in getattr(
-                    output_path, "mode", ""
+                if hasattr(destination, "mode") and "b" not in getattr(
+                    destination, "mode", ""
                 ):
                     raise OutputError(
                         "Parquet format requires binary streams, "
                         "text streams not supported"
                     )
                 pq.write_table(
-                    table, output_path, compression=compression_val, **format_options
+                    table, destination, compression=compression_val, **options
                 )
-                return output_path
+                return destination
 
         except Exception as e:
             logger.error(f"Error writing Parquet: {e}")
             raise OutputError(f"Failed to write Parquet file: {e}") from e
-
-    def write_all_tables(
-        self,
-        main_table: list[JsonDict],
-        child_tables: dict[str, list[JsonDict]],
-        base_path: Union[str],
-        entity_name: str,
-        **options: Any,
-    ) -> dict[str, str]:
-        """Write main and child tables to Parquet files.
-
-        Args:
-            main_table: The main table data
-            child_tables: Dictionary of child tables
-            base_path: Directory to write files to
-            entity_name: Name of the entity (for main table filename)
-            **options: Additional Parquet formatting options
-
-        Returns:
-            Dictionary mapping table names to file paths
-
-        Raises:
-            MissingDependencyError: If PyArrow is not available
-            OutputError: If writing fails
-        """
-        if pa is None:
-            raise MissingDependencyError(
-                "PyArrow is required for Parquet support. "
-                "Install with: pip install pyarrow",
-                package="pyarrow",
-            )
-
-        # Write main table
-        main_filename = WriterUtils.sanitize_filename(entity_name)
-        main_path = WriterUtils.build_output_path(
-            base_path, main_filename, "parquet", None
-        )
-        self.write_table(main_table, main_path, **options)
-
-        # Write child tables
-        paths = {"main": main_path}
-        for table_name, table_data in child_tables.items():
-            child_filename = WriterUtils.sanitize_filename(table_name)
-            child_path = WriterUtils.build_output_path(
-                base_path, child_filename, "parquet", None
-            )
-            self.write_table(table_data, child_path, **options)
-            paths[table_name] = child_path
-
-        return paths
 
 
 class ParquetStreamingWriter(StreamingWriter):
@@ -198,7 +139,6 @@ class ParquetStreamingWriter(StreamingWriter):
         entity_name: str = "entity",
         compression: str = "snappy",
         row_group_size: int = 10000,
-        buffer_size: int = 1000,
         **options: Any,
     ) -> None:
         """Initialize the Parquet streaming writer.
@@ -208,10 +148,9 @@ class ParquetStreamingWriter(StreamingWriter):
             entity_name: Name of the entity for output files
             compression: Compression algorithm ("snappy", "gzip", etc.)
             row_group_size: Number of records per row group
-            buffer_size: Number of records to buffer before writing
             **options: Additional options for PyArrow
         """
-        super().__init__(destination, entity_name, buffer_size, **options)
+        super().__init__(destination, entity_name, **options)
 
         if pa is None:
             raise MissingDependencyError(
@@ -243,15 +182,6 @@ class ParquetStreamingWriter(StreamingWriter):
                     "Parquet streaming writer requires binary streams "
                     "for file-like objects"
                 )
-
-    def initialize_main_table(self, **options: Any) -> None:
-        """Initialize the main table for streaming.
-
-        Args:
-            **options: Format-specific options
-        """
-        # Main table initialization happens when first records are written
-        pass
 
     def _get_table_path(self, table_name: str) -> Optional[str]:
         """Get the file path for a table.
@@ -379,15 +309,12 @@ class ParquetStreamingWriter(StreamingWriter):
 
         return pa.table(arrays, schema=schema)
 
-    def _initialize_writer(
-        self, table_name: str, schema: Any, append: bool = False
-    ) -> None:
+    def _initialize_writer(self, table_name: str, schema: Any) -> None:
         """Initialize a Parquet writer for a table.
 
         Args:
             table_name: Name of the table
             schema: PyArrow schema
-            append: Whether to append to existing file
         """
         file_path = self._get_table_path(table_name)
 
@@ -400,11 +327,6 @@ class ParquetStreamingWriter(StreamingWriter):
             return
 
         try:
-            if append and os.path.exists(file_path):
-                # For append mode, we would need to read existing schema
-                # For simplicity, we'll overwrite for now
-                pass
-
             writer = pq.ParquetWriter(
                 file_path, schema, compression=self.compression, **self.options
             )
@@ -436,16 +358,14 @@ class ParquetStreamingWriter(StreamingWriter):
         if writer:
             writer.write_table(table)
 
-        # Clear buffer and report progress
+        # Clear buffer
         self.buffers[table_name] = []
-        self._report_progress(table_name, len(records))
 
-    def write_main_records(self, records: list[JsonDict], **options: Any) -> None:
+    def write_main_records(self, records: list[JsonDict]) -> None:
         """Write a batch of main records.
 
         Args:
             records: List of main table records to write
-            **options: Format-specific options
         """
         if not records:
             return
@@ -463,30 +383,15 @@ class ParquetStreamingWriter(StreamingWriter):
         if len(self.buffers[table_name]) >= self.row_group_size:
             self._write_buffer(table_name)
 
-        # Update record count
-        self.record_counts[table_name] = self.record_counts.get(table_name, 0) + len(
-            records
-        )
+        # Record persistence is handled by the buffer;
+        # external counters are not tracked.
 
-    def initialize_child_table(self, table_name: str, **options: Any) -> None:
-        """Initialize a child table for streaming.
-
-        Args:
-            table_name: Name of the child table
-            **options: Format-specific options
-        """
-        # Child table initialization happens when first records are written
-        pass
-
-    def write_child_records(
-        self, table_name: str, records: list[JsonDict], **options: Any
-    ) -> None:
+    def write_child_records(self, table_name: str, records: list[JsonDict]) -> None:
         """Write a batch of child records.
 
         Args:
             table_name: Name of the child table
             records: List of child records to write
-            **options: Format-specific options
         """
         if not records:
             return
@@ -502,17 +407,8 @@ class ParquetStreamingWriter(StreamingWriter):
         if len(self.buffers[table_name]) >= self.row_group_size:
             self._write_buffer(table_name)
 
-        # Update record count
-        self.record_counts[table_name] = self.record_counts.get(table_name, 0) + len(
-            records
-        )
-
-    def finalize(self, **options: Any) -> None:
-        """Finalize the output and close all writers.
-
-        Args:
-            **options: Format-specific options
-        """
+    def finalize(self) -> None:
+        """Finalize the output and close all writers."""
         if self.finalized:
             return
 
@@ -537,11 +433,3 @@ class ParquetStreamingWriter(StreamingWriter):
         self.writers.clear()
         self.schemas.clear()
         self.buffers.clear()
-
-    def get_output_files(self) -> dict[str, str]:
-        """Get the output file paths.
-
-        Returns:
-            dict[str, str]: Mapping of table names to file paths
-        """
-        return self.file_paths.copy()

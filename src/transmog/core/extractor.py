@@ -4,6 +4,7 @@ This module extracts nested arrays from JSON structures and creates
 child tables with appropriate parent-child relationships.
 """
 
+import functools
 from collections.abc import Generator
 from typing import Any, Optional
 
@@ -14,12 +15,57 @@ from transmog.core.metadata import annotate_with_metadata
 from transmog.error import (
     logger,
 )
-from transmog.naming.conventions import sanitize_name
-from transmog.naming.utils import get_table_name_for_array
-from transmog.types import ArrayMode, JsonDict, ProcessingContext
+from transmog.types import ArrayMode, JsonDict, NullHandling, ProcessingContext
 
-ExtractResult = dict[str, list[dict[str, Any]]]
-StreamExtractResult = Generator[tuple[str, dict[str, Any]], None, None]
+
+@functools.lru_cache(maxsize=1024)
+def _sanitize_name(name: str) -> str:
+    """Sanitize names for SQL compatibility.
+
+    Args:
+        name: Name to sanitize
+
+    Returns:
+        Sanitized name
+    """
+    sanitized = name.replace(" ", "_").replace("-", "_")
+
+    result = []
+    last_underscore = False
+
+    for char in sanitized:
+        if char.isalnum() or char == "_":
+            result.append(char)
+            last_underscore = char == "_"
+        elif not last_underscore:
+            result.append("_")
+            last_underscore = True
+
+    sanitized = "".join(result).strip("_")
+
+    if sanitized and sanitized[0].isdigit():
+        sanitized = f"col_{sanitized}"
+
+    return sanitized or "unnamed_field"
+
+
+def _get_table_name(
+    entity_name: str, array_name: str, parent_path: str, separator: str
+) -> str:
+    """Generate table names for arrays.
+
+    Args:
+        entity_name: Entity name
+        array_name: Array field name
+        parent_path: Parent path
+        separator: Separator for path components
+
+    Returns:
+        Generated table name
+    """
+    if not parent_path:
+        return f"{entity_name}{separator}{array_name}"
+    return f"{entity_name}{separator}{parent_path}{separator}{array_name}"
 
 
 def _extract_arrays_impl(
@@ -28,13 +74,11 @@ def _extract_arrays_impl(
     context: ProcessingContext,
     parent_id: Optional[str],
     entity_name: str,
-    streaming_mode: bool,
 ) -> Generator[tuple[str, dict[str, Any]], None, None]:
-    """Implementation helper for array extraction.
+    """Generate array extraction records.
 
-    This shared implementation is used by both extract_arrays and stream_extract_arrays.
-    In streaming mode, it yields records individually. In batch mode, the caller
-    collects records into tables.
+    Yields records one at a time for both batch and streaming modes.
+    The caller determines how to collect the yielded records.
 
     Args:
         data: JSON data to process
@@ -42,7 +86,6 @@ def _extract_arrays_impl(
         context: Processing context with runtime state
         parent_id: UUID of parent record
         entity_name: Entity name
-        streaming_mode: Whether to operate in streaming mode
 
     Yields:
         Tuples of (table_name, record) for each extracted record
@@ -71,21 +114,20 @@ def _extract_arrays_impl(
             if config.array_mode == ArrayMode.SMART and _is_simple_array(value):
                 continue
 
-            nested_context = context.descend(key, config.nested_threshold)
+            nested_context = context.descend(key)
 
-            sanitized_key = sanitize_name(key, config.separator)
-            sanitized_entity = sanitize_name(entity_name) if entity_name else ""
+            sanitized_key = _sanitize_name(key)
+            sanitized_entity = _sanitize_name(entity_name) if entity_name else ""
 
-            table_name = get_table_name_for_array(
+            table_name = _get_table_name(
                 entity_name=sanitized_entity,
                 array_name=sanitized_key,
                 parent_path=context.build_path(config.separator),
                 separator=config.separator,
-                nested_threshold=config.nested_threshold,
             )
 
             for _i, item in enumerate(value):
-                if item is None and config.skip_null:
+                if item is None and config.null_handling == NullHandling.SKIP:
                     continue
 
                 if isinstance(item, dict) and not item:
@@ -107,14 +149,12 @@ def _extract_arrays_impl(
                     config=config,
                     parent_id=parent_id,
                     transmog_time=context.extract_time,
-                    path=table_name,
-                    in_place=True,
                 )
 
                 yield table_name, annotated
 
                 if isinstance(item, dict):
-                    parent_id_field, parent_id_value = get_record_id(
+                    _, parent_id_value = get_record_id(
                         annotated,
                         id_patterns=config.id_patterns,
                         fallback_field=config.id_field,
@@ -126,7 +166,6 @@ def _extract_arrays_impl(
                         nested_context,
                         parent_id_value,
                         entity_name,
-                        streaming_mode,
                     )
 
                     yield from nested_generator
@@ -135,10 +174,9 @@ def _extract_arrays_impl(
             nested_generator = _extract_arrays_impl(
                 value,
                 config,
-                context.descend(key, config.nested_threshold),
+                context.descend(key),
                 parent_id,
                 entity_name,
-                streaming_mode,
             )
 
             yield from nested_generator
@@ -150,7 +188,7 @@ def extract_arrays(
     context: ProcessingContext,
     parent_id: Optional[str] = None,
     entity_name: str = "",
-) -> ExtractResult:
+) -> dict[str, list[dict[str, Any]]]:
     """Extract nested arrays into flattened tables.
 
     Processes nested JSON data and extracts arrays into separate tables.
@@ -166,7 +204,7 @@ def extract_arrays(
     Returns:
         Dictionary mapping table names to lists of records
     """
-    result: ExtractResult = {}
+    result: dict[str, list[dict[str, Any]]] = {}
 
     for table_name, record in _extract_arrays_impl(
         data,
@@ -174,7 +212,6 @@ def extract_arrays(
         context,
         parent_id,
         entity_name,
-        streaming_mode=False,
     ):
         if table_name not in result:
             result[table_name] = []
@@ -189,7 +226,7 @@ def stream_extract_arrays(
     context: ProcessingContext,
     parent_id: Optional[str] = None,
     entity_name: str = "",
-) -> StreamExtractResult:
+) -> Generator[tuple[str, dict[str, Any]], None, None]:
     """Extract nested arrays as a stream.
 
     Memory-efficient streaming version that yields records one at a time
@@ -211,5 +248,4 @@ def stream_extract_arrays(
         context,
         parent_id,
         entity_name,
-        streaming_mode=True,
     )

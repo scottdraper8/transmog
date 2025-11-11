@@ -11,8 +11,7 @@ from pathlib import Path
 import pytest
 
 from transmog.config import TransmogConfig
-from transmog.error import FileError, ParsingError, ProcessingError, ValidationError
-from transmog.process import Processor
+from transmog.error import ProcessingError, ValidationError
 from transmog.process.data_iterators import (
     get_data_iterator,
     get_json_data_iterator,
@@ -25,10 +24,19 @@ class TestGetDataIterator:
     """Test the main data iterator function."""
 
     @pytest.fixture
-    def processor(self):
-        """Create a processor for testing."""
-        config = TransmogConfig()
-        return Processor(config)
+    def config(self):
+        """Create a config for testing."""
+        return TransmogConfig()
+
+    @pytest.fixture
+    def processor(self, config):
+        """Create a processor-like object for testing."""
+
+        class ConfigWrapper:
+            def __init__(self, config):
+                self.config = config
+
+        return ConfigWrapper(config)
 
     def test_iterate_list_of_dicts(self, processor):
         """Test iterating over list of dictionaries."""
@@ -80,12 +88,12 @@ class TestGetDataIterator:
         """Test auto format detection."""
         # JSON data
         json_data = {"id": 1, "name": "Alice"}
-        records = list(get_data_iterator(processor, json_data, input_format="auto"))
+        records = list(get_data_iterator(processor, json_data))
         assert len(records) == 1
 
         # JSONL data
         jsonl_data = '{"id": 1}\n{"id": 2}\n'
-        records = list(get_data_iterator(processor, jsonl_data, input_format="auto"))
+        records = list(get_data_iterator(processor, jsonl_data))
         assert len(records) == 2
 
     def test_iterate_unsupported_type(self, processor):
@@ -153,10 +161,19 @@ class TestJSONLDataIterator:
     """Test the JSONL data iterator function."""
 
     @pytest.fixture
-    def processor(self):
-        """Create a processor for testing."""
-        config = TransmogConfig()
-        return Processor(config)
+    def config(self):
+        """Create a config for testing."""
+        return TransmogConfig()
+
+    @pytest.fixture
+    def processor(self, config):
+        """Create a processor-like object for testing."""
+
+        class ConfigWrapper:
+            def __init__(self, config):
+                self.config = config
+
+        return ConfigWrapper(config)
 
     def test_iterate_jsonl_string(self, processor):
         """Test iterating over JSONL string."""
@@ -197,10 +214,19 @@ class TestJSONLFileIterator:
     """Test the JSONL file iterator function."""
 
     @pytest.fixture
-    def processor(self):
-        """Create a processor for testing."""
-        config = TransmogConfig()
-        return Processor(config)
+    def config(self):
+        """Create a config for testing."""
+        return TransmogConfig()
+
+    @pytest.fixture
+    def processor(self, config):
+        """Create a processor-like object for testing."""
+
+        class ConfigWrapper:
+            def __init__(self, config):
+                self.config = config
+
+        return ConfigWrapper(config)
 
     def test_iterate_jsonl_file(self, processor):
         """Test iterating over JSONL file."""
@@ -241,7 +267,7 @@ class TestJSONLFileIterator:
 
     def test_iterate_nonexistent_file(self, processor):
         """Test iterating over nonexistent file."""
-        with pytest.raises(FileError):
+        with pytest.raises(ProcessingError):
             list(get_jsonl_file_iterator(processor, "/path/that/does/not/exist.jsonl"))
 
     def test_iterate_large_jsonl_file(self, processor):
@@ -268,10 +294,19 @@ class TestDataIteratorEdgeCases:
     """Test edge cases in data iteration."""
 
     @pytest.fixture
-    def processor(self):
-        """Create a processor for testing."""
-        config = TransmogConfig()
-        return Processor(config)
+    def config(self):
+        """Create a config for testing."""
+        return TransmogConfig()
+
+    @pytest.fixture
+    def processor(self, config):
+        """Create a processor-like object for testing."""
+
+        class ConfigWrapper:
+            def __init__(self, config):
+                self.config = config
+
+        return ConfigWrapper(config)
 
     def test_iterator_with_unicode_data(self, processor):
         """Test iterator handling unicode data."""
@@ -325,8 +360,8 @@ class TestDataIteratorEdgeCases:
             '{"id": 1, "name": "Alice"}\n{"invalid": json}\n{"id": 2, "name": "Bob"}\n'
         )
 
-        # With default strict error handling, should raise ParsingError for invalid JSON
-        with pytest.raises(ParsingError):
+        # With default strict error handling, should raise ProcessingError for invalid JSON
+        with pytest.raises(ProcessingError):
             list(get_jsonl_data_iterator(processor, data))
 
     def test_empty_data_handling(self, processor):
@@ -349,12 +384,14 @@ class TestDataIteratorEdgeCases:
         """Test explicit format specification."""
         data = '{"id": 1, "name": "Alice"}'
 
-        # Explicit JSON format
-        records = list(get_data_iterator(processor, data, input_format="json"))
+        # Auto-detected as JSON (single line, no newlines)
+        records = list(get_data_iterator(processor, data))
         assert len(records) == 1
         assert records[0]["name"] == "Alice"
 
-        # Explicit JSONL format (single line)
-        records = list(get_data_iterator(processor, data, input_format="jsonl"))
-        assert len(records) == 1
+        # JSONL format (multiple lines)
+        jsonl_data = '{"id": 1, "name": "Alice"}\n{"id": 2, "name": "Bob"}\n'
+        records = list(get_data_iterator(processor, jsonl_data))
+        assert len(records) == 2
         assert records[0]["name"] == "Alice"
+        assert records[1]["name"] == "Bob"

@@ -12,7 +12,7 @@ import pytest
 
 import transmog as tm
 
-from ...conftest import assert_files_created, count_files_in_dir, load_json_file
+from ...conftest import assert_files_created, count_files_in_dir
 
 
 class TestEndToEndWorkflows:
@@ -213,7 +213,7 @@ class TestPerformanceScenarios:
             large_dataset.append(record)
 
         # Process with memory optimization
-        config = tm.TransmogConfig(batch_size=10, cache_size=1000)
+        config = tm.TransmogConfig(batch_size=10)
         result = tm.flatten(large_dataset, name="large_data", config=config)
 
         assert len(result.main) == 50

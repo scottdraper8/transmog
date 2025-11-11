@@ -1,14 +1,9 @@
-"""
-Tests for core flattening functionality.
-
-Tests the core JSON flattening logic and cache management.
-"""
+"""Tests for core flattening functionality."""
 
 import pytest
 
 from transmog.config import TransmogConfig
-from transmog.core.flattener import clear_caches, flatten_json, refresh_cache_config
-from transmog.types import ProcessingContext
+from transmog.core.flattener import flatten_json
 
 
 class TestFlattenJson:
@@ -58,8 +53,7 @@ class TestFlattenJson:
     def test_flatten_nested_objects(self):
         """Test flattening deeply nested objects."""
         data = {"level1": {"level2": {"level3": {"value": "deep"}}}}
-        # Disable nested threshold to test full path flattening
-        config = TransmogConfig(separator="_", nested_threshold=10)
+        config = TransmogConfig(separator="_")
 
         result = flatten_json(data, config)
 
@@ -124,47 +118,6 @@ class TestFlattenJson:
         # Original should be unchanged
         assert data == original
         assert result != original
-
-
-class TestCacheManagement:
-    """Test cache management functions."""
-
-    def test_clear_caches(self):
-        """Test clearing caches."""
-        # This should not raise an exception
-        clear_caches()
-
-    def test_refresh_cache_config(self):
-        """Test refreshing cache configuration."""
-        # This should not raise an exception
-        refresh_cache_config()
-
-    def test_cache_functionality(self):
-        """Test that caching works correctly."""
-        import copy
-
-        data = {"test": {"nested": "value"}}
-        config = TransmogConfig(separator="_")
-
-        # First call
-        result1 = flatten_json(copy.deepcopy(data), config)
-
-        # Second call should use cache (if enabled)
-        result2 = flatten_json(copy.deepcopy(data), config)
-
-        assert result1 == result2
-
-    def test_cache_with_different_separators(self):
-        """Test caching with different separators."""
-        data = {"test": {"nested": "value"}}
-        config_underscore = TransmogConfig(separator="_")
-        config_dot = TransmogConfig(separator=".")
-
-        result_underscore = flatten_json(data, config_underscore)
-        result_dot = flatten_json(data, config_dot)
-
-        # Results should be different due to different separators
-        assert result_underscore != result_dot
 
 
 class TestFlattenJsonEdgeCases:
@@ -238,7 +191,7 @@ class TestFlattenJsonEdgeCases:
         result = flatten_json(data, config)
 
         assert isinstance(result, dict)
-        assert len(result) > 100  # Should have many flattened fields
+        assert len(result) >= 50  # Simplified paths reduce unique field count
 
     def test_flatten_with_list_values(self):
         """Test flattening with list values in INLINE mode."""

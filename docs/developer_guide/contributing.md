@@ -136,24 +136,17 @@ The Transmog codebase is organized into focused, single-responsibility modules:
   - `extractor.py` - Array extraction logic
   - `hierarchy.py` - Nested structure handling
   - `metadata.py` - Metadata annotation
-  - `memory.py` - Memory optimization utilities
+  - `id_discovery.py` - Natural ID discovery
 
-- **`src/transmog/process/strategies/`** - Processing strategy implementations
-  - `base.py` - Base strategy class and common utilities
-  - `shared.py` - Shared batch processing logic
-  - `memory.py`, `file.py`, `batch.py`, `chunked.py`, `csv.py` - Specific strategies
+- **`src/transmog/process/`** - Processing orchestration
+  - `data_iterators.py` - Input normalization utilities
+  - `result.py` - Processing result container
+  - `streaming.py` - Streaming pipeline
 
-- **`src/transmog/process/result/`** - Result handling and output
-  - `core.py` - Core result functionality
-  - `converters.py` - Format conversion methods
-  - `writers.py` - File writing operations
-  - `streaming.py` - Streaming functionality
-
-### Configuration and Validation
+### Configuration and Error Handling
 
 - **`src/transmog/config/`** - Configuration management
-- **`src/transmog/validation.py`** - Unified parameter validation system
-- **`src/transmog/error/`** - Error handling and recovery strategies
+- **`src/transmog/error/`** - Error handling and exception types
 
 This modular structure makes it easier to:
 
@@ -168,10 +161,10 @@ This modular structure makes it easier to:
 
 Code style is automatically enforced by pre-commit hooks. The setup includes:
 
-- **Black** for code formatting
-- **isort** for import sorting
-- **flake8** for linting
+- **Ruff** for code formatting and linting
 - **mypy** for type checking
+- **interrogate** for docstring coverage
+- **bandit** for security checks
 
 No manual formatting is required - just commit changes and the hooks handle the rest.
 
@@ -309,7 +302,7 @@ Brief description of changes and motivation.
 
 Transmog follows a modular design with several core components:
 
-- **Processor**: Main entry point for users, orchestrates transformation
+- **API Layer**: Public functions (`flatten()`, `flatten_file()`, `flatten_stream()`) for data transformation
 - **Core Transformation**: Flattener and Extractor for data transformation
 - **Configuration System**: Hierarchical configuration with factory methods
 - **I/O System**: Handles reading input and writing output in various formats
@@ -317,30 +310,22 @@ Transmog follows a modular design with several core components:
 
 ### Extension Points
 
-Transmog provides several extension points for customization:
+Transmog provides configuration options for customization:
 
-1. **Custom Recovery Strategies**:
+**Deterministic ID Generation**:
 
-   ```python
-   from transmog.error import RecoveryStrategy
+```python
+# Generate deterministic IDs based on record content
+config = tm.TransmogConfig(deterministic_ids=True)
+result = tm.flatten(data, config=config)
 
-   class MyRecoveryStrategy(RecoveryStrategy):
-       def recover(self, error, entity_name=None, **kwargs):
-           # Custom recovery logic
-           return recovery_result
-   ```
-
-2. **Custom ID Generation**:
-
-   ```python
-   def custom_id_generator(record):
-       # Generate ID based on record contents
-       return f"CUSTOM-{record.get('id', 'unknown')}"
-
-   # Use with configuration
-   config = tm.TransmogConfig(id_generator=custom_id_generator)
-   result = tm.flatten(data, config=config)
-   ```
+# Or use specific fields for composite IDs
+config = tm.TransmogConfig(
+    deterministic_ids=True,
+    id_fields=["user_id", "timestamp"]
+)
+result = tm.flatten(data, config=config)
+```
 
 ### Performance Testing
 

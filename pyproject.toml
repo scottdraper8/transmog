@@ -156,3 +156,7 @@ color = true
 exclude_dirs = [ "tests", "examples" ]
 skips = [ "B101" ]
 target-version = "py39"
+
+[tool.vulture]
+paths = [ "src/transmog", "tests" ]
+min_confidence = 80
