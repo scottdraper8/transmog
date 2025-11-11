@@ -5,6 +5,7 @@ Tests Parquet file writing functionality, formats, and edge cases.
 """
 
 import json
+import sys
 import tempfile
 from pathlib import Path
 
@@ -250,6 +251,10 @@ class TestParquetWriterOptions:
 class TestParquetWriterErrorHandling:
     """Test ParquetWriter error handling."""
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows allows creation of paths like /nonexistent/directory"
+    )
     def test_parquet_writer_invalid_path(self):
         """Test writing to invalid path."""
         data = [{"id": "1", "name": "Alice"}]

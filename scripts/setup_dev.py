@@ -2,23 +2,21 @@
 """Setup script for Transmog development environment.
 
 This script:
-1. Creates a virtual environment if it doesn't exist
-2. Activates the virtual environment
-3. Checks Python version compatibility
-4. Installs development dependencies
-5. Sets up pre-commit and pre-push hooks
-6. Runs pre-commit hooks against all files
-7. Sets up documentation dependencies and tests the build
-8. Validates optional dependencies for performance optimization
-9. Sets up security scanning tools
-10. Creates required directories for benchmarks
-11. Validates dependencies against latest versions
+1. Checks Python version compatibility (3.9+)
+2. Creates a virtual environment if it doesn't exist
+3. Upgrades pip to the latest version
+4. Installs all development dependencies from .[dev]
+5. Creates required directories (docs, benchmarks)
+6. Validates installed dependencies
+7. Checks optional performance dependencies
+8. Installs and configures pre-commit hooks
+9. Runs pre-commit on all files
+10. Tests documentation build
 """
 
 import os
 import platform
 import re
-import shlex
 import subprocess  # nosec B404 - Used in a controlled dev environment with appropriate safeguards
 import sys
 import venv
@@ -42,37 +40,12 @@ def check_python_version():
 
 
 def run_command(command, description=None, check=False, capture_output=False):
-    """Run a command and handle errors safely.
-
-    Note: This function may use shell=True in controlled cases where the commands
-    are constructed from trusted inputs in a development environment. All shell commands
-    are carefully validated before execution.
-    """
+    """Run a command and handle errors safely."""
     if description:
         print(f"{description}...")
 
-    # Convert string commands to lists to avoid shell=True where possible
-    if isinstance(command, str):
-        # Only use shell=True for complex commands that require shell features
-        if any(
-            shell_char in command for shell_char in ["|", ">", "<", "&&", "||", ";"]
-        ):
-            # For shell commands with proper validation
-            cmd = command
-            use_shell = True
-        else:
-            # Split the string to avoid shell=True
-            cmd = shlex.split(command)
-            use_shell = False
-    else:
-        cmd = command
-        use_shell = False
-
-    # nosec B602 - Shell is only used in a controlled development environment
-    # with safeguards to prevent arbitrary command execution
-    result = subprocess.run(  # nosec B602 # noqa: S603
-        cmd,
-        shell=use_shell,  # Only True for validated complex commands
+    result = subprocess.run(  # noqa: S603
+        command,
         check=check,
         text=True,
         capture_output=capture_output,
@@ -192,17 +165,16 @@ def validate_dependencies(python_path, dependencies):
 
 
 def check_dependencies(python_path):
-    """Check dependencies for performance optimization."""
-    print("\nChecking dependencies for performance optimization...")
+    """Check core dependencies are available."""
+    print("\nValidating core dependencies...")
 
-    # List of packages to check
-    performance_packages = [
+    # Core dependencies that should be installed via .[dev]
+    core_packages = [
         "orjson",
         "pyarrow",
-        "polars",
     ]
 
-    for package in performance_packages:
+    for package in core_packages:
         # Python import check command
         result = run_command(
             [
@@ -218,27 +190,14 @@ def check_dependencies(python_path):
         if result.returncode == 0:
             print(f"✅ {result.stdout.strip()}")
         else:
-            print(f"⚠️ {package} is not installed (optional)")
+            print(f"❌ {package} is required but not installed")
 
 
-def setup_security_tools(python_path, root_dir):
-    """Set up security scanning tools."""
-    print("\nSetting up security scanning tools...")
-
-    # Install security tools if not already installed
-    security_tools = ["bandit", "safety"]
-    for tool in security_tools:
-        run_command(
-            [str(python_path), "-m", "pip", "install", tool],
-            description=f"Installing {tool}",
-            check=False,
-        )
-
-    # Run a basic security scan
+def pip_install(python_path, *args, description=None):
+    """Install packages using pip."""
     run_command(
-        [str(python_path), "-m", "bandit", "-r", str(root_dir / "src"), "-ll"],
-        description="Running basic security scan with bandit",
-        check=False,
+        [str(python_path), "-m", "pip", "install", *args],
+        description=description,
     )
 
 
@@ -267,20 +226,11 @@ def main():
     print(f"\nProject version: {version}")
 
     # Update pip
-    run_command(
-        f"{python_path} -m pip install --upgrade pip", description="Upgrading pip"
-    )
+    pip_install(python_path, "--upgrade", "pip", description="Upgrading pip")
 
-    # Install dev dependencies
-    run_command(
-        f"{python_path} -m pip install -e '.[dev]'",
-        description="Installing development dependencies",
-    )
-
-    # Install documentation dependencies
-    run_command(
-        f"{python_path} -m pip install -e '.[docs]'",
-        description="Installing documentation dependencies",
+    # Install dev dependencies (includes all tools: ruff, mypy, pytest, sphinx, etc.)
+    pip_install(
+        python_path, "-e", ".[dev]", description="Installing development dependencies"
     )
 
     # Create necessary directories
@@ -289,32 +239,18 @@ def main():
     # Validate dependencies
     validate_dependencies(python_path, dependencies)
 
-    # Check dependencies
+    # Verify core dependencies are importable
     check_dependencies(python_path)
 
-    # Setup security tools
-    setup_security_tools(python_path, root_dir)
-
-    # Install pre-commit if not already installed
-    result = run_command(
-        f"{python_path} -m pre-commit --version", description=None, check=False
-    )
-
-    if result.returncode != 0:
-        run_command(
-            f"{python_path} -m pip install pre-commit",
-            description="Installing pre-commit",
-        )
-
-    # Install pre-commit hooks
+    # Install pre-commit hooks (pre-commit is already installed via .[dev])
     run_command(
-        f"{python_path} -m pre-commit install",
+        [str(python_path), "-m", "pre-commit", "install"],
         description="Setting up pre-commit hooks",
     )
 
-    # Install pre-push hooks (if supported)
+    # Install pre-push hooks
     run_command(
-        f"{python_path} -m pre-commit install --hook-type pre-push",
+        [str(python_path), "-m", "pre-commit", "install", "--hook-type", "pre-push"],
         description="Setting up pre-push hooks",
         check=False,
     )
@@ -322,7 +258,7 @@ def main():
     # Run pre-commit hooks on all files
     print("\nRunning pre-commit hooks on all files (this may take a while)...")
     run_command(
-        f"{python_path} -m pre-commit run --all-files",
+        [str(python_path), "-m", "pre-commit", "run", "--all-files"],
         check=False,
         capture_output=False,
     )
@@ -330,11 +266,30 @@ def main():
 
     # Test building documentation
     print("\nTesting documentation build (this may take a moment)...")
-    docs_cmd = (
-        f"cd docs && {python_path} -m sphinx.cmd.build -b html "
-        f"-d _build/doctrees . _build/html"
+
+    # Save original directory and change to docs directory for sphinx
+    docs_dir = root_dir / "docs"
+    original_dir = os.getcwd()
+    os.chdir(docs_dir)
+
+    # Run sphinx-build directly from the docs directory
+    result = run_command(
+        [
+            str(python_path),
+            "-m",
+            "sphinx.cmd.build",
+            "-b",
+            "html",
+            "-d",
+            "_build/doctrees",
+            ".",
+            "_build/html",
+        ],
+        check=False,
     )
-    result = run_command(docs_cmd, check=False)
+
+    # Change back to root directory after build
+    os.chdir(original_dir)
 
     if result.returncode == 0:
         print("✅ Documentation builds successfully")
@@ -362,7 +317,11 @@ def main():
     print("- Documentation checking: interrogate")
     print("- Documentation building: sphinx-build")
     print("\nPre-commit hooks will run automatically on each commit.")
-    print("To build documentation: cd docs && sphinx-autobuild . _build/html")
+
+    if platform.system() == "Windows":
+        print("To build documentation: cd docs & sphinx-autobuild . _build/html")
+    else:
+        print("To build documentation: cd docs && sphinx-autobuild . _build/html")
 
 
 if __name__ == "__main__":

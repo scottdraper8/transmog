@@ -142,6 +142,7 @@ config = tm.TransmogConfig.error_tolerant()
 result = tm.flatten(data, config=config)
 ```
 
+(array-handling)=
 ## Array Handling
 
 Arrays are processed according to the `array_mode` configuration parameter.
@@ -289,6 +290,7 @@ print(list(result.all_tables.keys()))
 # ['company', 'company_departments', 'company_departments_teams']
 ```
 
+(id-management)=
 ## ID Management
 
 ### Automatic ID Generation
@@ -429,6 +431,7 @@ for review in result.tables["products_reviews"]:
     assert review["_parent_id"] == main_id
 ```
 
+(error-handling)=
 ## Error Handling
 
 Control error handling behavior through `recovery_mode`:

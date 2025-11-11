@@ -1,5 +1,6 @@
 """Tests for FlattenResult class and its methods."""
 
+import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import mock_open, patch
@@ -395,6 +396,10 @@ class TestFlattenResultEdgeCases:
 class TestFlattenResultSaveErrors:
     """Test error handling in save operations."""
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows file permissions work differently from Unix"
+    )
     def test_result_save_permission_errors(self):
         """Test save operations with permission errors."""
         data = {"id": 1, "name": "Test"}

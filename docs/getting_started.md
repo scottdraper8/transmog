@@ -188,7 +188,7 @@ config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
 result = tm.flatten(data, config=config)
 ```
 
-See [Array Handling](user_guide.md#array-handling) section in the User Guide for complete details.
+See the [Array Handling](user_guide.md#array-handling) section in the User Guide for complete details.
 
 ### Field Naming
 

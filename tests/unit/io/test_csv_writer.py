@@ -5,6 +5,7 @@ Tests CSV output, formatting, and writer interface implementation.
 """
 
 import csv
+import sys
 import tempfile
 from io import StringIO
 from pathlib import Path
@@ -402,6 +403,10 @@ class TestCsvWriter:
         finally:
             Path(tmp_path).unlink(missing_ok=True)
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows allows creation of paths like /invalid/path"
+    )
     def test_csv_writer_invalid_path(self, sample_data):
         """Test CSV writer with invalid file path."""
         writer = CsvWriter()
