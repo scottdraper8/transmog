@@ -405,7 +405,7 @@ class TestCsvWriter:
 
     @pytest.mark.skipif(
         sys.platform == "win32",
-        reason="Windows allows creation of paths like /invalid/path"
+        reason="Windows allows creation of paths like /invalid/path",
     )
     def test_csv_writer_invalid_path(self, sample_data):
         """Test CSV writer with invalid file path."""

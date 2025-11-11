@@ -253,7 +253,7 @@ class TestParquetWriterErrorHandling:
 
     @pytest.mark.skipif(
         sys.platform == "win32",
-        reason="Windows allows creation of paths like /nonexistent/directory"
+        reason="Windows allows creation of paths like /nonexistent/directory",
     )
     def test_parquet_writer_invalid_path(self):
         """Test writing to invalid path."""

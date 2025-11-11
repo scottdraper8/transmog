@@ -398,7 +398,7 @@ class TestFlattenResultSaveErrors:
 
     @pytest.mark.skipif(
         sys.platform == "win32",
-        reason="Windows file permissions work differently from Unix"
+        reason="Windows file permissions work differently from Unix",
     )
     def test_result_save_permission_errors(self):
         """Test save operations with permission errors."""

@@ -206,7 +206,7 @@ class TestFileProcessingErrors:
 
     @pytest.mark.skipif(
         sys.platform == "win32",
-        reason="Windows file permissions work differently from Unix"
+        reason="Windows file permissions work differently from Unix",
     )
     def test_permission_denied_file(self, tmp_path):
         """Test handling of permission errors."""
@@ -232,7 +232,7 @@ class TestStreamingErrors:
 
     @pytest.mark.skipif(
         sys.platform == "win32",
-        reason="Windows file permissions work differently from Unix"
+        reason="Windows file permissions work differently from Unix",
     )
     def test_streaming_to_readonly_directory(self, simple_data):
         """Test streaming to read-only directory."""
