@@ -100,3 +100,23 @@ class TestConfigConsistency:
             assert config.id_field
             assert config.parent_field
             assert config.id_generation
+
+
+class TestArrayModeHandling:
+    """Test array mode validation and error handling."""
+
+    def test_invalid_array_mode_raises_error(self):
+        """Test that invalid ArrayMode raises ValueError during processing."""
+        import transmog as tm
+
+        config = TransmogConfig(array_mode=ArrayMode.SMART)
+
+        # Monkey-patch with invalid mode to test defensive check
+        class InvalidMode:
+            value = "invalid"
+
+        config.array_mode = InvalidMode()
+        data = {"test": [1, 2, 3]}
+
+        with pytest.raises(ValueError, match="Unhandled ArrayMode"):
+            tm.flatten(data, config=config)

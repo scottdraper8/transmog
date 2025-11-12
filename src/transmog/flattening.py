@@ -314,8 +314,7 @@ def flatten_json(
         elif is_list:
             if config.array_mode == ArrayMode.SKIP:
                 continue
-
-            if config.array_mode == ArrayMode.INLINE:
+            elif config.array_mode == ArrayMode.INLINE:
                 result[current_path] = json.dumps(value, ensure_ascii=False)
             elif config.array_mode == ArrayMode.SMART:
                 is_simple, array_items = _process_array_items(
@@ -333,20 +332,25 @@ def flatten_json(
                 elif _collect_arrays:
                     for table_name, table_records in array_items.items():
                         arrays.setdefault(table_name, []).extend(table_records)
-            elif _collect_arrays and config.array_mode == ArrayMode.SEPARATE:
-                _, array_items = _process_array_items(
-                    value,
-                    key,
-                    config,
-                    _context,
-                    _collect_arrays,
-                    _parent_id,
-                    _entity_name,
-                )
+            elif config.array_mode == ArrayMode.SEPARATE:
+                if _collect_arrays:
+                    _, array_items = _process_array_items(
+                        value,
+                        key,
+                        config,
+                        _context,
+                        _collect_arrays,
+                        _parent_id,
+                        _entity_name,
+                    )
 
-                # Merge extracted array items
-                for table_name, table_records in array_items.items():
-                    arrays.setdefault(table_name, []).extend(table_records)
+                    for table_name, table_records in array_items.items():
+                        arrays.setdefault(table_name, []).extend(table_records)
+            else:
+                raise ValueError(
+                    f"Unhandled ArrayMode: {config.array_mode}. "
+                    f"Valid modes: {[mode.value for mode in ArrayMode]}"
+                )
 
         else:
             if value is not None and value != "":
@@ -441,7 +445,19 @@ def _process_structure(
     if not data:
         return {}, {}
 
-    collect_arrays = config.array_mode in (ArrayMode.SEPARATE, ArrayMode.SMART)
+    if config.array_mode == ArrayMode.SEPARATE:
+        collect_arrays = True
+    elif config.array_mode == ArrayMode.SMART:
+        collect_arrays = True
+    elif config.array_mode == ArrayMode.INLINE:
+        collect_arrays = False
+    elif config.array_mode == ArrayMode.SKIP:
+        collect_arrays = False
+    else:
+        raise ValueError(
+            f"Unhandled ArrayMode: {config.array_mode}. "
+            f"Valid modes: {[mode.value for mode in ArrayMode]}"
+        )
 
     generated_id = generate_transmog_id(
         record=data,
