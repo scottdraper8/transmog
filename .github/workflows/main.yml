@@ -62,12 +62,12 @@ jobs:
 
         # Test result iteration and access
         print("Testing result iteration...")
-        for record in result:
+        for record in result.main:
             print(f"Record ID: {record.get('_id', 'N/A')}")
             break  # Just test first record
 
         # Test length operator
-        print(f"Result length: {len(result)}")
+        print(f"Result length: {len(result.main)}")
 
         # Create temp directory for testing file outputs
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -131,20 +131,15 @@ jobs:
         result_skip = tm.flatten(data, name='skip_test', config=config_skip)
         print(f"Skip arrays: {len(result_skip.main)} records")
 
-        # Test custom separator
-        config_dot = tm.TransmogConfig(separator='.')
-        result_dot = tm.flatten(data, name='dot_test', config=config_dot)
-        print(f"Dot separator: {len(result_dot.main)} records")
-
-        # Test memory preset
-        config_memory = tm.TransmogConfig.for_memory()
+        # Test memory-optimized configuration
+        config_memory = tm.TransmogConfig(batch_size=100)
         result_memory = tm.flatten(data, name='memory_test', config=config_memory)
-        print(f"Memory preset: {len(result_memory.main)} records")
+        print(f"Memory optimized: {len(result_memory.main)} records")
 
-        # Test error handling
-        config_skip_errors = tm.TransmogConfig.error_tolerant()
-        result_skip_errors = tm.flatten(data, name='error_test', config=config_skip_errors)
-        print(f"Error tolerant: {len(result_skip_errors.main)} records")
+        # Test null handling configurations
+        config_include_nulls = tm.TransmogConfig(include_nulls=True)
+        result_include = tm.flatten(data, name='nulls_test', config=config_include_nulls)
+        print(f"Include nulls: {len(result_include.main)} records")
 
         print('All API methods working correctly!')
         EOF

@@ -217,15 +217,11 @@ def run_standard_benchmarks(record_counts: list[int]) -> dict[str, dict[str, Any
         ("Low Memory", tm.TransmogConfig(batch_size=100)),
         ("Large Batches", tm.TransmogConfig(batch_size=5000)),
         ("Small Batches", tm.TransmogConfig(batch_size=100)),
-        ("Preserve Types", tm.TransmogConfig(cast_to_string=False)),
-        ("Skip Empty", tm.TransmogConfig(null_handling=tm.config.NullHandling.SKIP)),
-        (
-            "Include Empty",
-            tm.TransmogConfig(null_handling=tm.config.NullHandling.INCLUDE),
-        ),
+        ("Skip Empty", tm.TransmogConfig(include_nulls=False)),
+        ("Include Empty", tm.TransmogConfig(include_nulls=True)),
         ("Inline Arrays", tm.TransmogConfig(array_mode=tm.ArrayMode.INLINE)),
         ("Skip Arrays", tm.TransmogConfig(array_mode=tm.ArrayMode.SKIP)),
-        ("Custom Separator", tm.TransmogConfig(separator=".")),
+        ("Separate Arrays", tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)),
     ]
 
     for count in record_counts:
@@ -397,9 +393,9 @@ def run_array_handling_benchmarks() -> None:
         array_heavy_data.append(record)
 
     array_modes = [
-        ("Separate Tables", tm.TransmogConfig(array_mode=tm.types.ArrayMode.SEPARATE)),
-        ("Inline JSON", tm.TransmogConfig(array_mode=tm.types.ArrayMode.INLINE)),
-        ("Skip Arrays", tm.TransmogConfig(array_mode=tm.types.ArrayMode.SKIP)),
+        ("Separate Tables", tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)),
+        ("Inline JSON", tm.TransmogConfig(array_mode=tm.ArrayMode.INLINE)),
+        ("Skip Arrays", tm.TransmogConfig(array_mode=tm.ArrayMode.SKIP)),
     ]
 
     print(f"Testing array handling with {len(array_heavy_data)} records...")

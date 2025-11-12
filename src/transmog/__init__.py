@@ -15,7 +15,7 @@ Advanced Usage:
     >>> tm.flatten_stream(large_data, "output/", output_format="parquet")
 """
 
-__version__ = "1.1.1"
+__version__ = "2.0.0"
 
 from transmog.api import FlattenResult, flatten, flatten_stream
 from transmog.config import TransmogConfig
