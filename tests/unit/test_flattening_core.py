@@ -14,9 +14,7 @@ class TestFlattenJson:
         data = {"name": "test", "nested": {"value": 42}}
         config = TransmogConfig()
 
-        config = TransmogConfig()
-
-        result = flatten_json(data, config)
+        result, _ = flatten_json(data, config)
 
         assert isinstance(result, dict)
         assert result["name"] == "test"
@@ -28,7 +26,7 @@ class TestFlattenJson:
 
         config = TransmogConfig()
 
-        result = flatten_json(data, config)
+        result, _ = flatten_json(data, config)
 
         assert result == {}
 
@@ -37,13 +35,9 @@ class TestFlattenJson:
         data = {"items": [1, 2, 3], "name": "test"}
         config = TransmogConfig()
 
-        config = TransmogConfig()
+        result, _ = flatten_json(data, config)
 
-        result = flatten_json(data, config)
-
-        # Arrays may be skipped or converted to JSON strings in basic flattening
         assert result["name"] == "test"
-        # Arrays handling depends on configuration
 
     def test_flatten_nested_objects(self):
         """Test flattening deeply nested objects."""
@@ -51,7 +45,7 @@ class TestFlattenJson:
 
         config = TransmogConfig()
 
-        result = flatten_json(data, config)
+        result, _ = flatten_json(data, config)
 
         assert "level1_level2_level3_value" in result
         assert result["level1_level2_level3_value"] == "deep"
@@ -62,10 +56,9 @@ class TestFlattenJson:
 
         config = TransmogConfig()
 
-        result = flatten_json(data, config)
+        result, _ = flatten_json(data, config)
 
         assert result["name"] == "test"
-        # Null handling may vary based on configuration
 
     def test_flatten_with_empty_strings(self):
         """Test flattening with empty strings."""
@@ -73,9 +66,8 @@ class TestFlattenJson:
 
         config = TransmogConfig()
 
-        result = flatten_json(data, config)
+        result, _ = flatten_json(data, config)
 
-        # Empty strings may be skipped based on configuration
         assert isinstance(result, dict)
 
     def test_flatten_mixed_types(self):
@@ -89,7 +81,7 @@ class TestFlattenJson:
 
         config = TransmogConfig()
 
-        result = flatten_json(data, config)
+        result, _ = flatten_json(data, config)
 
         assert result["string"] == "text"
         assert result["number"] == 42
@@ -146,7 +138,7 @@ class TestFlattenJsonEdgeCases:
         data = {"level0": {}}
         current = data["level0"]
 
-        for i in range(1, 20):  # 20 levels deep
+        for i in range(1, 20):
             current[f"level{i}"] = {}
             current = current[f"level{i}"]
 
@@ -154,9 +146,8 @@ class TestFlattenJsonEdgeCases:
 
         config = TransmogConfig()
 
-        result = flatten_json(data, config)
+        result, _ = flatten_json(data, config)
 
-        # Should handle deep nesting
         assert isinstance(result, dict)
         assert len(result) > 0
 
@@ -166,7 +157,7 @@ class TestFlattenJsonEdgeCases:
 
         config = TransmogConfig()
 
-        result = flatten_json(data, config)
+        result, _ = flatten_json(data, config)
 
         assert isinstance(result, dict)
         assert len(result) >= 3
@@ -177,14 +168,13 @@ class TestFlattenJsonEdgeCases:
 
         config = TransmogConfig()
 
-        result = flatten_json(data, config)
+        result, _ = flatten_json(data, config)
 
         assert isinstance(result, dict)
         assert len(result) >= 2
 
     def test_flatten_large_object(self):
         """Test flattening large objects."""
-        # Create large nested object
         data = {"root": {}}
         current = data["root"]
 
@@ -193,20 +183,20 @@ class TestFlattenJsonEdgeCases:
 
         config = TransmogConfig()
 
-        result = flatten_json(data, config)
+        result, _ = flatten_json(data, config)
 
         assert isinstance(result, dict)
-        assert len(result) >= 50  # Simplified paths reduce unique field count
+        assert len(result) >= 50
 
     def test_flatten_with_list_values(self):
-        """Test flattening with list values in INLINE mode."""
+        """Test flattening with list values in SMART mode."""
         from transmog.types import ArrayMode
 
         data = {"simple_list": [1, 2, 3], "nested": {"list": ["a", "b", "c"]}}
 
-        config = TransmogConfig()
+        config = TransmogConfig(array_mode=ArrayMode.SMART)
 
-        result = flatten_json(data, config)
+        result, _ = flatten_json(data, config, _collect_arrays=False)
 
         assert isinstance(result, dict)
         assert "simple_list" in result
@@ -223,7 +213,7 @@ class TestFlattenJsonEdgeCases:
 
         config = TransmogConfig()
 
-        result = flatten_json(data, config)
+        result, _ = flatten_json(data, config)
 
         assert isinstance(result, dict)
         if "true_val" in result:

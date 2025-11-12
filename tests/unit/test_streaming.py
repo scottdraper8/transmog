@@ -16,7 +16,7 @@ from typing import Any
 import pytest
 
 from transmog.config import TransmogConfig
-from transmog.exceptions import ConfigurationError, ProcessingError
+from transmog.exceptions import ConfigurationError, ValidationError
 from transmog.iterators import (
     get_json_file_iterator,
     get_jsonl_file_iterator,
@@ -265,7 +265,7 @@ class TestStreamProcessFile:
         config = TransmogConfig()
         output_dir = tmp_path / "output"
 
-        data_iterator = get_jsonl_file_iterator(config, str(input_file))
+        data_iterator = get_jsonl_file_iterator(str(input_file))
         stream_process(
             config=config,
             data=data_iterator,
@@ -284,7 +284,7 @@ class TestStreamProcessFile:
 
     def test_stream_process_nonexistent_file(self):
         """Test streaming processing with nonexistent file."""
-        with pytest.raises(ProcessingError):
+        with pytest.raises(ValidationError):
             list(get_json_file_iterator("nonexistent.json"))
 
 

@@ -111,8 +111,6 @@ result = tm.flatten(data, config=tm.TransmogConfig(batch_size=100))
 # High-performance processing (larger batches)
 result = tm.flatten(data, config=tm.TransmogConfig(batch_size=10000))
 
-# Error-tolerant processing (skip malformed records)
-result = tm.flatten(data, config=tm.TransmogConfig(recovery_mode=tm.RecoveryMode.SKIP))
 ```
 
 **File Processing:**
@@ -138,9 +136,6 @@ config = tm.TransmogConfig(
     parent_field="_parent",            # Customize parent reference field name
     time_field="_timestamp",           # Add processing timestamp to records
 
-    # Error handling
-    recovery_mode=tm.RecoveryMode.SKIP,  # Skip records with errors
-    # Options: STRICT (default), SKIP
 
     # Data processing
     include_nulls=False,               # Skip null and empty values (default: False)

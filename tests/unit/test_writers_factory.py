@@ -6,7 +6,7 @@ import time
 import pytest
 
 from transmog.exceptions import ConfigurationError
-from transmog.writers import FORMATS, STREAMING_FORMATS, create_writer
+from transmog.writers import create_writer
 
 
 class TestWriterFactory:
@@ -21,6 +21,12 @@ class TestWriterFactory:
     def test_create_parquet_writer(self):
         """Test creating Parquet writer."""
         writer = create_writer("parquet")
+        assert writer is not None
+        assert hasattr(writer, "write")
+
+    def test_create_orc_writer(self):
+        """Test creating ORC writer."""
+        writer = create_writer("orc")
         assert writer is not None
         assert hasattr(writer, "write")
 
@@ -43,6 +49,9 @@ class TestWriterFactory:
         parquet_writer = create_writer("parquet", compression="snappy")
         assert parquet_writer is not None
 
+        orc_writer = create_writer("orc", compression="zstd")
+        assert orc_writer is not None
+
     def test_create_writer_unsupported_format(self):
         """Test creating writer for unsupported format."""
         with pytest.raises(ConfigurationError) as exc_info:
@@ -54,13 +63,6 @@ class TestWriterFactory:
         """Test creating writer with empty format."""
         with pytest.raises(ConfigurationError):
             create_writer("")
-
-    def test_supported_formats(self):
-        """Test supported formats are defined."""
-        assert isinstance(FORMATS, dict)
-        assert "csv" in FORMATS
-        assert "parquet" in FORMATS
-        assert "csv" in STREAMING_FORMATS
 
     def test_factory_returns_new_instances(self):
         """Test factory returns new instances."""
@@ -120,6 +122,31 @@ class TestWriterFactoryIntegration:
         name_column = table.column("name").to_pylist()
         assert name_column[0] == "Test 1"
 
+    def test_orc_writer_integration(self, tmp_path):
+        """Test factory-created ORC writer integration."""
+        pytest.importorskip("pyarrow")
+
+        writer = create_writer("orc")
+
+        data = [
+            {"id": 1, "name": "Test 1", "value": 100},
+            {"id": 2, "name": "Test 2", "value": 200},
+        ]
+
+        output_file = tmp_path / "factory_test.orc"
+        writer.write(data, str(output_file))
+
+        assert output_file.exists()
+
+        import pyarrow.orc as orc
+
+        table = orc.read_table(str(output_file))
+
+        assert table.num_rows == 2
+        assert "name" in table.schema.names
+        name_column = table.column("name").to_pylist()
+        assert name_column[0] == "Test 1"
+
 
 class TestWriterFactoryThreadSafety:
     """Test writer factory thread safety."""
@@ -154,7 +181,7 @@ class TestWriterFactoryThreadSafety:
         """Test factory handles creating many writers."""
         writers = []
         for i in range(100):
-            format_type = ["csv", "parquet"][i % 2]
+            format_type = ["csv", "parquet", "orc"][i % 3]
             writer = create_writer(format_type)
             writers.append(writer)
 

@@ -8,8 +8,7 @@ from unittest.mock import mock_open, patch
 import pytest
 
 import transmog as tm
-from transmog.exceptions import OutputError, ProcessingError
-from transmog.types import RecoveryMode
+from transmog.exceptions import OutputError, ValidationError
 
 from ..conftest import assert_files_created, count_files_in_dir
 
@@ -284,8 +283,7 @@ class TestFlattenResultEdgeCases:
             ],
         }
 
-        config = tm.TransmogConfig(recovery_mode=RecoveryMode.SKIP)
-        result = tm.flatten(data, name="nulls", config=config)
+        result = tm.flatten(data, name="nulls")
         assert isinstance(result, tm.FlattenResult)
         assert len(result.all_tables) >= 1
 
@@ -311,7 +309,7 @@ class TestFlattenResultSaveErrors:
                 readonly_file = readonly_dir / "output.csv"
 
                 with pytest.raises(
-                    (ProcessingError, OutputError, PermissionError, OSError)
+                    (ValidationError, OutputError, PermissionError, OSError)
                 ):
                     result.save(str(readonly_file))
             except (OSError, NotImplementedError):
@@ -335,7 +333,7 @@ class TestFlattenResultSaveErrors:
                     "No space left on device"
                 )
 
-                with pytest.raises((OutputError, ProcessingError, OSError)):
+                with pytest.raises((OutputError, ValidationError, OSError)):
                     result.save(str(output_path))
 
     def test_result_serialization_edge_cases(self):
@@ -358,5 +356,5 @@ class TestFlattenResultSaveErrors:
                     for path in saved_paths:
                         assert Path(path).exists()
 
-            except (ProcessingError, OutputError):
+            except (ValidationError, OutputError):
                 pass

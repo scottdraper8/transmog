@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 from transmog.exceptions import ConfigurationError
-from transmog.types import ArrayMode, RecoveryMode
+from transmog.types import ArrayMode
 
 
 @dataclass
@@ -48,9 +48,6 @@ class TransmogConfig:
     batch_size: int = 1000
     """Number of records to process at once for memory efficiency."""
 
-    recovery_mode: RecoveryMode = RecoveryMode.STRICT
-    """Error handling strategy: STRICT (default) or SKIP."""
-
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
         if self.batch_size < 1:
@@ -58,12 +55,6 @@ class TransmogConfig:
 
         if self.max_depth < 1:
             raise ConfigurationError("Max depth must be at least 1")
-
-        if not isinstance(self.recovery_mode, RecoveryMode):
-            raise ConfigurationError(
-                f"recovery_mode must be a RecoveryMode enum value, "
-                f"got {type(self.recovery_mode).__name__}"
-            )
 
         if not isinstance(self.include_nulls, bool):
             raise ConfigurationError(

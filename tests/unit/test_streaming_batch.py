@@ -11,7 +11,6 @@ import pytest
 import transmog as tm
 from transmog.config import TransmogConfig
 from transmog.flattening import process_record_batch
-from transmog.types import RecoveryMode
 
 
 class TestBatchProcessing:
@@ -107,9 +106,7 @@ class TestBatchProcessing:
             {"id": "invalid", "name": None, "age": "not_a_number"}
         ]
 
-        # Use error tolerant config
-        config = TransmogConfig(batch_size=2, recovery_mode=RecoveryMode.SKIP)
-
+        config = TransmogConfig(batch_size=2)
         result = tm.flatten(problematic_records, name="users", config=config)
 
         # Should process valid records and handle errors gracefully
@@ -256,7 +253,7 @@ class TestBatchProcessingEdgeCases:
             {
                 "id": i,
                 "data": {f"field_{j}": f"value_{i}_{j}" for j in range(50)},
-                "arrays": [[f"item_{i}_{j}_{k}" for k in range(10)] for j in range(5)],
+                "items": [{"value": f"item_{i}_{j}"} for j in range(5)],
             }
             for i in range(20)
         ]

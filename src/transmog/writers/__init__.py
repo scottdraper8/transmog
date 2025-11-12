@@ -8,8 +8,13 @@ and a streaming writer for memory-efficient processing.
 from typing import Any, BinaryIO
 
 from transmog.exceptions import ConfigurationError, MissingDependencyError
-from transmog.writers.base import DataWriter, StreamingWriter, sanitize_filename
+from transmog.writers.base import DataWriter, StreamingWriter
 from transmog.writers.csv import CsvStreamingWriter, CsvWriter
+from transmog.writers.orc import (
+    ORC_AVAILABLE,
+    OrcStreamingWriter,
+    OrcWriter,
+)
 from transmog.writers.parquet import (
     PARQUET_AVAILABLE,
     ParquetStreamingWriter,
@@ -23,6 +28,10 @@ STREAMING_FORMATS: dict[str, type[StreamingWriter]] = {"csv": CsvStreamingWriter
 if PARQUET_AVAILABLE:
     FORMATS["parquet"] = ParquetWriter
     STREAMING_FORMATS["parquet"] = ParquetStreamingWriter
+
+if ORC_AVAILABLE:
+    FORMATS["orc"] = OrcWriter
+    STREAMING_FORMATS["orc"] = OrcStreamingWriter
 
 
 def create_writer(format_name: str, **kwargs: Any) -> DataWriter:
@@ -46,8 +55,11 @@ def create_writer(format_name: str, **kwargs: Any) -> DataWriter:
         if format_name == "parquet" and not PARQUET_AVAILABLE:
             raise MissingDependencyError(
                 "PyArrow is required for Parquet support. "
-                "Install with: pip install pyarrow",
-                package="pyarrow",
+                "Install with: pip install pyarrow"
+            )
+        if format_name == "orc" and not ORC_AVAILABLE:
+            raise MissingDependencyError(
+                "PyArrow is required for ORC support. Install with: pip install pyarrow"
             )
         raise ConfigurationError(
             f"Unsupported format: {format_name}. Supported: {', '.join(FORMATS.keys())}"
@@ -84,8 +96,12 @@ def create_streaming_writer(
         if format_name == "parquet" and not PARQUET_AVAILABLE:
             raise MissingDependencyError(
                 "PyArrow is required for Parquet streaming. "
-                "Install with: pip install pyarrow",
-                package="pyarrow",
+                "Install with: pip install pyarrow"
+            )
+        if format_name == "orc" and not ORC_AVAILABLE:
+            raise MissingDependencyError(
+                "PyArrow is required for ORC streaming. "
+                "Install with: pip install pyarrow"
             )
         raise ConfigurationError(
             f"Unsupported format: {format_name}. "
@@ -96,18 +112,14 @@ def create_streaming_writer(
 
 
 __all__ = [
-    # Base classes
     "DataWriter",
     "StreamingWriter",
-    # CSV writers
     "CsvWriter",
     "CsvStreamingWriter",
-    # Parquet writers
+    "OrcWriter",
+    "OrcStreamingWriter",
     "ParquetWriter",
     "ParquetStreamingWriter",
-    # Factory functions
     "create_writer",
     "create_streaming_writer",
-    # Utilities
-    "sanitize_filename",
 ]

@@ -6,7 +6,7 @@ Tests ID generation strategies including auto, random, natural, hash, and compos
 import pytest
 
 from transmog.config import TransmogConfig
-from transmog.exceptions import ProcessingError
+from transmog.exceptions import ValidationError
 from transmog.flattening import generate_transmog_id
 
 
@@ -49,19 +49,19 @@ class TestIdStrategyNatural:
     def test_natural_fails_when_missing(self):
         """Natural strategy fails when field missing."""
         record = {"name": "test"}
-        with pytest.raises(ProcessingError, match="requires field '_id'"):
+        with pytest.raises(ValidationError, match="requires field '_id'"):
             generate_transmog_id(record, "natural", "_id")
 
     def test_natural_fails_when_empty(self):
         """Natural strategy fails when field is empty."""
         record = {"_id": "", "name": "test"}
-        with pytest.raises(ProcessingError, match="requires non-empty"):
+        with pytest.raises(ValidationError, match="requires non-empty"):
             generate_transmog_id(record, "natural", "_id")
 
     def test_natural_fails_when_none(self):
         """Natural strategy fails when field is None."""
         record = {"_id": None, "name": "test"}
-        with pytest.raises(ProcessingError, match="requires non-empty"):
+        with pytest.raises(ValidationError, match="requires non-empty"):
             generate_transmog_id(record, "natural", "_id")
 
     def test_natural_with_custom_field(self):
@@ -149,7 +149,7 @@ class TestConfigValidation:
 
     def test_invalid_string_strategy(self):
         """Invalid string strategy raises error."""
-        with pytest.raises(ProcessingError, match="Invalid id_generation"):
+        with pytest.raises(ValidationError, match="Invalid id_generation"):
             generate_transmog_id({"name": "test"}, "invalid", "_id")
 
     def test_valid_strategies(self):
@@ -159,7 +159,7 @@ class TestConfigValidation:
             try:
                 result = generate_transmog_id(record, strategy, "_id")
                 assert result is None or isinstance(result, str)
-            except ProcessingError:
+            except ValidationError:
                 if strategy == "natural":
                     pass
 

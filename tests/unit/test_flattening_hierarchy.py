@@ -12,7 +12,7 @@ from transmog.flattening import (
     _process_structure,
     process_record_batch,
 )
-from transmog.types import ProcessingContext, RecoveryMode
+from transmog.types import ProcessingContext
 
 
 class TestProcessStructure:
@@ -237,7 +237,7 @@ class TestHierarchyEdgeCases:
         data = {"name": "test", "child": {}}
         data["child"]["parent"] = data
 
-        config = TransmogConfig(max_depth=5, recovery_mode=RecoveryMode.SKIP)
+        config = TransmogConfig(max_depth=5)
         context = ProcessingContext()
         main_record, child_tables = _process_structure(
             data,

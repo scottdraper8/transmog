@@ -33,7 +33,7 @@ def stream_process(
         config: TransmogConfig instance
         data: Input data (dict, list, string, Path, bytes, or iterator)
         entity_name: Name of the entity being processed
-        output_format: Output format ("json", "csv", "parquet", etc)
+        output_format: Output format ("json", "csv", "parquet", "orc", etc)
         output_destination: File path or file-like object to write to
         extract_time: Optional extraction timestamp
         batch_size: Size of batches to process
@@ -47,7 +47,7 @@ def stream_process(
     )
 
     try:
-        data_iterator = get_data_iterator(config, data)
+        data_iterator = get_data_iterator(data)
         actual_batch_size = batch_size or config.batch_size
         timestamp = extract_time if extract_time else get_current_timestamp()
         context = ProcessingContext(extract_time=timestamp)

@@ -8,7 +8,7 @@ import pytest
 import transmog as tm
 from transmog import TransmogConfig
 from transmog.exceptions import ConfigurationError, ValidationError
-from transmog.types import ArrayMode, RecoveryMode
+from transmog.types import ArrayMode
 
 from ..conftest import assert_files_created, assert_valid_result
 
@@ -217,8 +217,7 @@ class TestFlattenEdgeCases:
             ]
         }
 
-        config = TransmogConfig(recovery_mode=RecoveryMode.SKIP)
-        result = tm.flatten(data, name="mixed", config=config)
+        result = tm.flatten(data, name="mixed")
         assert isinstance(result, tm.FlattenResult)
 
     def test_flatten_unicode_and_special_chars(self):

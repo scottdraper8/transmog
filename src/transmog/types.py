@@ -33,22 +33,6 @@ class ArrayMode(Enum):
     SKIP = "skip"
 
 
-class RecoveryMode(Enum):
-    """Defines error recovery behavior during processing.
-
-    STRICT mode (default):
-        Raises exceptions immediately when errors occur. Processing stops
-        at the first error. Use when data integrity is critical.
-
-    SKIP mode:
-        Continues processing, skipping problematic records. Failed records
-        are omitted from output. No automatic logging occurs.
-    """
-
-    STRICT = "strict"
-    SKIP = "skip"
-
-
 @dataclass
 class ProcessingContext:
     """Runtime state during processing, separate from configuration.
@@ -60,38 +44,11 @@ class ProcessingContext:
 
     current_depth: int = 0
     path_components: list[str] = field(default_factory=list)
-    extract_time: str = field(default_factory=lambda: "")
-
-    def descend(self, component: str) -> "ProcessingContext":
-        """Create context for descending into nested structure.
-
-        Args:
-            component: Path component to add
-
-        Returns:
-            New context with incremented depth and updated path
-        """
-        return ProcessingContext(
-            current_depth=self.current_depth + 1,
-            path_components=self.path_components + [component],
-            extract_time=self.extract_time,
-        )
-
-    def build_path(self, separator: str = "_") -> str:
-        """Build complete path string from components.
-
-        Args:
-            separator: Separator character for joining components
-
-        Returns:
-            Joined path string
-        """
-        return separator.join(self.path_components) if self.path_components else ""
+    extract_time: str = ""
 
 
 __all__ = [
     "JsonDict",
     "ArrayMode",
-    "RecoveryMode",
     "ProcessingContext",
 ]

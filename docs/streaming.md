@@ -23,6 +23,15 @@ tm.flatten_stream(
     output_format="parquet",
     compression="snappy"
 )
+
+# Stream to compressed ORC
+tm.flatten_stream(
+    large_data,
+    output_path="output/",
+    name="dataset",
+    output_format="orc",
+    compression="zstd"
+)
 ```
 
 `flatten()` keeps results in memory and returns a `FlattenResult` object.
@@ -31,8 +40,11 @@ tm.flatten_stream(
 ## Batch Size
 
 ```python
-# Default batch size: 1000
+# Default batch size: 1000 for flatten()
 result = tm.flatten(data)
+
+# flatten_stream() defaults to batch_size=100 for memory efficiency
+tm.flatten_stream(large_data, "output/")
 
 # Small batches for memory-constrained environments
 config = tm.TransmogConfig(batch_size=100)
@@ -66,6 +78,8 @@ tm.flatten_stream(data, "output/", output_format="csv")
 tm.flatten_stream(data, "output/", output_format="parquet")
 tm.flatten_stream(data, "output/", output_format="parquet", compression="snappy")
 tm.flatten_stream(data, "output/", output_format="parquet", row_group_size=50000)
+tm.flatten_stream(data, "output/", output_format="orc")
+tm.flatten_stream(data, "output/", output_format="orc", compression="zstd")
 ```
 
 ## Examples
@@ -85,6 +99,6 @@ tm.flatten_stream(
 ### ETL Pipeline
 
 ```python
-config = tm.TransmogConfig(batch_size=5000, recovery_mode=tm.RecoveryMode.SKIP)
+config = tm.TransmogConfig(batch_size=5000)
 tm.flatten_stream("raw_data.jsonl", "transformed/", name="events", output_format="parquet", config=config)
 ```

@@ -1,46 +1,6 @@
 # Error Handling
 
-Two recovery strategies control error behavior during processing.
-
-## Recovery Modes
-
-### STRICT Mode (Default)
-
-Stops processing on the first error:
-
-```python
-import transmog as tm
-
-# STRICT mode (default)
-config = tm.TransmogConfig(recovery_mode=tm.RecoveryMode.STRICT)
-
-malformed_data = [
-    {"name": "Valid Record"},
-    {"name": None, "invalid": ...},  # This will cause processing to stop
-    {"name": "Never Processed"}
-]
-
-try:
-    result = tm.flatten(malformed_data, config=config)
-except tm.TransmogError as e:
-    print(f"Processing failed: {e}")
-```
-
-### SKIP Mode
-
-Continue processing, skipping problematic records:
-
-```python
-# SKIP mode - continues on errors
-config = tm.TransmogConfig(recovery_mode=tm.RecoveryMode.SKIP)
-
-result = tm.flatten(malformed_data, config=config)
-
-# Problematic records are skipped
-print(len(result.main))  # Only valid records included
-```
-
-Skipped records do not emit log messages. Add custom logging if needed.
+Transmog raises exceptions when errors occur during processing. All exceptions inherit from `TransmogError`.
 
 ## Error Types
 
@@ -57,7 +17,7 @@ except tm.TransmogError as e:
 
 ### ValidationError
 
-Raised when input data validation fails. Available as `tm.ValidationError`.
+Raised when input data validation or processing fails. Available as `tm.ValidationError`.
 
 ```python
 # Invalid data type
@@ -69,10 +29,6 @@ except tm.ValidationError as e:
     print(f"Validation error: {e}")
 ```
 
-### ProcessingError
-
-Raised when record processing fails. Not exported; catch using `tm.TransmogError`.
-
 ### ConfigurationError
 
 Raised when configuration is invalid. Not exported; handled during initialization.
@@ -80,21 +36,6 @@ Raised when configuration is invalid. Not exported; handled during initializatio
 ### OutputError
 
 Raised when writing output fails. Not exported.
-
-## Custom Logging
-
-Skip mode does not emit log messages. Wrap processing for custom logging:
-
-```python
-import logging
-
-records = load_records()
-config = tm.TransmogConfig(recovery_mode=tm.RecoveryMode.SKIP)
-result = tm.flatten(records, config=config)
-
-if len(result.main) != len(records):
-    logging.warning("Omitted %s records", len(records) - len(result.main))
-```
 
 ## Custom Error Handling
 
@@ -118,19 +59,18 @@ def safe_flatten(data, **kwargs):
 config = tm.TransmogConfig(id_generation="natural", id_field="id")
 data = {"name": "Product"}  # Missing 'id'
 
-# Use skip mode to continue processing
-config = tm.TransmogConfig(
-    id_generation="natural",
-    id_field="id",
-    recovery_mode=tm.RecoveryMode.SKIP
-)
+try:
+    result = tm.flatten(data, config=config)
+except tm.TransmogError as e:
+    print(f"Error: {e}")
 ```
 
 ### Malformed JSONL
 
 ```python
 # File with invalid JSON on line 2
-config = tm.TransmogConfig(recovery_mode=tm.RecoveryMode.SKIP)
-result = tm.flatten("malformed.jsonl", config=config)
-# Processes valid lines, skips invalid lines
+try:
+    result = tm.flatten("malformed.jsonl")
+except tm.TransmogError as e:
+    print(f"Error processing file: {e}")
 ```

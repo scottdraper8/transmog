@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from transmog.config import TransmogConfig
-from transmog.exceptions import ProcessingError, ValidationError
+from transmog.exceptions import ValidationError
 from transmog.iterators import (
     get_data_iterator,
     get_json_data_iterator,
@@ -23,22 +23,7 @@ from transmog.iterators import (
 class TestGetDataIterator:
     """Test the main data iterator function."""
 
-    @pytest.fixture
-    def config(self):
-        """Create a config for testing."""
-        return TransmogConfig()
-
-    @pytest.fixture
-    def processor(self, config):
-        """Create a processor-like object for testing."""
-
-        class ConfigWrapper:
-            def __init__(self, config):
-                self.config = config
-
-        return ConfigWrapper(config)
-
-    def test_iterate_list_of_dicts(self, processor):
+    def test_iterate_list_of_dicts(self):
         """Test iterating over list of dictionaries."""
         data = [
             {"id": 1, "name": "Alice"},
@@ -46,60 +31,60 @@ class TestGetDataIterator:
             {"id": 3, "name": "Charlie"},
         ]
 
-        records = list(get_data_iterator(processor, data))
+        records = list(get_data_iterator(data))
         assert len(records) == 3
         assert records[0]["name"] == "Alice"
         assert records[1]["name"] == "Bob"
         assert records[2]["name"] == "Charlie"
 
-    def test_iterate_single_dict(self, processor):
+    def test_iterate_single_dict(self):
         """Test iterating over single dictionary."""
         data = {"id": 1, "name": "Alice"}
 
-        records = list(get_data_iterator(processor, data))
+        records = list(get_data_iterator(data))
         assert len(records) == 1
         assert records[0]["name"] == "Alice"
 
-    def test_iterate_empty_list(self, processor):
+    def test_iterate_empty_list(self):
         """Test iterating over empty list."""
         data = []
 
-        records = list(get_data_iterator(processor, data))
+        records = list(get_data_iterator(data))
         assert len(records) == 0
 
-    def test_iterate_json_string(self, processor):
+    def test_iterate_json_string(self):
         """Test iterating over JSON string."""
         data = '{"id": 1, "name": "Alice"}'
 
-        records = list(get_data_iterator(processor, data))
+        records = list(get_data_iterator(data))
         assert len(records) == 1
         assert records[0]["name"] == "Alice"
 
-    def test_iterate_json_list_string(self, processor):
+    def test_iterate_json_list_string(self):
         """Test iterating over JSON list string."""
         data = '[{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]'
 
-        records = list(get_data_iterator(processor, data))
+        records = list(get_data_iterator(data))
         assert len(records) == 2
         assert records[0]["name"] == "Alice"
         assert records[1]["name"] == "Bob"
 
-    def test_iterate_with_auto_format_detection(self, processor):
+    def test_iterate_with_auto_format_detection(self):
         """Test auto format detection."""
         # JSON data
         json_data = {"id": 1, "name": "Alice"}
-        records = list(get_data_iterator(processor, json_data))
+        records = list(get_data_iterator(json_data))
         assert len(records) == 1
 
         # JSONL data
         jsonl_data = '{"id": 1}\n{"id": 2}\n'
-        records = list(get_data_iterator(processor, jsonl_data))
+        records = list(get_data_iterator(jsonl_data))
         assert len(records) == 2
 
-    def test_iterate_unsupported_type(self, processor):
+    def test_iterate_unsupported_type(self):
         """Test iterating over unsupported data type."""
         with pytest.raises(ValidationError):
-            list(get_data_iterator(processor, 42))
+            list(get_data_iterator(42))
 
 
 class TestJSONDataIterator:
@@ -146,65 +131,50 @@ class TestJSONDataIterator:
         """Test iterating over invalid JSON data."""
         data = '{"invalid": json}'
 
-        with pytest.raises(ProcessingError):
+        with pytest.raises(ValidationError):
             list(get_json_data_iterator(data))
 
     def test_iterate_non_dict_list(self):
         """Test iterating over non-dict/list data."""
         data = "just a string"
 
-        with pytest.raises(ProcessingError):
+        with pytest.raises(ValidationError):
             list(get_json_data_iterator(data))
 
 
 class TestJSONLDataIterator:
     """Test the JSONL data iterator function."""
 
-    @pytest.fixture
-    def config(self):
-        """Create a config for testing."""
-        return TransmogConfig()
-
-    @pytest.fixture
-    def processor(self, config):
-        """Create a processor-like object for testing."""
-
-        class ConfigWrapper:
-            def __init__(self, config):
-                self.config = config
-
-        return ConfigWrapper(config)
-
-    def test_iterate_jsonl_string(self, processor):
+    def test_iterate_jsonl_string(self):
         """Test iterating over JSONL string."""
         data = '{"id": 1, "name": "Alice"}\n{"id": 2, "name": "Bob"}\n'
 
-        records = list(get_jsonl_data_iterator(processor, data))
+        records = list(get_jsonl_data_iterator(data))
         assert len(records) == 2
         assert records[0]["name"] == "Alice"
         assert records[1]["name"] == "Bob"
 
-    def test_iterate_jsonl_with_empty_lines(self, processor):
+    def test_iterate_jsonl_with_empty_lines(self):
         """Test iterating over JSONL with empty lines."""
         data = '{"id": 1, "name": "Alice"}\n\n{"id": 2, "name": "Bob"}\n'
 
-        records = list(get_jsonl_data_iterator(processor, data))
+        records = list(get_jsonl_data_iterator(data))
         assert len(records) == 2
         assert records[0]["name"] == "Alice"
         assert records[1]["name"] == "Bob"
 
-    def test_iterate_empty_jsonl(self, processor):
+    def test_iterate_empty_jsonl(self):
         """Test iterating over empty JSONL."""
         data = ""
 
-        records = list(get_jsonl_data_iterator(processor, data))
+        records = list(get_jsonl_data_iterator(data))
         assert len(records) == 0
 
-    def test_iterate_jsonl_bytes(self, processor):
+    def test_iterate_jsonl_bytes(self):
         """Test iterating over JSONL bytes."""
         data = b'{"id": 1, "name": "Alice"}\n{"id": 2, "name": "Bob"}\n'
 
-        records = list(get_jsonl_data_iterator(processor, data))
+        records = list(get_jsonl_data_iterator(data))
         assert len(records) == 2
         assert records[0]["name"] == "Alice"
         assert records[1]["name"] == "Bob"
@@ -213,22 +183,7 @@ class TestJSONLDataIterator:
 class TestJSONLFileIterator:
     """Test the JSONL file iterator function."""
 
-    @pytest.fixture
-    def config(self):
-        """Create a config for testing."""
-        return TransmogConfig()
-
-    @pytest.fixture
-    def processor(self, config):
-        """Create a processor-like object for testing."""
-
-        class ConfigWrapper:
-            def __init__(self, config):
-                self.config = config
-
-        return ConfigWrapper(config)
-
-    def test_iterate_jsonl_file(self, processor):
+    def test_iterate_jsonl_file(self):
         """Test iterating over JSONL file."""
         jsonl_data = [
             '{"id": 1, "name": "Alice"}',
@@ -244,7 +199,7 @@ class TestJSONLFileIterator:
             tmp_path = tmp.name
 
         try:
-            records = list(get_jsonl_file_iterator(processor, tmp_path))
+            records = list(get_jsonl_file_iterator(tmp_path))
             assert len(records) == 3
             assert records[0]["name"] == "Alice"
             assert records[1]["name"] == "Bob"
@@ -252,7 +207,7 @@ class TestJSONLFileIterator:
         finally:
             Path(tmp_path).unlink()
 
-    def test_iterate_empty_jsonl_file(self, processor):
+    def test_iterate_empty_jsonl_file(self):
         """Test iterating over empty JSONL file."""
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".jsonl", delete=False
@@ -260,17 +215,17 @@ class TestJSONLFileIterator:
             tmp_path = tmp.name
 
         try:
-            records = list(get_jsonl_file_iterator(processor, tmp_path))
+            records = list(get_jsonl_file_iterator(tmp_path))
             assert len(records) == 0
         finally:
             Path(tmp_path).unlink()
 
-    def test_iterate_nonexistent_file(self, processor):
+    def test_iterate_nonexistent_file(self):
         """Test iterating over nonexistent file."""
-        with pytest.raises(ProcessingError):
-            list(get_jsonl_file_iterator(processor, "/path/that/does/not/exist.jsonl"))
+        with pytest.raises(ValidationError):
+            list(get_jsonl_file_iterator("/path/that/does/not/exist.jsonl"))
 
-    def test_iterate_large_jsonl_file(self, processor):
+    def test_iterate_large_jsonl_file(self):
         """Test iterating over large JSONL file."""
         # Create large JSONL file
         with tempfile.NamedTemporaryFile(
@@ -282,7 +237,7 @@ class TestJSONLFileIterator:
             tmp_path = tmp.name
 
         try:
-            records = list(get_jsonl_file_iterator(processor, tmp_path))
+            records = list(get_jsonl_file_iterator(tmp_path))
             assert len(records) == 1000
             assert records[0]["value"] == "item_0"
             assert records[999]["value"] == "item_999"
@@ -293,22 +248,7 @@ class TestJSONLFileIterator:
 class TestDataIteratorEdgeCases:
     """Test edge cases in data iteration."""
 
-    @pytest.fixture
-    def config(self):
-        """Create a config for testing."""
-        return TransmogConfig()
-
-    @pytest.fixture
-    def processor(self, config):
-        """Create a processor-like object for testing."""
-
-        class ConfigWrapper:
-            def __init__(self, config):
-                self.config = config
-
-        return ConfigWrapper(config)
-
-    def test_iterator_with_unicode_data(self, processor):
+    def test_iterator_with_unicode_data(self):
         """Test iterator handling unicode data."""
         data = [
             {"name": "Alice", "city": "New York"},
@@ -317,13 +257,13 @@ class TestDataIteratorEdgeCases:
             {"name": "🌍", "city": "🏙️"},
         ]
 
-        records = list(get_data_iterator(processor, data))
+        records = list(get_data_iterator(data))
         assert len(records) == 4
         assert records[1]["name"] == "测试"
         assert records[2]["name"] == "José"
         assert records[3]["name"] == "🌍"
 
-    def test_iterator_with_nested_data(self, processor):
+    def test_iterator_with_nested_data(self):
         """Test iterator handling nested data structures."""
         data = {
             "company": "TechCorp",
@@ -334,13 +274,13 @@ class TestDataIteratorEdgeCases:
             "metadata": {"created": "2023-01-01", "version": "1.0"},
         }
 
-        records = list(get_data_iterator(processor, data))
+        records = list(get_data_iterator(data))
         assert len(records) == 1
         assert records[0]["company"] == "TechCorp"
         assert "employees" in records[0]
         assert "metadata" in records[0]
 
-    def test_existing_iterator_passthrough(self, processor):
+    def test_existing_iterator_passthrough(self):
         """Test that existing iterators are passed through."""
 
         def data_generator():
@@ -348,50 +288,50 @@ class TestDataIteratorEdgeCases:
             yield {"id": 2, "name": "Bob"}
 
         # Should pass through the generator directly
-        iterator = get_data_iterator(processor, data_generator())
+        iterator = get_data_iterator(data_generator())
         records = list(iterator)
         assert len(records) == 2
         assert records[0]["name"] == "Alice"
         assert records[1]["name"] == "Bob"
 
-    def test_malformed_jsonl_data(self, processor):
+    def test_malformed_jsonl_data(self):
         """Test handling malformed JSONL data."""
         data = (
             '{"id": 1, "name": "Alice"}\n{"invalid": json}\n{"id": 2, "name": "Bob"}\n'
         )
 
-        # With default strict error handling, should raise ProcessingError for invalid JSON
-        with pytest.raises(ProcessingError):
-            list(get_jsonl_data_iterator(processor, data))
+        # With default strict error handling, should raise ValidationError for invalid JSON
+        with pytest.raises(ValidationError):
+            list(get_jsonl_data_iterator(data))
 
-    def test_empty_data_handling(self, processor):
+    def test_empty_data_handling(self):
         """Test handling of various empty data scenarios."""
         # Empty list
-        assert len(list(get_data_iterator(processor, []))) == 0
+        assert len(list(get_data_iterator([]))) == 0
 
         # Empty dict is still a record
-        assert len(list(get_data_iterator(processor, {}))) == 1
+        assert len(list(get_data_iterator({}))) == 1
 
         # Empty string should raise error
-        with pytest.raises(ProcessingError):
-            list(get_data_iterator(processor, ""))
+        with pytest.raises(ValidationError):
+            list(get_data_iterator(""))
 
         # None data
-        with pytest.raises((ValidationError, ProcessingError)):
-            list(get_data_iterator(processor, None))
+        with pytest.raises(ValidationError):
+            list(get_data_iterator(None))
 
-    def test_format_specification(self, processor):
+    def test_format_specification(self):
         """Test explicit format specification."""
         data = '{"id": 1, "name": "Alice"}'
 
         # Auto-detected as JSON (single line, no newlines)
-        records = list(get_data_iterator(processor, data))
+        records = list(get_data_iterator(data))
         assert len(records) == 1
         assert records[0]["name"] == "Alice"
 
         # JSONL format (multiple lines)
         jsonl_data = '{"id": 1, "name": "Alice"}\n{"id": 2, "name": "Bob"}\n'
-        records = list(get_data_iterator(processor, jsonl_data))
+        records = list(get_data_iterator(jsonl_data))
         assert len(records) == 2
         assert records[0]["name"] == "Alice"
         assert records[1]["name"] == "Bob"

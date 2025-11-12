@@ -1,6 +1,6 @@
 # Output Formats
 
-Supported formats: CSV and Parquet.
+Supported formats: CSV, Parquet, and ORC.
 
 ## Saving Results
 
@@ -14,6 +14,7 @@ result = tm.flatten(data, name="products")
 # Auto-detect format from extension
 result.save("output.csv")          # CSV
 result.save("output.parquet")      # Parquet
+result.save("output.orc")          # ORC
 ```
 
 ### Explicit Format
@@ -22,6 +23,7 @@ result.save("output.parquet")      # Parquet
 # Specify format explicitly
 result.save("output", output_format="csv")
 result.save("output", output_format="parquet")
+result.save("output", output_format="orc")
 ```
 
 ### Multiple Tables
@@ -52,6 +54,8 @@ result.save("output.csv")
 Custom options:
 
 ```python
+import csv
+
 # Custom delimiter and quoting
 result.save(
     "output.csv",
@@ -71,6 +75,19 @@ result.save("output.parquet", compression="snappy")  # Default
 result.save("output.parquet", compression="gzip")
 result.save("output.parquet", compression="brotli")
 result.save("output.parquet", compression=None)
+```
+
+## ORC Output
+
+```python
+result = tm.flatten(data, name="products")
+result.save("output.orc")
+
+# Compression options
+result.save("output.orc", compression="zstd")    # Default
+result.save("output.orc", compression="snappy")
+result.save("output.orc", compression="lz4")
+result.save("output.orc", compression="zlib")
 ```
 
 ## Null Handling

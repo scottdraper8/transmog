@@ -19,8 +19,8 @@ __version__ = "1.1.1"
 
 from transmog.api import FlattenResult, flatten, flatten_stream
 from transmog.config import TransmogConfig
-from transmog.exceptions import TransmogError, ValidationError
-from transmog.types import ArrayMode, RecoveryMode
+from transmog.exceptions import MissingDependencyError, TransmogError, ValidationError
+from transmog.types import ArrayMode
 
 __all__ = [
     "flatten",
@@ -28,8 +28,8 @@ __all__ = [
     "FlattenResult",
     "TransmogConfig",
     "ArrayMode",
-    "RecoveryMode",
     "TransmogError",
     "ValidationError",
+    "MissingDependencyError",
     "__version__",
 ]

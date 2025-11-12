@@ -8,7 +8,12 @@ import sys
 from typing import Any, BinaryIO, TextIO, cast
 
 from transmog.exceptions import ConfigurationError, OutputError
-from transmog.writers.base import DataWriter, StreamingWriter, sanitize_filename
+from transmog.writers.base import (
+    DataWriter,
+    StreamingWriter,
+    _collect_field_names,
+    _sanitize_filename,
+)
 
 
 class CsvWriter(DataWriter):
@@ -69,17 +74,9 @@ class CsvWriter(DataWriter):
             use_escapechar = options.get("escapechar", self.escapechar)
 
             if not data:
-                if isinstance(destination, (str, pathlib.Path)):
-                    path = pathlib.Path(destination)
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.touch()
-                    return str(path) if isinstance(destination, str) else path
                 return destination
 
-            field_names_set: set[str] = set()
-            for record in data:
-                field_names_set.update(record.keys())
-            field_names = sorted(field_names_set)
+            field_names = _collect_field_names(data)
 
             if isinstance(destination, (str, pathlib.Path)):
                 path = pathlib.Path(destination)
@@ -210,7 +207,7 @@ class CsvStreamingWriter(StreamingWriter):
         self.file_objects: dict[str, TextIO] = {}
         self.writers: dict[str, csv.DictWriter] = {}
         self.fieldnames: dict[str, list[str]] = {}
-        self.headers_written: set[str] = set()
+        self.fieldname_sets: dict[str, set[str]] = {}
         self.should_close_files: bool = False
         self.base_dir: str | None = None
 
@@ -265,7 +262,7 @@ class CsvStreamingWriter(StreamingWriter):
             if table_name == "main":
                 filename = self.entity_name
             else:
-                filename = sanitize_filename(table_name)
+                filename = _sanitize_filename(table_name)
 
             file_path = os.path.join(self.base_dir, f"{filename}.csv")
             file_obj = open(file_path, "w", encoding="utf-8", newline="")
@@ -275,14 +272,14 @@ class CsvStreamingWriter(StreamingWriter):
         else:
             raise OutputError(f"Cannot create file for table {table_name}")
 
-    def _get_writer_for_table(
-        self, table_name: str, fieldnames: list[str]
+    def _ensure_writer(
+        self, table_name: str, records: list[dict[str, Any]]
     ) -> csv.DictWriter:
-        """Get or create a CSV writer for the given table.
+        """Ensure writer and schema are initialized for a table.
 
         Args:
             table_name: Name of the table
-            fieldnames: List of field names for the CSV
+            records: Records that will be written
 
         Returns:
             CSV writer for the table
@@ -290,6 +287,7 @@ class CsvStreamingWriter(StreamingWriter):
         if table_name in self.writers:
             return self.writers[table_name]
 
+        fieldnames = _collect_field_names(records)
         file_obj = self._get_file_for_table(table_name)
 
         writer = csv.DictWriter(
@@ -301,8 +299,35 @@ class CsvStreamingWriter(StreamingWriter):
 
         self.writers[table_name] = writer
         self.fieldnames[table_name] = fieldnames
+        self.fieldname_sets[table_name] = set(fieldnames)
+
+        if self.include_header and fieldnames:
+            writer.writeheader()
 
         return writer
+
+    def _write_records(self, table_name: str, records: list[dict[str, Any]]) -> None:
+        """Write records to the specified table in a single pass.
+
+        Args:
+            table_name: Name of the table
+            records: Records to write
+        """
+        if not records:
+            return
+
+        writer = self._ensure_writer(table_name, records)
+        allowed_fields = self.fieldname_sets.get(table_name, set())
+
+        for record in records:
+            unexpected_fields = set(record.keys()) - allowed_fields
+            if unexpected_fields:
+                raise OutputError(
+                    "CSV schema changed after header emission; "
+                    f"unexpected fields {sorted(unexpected_fields)} detected "
+                    f"in table '{table_name}'."
+                )
+            writer.writerow(record)
 
     def write_main_records(self, records: list[dict[str, Any]]) -> None:
         """Write a batch of main records.
@@ -310,21 +335,7 @@ class CsvStreamingWriter(StreamingWriter):
         Args:
             records: List of main table records to write
         """
-        if not records:
-            return
-
-        field_names_set: set[str] = set()
-        for record in records:
-            field_names_set.update(record.keys())
-        field_names = sorted(field_names_set)
-
-        writer = self._get_writer_for_table("main", field_names)
-
-        if "main" not in self.headers_written and self.include_header:
-            writer.writeheader()
-            self.headers_written.add("main")
-
-        writer.writerows(records)
+        self._write_records("main", records)
 
     def write_child_records(
         self, table_name: str, records: list[dict[str, Any]]
@@ -335,37 +346,16 @@ class CsvStreamingWriter(StreamingWriter):
             table_name: Name of the child table
             records: List of child records to write
         """
-        if not records:
+        self._write_records(table_name, records)
+
+    def close(self) -> None:
+        """Finalize output, flush buffered data, and clean up resources."""
+        if getattr(self, "_closed", False):
             return
 
-        field_names_set: set[str] = set()
-        for record in records:
-            field_names_set.update(record.keys())
-
-        if table_name in self.fieldnames:
-            field_names_set.update(self.fieldnames[table_name])
-
-        field_names = sorted(field_names_set)
-
-        writer = self._get_writer_for_table(table_name, field_names)
-
-        if table_name not in self.headers_written and self.include_header:
-            writer.writeheader()
-            self.headers_written.add(table_name)
-
-        writer.writerows(records)
-
-    def finalize(self) -> None:
-        """Finalize the output and flush all writers."""
         for file_obj in self.file_objects.values():
             if hasattr(file_obj, "flush"):
                 file_obj.flush()
-
-    def close(self) -> None:
-        """Clean up resources and close all files."""
-        if not getattr(self, "_finalized", False):
-            self.finalize()
-            self._finalized = True
 
         if self.should_close_files:
             for file_obj in self.file_objects.values():
@@ -375,6 +365,8 @@ class CsvStreamingWriter(StreamingWriter):
         self.file_objects.clear()
         self.writers.clear()
         self.fieldnames.clear()
+        self.fieldname_sets.clear()
+        self._closed = True
 
 
 __all__ = ["CsvWriter", "CsvStreamingWriter"]

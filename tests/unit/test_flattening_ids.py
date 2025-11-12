@@ -7,7 +7,8 @@ Tests deterministic ID generation, composite IDs, and reproducible behavior.
 import pytest
 
 import transmog as tm
-from transmog.flattening import _hash_value
+from transmog.flattening import _hash_value, process_record_batch
+from transmog.types import ProcessingContext
 
 
 class TestDeterministicIdGeneration:
@@ -419,3 +420,31 @@ class TestDeterministicIdApiIntegration:
         assert result_det.main[0]["_id"] != result_rand.main[0]["_id"]
         assert isinstance(result_det.main[0]["_id"], str)
         assert isinstance(result_rand.main[0]["_id"], str)
+
+    def test_natural_ids_propagate_to_child_tables(self):
+        """Ensure natural IDs become parent references for extracted arrays."""
+        records = [
+            {
+                "_id": "ORDER-123",
+                "customer": "Alice",
+                "items": [
+                    {"sku": "SKU-1", "qty": 1},
+                    {"sku": "SKU-2", "qty": 2},
+                ],
+            }
+        ]
+        config = tm.TransmogConfig(id_generation="natural")
+        context = ProcessingContext(extract_time="2025-01-01 00:00:00.000000")
+
+        main_rows, child_tables = process_record_batch(
+            records=records,
+            entity_name="orders",
+            config=config,
+            _context=context,
+        )
+
+        assert main_rows[0]["_id"] == "ORDER-123"
+        table_name = "orders_items"
+        assert table_name in child_tables
+        parent_ids = {row["_parent_id"] for row in child_tables[table_name]}
+        assert parent_ids == {"ORDER-123"}

@@ -150,51 +150,39 @@ class TestProcessingContext:
         assert isinstance(context.extract_time, str)
 
     def test_processing_context_descend(self):
-        """Test descending into nested structures."""
+        """Test creating nested contexts."""
         context = ProcessingContext(current_depth=1, path_components=["parent"])
 
-        child_context = context.descend("child")
+        child_context = ProcessingContext(
+            current_depth=context.current_depth + 1,
+            path_components=context.path_components + ["child"],
+            extract_time=context.extract_time,
+        )
 
         assert child_context.current_depth == 2
         assert child_context.path_components == ["parent", "child"]
         assert child_context.extract_time == context.extract_time
 
-    def test_processing_context_build_path_empty(self):
-        """Test building path with empty components."""
-        context = ProcessingContext()
-
-        path = context.build_path("_")
-        assert path == ""
-
-    def test_processing_context_build_path_single(self):
-        """Test building path with single component."""
-        context = ProcessingContext(path_components=["field"])
-
-        path = context.build_path("_")
-        assert path == "field"
-
-    def test_processing_context_build_path_multiple(self):
-        """Test building path with multiple components."""
-        context = ProcessingContext(path_components=["users", "profile", "name"])
-
-        path = context.build_path("_")
-        assert path == "users_profile_name"
-
-    def test_processing_context_build_path_custom_separator(self):
-        """Test building path with custom separator."""
-        context = ProcessingContext(path_components=["level1", "level2"])
-
-        path = context.build_path(".")
-        assert path == "level1.level2"
-
     def test_processing_context_descend_preserves_extract_time(self):
-        """Test that descend preserves extract_time across nested operations."""
+        """Test that nested contexts preserve extract_time."""
         context = ProcessingContext(extract_time="2023-01-01T12:00:00Z")
 
         # Multiple levels of nesting
-        level1 = context.descend("level1")
-        level2 = level1.descend("level2")
-        level3 = level2.descend("level3")
+        level1 = ProcessingContext(
+            current_depth=context.current_depth + 1,
+            path_components=context.path_components + ["level1"],
+            extract_time=context.extract_time,
+        )
+        level2 = ProcessingContext(
+            current_depth=level1.current_depth + 1,
+            path_components=level1.path_components + ["level2"],
+            extract_time=level1.extract_time,
+        )
+        level3 = ProcessingContext(
+            current_depth=level2.current_depth + 1,
+            path_components=level2.path_components + ["level3"],
+            extract_time=level2.extract_time,
+        )
 
         assert level1.extract_time == "2023-01-01T12:00:00Z"
         assert level2.extract_time == "2023-01-01T12:00:00Z"

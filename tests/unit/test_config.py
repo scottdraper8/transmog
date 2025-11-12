@@ -4,7 +4,7 @@ import pytest
 
 from transmog.config import TransmogConfig
 from transmog.exceptions import ConfigurationError
-from transmog.types import ArrayMode, RecoveryMode
+from transmog.types import ArrayMode
 
 
 class TestConfigCreation:
@@ -91,7 +91,6 @@ class TestConfigConsistency:
         configs = [
             TransmogConfig(),
             TransmogConfig(batch_size=100),
-            TransmogConfig(recovery_mode=RecoveryMode.SKIP),
             TransmogConfig(include_nulls=True),
         ]
 

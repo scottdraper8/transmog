@@ -70,7 +70,7 @@ flatten_stream(
 - **data** (*dict[str, Any] | list[dict[str, Any]] | str | Path | bytes*): Input data (same as `flatten()`).
 - **output_path** (*str | Path*): Directory path for output files.
 - **name** (*str*, default="data"): Base name for output files.
-- **output_format** (*str*, default="csv"): Output format ("csv", "parquet").
+- **output_format** (*str*, default="csv"): Output format ("csv", "parquet", "orc").
 - **config** (*TransmogConfig | None*, default=None): Configuration object.
 - **\*\*format_options**: Format-specific options.
 
@@ -78,6 +78,7 @@ flatten_stream(
 
 - **"csv"**: CSV files
 - **"parquet"**: Parquet files (requires pyarrow)
+- **"orc"**: ORC files (requires pyarrow)
 
 **Returns:**
 
@@ -89,9 +90,12 @@ flatten_stream(
 # Stream to CSV
 tm.flatten_stream(large_data, "output/", output_format="csv")
 
-# Stream to Parquet with configuration
+# Stream to Parquet
+tm.flatten_stream(data, "output/", output_format="parquet")
+
+# Stream to ORC with configuration
 config = tm.TransmogConfig(batch_size=5000)
-tm.flatten_stream(data, "output/", output_format="parquet", config=config)
+tm.flatten_stream(data, "output/", output_format="orc", config=config)
 ```
 
 ## Classes
@@ -110,7 +114,6 @@ TransmogConfig(
     parent_field: str = "_parent_id",
     time_field: str | None = "_timestamp",
     batch_size: int = 1000,
-    recovery_mode: RecoveryMode = RecoveryMode.STRICT,
 )
 ```
 
@@ -139,9 +142,6 @@ TransmogConfig(
 **Processing Control:**
 
 - `batch_size` (int, default=1000): Records to process at once
-- `recovery_mode` (RecoveryMode, default=RecoveryMode.STRICT): Error recovery strategy:
-  - `tm.RecoveryMode.STRICT`: Stop on first error
-  - `tm.RecoveryMode.SKIP`: Skip problematic records and continue
 
 ### FlattenResult
 
@@ -178,14 +178,16 @@ Save tables to files.
 ```python
 save(
     path: str | Path,
-    output_format: str | None = None
+    output_format: str | None = None,
+    **format_options: Any
 ) -> list[str] | dict[str, str]
 ```
 
 **Parameters:**
 
 - **path**: Output path (file or directory).
-- **output_format**: Output format ("csv", "parquet"). Auto-detected from extension if not specified.
+- **output_format**: Output format ("csv", "parquet", "orc"). Auto-detected from extension if not specified.
+- **\*\*format_options**: Format-specific writer options (e.g., `delimiter`, `quoting` for CSV; `compression` for Parquet).
 
 **Returns:**
 
@@ -253,10 +255,30 @@ except tm.ValidationError as e:
     print(f"Data validation error: {e}")
 ```
 
-**Note:** Other exception types (`ProcessingError`, `ConfigurationError`,
-`OutputError`) exist internally but are not exported in the public API.
-Catch them using generic exception handling or `TransmogError` as the base
-class.
+### MissingDependencyError
+
+Raised when an optional dependency is missing.
+
+```python
+class MissingDependencyError(TransmogError):
+    """Raised when an optional dependency is missing."""
+```
+
+**Available as:** `tm.MissingDependencyError`
+
+**Examples:**
+
+```python
+try:
+    tm.flatten_stream(data, "output/", output_format="parquet")
+except tm.MissingDependencyError as e:
+    print(f"Missing dependency: {e}")
+    print(f"Install with: pip install pyarrow")
+```
+
+**Note:** Other exception types (`ConfigurationError`, `OutputError`) exist
+internally but are not exported in the public API. Catch them using generic
+exception handling or `TransmogError` as the base class.
 
 ## Type Definitions
 
@@ -273,17 +295,6 @@ tm.ArrayMode.INLINE   # All arrays as JSON strings
 tm.ArrayMode.SKIP     # Ignore arrays
 ```
 
-### RecoveryMode
-
-Enumeration for controlling error recovery behavior. Available as `tm.RecoveryMode` when importing `transmog as tm`.
-
-```python
-import transmog as tm
-
-tm.RecoveryMode.STRICT  # Stop on first error (default)
-tm.RecoveryMode.SKIP    # Skip problematic records
-```
-
 ## Module Information
 
 ```python
@@ -295,14 +306,13 @@ print(tm.__version__)
 # Exported names
 print(tm.__all__)
 # ['flatten', 'flatten_stream', 'FlattenResult',
-#  'TransmogConfig', 'ArrayMode', 'RecoveryMode',
-#  'TransmogError', 'ValidationError', '__version__']
+#  'TransmogConfig', 'ArrayMode',
+#  'TransmogError', 'ValidationError', 'MissingDependencyError', '__version__']
 
 # All exported types are available directly
 result = tm.flatten(data)                    # Main function
 config = tm.TransmogConfig()                 # Configuration
 mode = tm.ArrayMode.SMART                    # Array handling mode
-recovery = tm.RecoveryMode.STRICT            # Error recovery mode
 
 # Exception handling
 try:
@@ -321,8 +331,7 @@ import transmog as tm
 
 config = tm.TransmogConfig(
     batch_size=1000,
-    array_mode=tm.ArrayMode.SEPARATE,
-    recovery_mode=tm.RecoveryMode.SKIP
+    array_mode=tm.ArrayMode.SEPARATE
 )
 result = tm.flatten(data, name="products", config=config)
 ```

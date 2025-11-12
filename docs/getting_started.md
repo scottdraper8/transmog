@@ -8,7 +8,7 @@ preserving relationships between parent and child records.
 ## Installation
 
 ```bash
-pip install transmog              # Standard (includes Parquet)
+pip install transmog              # Standard (includes Parquet and ORC)
 pip install transmog[minimal]     # CSV only
 ```
 
@@ -98,9 +98,6 @@ result = tm.flatten(data, config=config)
 config = tm.TransmogConfig(batch_size=100)
 result = tm.flatten(data, config=config)
 
-# Error-tolerant: skip malformed records
-config = tm.TransmogConfig(recovery_mode=tm.RecoveryMode.SKIP)
-result = tm.flatten(data, config=config)
 ```
 
 ### Behavior
@@ -125,6 +122,9 @@ result.save("output", output_format="csv")
 
 # Save results as Parquet
 result.save("output", output_format="parquet")
+
+# Save results as ORC
+result.save("output", output_format="orc")
 ```
 
 ### Streaming Large Data
@@ -185,12 +185,7 @@ for record in result.main:
 
 ## Error Handling
 
-```python
-config = tm.TransmogConfig(recovery_mode=tm.RecoveryMode.STRICT)  # Stop on error
-config = tm.TransmogConfig(recovery_mode=tm.RecoveryMode.SKIP)    # Continue
-```
-
-See [Error Handling](errors.md) for details.
+Errors are raised as exceptions. See [Error Handling](errors.md) for details.
 
 ## Reference
 

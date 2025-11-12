@@ -8,8 +8,7 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
-from transmog.exceptions import ProcessingError, ValidationError
-from transmog.types import RecoveryMode
+from transmog.exceptions import ValidationError
 
 try:
     import orjson as _orjson  # type: ignore[import-untyped]
@@ -26,7 +25,6 @@ else:
 
 
 def get_data_iterator(
-    config: Any,
     data: (
         dict[str, Any]
         | list[dict[str, Any]]
@@ -39,7 +37,6 @@ def get_data_iterator(
     """Return an iterator over input records.
 
     Args:
-        config: TransmogConfig instance for configuration settings
         data: Input data in various formats
 
     Returns:
@@ -58,18 +55,18 @@ def get_data_iterator(
     if isinstance(data, str) and os.path.exists(data):
         extension = os.path.splitext(data)[1].lower()
         if extension in (".jsonl", ".ndjson"):
-            return get_jsonl_file_iterator(config, data)
+            return get_jsonl_file_iterator(data)
         return get_json_file_iterator(data)
 
     if isinstance(data, (str, bytes)):
         text = data if isinstance(data, str) else data.decode("utf-8")
         if not text.strip():
-            raise ProcessingError("No JSON content provided")
+            raise ValidationError("No JSON content provided")
 
         normalised = _detect_string_format(text)
 
         if normalised == "jsonl":
-            return get_jsonl_data_iterator(config, data)
+            return get_jsonl_data_iterator(data)
         if normalised == "json":
             return get_json_data_iterator(data)
         raise ValueError(f"Unsupported input format: {normalised}")
@@ -88,7 +85,7 @@ def get_json_data_iterator(
     if isinstance(data, list):
         for index, item in enumerate(data):
             if not isinstance(item, dict):
-                raise ProcessingError(
+                raise ValidationError(
                     f"Expected JSON object at index {index}, got {type(item).__name__}"
                 )
             yield item
@@ -99,12 +96,12 @@ def get_json_data_iterator(
 
     payload = data
     if isinstance(data, str) and not data.strip():
-        raise ProcessingError("No JSON content provided")
+        raise ValidationError("No JSON content provided")
 
     try:
         parsed = _loads(payload)
     except JSON_DECODE_ERRORS as exc:
-        raise ProcessingError(f"Error parsing JSON data: {exc}") from exc
+        raise ValidationError(f"Error parsing JSON data: {exc}") from exc
 
     yield from _iter_parsed_json(parsed)
 
@@ -112,43 +109,41 @@ def get_json_data_iterator(
 def get_json_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
     """Iterate over records in a JSON file."""
     if not os.path.exists(file_path):
-        raise ProcessingError(f"File not found: {file_path}")
+        raise ValidationError(f"File not found: {file_path}")
 
     try:
         parsed = _load_json_file(file_path)
     except JSON_DECODE_ERRORS as exc:
-        raise ProcessingError(f"Invalid JSON in file {file_path}: {exc}") from exc
+        raise ValidationError(f"Invalid JSON in file {file_path}: {exc}") from exc
     except OSError as exc:
-        raise ProcessingError(f"Error reading file {file_path}: {exc}") from exc
+        raise ValidationError(f"Error reading file {file_path}: {exc}") from exc
 
     yield from _iter_parsed_json(parsed)
 
 
-def get_jsonl_file_iterator(config: Any, file_path: str) -> Iterator[dict[str, Any]]:
+def get_jsonl_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
     """Iterate over records in a JSON Lines file.
 
     Args:
-        config: TransmogConfig instance for configuration settings
         file_path: Path to the JSONL file
 
     Returns:
         Iterator over data records
     """
     if not os.path.exists(file_path):
-        raise ProcessingError(f"File not found: {file_path}")
+        raise ValidationError(f"File not found: {file_path}")
 
     try:
         with open(file_path, encoding="utf-8") as handle:
-            yield from _iter_jsonl_lines(config, handle, file_path)
+            yield from _iter_jsonl_lines(handle, file_path)
     except OSError as exc:
-        raise ProcessingError(f"Error reading file {file_path}: {exc}") from exc
+        raise ValidationError(f"Error reading file {file_path}: {exc}") from exc
 
 
-def get_jsonl_data_iterator(config: Any, data: str | bytes) -> Iterator[dict[str, Any]]:
+def get_jsonl_data_iterator(data: str | bytes) -> Iterator[dict[str, Any]]:
     """Iterate over JSON Lines content.
 
     Args:
-        config: TransmogConfig instance for configuration settings
         data: JSONL data as string or bytes
 
     Returns:
@@ -162,7 +157,7 @@ def get_jsonl_data_iterator(config: Any, data: str | bytes) -> Iterator[dict[str
         return
 
     lines = text.splitlines()
-    yield from _iter_jsonl_lines(config, lines, "JSONL data")
+    yield from _iter_jsonl_lines(lines, "JSONL data")
 
 
 def _loads(value: str | bytes) -> Any:
@@ -192,37 +187,27 @@ def _iter_parsed_json(payload: Any) -> Iterator[dict[str, Any]]:
     if isinstance(payload, list):
         for index, item in enumerate(payload):
             if not isinstance(item, dict):
-                raise ProcessingError(
+                raise ValidationError(
                     f"Expected JSON object at index {index}, got {type(item).__name__}"
                 )
             yield item
         return
 
-    raise ProcessingError(
+    raise ValidationError(
         f"Expected JSON object or list of objects, got {type(payload).__name__}"
     )
 
 
-def _iter_jsonl_lines(
-    config: Any, lines: Iterable[str], source: str
-) -> Iterator[dict[str, Any]]:
+def _iter_jsonl_lines(lines: Iterable[str], source: str) -> Iterator[dict[str, Any]]:
     """Yield dictionaries from JSON Lines content.
 
     Args:
-        config: TransmogConfig instance for configuration settings
         lines: Iterable of JSONL lines
         source: Source description for error messages
 
     Returns:
         Iterator over data records
     """
-    recovery_mode = (
-        config.recovery_mode
-        if hasattr(config, "recovery_mode")
-        else RecoveryMode.STRICT
-    )
-    skip_errors = recovery_mode == RecoveryMode.SKIP
-
     for index, raw_line in enumerate(lines, 1):
         line = raw_line.strip()
         if not line:
@@ -231,21 +216,15 @@ def _iter_jsonl_lines(
         try:
             record = _loads(line)
         except JSON_DECODE_ERRORS as exc:
-            parsing_error = ProcessingError(
+            raise ValidationError(
                 f"Invalid JSON on line {index} in {source}: {exc}"
-            )
-            if skip_errors:
-                continue
-            raise parsing_error from exc
+            ) from exc
 
         if not isinstance(record, dict):
-            parsing_error = ProcessingError(
+            raise ValidationError(
                 f"Expected JSON object on line {index} in {source}, "
                 f"got {type(record).__name__}"
             )
-            if skip_errors:
-                continue
-            raise parsing_error
 
         yield record
 
@@ -253,21 +232,24 @@ def _iter_jsonl_lines(
 def _detect_string_format(value: str) -> str:
     """Detect whether in-memory text is JSON or JSONL."""
     snippet = value.strip()
-    if not snippet:
-        return "json"
-    if "\n" not in snippet:
+    if not snippet or "\n" not in snippet:
         return "json"
 
-    candidates = [line.strip() for line in snippet.splitlines() if line.strip()]
     hits = 0
-    for line in candidates[:5]:
-        if not line.startswith("{"):
+    checked = 0
+    for line in snippet.splitlines():
+        line = line.strip()
+        if not line or not line.startswith("{"):
             continue
         try:
             _loads(line)
+            hits += 1
         except JSON_DECODE_ERRORS:
-            continue
-        hits += 1
+            pass
+
+        checked += 1
+        if checked >= 5:
+            break
 
     return "jsonl" if hits >= 2 else "json"
 

@@ -7,14 +7,8 @@ class TransmogError(Exception):
     pass
 
 
-class ProcessingError(TransmogError):
-    """Exception raised when an error occurs during data processing."""
-
-    pass
-
-
 class ValidationError(TransmogError):
-    """Exception raised when data validation fails."""
+    """Exception raised when data validation or processing fails."""
 
     pass
 
@@ -22,15 +16,7 @@ class ValidationError(TransmogError):
 class MissingDependencyError(TransmogError):
     """Exception raised when an optional dependency is missing."""
 
-    def __init__(self, message: str, package: str | None = None) -> None:
-        """Initialize the exception with an error message and optional package name.
-
-        Args:
-            message: Error message describing the missing dependency
-            package: Name of the missing package
-        """
-        super().__init__(message)
-        self.package = package
+    pass
 
 
 class ConfigurationError(TransmogError):
@@ -47,7 +33,6 @@ class OutputError(TransmogError):
 
 __all__ = [
     "TransmogError",
-    "ProcessingError",
     "ValidationError",
     "MissingDependencyError",
     "ConfigurationError",

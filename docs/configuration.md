@@ -21,7 +21,6 @@ config = tm.TransmogConfig(
 
     # Processing Control
     batch_size=1000,                     # Records to process at once
-    recovery_mode=tm.RecoveryMode.STRICT # Error recovery strategy
 )
 
 result = tm.flatten(data, config=config)
@@ -92,10 +91,3 @@ Field name for parent references.
 **Default:** `"_timestamp"`
 
 Field name for timestamps. Set to `None` to disable.
-
-### recovery_mode
-
-**Type:** `RecoveryMode`
-**Default:** `RecoveryMode.STRICT`
-
-Options: `STRICT` (stop on error) or `SKIP` (continue processing). See [Error Handling](errors.md).

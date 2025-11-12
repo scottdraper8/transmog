@@ -9,7 +9,7 @@ Transforms nested JSON data into flat, tabular formats while preserving relation
 ## Overview
 
 Transmog flattens nested objects, extracts arrays into separate tables,
-generates unique identifiers, and supports CSV and Parquet output formats
+generates unique identifiers, and supports CSV, Parquet, and ORC output formats
 with configurable error handling and batch processing.
 
 ## Example
@@ -31,7 +31,7 @@ print(result.tables)  # Employee data in separate table
 - **[Array Handling](arrays.md)** - Array processing modes
 - **[ID Management](ids.md)** - ID generation strategies
 - **[Error Handling](errors.md)** - Error recovery modes
-- **[Output Formats](outputs.md)** - CSV and Parquet output
+- **[Output Formats](outputs.md)** - CSV, Parquet, and ORC output
 - **[Streaming](streaming.md)** - Large dataset processing
 - **[API Reference](api.md)** - Function and class documentation
 - **[Contributing](contributing.md)** - Development guide

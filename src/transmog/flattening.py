@@ -5,14 +5,13 @@ tabular format, including metadata annotation, array extraction, and
 hierarchical relationship preservation.
 """
 
-import functools
 import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
 from transmog.config import TransmogConfig
-from transmog.exceptions import ProcessingError
+from transmog.exceptions import ValidationError
 from transmog.types import ArrayMode, JsonDict, ProcessingContext
 
 # Namespace UUID for deterministic ID generation
@@ -91,18 +90,18 @@ def generate_transmog_id(
         return _hash_value(record)
     elif strategy == "natural":
         if id_field_name not in record:
-            raise ProcessingError(
+            raise ValidationError(
                 f"Strategy 'natural' requires field '{id_field_name}' in record, "
                 f"but it was not found. Available fields: {list(record.keys())}"
             )
         if record[id_field_name] is None or record[id_field_name] == "":
-            raise ProcessingError(
+            raise ValidationError(
                 f"Strategy 'natural' requires non-empty '{id_field_name}', "
                 f"but found: {record[id_field_name]!r}"
             )
         return None
     else:
-        raise ProcessingError(f"Invalid id_generation strategy: {strategy}")
+        raise ValidationError(f"Invalid id_generation strategy: {strategy}")
 
 
 def get_current_timestamp() -> str:
@@ -119,6 +118,7 @@ def annotate_with_metadata(
     config: Any,
     parent_id: str | None = None,
     transmog_time: str | None = None,
+    record_id: str | None = None,
 ) -> dict[str, Any]:
     """Annotate a record with metadata fields.
 
@@ -129,18 +129,21 @@ def annotate_with_metadata(
         config: Configuration object
         parent_id: Optional parent record ID
         transmog_time: Transmog timestamp (current time if None)
+        record_id: Pre-generated record ID (if None, generates new one)
 
     Returns:
         Annotated record
     """
-    generated_id = generate_transmog_id(
-        record=record,
-        strategy=config.id_generation,
-        id_field_name=config.id_field,
-    )
-
-    if generated_id is not None:
-        record[config.id_field] = generated_id
+    if record_id is not None:
+        record[config.id_field] = record_id
+    else:
+        generated_id = generate_transmog_id(
+            record=record,
+            strategy=config.id_generation,
+            id_field_name=config.id_field,
+        )
+        if generated_id is not None:
+            record[config.id_field] = generated_id
 
     if parent_id is not None:
         record[config.parent_field] = parent_id
@@ -158,81 +161,192 @@ def annotate_with_metadata(
 # ============================================================================
 
 
-def _is_simple_array(array: list) -> bool:
-    """Check if array contains only primitive values.
+def _process_array_items(
+    array: list,
+    key: str,
+    config: TransmogConfig,
+    _context: ProcessingContext,
+    _collect_arrays: bool,
+    _parent_id: str | None,
+    _entity_name: str,
+) -> tuple[bool, dict[str, list[dict[str, Any]]]]:
+    """Process array items in a single pass, determining simplicity while extracting.
 
     Args:
-        array: The array to check
+        array: The array to process
+        key: The field name/key for this array
+        config: Configuration settings
+        _context: Processing context
+        _collect_arrays: Whether to collect arrays into separate tables
+        _parent_id: Parent record ID for child records
+        _entity_name: Entity name for table naming
 
     Returns:
-        True if array contains only primitives (str, int, float, bool, None)
+        Tuple of (is_simple: bool, child_arrays: dict)
     """
     if not array:
-        return True
+        return True, {}
 
-    for item in array:
-        if isinstance(item, (dict, list, tuple)):
-            return False
-    return True
+    arrays: dict[str, list[dict[str, Any]]] = {}
+    is_simple = True
+
+    for item in array:  # Single iteration through the array
+        if item is None and not config.include_nulls:
+            continue
+
+        if isinstance(item, dict):
+            is_simple = False  # Array contains complex objects
+            if not item:
+                continue
+
+            # Process complex item
+            item_context = ProcessingContext(
+                current_depth=_context.current_depth + 1,
+                path_components=[],
+                extract_time=_context.extract_time,
+            )
+            flattened, item_arrays = flatten_json(
+                item,
+                config,
+                item_context,
+                _collect_arrays=True,
+                _parent_id=_parent_id,
+                _entity_name=_entity_name,
+            )
+            metadata_dict = flattened
+        else:
+            # Simple primitive value
+            metadata_dict = {"value": item}
+            item_arrays = {}
+
+        if _collect_arrays:
+            # Create child record
+            if (
+                config.id_generation == "natural"
+                and config.id_field not in metadata_dict
+            ):
+                metadata_dict[config.id_field] = str(uuid.uuid4())
+            annotated = annotate_with_metadata(
+                metadata_dict,
+                config=config,
+                parent_id=_parent_id,
+                transmog_time=_context.extract_time,
+            )
+
+            # Determine table name using the actual field key
+            sanitized_key = _sanitize_name(key)
+            sanitized_entity = _sanitize_name(_entity_name) if _entity_name else ""
+            parent_path = "_".join(_context.path_components)
+            table_name = _get_table_name(sanitized_entity, sanitized_key, parent_path)
+
+            arrays.setdefault(table_name, []).append(annotated)
+
+            if isinstance(item, dict):
+                for nested_table_name, nested_records in item_arrays.items():
+                    arrays.setdefault(nested_table_name, []).extend(nested_records)
+
+    return is_simple, arrays
 
 
 def flatten_json(
     data: dict[str, Any],
     config: TransmogConfig,
     _context: ProcessingContext | None = None,
-) -> dict[str, Any]:
-    """Flatten nested JSON structure into a flat dictionary.
+    _collect_arrays: bool = False,
+    _parent_id: str | None = None,
+    _entity_name: str = "",
+) -> tuple[dict[str, Any], dict[str, list[dict[str, Any]]]]:
+    """Flatten nested JSON structure and optionally extract arrays in a single pass.
 
     Args:
         data: JSON data to flatten
         config: Configuration settings
+        _context: Processing context
+        _collect_arrays: Whether to collect arrays into separate tables
+        _parent_id: Parent record ID for array extraction
+        _entity_name: Entity name for table naming
 
     Returns:
-        Flattened JSON data
+        Tuple of (flattened_data, child_arrays)
     """
     if data is None:
-        return {}
+        return {}, {}
 
     if _context is None:
         _context = ProcessingContext()
 
     result: dict[str, Any] = {}
+    arrays: dict[str, list[dict[str, Any]]] = {}
 
     if _context.current_depth >= config.max_depth:
-        return result
+        return result, arrays
 
     for key, value in data.items():
-        if len(key) >= 2 and key[0] == "_" and key[1] == "_":
-            result[key] = value
-            continue
-
         is_dict = isinstance(value, dict)
         is_list = isinstance(value, list)
 
         if (is_dict or is_list) and not value:
             continue
 
-        nested_context = _context.descend(key)
-        current_path = nested_context.build_path("_")
+        nested_context = ProcessingContext(
+            current_depth=_context.current_depth + 1,
+            path_components=_context.path_components + [key],
+            extract_time=_context.extract_time,
+        )
+        current_path = "_".join(nested_context.path_components)
 
         if is_dict:
-            flattened = flatten_json(
+            flattened, nested_arrays = flatten_json(
                 value,
                 config,
                 nested_context,
+                _collect_arrays,
+                _parent_id,
+                _entity_name,
             )
 
-            for flattened_key, flattened_value in flattened.items():
-                result[flattened_key] = flattened_value
+            result.update(flattened)
+
+            if _collect_arrays:
+                for nested_table_name, nested_records in nested_arrays.items():
+                    arrays.setdefault(nested_table_name, []).extend(nested_records)
 
         elif is_list:
             if config.array_mode == ArrayMode.SKIP:
                 continue
+
+            if config.array_mode == ArrayMode.INLINE:
+                result[current_path] = json.dumps(value, ensure_ascii=False)
             elif config.array_mode == ArrayMode.SMART:
-                if _is_simple_array(value):
+                is_simple, array_items = _process_array_items(
+                    value,
+                    key,
+                    config,
+                    _context,
+                    _collect_arrays,
+                    _parent_id,
+                    _entity_name,
+                )
+
+                if is_simple:
                     result[current_path] = value
-            elif config.array_mode == ArrayMode.INLINE:
-                result[current_path] = value
+                elif _collect_arrays:
+                    for table_name, table_records in array_items.items():
+                        arrays.setdefault(table_name, []).extend(table_records)
+            elif _collect_arrays and config.array_mode == ArrayMode.SEPARATE:
+                _, array_items = _process_array_items(
+                    value,
+                    key,
+                    config,
+                    _context,
+                    _collect_arrays,
+                    _parent_id,
+                    _entity_name,
+                )
+
+                # Merge extracted array items
+                for table_name, table_records in array_items.items():
+                    arrays.setdefault(table_name, []).extend(table_records)
 
         else:
             if value is not None and value != "":
@@ -246,15 +360,14 @@ def flatten_json(
                 else:
                     result[key] = ""
 
-    return result
+    return result, arrays
 
 
 # ============================================================================
-# Array Extraction
+# Array Extraction Helpers
 # ============================================================================
 
 
-@functools.lru_cache(maxsize=1024)
 def _sanitize_name(name: str) -> str:
     """Sanitize names for SQL compatibility.
 
@@ -301,116 +414,6 @@ def _get_table_name(entity_name: str, array_name: str, parent_path: str) -> str:
     return f"{entity_name}_{parent_path}_{array_name}"
 
 
-def extract_arrays(
-    data: JsonDict,
-    config: TransmogConfig,
-    _context: ProcessingContext,
-    parent_id: str | None = None,
-    entity_name: str = "",
-) -> dict[str, list[dict[str, Any]]]:
-    """Extract nested arrays into flattened tables.
-
-    Processes nested JSON data and extracts arrays into separate tables.
-    Parent-child relationships are maintained with ID references.
-
-    Args:
-        data: JSON data to process
-        config: Configuration settings
-        parent_id: UUID of parent record
-        entity_name: Entity name
-
-    Returns:
-        Dictionary mapping table names to lists of records
-    """
-    result: dict[str, list[dict[str, Any]]] = {}
-
-    if data is None or _context.current_depth >= config.max_depth:
-        return result
-
-    for key, value in data.items():
-        if len(key) >= 2 and key[0] == "_" and key[1] == "_":
-            continue
-
-        is_list = isinstance(value, list)
-        is_dict = isinstance(value, dict)
-
-        if not value and (is_list or is_dict):
-            continue
-
-        if is_list:
-            if config.array_mode == ArrayMode.SMART and _is_simple_array(value):
-                continue
-
-            nested_context = _context.descend(key)
-
-            sanitized_key = _sanitize_name(key)
-            sanitized_entity = _sanitize_name(entity_name) if entity_name else ""
-
-            table_name = _get_table_name(
-                entity_name=sanitized_entity,
-                array_name=sanitized_key,
-                parent_path=_context.build_path("_"),
-            )
-
-            for item in value:
-                if item is None and not config.include_nulls:
-                    continue
-
-                if isinstance(item, dict) and not item:
-                    continue
-
-                if isinstance(item, dict):
-                    item_context = ProcessingContext(
-                        current_depth=0,
-                        path_components=[],
-                        extract_time=_context.extract_time,
-                    )
-                    flattened = flatten_json(item, config, item_context)
-                    metadata_dict = flattened if flattened is not None else {}
-                else:
-                    metadata_dict = {"value": item}
-
-                annotated = annotate_with_metadata(
-                    metadata_dict,
-                    config=config,
-                    parent_id=parent_id,
-                    transmog_time=_context.extract_time,
-                )
-
-                if table_name not in result:
-                    result[table_name] = []
-                result[table_name].append(annotated)
-
-                if isinstance(item, dict):
-                    parent_id_value = annotated.get(config.id_field)
-                    nested_arrays = extract_arrays(
-                        item,
-                        config,
-                        nested_context,
-                        parent_id_value,
-                        entity_name,
-                    )
-                    for nested_table_name, nested_records in nested_arrays.items():
-                        if nested_table_name not in result:
-                            result[nested_table_name] = []
-                        result[nested_table_name].extend(nested_records)
-
-        elif is_dict:
-            nested_arrays = extract_arrays(
-                value,
-                config,
-                _context.descend(key),
-                parent_id,
-                entity_name,
-            )
-            for nested_table_name, nested_records in nested_arrays.items():
-                if nested_table_name not in result:
-                    result[nested_table_name] = []
-                result[nested_table_name].extend(nested_records)
-
-    return result
-
-
 # ============================================================================
 # Hierarchy Processing
 # ============================================================================
@@ -429,6 +432,7 @@ def _process_structure(
         data: JSON data to process
         entity_name: Name of the entity
         config: Configuration settings
+        _context: Processing context
         parent_id: Parent record ID
 
     Returns:
@@ -437,26 +441,35 @@ def _process_structure(
     if not data:
         return {}, {}
 
-    flattened = flatten_json(data, config, _context)
+    collect_arrays = config.array_mode in (ArrayMode.SEPARATE, ArrayMode.SMART)
 
+    generated_id = generate_transmog_id(
+        record=data,
+        strategy=config.id_generation,
+        id_field_name=config.id_field,
+    )
+    if generated_id is None and config.id_generation == "natural":
+        current_record_id = data.get(config.id_field)
+    else:
+        current_record_id = generated_id
+
+    # Single pass through data with parent ID already known
+    flattened, arrays_result = flatten_json(
+        data,
+        config,
+        _context,
+        _collect_arrays=collect_arrays,
+        _parent_id=current_record_id,
+        _entity_name=entity_name,
+    )
+
+    # Apply metadata with pre-generated ID
     annotated = annotate_with_metadata(
         flattened,
         config=config,
         parent_id=parent_id,
         transmog_time=_context.extract_time,
-    )
-
-    record_id = annotated.get(config.id_field)
-
-    if config.array_mode not in (ArrayMode.SEPARATE, ArrayMode.SMART):
-        return annotated, {}
-
-    arrays_result = extract_arrays(
-        data,
-        config,
-        _context,
-        parent_id=record_id,
-        entity_name=entity_name,
+        record_id=current_record_id,
     )
 
     return annotated, arrays_result
@@ -474,6 +487,7 @@ def process_record_batch(
         records: List of records to process
         entity_name: Entity name
         config: Configuration settings
+        _context: Processing context
 
     Returns:
         Tuple of (flattened_records, child_arrays)
@@ -503,7 +517,5 @@ def process_record_batch(
 __all__ = [
     "get_current_timestamp",
     "annotate_with_metadata",
-    "flatten_json",
-    "extract_arrays",
     "process_record_batch",
 ]

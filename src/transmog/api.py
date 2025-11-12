@@ -16,7 +16,8 @@ from transmog.flattening import get_current_timestamp, process_record_batch
 from transmog.iterators import get_data_iterator
 from transmog.streaming import stream_process
 from transmog.types import JsonDict, ProcessingContext
-from transmog.writers import create_writer, sanitize_filename
+from transmog.writers import create_writer
+from transmog.writers.base import _sanitize_filename
 
 
 class FlattenResult:
@@ -85,7 +86,7 @@ class FlattenResult:
         Args:
             path: Output path (file or directory depending on format)
             output_format: Output format (auto-detected from extension if not specified)
-                          Options: 'csv', 'parquet'
+                          Options: 'csv', 'parquet', 'orc'
             **format_options: Additional writer-specific options forwarded to
                 the underlying writer implementation.
 
@@ -99,7 +100,7 @@ class FlattenResult:
             if not output_format:
                 output_format = "csv"
 
-        valid_formats = ["csv", "parquet"]
+        valid_formats = ["csv", "parquet", "orc"]
         if output_format not in valid_formats:
             raise ValueError(
                 f"Unsupported format: {output_format}. Must be one of {valid_formats}"
@@ -131,11 +132,11 @@ class FlattenResult:
             if not records:
                 continue
 
-            safe_name = sanitize_filename(table_name)
+            safe_name = _sanitize_filename(table_name)
             destination = base_path / f"{safe_name or 'table'}{extension}"
 
             try:
-                written_path = writer.write(records, str(destination), **format_options)
+                written_path = writer.write(records, str(destination))
             except Exception as exc:
                 raise OutputError(
                     f"Failed to write {output_format.upper()} for table '{table_name}' "
@@ -156,7 +157,7 @@ class FlattenResult:
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         writer = create_writer(output_format, **format_options)
-        written_path = writer.write(self.main, str(file_path), **format_options)
+        written_path = writer.write(self.main, str(file_path))
         return [str(written_path)]
 
 
@@ -201,7 +202,7 @@ def flatten(
     elif isinstance(data, list):
         iterator = iter(data)
     else:
-        iterator = get_data_iterator(config, data)
+        iterator = get_data_iterator(data)
 
     timestamp = get_current_timestamp()
     context = ProcessingContext(extract_time=timestamp)

@@ -5,11 +5,27 @@ from abc import ABC, abstractmethod
 from typing import Any, BinaryIO, Literal, TextIO
 
 
-def sanitize_filename(name: str) -> str:
-    """Sanitize a string for use as a filename.
+def _collect_field_names(data: list[dict[str, Any]]) -> list[str]:
+    """Collect all unique field names from data.
 
-    Replaces non-word characters with underscores and collapses multiple
-    underscores into one.
+    Args:
+        data: List of records
+
+    Returns:
+        Sorted list of unique field names
+    """
+    if not data:
+        return []
+
+    field_names: set[str] = set()
+    for record in data:
+        field_names.update(record.keys())
+
+    return sorted(field_names)
+
+
+def _sanitize_filename(name: str) -> str:
+    """Sanitize a string for use as a filename.
 
     Args:
         name: String to sanitize
@@ -87,15 +103,9 @@ class StreamingWriter(ABC):
         pass
 
     @abstractmethod
-    def finalize(self) -> None:
-        """Finalize the output and flush any buffered data."""
-        pass
-
     def close(self) -> None:
-        """Clean up resources."""
-        if not getattr(self, "_finalized", False):
-            self.finalize()
-            self._finalized = True
+        """Finalize output, flush buffered data, and clean up resources."""
+        pass
 
     def __enter__(self) -> "StreamingWriter":
         """Support for context manager protocol."""
@@ -107,4 +117,4 @@ class StreamingWriter(ABC):
         return False
 
 
-__all__ = ["DataWriter", "StreamingWriter", "sanitize_filename"]
+__all__ = ["DataWriter", "StreamingWriter"]

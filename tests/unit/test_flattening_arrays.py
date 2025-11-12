@@ -10,24 +10,25 @@ import pytest
 
 import transmog as tm
 from transmog.config import TransmogConfig
-from transmog.flattening import extract_arrays
-from transmog.types import ArrayMode, ProcessingContext, RecoveryMode
+from transmog.flattening import flatten_json
+from transmog.types import ArrayMode, ProcessingContext
 
 
 class TestExtractArraysFunction:
-    """Test the extract_arrays utility function."""
+    """Test the array extraction functionality via flatten_json."""
 
     def test_extract_arrays_basic(self, array_data):
         """Test basic array extraction function."""
-        config = TransmogConfig()
-        context = ProcessingContext(extract_time=datetime.now())
+        config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
+        context = ProcessingContext(extract_time=str(datetime.now()))
 
-        result = extract_arrays(
+        _flattened, result = flatten_json(
             array_data,
             config=config,
             _context=context,
-            parent_id="parent-1",
-            entity_name="test",
+            _collect_arrays=True,
+            _parent_id="parent-1",
+            _entity_name="test",
         )
 
         assert isinstance(result, dict)
@@ -37,63 +38,64 @@ class TestExtractArraysFunction:
     def test_extract_arrays_with_parent_id(self, array_data):
         """Test array extraction with parent ID."""
         parent_id = "test-parent-123"
-        config = TransmogConfig()
-        context = ProcessingContext(extract_time=datetime.now())
+        config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
+        context = ProcessingContext(extract_time=str(datetime.now()))
 
-        result = extract_arrays(
+        _flattened, result = flatten_json(
             array_data,
             config=config,
             _context=context,
-            parent_id=parent_id,
-            entity_name="test_entity",
+            _collect_arrays=True,
+            _parent_id=parent_id,
+            _entity_name="test_entity",
         )
 
         assert isinstance(result, dict)
 
         # Check that direct child tables have the correct parent ID
-        # Note: Nested arrays (like employees_skills) will have their immediate parent's ID
-        direct_child_tables = [
-            name for name in result.keys() if name.count("_") == 2
-        ]  # test_entity_tablename
+        direct_child_tables = [name for name in result.keys() if name.count("_") == 2]
 
         for table_name in direct_child_tables:
             records = result[table_name]
-            if records:  # Only check non-empty tables
+            if records:
                 for record in records:
                     assert config.parent_field in record
                     assert record[config.parent_field] == parent_id
 
     def test_extract_arrays_with_options(self, array_data):
         """Test array extraction with configuration options."""
-        config = TransmogConfig()
-        context = ProcessingContext(extract_time=datetime.now())
+        config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
+        context = ProcessingContext(extract_time=str(datetime.now()))
 
-        result = extract_arrays(
+        _flattened, result = flatten_json(
             array_data,
             config=config,
             _context=context,
-            entity_name="test",
+            _collect_arrays=True,
+            _entity_name="test",
         )
 
         assert isinstance(result, dict)
 
     def test_extract_arrays_depth_limit(self, complex_nested_data):
         """Test array extraction with depth limits."""
-        config_shallow = TransmogConfig(max_depth=2)
-        config_deep = TransmogConfig(max_depth=10)
-        context = ProcessingContext(extract_time=datetime.now())
+        config_shallow = TransmogConfig(max_depth=2, array_mode=ArrayMode.SEPARATE)
+        config_deep = TransmogConfig(max_depth=10, array_mode=ArrayMode.SEPARATE)
+        context = ProcessingContext(extract_time=str(datetime.now()))
 
-        result_shallow = extract_arrays(
+        _flat_shallow, result_shallow = flatten_json(
             complex_nested_data,
             config=config_shallow,
             _context=context,
-            entity_name="test",
+            _collect_arrays=True,
+            _entity_name="test",
         )
-        result_deep = extract_arrays(
+        _flat_deep, result_deep = flatten_json(
             complex_nested_data,
             config=config_deep,
             _context=context,
-            entity_name="test",
+            _collect_arrays=True,
+            _entity_name="test",
         )
 
         assert isinstance(result_shallow, dict)
@@ -108,13 +110,14 @@ class TestExtractArraysFunction:
             "booleans": [True, False, True],
         }
         config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
-        context = ProcessingContext(extract_time=datetime.now())
+        context = ProcessingContext(extract_time=str(datetime.now()))
 
-        result = extract_arrays(
+        _flattened, result = flatten_json(
             data,
             config=config,
             _context=context,
-            entity_name="primitive_test",
+            _collect_arrays=True,
+            _entity_name="primitive_test",
         )
 
         assert isinstance(result, dict)
@@ -123,14 +126,15 @@ class TestExtractArraysFunction:
 
     def test_extract_object_arrays(self, array_data):
         """Test extracting arrays of objects."""
-        config = TransmogConfig()
-        context = ProcessingContext(extract_time=datetime.now())
+        config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
+        context = ProcessingContext(extract_time=str(datetime.now()))
 
-        result = extract_arrays(
+        _flattened, result = flatten_json(
             array_data,
             config=config,
             _context=context,
-            entity_name="object_test",
+            _collect_arrays=True,
+            _entity_name="object_test",
         )
 
         assert isinstance(result, dict)
@@ -140,14 +144,15 @@ class TestExtractArraysFunction:
     def test_extract_empty_arrays(self):
         """Test extracting empty arrays."""
         data = {"id": 1, "empty_array": [], "nested": {"also_empty": []}}
-        config = TransmogConfig()
-        context = ProcessingContext(extract_time=datetime.now())
+        config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
+        context = ProcessingContext(extract_time=str(datetime.now()))
 
-        result = extract_arrays(
+        _flattened, result = flatten_json(
             data,
             config=config,
             _context=context,
-            entity_name="empty_test",
+            _collect_arrays=True,
+            _entity_name="empty_test",
         )
 
         # Empty arrays should be skipped
@@ -156,14 +161,15 @@ class TestExtractArraysFunction:
     def test_extract_no_arrays(self):
         """Test extraction when no arrays present."""
         data = {"id": 1, "name": "test", "nested": {"value": 42, "active": True}}
-        config = TransmogConfig()
-        context = ProcessingContext(extract_time=datetime.now())
+        config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
+        context = ProcessingContext(extract_time=str(datetime.now()))
 
-        result = extract_arrays(
+        _flattened, result = flatten_json(
             data,
             config=config,
             _context=context,
-            entity_name="no_array_test",
+            _collect_arrays=True,
+            _entity_name="no_array_test",
         )
 
         # Should return empty dict when no arrays
@@ -227,14 +233,15 @@ class TestArrayExtractionEdgeCases:
                 }
             ]
         }
-        config = TransmogConfig()
-        context = ProcessingContext(extract_time=datetime.now())
+        config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
+        context = ProcessingContext(extract_time=str(datetime.now()))
 
-        result = extract_arrays(
+        _flattened, result = flatten_json(
             data,
             config=config,
             _context=context,
-            entity_name="deep_test",
+            _collect_arrays=True,
+            _entity_name="deep_test",
         )
 
         assert isinstance(result, dict)
@@ -246,18 +253,19 @@ class TestArrayExtractionEdgeCases:
         data = {
             "items": [
                 {"id": 1, "name": "Item 1"},
-                None,  # Null item
+                None,
                 {"id": 2, "name": "Item 2"},
             ]
         }
-        config = TransmogConfig()
-        context = ProcessingContext(extract_time=datetime.now())
+        config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
+        context = ProcessingContext(extract_time=str(datetime.now()))
 
-        result = extract_arrays(
+        _flattened, result = flatten_json(
             data,
             config=config,
             _context=context,
-            entity_name="null_test",
+            _collect_arrays=True,
+            _entity_name="null_test",
         )
 
         assert isinstance(result, dict)
@@ -266,14 +274,15 @@ class TestArrayExtractionEdgeCases:
         """Test extraction of large arrays."""
         large_array = [{"id": i, "value": f"item_{i}"} for i in range(100)]
         data = {"large_items": large_array}
-        config = TransmogConfig()
-        context = ProcessingContext(extract_time=datetime.now())
+        config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
+        context = ProcessingContext(extract_time=str(datetime.now()))
 
-        result = extract_arrays(
+        _flattened, result = flatten_json(
             data,
             config=config,
             _context=context,
-            entity_name="large_test",
+            _collect_arrays=True,
+            _entity_name="large_test",
         )
 
         assert isinstance(result, dict)
@@ -290,35 +299,15 @@ class TestArrayExtractionEdgeCases:
                 {"field@name": "value3", "field with spaces": "value4"},
             ]
         }
-        config = TransmogConfig()
-        context = ProcessingContext(extract_time=datetime.now())
+        config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
+        context = ProcessingContext(extract_time=str(datetime.now()))
 
-        result = extract_arrays(
+        _flattened, result = flatten_json(
             data,
             config=config,
             _context=context,
-            entity_name="special_test",
-        )
-
-        assert isinstance(result, dict)
-
-    def test_circular_reference_handling(self):
-        """Test handling of circular references in data."""
-        # Create data with potential circular reference
-        data = {"items": [{"id": 1, "name": "Item 1"}]}
-
-        # Add circular reference
-        data["items"][0]["parent"] = data  # This creates a circular reference
-
-        # Should handle gracefully with recovery strategy
-        config = TransmogConfig(max_depth=5, recovery_mode=RecoveryMode.SKIP)
-        context = ProcessingContext(extract_time=datetime.now())
-
-        result = extract_arrays(
-            data,
-            config=config,
-            _context=context,
-            entity_name="circular_test",
+            _collect_arrays=True,
+            _entity_name="special_test",
         )
 
         assert isinstance(result, dict)
