@@ -23,13 +23,12 @@ keywords = [
 ]
 license = "MIT"
 authors = [ { name = "Scott Draper", email = "admin@scottdraper.io" } ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Intended Audience :: Information Technology",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -89,7 +88,7 @@ where = [ "src" ]
 include = [ "transmog*" ]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 88
 format.indent-style = "space"
 format.quote-style = "double"
@@ -155,7 +154,7 @@ color = true
 [tool.bandit]
 exclude_dirs = [ "tests", "examples" ]
 skips = [ "B101" ]
-target-version = "py39"
+target-version = "py310"
 
 [tool.vulture]
 paths = [ "src/transmog", "tests" ]

@@ -1,7 +1,7 @@
 # Transmog
 
 [![PyPI version](https://img.shields.io/pypi/v/transmog.svg?logo=pypi)](https://pypi.org/project/transmog/)
-[![Python versions](https://img.shields.io/badge/python-3.9%2B-blue?logo=python)](https://pypi.org/project/transmog/)
+[![Python versions](https://img.shields.io/badge/python-3.10%2B-blue?logo=python)](https://pypi.org/project/transmog/)
 [![License](https://img.shields.io/github/license/scottdraper8/transmog.svg?logo=github)](https://github.com/scottdraper8/transmog/blob/main/LICENSE)
 
 Transform nested data into flat tables with a simple, intuitive API.
@@ -94,33 +94,31 @@ result.save("analytics/", "csv")       # CSV files for database import
 result.save("warehouse/", "parquet")   # Parquet files for data warehouse
 ```
 
-## Configuration Presets
+## Configuration
+
+Customize processing behavior with `TransmogConfig`:
 
 ```python
-# Default: types preserved, optimized for Parquet/analytics
+# Default configuration
 result = tm.flatten(data)
 
-# CSV: strings, includes empty/null values
-result = tm.flatten(data, config=tm.TransmogConfig.for_csv())
+# Include nulls for CSV export (consistent columns)
+result = tm.flatten(data, config=tm.TransmogConfig(include_nulls=True))
 
-# Memory: small batches
-result = tm.flatten(data, config=tm.TransmogConfig.for_memory())
+# Memory-efficient processing (smaller batches)
+result = tm.flatten(data, config=tm.TransmogConfig(batch_size=100))
 
-# Large datasets: customize batch size
+# High-performance processing (larger batches)
 result = tm.flatten(data, config=tm.TransmogConfig(batch_size=10000))
 
-# Error-tolerant: skip malformed records
-result = tm.flatten(data, config=tm.TransmogConfig.error_tolerant())
-
-# Or use RecoveryMode enum directly
-config = tm.TransmogConfig(recovery_mode=tm.RecoveryMode.SKIP)
-result = tm.flatten(data, config=config)
+# Error-tolerant processing (skip malformed records)
+result = tm.flatten(data, config=tm.TransmogConfig(recovery_mode=tm.RecoveryMode.SKIP))
 ```
 
 **File Processing:**
 
 ```python
-result = tm.flatten_file("data.json")
+result = tm.flatten("data.json")
 ```
 
 ## Advanced Configuration
@@ -130,26 +128,23 @@ For more control over the flattening process:
 ```python
 # Create custom configuration
 config = tm.TransmogConfig(
-    # Naming options
-    separator=".",                     # Use dots: user.name instead of user_name
-
-    # ID management
-    id_field="sku",                    # Use existing field as primary ID
-    parent_field="_parent",            # Customize parent reference field name
-    time_field="_timestamp",           # Add processing timestamp to records
-
     # Array handling
     array_mode=tm.ArrayMode.SEPARATE,  # Extract all arrays to child tables
     # Options: SMART (default), SEPARATE, INLINE, SKIP
+
+    # ID management
+    id_generation="natural",           # Use existing ID field (options: random, natural, hash, or list)
+    id_field="sku",                    # Name of ID field to use/create
+    parent_field="_parent",            # Customize parent reference field name
+    time_field="_timestamp",           # Add processing timestamp to records
 
     # Error handling
     recovery_mode=tm.RecoveryMode.SKIP,  # Skip records with errors
     # Options: STRICT (default), SKIP
 
     # Data processing
-    cast_to_string=False,              # Preserve native types (default)
-    null_handling=tm.NullHandling.SKIP,  # Skip null and empty values (default)
-    # Options: SKIP (default), INCLUDE
+    include_nulls=False,               # Skip null and empty values (default: False)
+    max_depth=100,                     # Maximum nesting depth
 
     # Performance tuning
     batch_size=5000,                   # Process more records per batch
@@ -157,8 +152,14 @@ config = tm.TransmogConfig(
 
 result = tm.flatten(data, name="products", config=config)
 
-# Or start with a preset and customize
-config = tm.TransmogConfig.for_csv()
+# ID generation options
+config = tm.TransmogConfig(id_generation="random")              # Always generate new UUIDs (default)
+config = tm.TransmogConfig(id_generation="natural")             # Use existing ID field (fail if missing)
+config = tm.TransmogConfig(id_generation="hash")                # Hash entire record (deterministic)
+config = tm.TransmogConfig(id_generation=["user_id", "date"])   # Composite key (deterministic)
+
+# Customize configuration as needed
+config = tm.TransmogConfig(include_nulls=True)  # For consistent CSV columns
 config.id_field = "product_id"
 result = tm.flatten(data, config=config)
 ```

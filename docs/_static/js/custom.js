@@ -61,113 +61,74 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Apply custom styling to admonitions
-    customizeAdmonitions();
+    // Smooth scroll to anchors
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            const targetId = this.getAttribute('href').substring(1);
+            const targetElement = document.getElementById(targetId);
 
-    // Add tutorial-to-example navigation widgets
-    addTutorialExampleNavigation();
+            if (targetElement) {
+                e.preventDefault();
+                targetElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+
+                // Update URL without triggering page reload
+                history.pushState(null, null, this.getAttribute('href'));
+            }
+        });
+    });
+
+    // Add "back to top" button for long pages
+    if (document.body.scrollHeight > window.innerHeight * 2) {
+        addBackToTopButton();
+    }
 });
 
-function customizeAdmonitions() {
-    // Add custom styling to admonitions if needed
-    const admonitions = document.querySelectorAll('.admonition');
-    admonitions.forEach(admonition => {
-        // Add any custom admonition styling here
-    });
-}
-
-function addTutorialExampleNavigation() {
-    // Tutorial to example mapping
-    const tutorialExampleMap = {
-        // Basic tutorials
-        '/tutorials/basic/transform-nested-json': 'data_processing/basic/flattening_basics.py',
-        '/tutorials/basic/flatten-and-normalize': 'data_processing/basic/flattening_basics.py',
-
-        // Intermediate tutorials
-        '/tutorials/intermediate/streaming-large-datasets': 'data_processing/advanced/streaming_processing.py',
-        '/tutorials/intermediate/customizing-id-generation': 'data_transformation/advanced/deterministic_ids.py',
-
-        // Advanced tutorials
-        '/tutorials/advanced/error-recovery-strategies': 'data_processing/advanced/error_handling.py',
-        '/tutorials/advanced/optimizing-memory-usage': 'data_processing/advanced/performance_optimization.py'
-    };
-
-    // Example to tutorial mapping
-    const exampleTutorialMap = {
-        'data_processing/basic/flattening_basics.py': [
-            { path: '/tutorials/basic/transform-nested-json', name: 'Transform Nested JSON' },
-            { path: '/tutorials/basic/flatten-and-normalize', name: 'Flatten and Normalize' }
-        ],
-        'data_processing/advanced/streaming_processing.py': [
-            { path: '/tutorials/intermediate/streaming-large-datasets', name: 'Streaming Large Datasets' }
-        ],
-        'data_transformation/advanced/deterministic_ids.py': [
-            { path: '/tutorials/intermediate/customizing-id-generation', name: 'Customizing ID Generation' }
-        ],
-        'data_processing/advanced/error_handling.py': [
-            { path: '/tutorials/advanced/error-recovery-strategies', name: 'Error Recovery Strategies' }
-        ],
-        'data_processing/advanced/performance_optimization.py': [
-            { path: '/tutorials/advanced/optimizing-memory-usage', name: 'Optimizing Memory Usage' }
-        ]
-    };
-
-    // Check if we're on a tutorial page
-    const currentPath = window.location.pathname;
-    let tutorialPath = '';
-
-    for (const path in tutorialExampleMap) {
-        if (currentPath.includes(path)) {
-            tutorialPath = path;
-            break;
-        }
-    }
-
-    if (tutorialPath) {
-        // We're on a tutorial page, add navigation to example
-        const examplePath = tutorialExampleMap[tutorialPath];
-        const exampleUrl = `https://github.com/scottdraper8/transmog/blob/main/examples/${examplePath}`;
-
-        // Create navigation widget
-        createNavigationWidget('example', examplePath, exampleUrl);
-    } else {
-        // Check if we're on an example page in the documentation
-        const examplePattern = /\/examples\/(.+?)\.html/;
-        const match = currentPath.match(examplePattern);
-
-        if (match) {
-            const examplePath = match[1].replace(/\//g, '_') + '.py';
-            const tutorials = exampleTutorialMap[examplePath];
-
-            if (tutorials && tutorials.length) {
-                // Create navigation widgets for each tutorial
-                tutorials.forEach(tutorial => {
-                    createNavigationWidget('tutorial', tutorial.name, tutorial.path);
-                });
-            }
-        }
-    }
-}
-
-function createNavigationWidget(type, name, url) {
-    // Create widget element
-    const widget = document.createElement('div');
-    widget.className = 'tutorial-example-nav';
-
-    const label = type === 'example' ? 'View Example Code:' : 'Related Tutorial:';
-
-    widget.innerHTML = `
-        <div class="tutorial-example-nav-header">
-            ${label}
-        </div>
-        <div class="tutorial-example-nav-link">
-            <a href="${url}" target="${type === 'example' ? '_blank' : '_self'}">${name}</a>
-        </div>
+function addBackToTopButton() {
+    const button = document.createElement('button');
+    button.className = 'back-to-top';
+    button.innerHTML = '↑';
+    button.title = 'Back to top';
+    button.style.cssText = `
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        width: 3rem;
+        height: 3rem;
+        border-radius: 50%;
+        background-color: var(--color-brand-primary);
+        color: white;
+        border: none;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.3s;
+        z-index: 1000;
+        font-size: 1.5rem;
+        display: none;
     `;
 
-    // Find insertion point (after title)
-    const title = document.querySelector('h1');
-    if (title && title.parentNode) {
-        title.parentNode.insertBefore(widget, title.nextSibling);
-    }
+    document.body.appendChild(button);
+
+    // Show button when scrolled down
+    window.addEventListener('scroll', function() {
+        if (window.pageYOffset > 300) {
+            button.style.display = 'block';
+            setTimeout(() => button.style.opacity = '0.7', 10);
+        } else {
+            button.style.opacity = '0';
+            setTimeout(() => button.style.display = 'none', 300);
+        }
+    });
+
+    button.addEventListener('mouseenter', () => button.style.opacity = '1');
+    button.addEventListener('mouseleave', () => button.style.opacity = '0.7');
+
+    button.addEventListener('click', function() {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    });
 }

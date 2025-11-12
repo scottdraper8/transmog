@@ -211,7 +211,7 @@ class TestFileProcessingPerformance:
         """Test JSON file processing performance."""
         start_time = time.time()
 
-        result = tm.flatten_file(large_json_file, name="file_perf")
+        result = tm.flatten(large_json_file, name="file_perf")
 
         end_time = time.time()
         processing_time = end_time - start_time
@@ -408,10 +408,10 @@ class TestPerformanceComparisons:
         configs = [
             {"name": "default", "config": tm.TransmogConfig()},
             {
-                "name": "preserve_types",
-                "config": tm.TransmogConfig(cast_to_string=False),
+                "name": "include_nulls",
+                "config": tm.TransmogConfig(include_nulls=True),
             },
-            {"name": "custom_separator", "config": tm.TransmogConfig(separator=".")},
+            {"name": "small_batch", "config": tm.TransmogConfig(batch_size=100)},
         ]
 
         results = {}

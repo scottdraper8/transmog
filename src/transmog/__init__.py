@@ -8,29 +8,26 @@ Basic Usage:
     >>> result = tm.flatten({"name": "Product", "tags": ["sale", "clearance"]})
     >>> result.main  # Main table
     >>> result.tables  # Child tables
-    >>> result.save("output.json")  # Save to file
+    >>> result.save("output.csv")  # Save to file
 
 Advanced Usage:
     >>> # For very large datasets, use streaming
-    >>> tm.flatten_stream(large_data, "output/", format="parquet")
+    >>> tm.flatten_stream(large_data, "output/", output_format="parquet")
 """
 
 __version__ = "1.1.1"
 
-# Import the simplified API
-from .api import FlattenResult, flatten, flatten_file, flatten_stream
-from .config import TransmogConfig
-from .error import TransmogError, ValidationError
-from .types import ArrayMode, NullHandling, RecoveryMode
+from transmog.api import FlattenResult, flatten, flatten_stream
+from transmog.config import TransmogConfig
+from transmog.exceptions import TransmogError, ValidationError
+from transmog.types import ArrayMode, RecoveryMode
 
 __all__ = [
     "flatten",
-    "flatten_file",
     "flatten_stream",
     "FlattenResult",
     "TransmogConfig",
     "ArrayMode",
-    "NullHandling",
     "RecoveryMode",
     "TransmogError",
     "ValidationError",

@@ -4,60 +4,82 @@ This module provides the primary user-facing functions for flattening
 nested data structures into tabular formats.
 """
 
-from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 from transmog.config import TransmogConfig
-from transmog.core.hierarchy import process_record_batch
-from transmog.core.metadata import get_current_timestamp
-from transmog.error import (
+from transmog.exceptions import (
     ConfigurationError,
     OutputError,
-    ProcessingError,
-    ValidationError,
-    logger,
 )
-from transmog.io.writer_factory import create_writer
-from transmog.io.writer_interface import sanitize_filename
-from transmog.process.data_iterators import get_data_iterator
-from transmog.process.result import ProcessingResult as _ProcessingResult
-from transmog.process.streaming import stream_process
+from transmog.flattening import get_current_timestamp, process_record_batch
+from transmog.iterators import get_data_iterator
+from transmog.streaming import stream_process
 from transmog.types import JsonDict, ProcessingContext
+from transmog.writers import create_writer, sanitize_filename
 
 
 class FlattenResult:
-    """Result of flattening nested data.
+    """Container for flattened tables."""
 
-    Provides intuitive access to flattened tables with convenience methods
-    for saving and converting data.
-    """
+    def __init__(
+        self,
+        entity_name: str,
+        main_table: list[JsonDict] | None = None,
+        child_tables: dict[str, list[JsonDict]] | None = None,
+    ):
+        """Initialize flattened data container."""
+        self._entity_name = entity_name
+        self._main_table = list(main_table) if main_table else []
+        self._child_tables = (
+            {name: list(records) for name, records in child_tables.items()}
+            if child_tables
+            else {}
+        )
 
-    def __init__(self, processing_result: _ProcessingResult):
-        """Initialize from internal processing result."""
-        self._result = processing_result
+    @property
+    def entity_name(self) -> str:
+        """Get the entity name associated with the main table."""
+        return self._entity_name
 
     @property
     def main(self) -> list[JsonDict]:
         """Get the main flattened table."""
-        return self._result.main_table
+        return self._main_table
 
     @property
     def tables(self) -> dict[str, list[JsonDict]]:
         """Get all child tables as a dictionary."""
-        return self._result.child_tables
+        return self._child_tables
 
     @property
     def all_tables(self) -> dict[str, list[JsonDict]]:
         """Get all tables including main table."""
-        return self._result.all_tables()
+        tables: dict[str, list[JsonDict]] = {self._entity_name: self._main_table}
+        tables.update(self._child_tables)
+        return tables
+
+    def _extend_main(self, records: list[JsonDict]) -> None:
+        """Append flattened records to the main table."""
+        if records:
+            self._main_table.extend(records)
+
+    def _merge_child_tables(self, tables: dict[str, list[JsonDict]]) -> None:
+        """Merge child table batches into the container."""
+        if not tables:
+            return
+        for table_name, table_records in tables.items():
+            if not table_records:
+                continue
+            target = self._child_tables.setdefault(table_name, [])
+            target.extend(table_records)
 
     def save(
         self,
-        path: Union[str, Path],
-        output_format: Optional[str] = None,
+        path: str | Path,
+        output_format: str | None = None,
         **format_options: Any,
-    ) -> Union[list[str], dict[str, str]]:
+    ) -> list[str] | dict[str, str]:
         """Save all tables to files.
 
         Args:
@@ -92,66 +114,6 @@ class FlattenResult:
                 path = path.with_suffix(f".{output_format}")
             return self._save_single_table(path, output_format, **format_options)
 
-    def __repr__(self) -> str:
-        """Provide clear representation for debugging."""
-        table_info = [
-            f"  - {self._result.entity_name}: {len(self.main)} records (main)"
-        ]
-        for name, data in self.tables.items():
-            table_info.append(f"  - {name}: {len(data)} records")
-
-        return f"FlattenResult with {len(self.all_tables)} tables:\n" + "\n".join(
-            table_info
-        )
-
-    def __len__(self) -> int:
-        """Return number of records in main table."""
-        return len(self.main)
-
-    def __iter__(self) -> Iterator[JsonDict]:
-        """Iterate over main table records."""
-        return iter(self.main)
-
-    def __getitem__(self, key: str) -> list[JsonDict]:
-        """Get a specific table by name."""
-        if key == self._result.entity_name or key == "main":
-            return self.main
-        elif key in self.tables:
-            return self.tables[key]
-        else:
-            raise KeyError(
-                f"Table '{key}' not found. Available: {list(self.all_tables.keys())}"
-            )
-
-    def __contains__(self, key: str) -> bool:
-        """Check if a table exists."""
-        if key == "main" or key == self._result.entity_name:
-            return True
-        return key in self.tables
-
-    def keys(self) -> Any:
-        """Get all table names."""
-        return self.all_tables.keys()
-
-    def values(self) -> Any:
-        """Get all table data."""
-        return self.all_tables.values()
-
-    def items(self) -> Any:
-        """Get all table name-data pairs."""
-        return self.all_tables.items()
-
-    def table_info(self) -> dict[str, dict[str, Any]]:
-        """Get information about all tables."""
-        info = {}
-        for name, data in self.all_tables.items():
-            info[name] = {
-                "records": len(data),
-                "fields": list(data[0].keys()) if data else [],
-                "is_main": name == self._result.entity_name,
-            }
-        return info
-
     def _save_all_tables(
         self,
         base_path: Path,
@@ -165,7 +127,7 @@ class FlattenResult:
         extension = ".csv" if output_format == "csv" else f".{output_format}"
         saved_paths: dict[str, str] = {}
 
-        for table_name, records in self._result.all_tables().items():
+        for table_name, records in self.all_tables.items():
             if not records:
                 continue
 
@@ -198,88 +160,10 @@ class FlattenResult:
         return [str(written_path)]
 
 
-def _build_iterator(
-    config: TransmogConfig,
-    data: Union[
-        dict[str, Any],
-        list[dict[str, Any]],
-        str,
-        bytes,
-        Iterator[dict[str, Any]],
-    ],
-) -> Iterator[JsonDict]:
-    """Build data iterator from various input types."""
-    if isinstance(data, dict):
-        return iter([data])
-    if isinstance(data, list):
-        return iter(data)
-
-    # Create a minimal processor-like object for get_data_iterator
-    class ConfigWrapper:
-        def __init__(self, config: TransmogConfig) -> None:
-            self.config = config
-
-    try:
-        return get_data_iterator(ConfigWrapper(config), data)
-    except (ValidationError, ProcessingError) as exc:
-        raise ConfigurationError(str(exc)) from exc
-
-
-def _consume_iterator(
-    iterator: Iterator[JsonDict],
-    entity_name: str,
-    config: TransmogConfig,
-    context: ProcessingContext,
-    result: _ProcessingResult,
-) -> None:
-    """Consume iterator and process records in batches."""
-    batch: list[JsonDict] = []
-    batch_size = max(1, config.batch_size)
-
-    try:
-        for record in iterator:
-            if not isinstance(record, dict):
-                raise ConfigurationError(
-                    f"Unsupported record type: {type(record).__name__}"
-                )
-
-            batch.append(record)
-            if len(batch) >= batch_size:
-                flattened_records, child_tables = process_record_batch(
-                    records=batch,
-                    entity_name=entity_name,
-                    config=config,
-                    context=context,
-                )
-
-                if child_tables:
-                    result.add_child_tables(child_tables)
-
-                for record in flattened_records:
-                    result.add_main_record(record)
-                batch = []
-
-        if batch:
-            flattened_records, child_tables = process_record_batch(
-                records=batch,
-                entity_name=entity_name,
-                config=config,
-                context=context,
-            )
-
-            if child_tables:
-                result.add_child_tables(child_tables)
-
-            for record in flattened_records:
-                result.add_main_record(record)
-    except ProcessingError as exc:
-        raise ConfigurationError(str(exc)) from exc
-
-
 def flatten(
-    data: Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes],
+    data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes,
     name: str = "data",
-    config: Optional[TransmogConfig] = None,
+    config: TransmogConfig | None = None,
 ) -> FlattenResult:
     """Flatten nested data structures into tabular format.
 
@@ -301,11 +185,8 @@ def flatten(
         [{'name': 'Product', '_id': '...'}]
 
         >>> # Custom configuration
-        >>> config = TransmogConfig(separator=".", cast_to_string=False)
+        >>> config = TransmogConfig(include_nulls=True, batch_size=500)
         >>> result = flatten(data, config=config)
-
-        >>> # Use factory methods
-        >>> result = flatten(data, config=TransmogConfig.for_csv())
 
         >>> # Save to file
         >>> result.save("output.csv")
@@ -313,64 +194,53 @@ def flatten(
     if config is None:
         config = TransmogConfig()
 
-    if isinstance(data, Path):
-        data = str(data)
+    result = FlattenResult(entity_name=name)
 
-    try:
-        result = _ProcessingResult(
-            main_table=[],
-            child_tables={},
+    if isinstance(data, dict):
+        iterator = iter([data])
+    elif isinstance(data, list):
+        iterator = iter(data)
+    else:
+        iterator = get_data_iterator(config, data)
+
+    timestamp = get_current_timestamp()
+    context = ProcessingContext(extract_time=timestamp)
+    batch: list[JsonDict] = []
+    batch_size = max(1, config.batch_size)
+
+    def flush_batch() -> None:
+        if not batch:
+            return
+        flattened_records, child_tables = process_record_batch(
+            records=batch,
             entity_name=name,
+            config=config,
+            _context=context,
         )
+        result._merge_child_tables(child_tables)
+        result._extend_main(flattened_records)
+        batch.clear()
 
-        iterator = _build_iterator(config, data)
-        timestamp = get_current_timestamp()
-        context = ProcessingContext(extract_time=timestamp)
+    for record in iterator:
+        if not isinstance(record, dict):
+            raise ConfigurationError(
+                f"Unsupported record type: {type(record).__name__}"
+            )
+        batch.append(record)
+        if len(batch) >= batch_size:
+            flush_batch()
 
-        _consume_iterator(iterator, name, config, context, result)
-        return FlattenResult(result)
-    except Exception as e:
-        logger.error(f"Failed to process data: {e}")
-        if not isinstance(e, (ConfigurationError, ProcessingError, ValidationError)):
-            raise ProcessingError(f"Failed to process data: {e}") from e
-        raise
+    flush_batch()
 
-
-def flatten_file(
-    path: Union[str, Path],
-    name: Optional[str] = None,
-    config: Optional[TransmogConfig] = None,
-) -> FlattenResult:
-    """Flatten data from a file.
-
-    Convenience function for processing files with auto-detection of format.
-
-    Args:
-        path: Path to input file
-        name: Base name for tables (defaults to filename without extension)
-        config: Optional configuration
-
-    Returns:
-        FlattenResult with flattened tables
-
-    Examples:
-        >>> result = flatten_file("products.json")
-        >>> result = flatten_file("data.jsonl", config=TransmogConfig(separator="."))
-    """
-    path = Path(path)
-
-    if name is None:
-        name = path.stem
-
-    return flatten(str(path), name=name, config=config)
+    return result
 
 
 def flatten_stream(
-    data: Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes],
-    output_path: Union[str, Path],
+    data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes,
+    output_path: str | Path,
     name: str = "data",
     output_format: str = "csv",
-    config: Optional[TransmogConfig] = None,
+    config: TransmogConfig | None = None,
     **format_options: Any,
 ) -> None:
     r"""Stream flatten data directly to files for memory-efficient processing.
@@ -386,9 +256,6 @@ def flatten_stream(
         config: Optional configuration (optimized for memory if not provided)
         **format_options: Format-specific writer options:
 
-            CSV options:
-                - compression: str - Compression type (None, "gzip")
-
             Parquet options:
                 - compression: str - Compression codec
                   ("snappy", "gzip", "brotli", None)
@@ -399,33 +266,21 @@ def flatten_stream(
         >>> flatten_stream(large_data, "output/", output_format="csv")
 
         >>> # Stream with custom config
-        >>> config = TransmogConfig.for_memory()
+        >>> config = TransmogConfig(batch_size=100)
         >>> flatten_stream(data, "output/", config=config)
 
         >>> # Stream to compressed Parquet with specific row group size
         >>> flatten_stream(data, "output/", output_format="parquet",
         ...                compression="snappy", row_group_size=50000)
-
-        >>> # Stream CSV with gzip compression
-        >>> flatten_stream(data, "output/", output_format="csv",
-        ...                compression="gzip")
     """
     if config is None:
-        config = TransmogConfig.for_memory()
-
-    if isinstance(data, Path):
-        data = str(data)
+        config = TransmogConfig(batch_size=100)
 
     output_path = Path(output_path)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Create a minimal processor-like object for stream_process
-    class ConfigWrapper:
-        def __init__(self, config: TransmogConfig) -> None:
-            self.config = config
-
     stream_process(
-        processor=ConfigWrapper(config),
+        config=config,
         data=data,
         entity_name=name,
         output_format=output_format,
@@ -436,7 +291,6 @@ def flatten_stream(
 
 __all__ = [
     "flatten",
-    "flatten_file",
     "flatten_stream",
     "FlattenResult",
     "TransmogConfig",

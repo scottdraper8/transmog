@@ -50,7 +50,7 @@ class TestEndToEndWorkflows:
     def test_file_to_file_processing(self, large_json_file, output_dir):
         """Test processing from file to file."""
         # Step 1: Process file directly
-        result = tm.flatten_file(large_json_file, name="large_dataset")
+        result = tm.flatten(large_json_file, name="large_dataset")
 
         # Verify processing
         assert len(result.main) == 1000  # 1000 records from fixture
@@ -96,14 +96,11 @@ class TestEndToEndWorkflows:
 
     def test_deterministic_id_consistency(self, array_data):
         """Test that deterministic IDs are consistent across runs."""
-        # First run
-        config = tm.TransmogConfig(id_field="id")
+        config = tm.TransmogConfig(id_generation="hash", id_field="id")
         result1 = tm.flatten(array_data, name="test", config=config)
 
-        # Second run with same data
         result2 = tm.flatten(array_data, name="test", config=config)
 
-        # IDs should be consistent
         assert result1.main[0]["id"] == result2.main[0]["id"]
 
 

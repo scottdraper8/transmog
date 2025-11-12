@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
 
     steps:
     - uses: actions/checkout@v3
@@ -66,71 +66,49 @@ jobs:
             print(f"Record ID: {record.get('_id', 'N/A')}")
             break  # Just test first record
 
-        # Test table access methods
-        print("Testing table access methods...")
-        main_data = result.get_table('main')
-        if main_data:
-            print(f"Got main table with {len(main_data)} records")
-
-        # Test table info
-        table_info = result.table_info()
-        print(f"Table info: {table_info}")
+        # Test length operator
+        print(f"Result length: {len(result)}")
 
         # Create temp directory for testing file outputs
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Test JSON file output
-            print("Testing JSON file output...")
-            json_file = temp_path / "test_output.json"
-            result.save(json_file, output_format='json')
-
-            if json_file.exists():
-                print(f"JSON file created: {json_file}")
-                with open(json_file) as f:
-                    json_data = json.load(f)
-                    print(f"JSON contains {len(json_data)} records")
-
             # Test CSV file output
             print("Testing CSV file output...")
             csv_file = temp_path / "test_output.csv"
+            result.save(csv_file, output_format='csv')
+            if csv_file.exists():
+                print(f"CSV file created: {csv_file}")
+
+            # Test Parquet file output
+            print("Testing Parquet file output...")
             try:
-                result.save(csv_file, output_format='csv')
-                if csv_file.exists():
-                    print(f"CSV file created: {csv_file}")
-            except Exception as e:
-                print(f"CSV save failed: {e}")
+                parquet_file = temp_path / "test_output.parquet"
+                result.save(parquet_file, output_format='parquet')
+                if parquet_file.exists():
+                    print(f"Parquet file created: {parquet_file}")
+            except ImportError:
+                print("PyArrow not available, skipping Parquet test")
 
             # Test directory output for multiple tables
             print("Testing directory output...")
             output_dir = temp_path / "tables"
-            try:
-                result.save(output_dir, output_format='json')
-                json_files = list(output_dir.glob("*.json"))
-                print(f"Created {len(json_files)} JSON files in directory")
-            except Exception as e:
-                print(f"Directory save failed: {e}")
+            paths = result.save(output_dir, output_format='csv')
+            print(f"Created {len(paths)} CSV files in directory")
 
             # Test the streaming API
             print("Testing streaming API...")
             stream_output_dir = temp_path / 'streaming'
             stream_output_dir.mkdir(exist_ok=True)
 
-            try:
-                tm.flatten_stream(
-                    data=data,
-                    output_path=stream_output_dir,
-                    name='streaming_test',
-                    output_format='json'
-                )
-
-                stream_files = list(stream_output_dir.glob("*.json"))
-                if stream_files:
-                    print(f"Streaming created {len(stream_files)} files")
-                else:
-                    print("No streaming files created")
-            except Exception as e:
-                print(f"Streaming failed: {e}")
+            tm.flatten_stream(
+                data,
+                output_path=stream_output_dir,
+                name='streaming_test',
+                output_format='csv'
+            )
+            stream_files = list(stream_output_dir.glob("*.csv"))
+            print(f"Streaming created {len(stream_files)} files")
 
             # Test file processing
             print("Testing file processing...")
@@ -138,63 +116,50 @@ jobs:
             with open(source_json_path, 'w') as f:
                 json.dump(data, f)
 
-            try:
-                file_result = tm.flatten_file(source_json_path, name='file_test')
-                print(f"File processing: {len(file_result.main)} records")
-            except Exception as e:
-                print(f"File processing failed: {e}")
+            file_result = tm.flatten(source_json_path, name='file_test')
+            print(f"File processing: {len(file_result.main)} records")
 
-        # Test different API options
-        print("Testing API options...")
+        # Test different configuration options
+        print("Testing configuration options...")
 
-        # Test different array handling
-        try:
-            result_inline = tm.flatten(data, name='inline_test', arrays='inline')
-            print(f"Inline arrays: {len(result_inline.main)} records")
-        except Exception as e:
-            print(f"Inline arrays failed: {e}")
+        # Test different array handling modes
+        config_inline = tm.TransmogConfig(array_mode=tm.ArrayMode.INLINE)
+        result_inline = tm.flatten(data, name='inline_test', config=config_inline)
+        print(f"Inline arrays: {len(result_inline.main)} records")
 
-        try:
-            result_skip = tm.flatten(data, name='skip_test', arrays='skip')
-            print(f"Skip arrays: {len(result_skip.main)} records")
-        except Exception as e:
-            print(f"Skip arrays failed: {e}")
+        config_skip = tm.TransmogConfig(array_mode=tm.ArrayMode.SKIP)
+        result_skip = tm.flatten(data, name='skip_test', config=config_skip)
+        print(f"Skip arrays: {len(result_skip.main)} records")
 
         # Test custom separator
-        try:
-            result_dot = tm.flatten(data, name='dot_test', separator='.')
-            print(f"Dot separator: {len(result_dot.main)} records")
-        except Exception as e:
-            print(f"Dot separator failed: {e}")
+        config_dot = tm.TransmogConfig(separator='.')
+        result_dot = tm.flatten(data, name='dot_test', config=config_dot)
+        print(f"Dot separator: {len(result_dot.main)} records")
 
-        # Test performance options
-        try:
-            result_memory = tm.flatten(data, name='memory_test', low_memory=True)
-            print(f"Low memory: {len(result_memory.main)} records")
-        except Exception as e:
-            print(f"Low memory failed: {e}")
+        # Test memory preset
+        config_memory = tm.TransmogConfig.for_memory()
+        result_memory = tm.flatten(data, name='memory_test', config=config_memory)
+        print(f"Memory preset: {len(result_memory.main)} records")
 
         # Test error handling
-        try:
-            result_skip_errors = tm.flatten(data, name='error_test', errors='skip')
-            print(f"Skip errors: {len(result_skip_errors.main)} records")
-        except Exception as e:
-            print(f"Skip errors failed: {e}")
+        config_skip_errors = tm.TransmogConfig.error_tolerant()
+        result_skip_errors = tm.flatten(data, name='error_test', config=config_skip_errors)
+        print(f"Error tolerant: {len(result_skip_errors.main)} records")
 
-        print('All output format methods working!')
+        print('All API methods working correctly!')
         EOF
         python test_output_formats.py
 
-    # Only build docs on Python 3.9 to verify they build correctly during CI
+    # Only build docs on Python 3.10 to verify they build correctly during CI
     - name: Build docs
-      if: matrix.python-version == '3.9'
+      if: matrix.python-version == '3.10'
       run: |
         python -m pip install -e ".[docs]"
         cd docs && make html
 
     - name: Upload docs
       uses: actions/upload-artifact@v4
-      if: matrix.python-version == '3.9'
+      if: matrix.python-version == '3.10'
       with:
         name: docs-html
         path: docs/_build/html/
@@ -210,7 +175,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: '3.10'
 
     - name: Install build dependencies
       run: |

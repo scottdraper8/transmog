@@ -13,7 +13,7 @@ import sys
 import time
 import traceback
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 # Try to import from installed package first, fall back to development setup
 try:
@@ -136,8 +136,8 @@ def get_memory_usage() -> float:
 def benchmark_configuration(
     config_name: str,
     data: list[dict[str, Any]],
-    config: Optional[tm.TransmogConfig] = None,
-) -> dict[str, Union[str, float, int]]:
+    config: tm.TransmogConfig | None = None,
+) -> dict[str, str | float | int]:
     """Benchmark a specific configuration.
 
     Args:
@@ -214,7 +214,7 @@ def run_standard_benchmarks(record_counts: list[int]) -> dict[str, dict[str, Any
     # Define configurations to test
     configurations = [
         ("Default", tm.TransmogConfig()),
-        ("Low Memory", tm.TransmogConfig.for_memory()),
+        ("Low Memory", tm.TransmogConfig(batch_size=100)),
         ("Large Batches", tm.TransmogConfig(batch_size=5000)),
         ("Small Batches", tm.TransmogConfig(batch_size=100)),
         ("Preserve Types", tm.TransmogConfig(cast_to_string=False)),
@@ -270,14 +270,14 @@ def run_memory_benchmarks() -> None:
         # Test different memory configurations
         configs = [
             ("Standard", tm.TransmogConfig()),
-            ("Low Memory", tm.TransmogConfig.for_memory()),
+            ("Low Memory", tm.TransmogConfig(batch_size=100)),
             ("Small Batches", tm.TransmogConfig(batch_size=50)),
             ("Large Batches", tm.TransmogConfig(batch_size=2000)),
             ("Performance Optimized", tm.TransmogConfig(batch_size=1000)),
-            ("Memory + Types", tm.TransmogConfig.for_memory()),
+            ("Memory + Types", tm.TransmogConfig(batch_size=100)),
             (
                 "Memory + Skip Empty",
-                tm.TransmogConfig.for_memory(),
+                tm.TransmogConfig(batch_size=100),
             ),
         ]
 
@@ -350,7 +350,7 @@ def run_streaming_benchmarks() -> None:
                 output_path=stream_output,
                 name=f"stream_{size}",
                 output_format="csv",
-                config=tm.TransmogConfig.for_memory(),
+                config=tm.TransmogConfig(batch_size=100),
             )
 
             stream_time = time.time() - start_time
