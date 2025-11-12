@@ -52,7 +52,8 @@ class TestProcessingSpeedBenchmarks:
 
         start_time = time.time()
 
-        result = tm.flatten(medium_data, name="medium_perf", arrays="separate")
+        config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+        result = tm.flatten(medium_data, name="medium_perf", config=config)
 
         end_time = time.time()
         processing_time = end_time - start_time
@@ -129,7 +130,8 @@ class TestProcessingSpeedBenchmarks:
 
         start_time = time.time()
 
-        result = tm.flatten(complex_data, name="complex_perf", arrays="separate")
+        config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+        result = tm.flatten(complex_data, name="complex_perf", config=config)
 
         end_time = time.time()
         processing_time = end_time - start_time
@@ -187,7 +189,8 @@ class TestProcessingSpeedBenchmarks:
 
         start_time = time.time()
 
-        result = tm.flatten(array_heavy_data, name="array_perf", arrays="separate")
+        config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+        result = tm.flatten(array_heavy_data, name="array_perf", config=config)
 
         end_time = time.time()
         processing_time = end_time - start_time
@@ -208,7 +211,7 @@ class TestFileProcessingPerformance:
         """Test JSON file processing performance."""
         start_time = time.time()
 
-        result = tm.flatten_file(large_json_file, name="file_perf")
+        result = tm.flatten(large_json_file, name="file_perf")
 
         end_time = time.time()
         processing_time = end_time - start_time
@@ -219,32 +222,6 @@ class TestFileProcessingPerformance:
         # File processing should be efficient
         assert processing_time < 15.0
         print(f"JSON file processing (1000 records): {processing_time:.4f}s")
-
-    def test_csv_file_processing_performance(self):
-        """Test CSV file processing performance."""
-        # Create large CSV file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
-            f.write("id,name,value,category,active\n")
-            for i in range(5000):
-                f.write(f"{i},Name_{i},{i * 10},cat_{i % 10},{i % 2 == 0}\n")
-            csv_file = f.name
-
-        try:
-            start_time = time.time()
-
-            result = tm.flatten_file(csv_file, name="csv_perf")
-
-            end_time = time.time()
-            processing_time = end_time - start_time
-
-            assert result is not None
-            assert len(result.main) == 5000
-
-            # CSV processing should be efficient
-            assert processing_time < 20.0
-            print(f"CSV file processing (5000 records): {processing_time:.4f}s")
-        finally:
-            Path(csv_file).unlink()
 
     def test_streaming_performance(self):
         """Test streaming processing performance."""
@@ -261,11 +238,11 @@ class TestFileProcessingPerformance:
         start_time = time.time()
 
         # Use memory-efficient processing with small batch size
+        config = tm.TransmogConfig(batch_size=100)
         result = tm.flatten(
             large_streaming_data,
             name="stream_perf",
-            low_memory=True,
-            batch_size=100,
+            config=config,
         )
 
         end_time = time.time()
@@ -300,11 +277,11 @@ class TestMemoryPerformance:
         start_time = time.time()
 
         # Use memory-efficient processing
+        config = tm.TransmogConfig(batch_size=50)
         result = tm.flatten(
             memory_test_data,
             name="memory_perf",
-            low_memory=True,
-            batch_size=50,
+            config=config,
         )
 
         end_time = time.time()
@@ -328,9 +305,8 @@ class TestMemoryPerformance:
         for batch_size in batch_sizes:
             start_time = time.time()
 
-            result = tm.flatten(
-                test_data, name=f"batch_{batch_size}", batch_size=batch_size
-            )
+            config = tm.TransmogConfig(batch_size=batch_size)
+            result = tm.flatten(test_data, name=f"batch_{batch_size}", config=config)
 
             end_time = time.time()
             processing_time = end_time - start_time
@@ -360,13 +336,18 @@ class TestPerformanceComparisons:
             for i in range(500)
         ]
 
-        modes = ["separate", "inline", "skip"]
+        mode_map = {
+            "separate": tm.ArrayMode.SEPARATE,
+            "inline": tm.ArrayMode.INLINE,
+            "skip": tm.ArrayMode.SKIP,
+        }
         results = {}
 
-        for mode in modes:
+        for mode_name, mode_value in mode_map.items():
             start_time = time.time()
 
-            result = tm.flatten(array_data, name=f"array_{mode}", arrays=mode)
+            config = tm.TransmogConfig(array_mode=mode_value)
+            result = tm.flatten(array_data, name=f"array_{mode_name}", config=config)
 
             end_time = time.time()
             processing_time = end_time - start_time
@@ -374,11 +355,11 @@ class TestPerformanceComparisons:
             assert result is not None
             assert len(result.main) == 500
 
-            results[mode] = processing_time
-            print(f"Array mode '{mode}': {processing_time:.4f}s")
+            results[mode_name] = processing_time
+            print(f"Array mode '{mode_name}': {processing_time:.4f}s")
 
         # All modes should complete successfully
-        assert len(results) == len(modes)
+        assert len(results) == len(mode_map)
 
     def test_error_handling_performance_impact(self):
         """Test performance impact of different error handling modes."""
@@ -425,19 +406,22 @@ class TestPerformanceComparisons:
         ]
 
         configs = [
-            {"name": "default", "options": {}},
-            {"name": "preserve_types", "options": {"preserve_types": True}},
-            {"name": "custom_separator", "options": {"separator": "."}},
-            {"name": "low_threshold", "options": {"nested_threshold": 2}},
-            {"name": "high_threshold", "options": {"nested_threshold": 10}},
+            {"name": "default", "config": tm.TransmogConfig()},
+            {
+                "name": "include_nulls",
+                "config": tm.TransmogConfig(include_nulls=True),
+            },
+            {"name": "small_batch", "config": tm.TransmogConfig(batch_size=100)},
         ]
 
         results = {}
 
-        for config in configs:
+        for config_dict in configs:
             start_time = time.time()
 
-            result = tm.flatten(test_data, name=config["name"], **config["options"])
+            result = tm.flatten(
+                test_data, name=config_dict["name"], config=config_dict["config"]
+            )
 
             end_time = time.time()
             processing_time = end_time - start_time
@@ -445,8 +429,8 @@ class TestPerformanceComparisons:
             assert result is not None
             assert len(result.main) == 1000
 
-            results[config["name"]] = processing_time
-            print(f"Config '{config['name']}': {processing_time:.4f}s")
+            results[config_dict["name"]] = processing_time
+            print(f"Config '{config_dict['name']}': {processing_time:.4f}s")
 
         # All configurations should complete
         assert len(results) == len(configs)

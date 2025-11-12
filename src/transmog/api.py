@@ -4,234 +4,167 @@ This module provides the primary user-facing functions for flattening
 nested data structures into tabular formats.
 """
 
-import os
-from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Literal, Optional, Union
+from typing import Any
 
-from transmog.config import MetadataConfig, ProcessingMode, TransmogConfig
-from transmog.io import initialize_io_features
-from transmog.process import Processor
-from transmog.process.result import ProcessingResult as _ProcessingResult
-from transmog.process.streaming import stream_process
-from transmog.types.base import ArrayMode, JsonDict
-from transmog.validation import validate_api_parameters
-
-# Initialize IO features to register writers
-initialize_io_features()
-
-# Type aliases for clarity
-DataInput = Union[dict[str, Any], list[dict[str, Any]], str, Path, bytes]
-ArrayHandling = Literal["smart", "separate", "inline", "skip"]
-ErrorHandling = Literal["raise", "skip", "warn"]
-IdSource = Union[str, dict[str, str], None]
+from transmog.config import TransmogConfig
+from transmog.exceptions import (
+    ConfigurationError,
+    OutputError,
+)
+from transmog.flattening import get_current_timestamp, process_record_batch
+from transmog.iterators import get_data_iterator
+from transmog.streaming import stream_process
+from transmog.types import JsonDict, ProcessingContext
+from transmog.writers import create_writer
+from transmog.writers.base import _sanitize_filename
 
 
 class FlattenResult:
-    """Result of flattening nested data.
+    """Container for flattened tables."""
 
-    Provides intuitive access to flattened tables with convenience methods
-    for saving and converting data.
-    """
+    def __init__(
+        self,
+        entity_name: str,
+        main_table: list[JsonDict] | None = None,
+        child_tables: dict[str, list[JsonDict]] | None = None,
+    ):
+        """Initialize flattened data container."""
+        self._entity_name = entity_name
+        self._main_table = list(main_table) if main_table else []
+        self._child_tables = (
+            {name: list(records) for name, records in child_tables.items()}
+            if child_tables
+            else {}
+        )
 
-    def __init__(self, processing_result: _ProcessingResult):
-        """Initialize from internal processing result."""
-        self._result = processing_result
+    @property
+    def entity_name(self) -> str:
+        """Get the entity name associated with the main table."""
+        return self._entity_name
 
     @property
     def main(self) -> list[JsonDict]:
         """Get the main flattened table."""
-        return self._result.main_table
+        return self._main_table
 
     @property
     def tables(self) -> dict[str, list[JsonDict]]:
         """Get all child tables as a dictionary."""
-        return self._result.child_tables
+        return self._child_tables
 
     @property
     def all_tables(self) -> dict[str, list[JsonDict]]:
         """Get all tables including main table."""
-        all_tables = {self._result.entity_name: self.main}
-        all_tables.update(self.tables)
-        return all_tables
+        tables: dict[str, list[JsonDict]] = {self._entity_name: self._main_table}
+        tables.update(self._child_tables)
+        return tables
+
+    def _extend_main(self, records: list[JsonDict]) -> None:
+        """Append flattened records to the main table."""
+        if records:
+            self._main_table.extend(records)
+
+    def _merge_child_tables(self, tables: dict[str, list[JsonDict]]) -> None:
+        """Merge child table batches into the container."""
+        if not tables:
+            return
+        for table_name, table_records in tables.items():
+            if not table_records:
+                continue
+            target = self._child_tables.setdefault(table_name, [])
+            target.extend(table_records)
 
     def save(
         self,
-        path: Union[str, Path],
-        output_format: Optional[str] = None,
-    ) -> Union[list[str], dict[str, str]]:
+        path: str | Path,
+        output_format: str | None = None,
+        **format_options: Any,
+    ) -> list[str] | dict[str, str]:
         """Save all tables to files.
 
         Args:
             path: Output path (file or directory depending on format)
             output_format: Output format (auto-detected from extension if not specified)
-                          Options: 'csv', 'json', 'parquet'
+                          Options: 'csv', 'parquet', 'orc'
+            **format_options: Additional writer-specific options forwarded to
+                the underlying writer implementation.
 
         Returns:
             List of created file paths
         """
         path = Path(path)
 
-        # Auto-detect format from extension
         if output_format is None:
             output_format = path.suffix.lower().lstrip(".")
             if not output_format:
-                output_format = "json"  # Default to JSON
+                output_format = "csv"
 
-        # Validate format
-        valid_formats = ["csv", "json", "parquet"]
+        valid_formats = ["csv", "parquet", "orc"]
         if output_format not in valid_formats:
             raise ValueError(
                 f"Unsupported format: {output_format}. Must be one of {valid_formats}"
             )
 
-        # Handle directory vs file output
         if len(self.tables) > 0:
-            # Multiple tables - use directory
             if path.suffix:
-                # Remove extension if provided
                 path = path.parent / path.stem
-            return self._save_all_tables(path, output_format)
+            return self._save_all_tables(path, output_format, **format_options)
         else:
-            # Single table - can use file
             if not path.suffix:
                 path = path.with_suffix(f".{output_format}")
-            return self._save_single_table(path, output_format)
+            return self._save_single_table(path, output_format, **format_options)
 
-    def __repr__(self) -> str:
-        """Provide clear representation for debugging."""
-        table_info = [
-            f"  - {self._result.entity_name}: {len(self.main)} records (main)"
-        ]
-        for name, data in self.tables.items():
-            table_info.append(f"  - {name}: {len(data)} records")
-
-        return f"FlattenResult with {len(self.all_tables)} tables:\n" + "\n".join(
-            table_info
-        )
-
-    def __len__(self) -> int:
-        """Return number of records in main table."""
-        return len(self.main)
-
-    def __iter__(self) -> Iterator[JsonDict]:
-        """Iterate over main table records."""
-        return iter(self.main)
-
-    def __getitem__(self, key: str) -> list[JsonDict]:
-        """Get a specific table by name."""
-        if key == self._result.entity_name or key == "main":
-            return self.main
-        elif key in self.tables:
-            return self.tables[key]
-        else:
-            raise KeyError(
-                f"Table '{key}' not found. Available: {list(self.all_tables.keys())}"
-            )
-
-    def __contains__(self, key: str) -> bool:
-        """Check if a table exists."""
-        if key == "main" or key == self._result.entity_name:
-            return True
-        return key in self.tables
-
-    def keys(self) -> Any:
-        """Get all table names."""
-        return self.all_tables.keys()
-
-    def values(self) -> Any:
-        """Get all table data."""
-        return self.all_tables.values()
-
-    def items(self) -> Any:
-        """Get all table name-data pairs."""
-        return self.all_tables.items()
-
-    def get_table(
-        self, name: str, default: Optional[list[JsonDict]] = None
-    ) -> Optional[list[JsonDict]]:
-        """Get a table by name with optional default."""
-        if name == "main":
-            return self.main
-        return self.all_tables.get(name, default)
-
-    def table_info(self) -> dict[str, dict[str, Any]]:
-        """Get information about all tables."""
-        info = {}
-        for name, data in self.all_tables.items():
-            info[name] = {
-                "records": len(data),
-                "fields": list(data[0].keys()) if data else [],
-                "is_main": name == self._result.entity_name,
-            }
-        return info
-
-    def _save_all_tables(self, base_path: Path, output_format: str) -> dict[str, str]:
+    def _save_all_tables(
+        self,
+        base_path: Path,
+        output_format: str,
+        **format_options: Any,
+    ) -> dict[str, str]:
         """Save all tables to a directory."""
         base_path.mkdir(parents=True, exist_ok=True)
 
-        if output_format == "json":
-            return self._result.write_all_json(str(base_path))
-        elif output_format == "csv":
-            return self._result.write_all_csv(str(base_path))
-        elif output_format == "parquet":
-            return self._result.write_all_parquet(str(base_path))
-        else:
-            # Return empty dict for unknown formats
-            return {}
+        writer = create_writer(output_format, **format_options)
+        extension = ".csv" if output_format == "csv" else f".{output_format}"
+        saved_paths: dict[str, str] = {}
 
-    def _save_single_table(self, file_path: Path, output_format: str) -> list[str]:
+        for table_name, records in self.all_tables.items():
+            if not records:
+                continue
+
+            safe_name = _sanitize_filename(table_name)
+            destination = base_path / f"{safe_name or 'table'}{extension}"
+
+            try:
+                written_path = writer.write(records, str(destination))
+            except Exception as exc:
+                raise OutputError(
+                    f"Failed to write {output_format.upper()} for table '{table_name}' "
+                    f"to '{destination}': {exc}"
+                ) from exc
+
+            saved_paths[table_name] = str(written_path)
+
+        return saved_paths
+
+    def _save_single_table(
+        self,
+        file_path: Path,
+        output_format: str,
+        **format_options: Any,
+    ) -> list[str]:
         """Save single table to a file."""
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if output_format == "json":
-            paths = self._result.write("json", str(file_path.parent))
-            # Rename to match requested filename
-            if paths:
-                # paths is a dict, get the first file path
-                first_path = next(iter(paths.values()))
-                os.rename(first_path, str(file_path))
-                return [str(file_path)]
-        elif output_format == "csv":
-            paths = self._result.write("csv", str(file_path.parent))
-            if paths:
-                # paths is a dict, get the first file path
-                first_path = next(iter(paths.values()))
-                os.rename(first_path, str(file_path))
-                return [str(file_path)]
-        elif output_format == "parquet":
-            paths = self._result.write("parquet", str(file_path.parent))
-            if paths:
-                # paths is a dict, get the first file path
-                first_path = next(iter(paths.values()))
-                os.rename(first_path, str(file_path))
-                return [str(file_path)]
-
-        return []
+        writer = create_writer(output_format, **format_options)
+        written_path = writer.write(self.main, str(file_path))
+        return [str(written_path)]
 
 
 def flatten(
-    data: DataInput,
-    *,
+    data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes,
     name: str = "data",
-    # Naming options
-    separator: str = "_",
-    nested_threshold: int = 4,
-    # ID options
-    id_field: IdSource = None,
-    parent_id_field: str = "_parent_id",
-    add_timestamp: bool = False,
-    # Array handling
-    arrays: ArrayHandling = "smart",
-    # Data options
-    preserve_types: bool = False,
-    skip_null: bool = True,
-    skip_empty: bool = True,
-    # Error handling
-    errors: ErrorHandling = "raise",
-    # Performance
-    batch_size: int = 1000,
-    low_memory: bool = False,
+    config: TransmogConfig | None = None,
 ) -> FlattenResult:
     """Flatten nested data structures into tabular format.
 
@@ -241,166 +174,77 @@ def flatten(
     Args:
         data: Input data - can be dict, list of dicts, file path, or JSON string
         name: Base name for the flattened tables
-
-        Naming Options:
-        separator: Character to separate nested field names (default: "_")
-        nested_threshold: Depth at which to simplify deeply nested names (default: 4)
-
-        ID Options:
-        id_field: Field to use as ID. Can be:
-                 - None: Generate unique IDs
-                 - String: Field name to use as ID
-                 - Dict: Mapping of table names to ID fields
-        parent_id_field: Name for parent reference field (default: "_parent_id")
-        add_timestamp: Add timestamp field to records (default: False)
-
-        Array Handling:
-        arrays: How to handle arrays:
-               - "smart": Intelligently handle - explode complex arrays,
-                 preserve simple primitive arrays as native arrays (default)
-               - "separate": Extract all arrays to child tables
-               - "inline": Keep all arrays in main record as JSON strings
-               - "skip": Ignore arrays completely
-
-        Data Options:
-        preserve_types: Keep original types instead of converting to strings
-                       (default: False)
-        skip_null: Skip null values in output (default: True)
-        skip_empty: Skip empty strings/lists/dicts (default: True)
-
-        Error Handling:
-        errors: How to handle errors:
-               - "raise": Raise exception on error (default)
-               - "skip": Skip problematic records
-               - "warn": Log warnings and continue
-
-        Performance:
-        batch_size: Number of records to process at once (default: 1000)
-        low_memory: Optimize for low memory usage (default: False)
+        config: Optional configuration (uses defaults if not provided)
 
     Returns:
         FlattenResult with flattened tables
 
     Examples:
-        >>> # Basic usage
+        >>> # Basic usage with defaults
         >>> result = flatten({"name": "Product", "tags": ["sale", "clearance"]})
         >>> result.main
         [{'name': 'Product', '_id': '...'}]
-        >>> result.tables['data_tags']
-        [{'value': 'sale', '_parent_id': '...'},
-         {'value': 'clearance', '_parent_id': '...'}]
+
+        >>> # Custom configuration
+        >>> config = TransmogConfig(include_nulls=True, batch_size=500)
+        >>> result = flatten(data, config=config)
 
         >>> # Save to file
-        >>> result.save("output.json")
-
-        >>> # Use existing ID field
-        >>> result = flatten(data, id_field="product_id")
-
-        >>> # Custom separator for nested fields
-        >>> result = flatten(nested_data, separator=".")
+        >>> result.save("output.csv")
     """
-    # Validate API parameters
-    validate_api_parameters(
-        data=data,
-        name=name,
-        separator=separator,
-        nested_threshold=nested_threshold,
-        id_field=id_field,
-        parent_id_field=parent_id_field,
-        arrays=arrays,
-        errors=errors,
-        batch_size=batch_size,
-    )
+    if config is None:
+        config = TransmogConfig()
 
-    # Build configuration from simplified options
-    config = _build_config(
-        separator=separator,
-        nested_threshold=nested_threshold,
-        id_field=id_field,
-        parent_id_field=parent_id_field,
-        add_timestamp=add_timestamp,
-        arrays=arrays,
-        preserve_types=preserve_types,
-        skip_null=skip_null,
-        skip_empty=skip_empty,
-        errors=errors,
-        batch_size=batch_size,
-        low_memory=low_memory,
-    )
+    result = FlattenResult(entity_name=name)
 
-    # Create processor and process data
-    processor = Processor(config)
+    if isinstance(data, dict):
+        iterator = iter([data])
+    elif isinstance(data, list):
+        iterator = iter(data)
+    else:
+        iterator = get_data_iterator(data)
 
-    # Handle file paths
-    if isinstance(data, Path):
-        data = str(data)
+    timestamp = get_current_timestamp()
+    context = ProcessingContext(extract_time=timestamp)
+    batch: list[JsonDict] = []
+    batch_size = max(1, config.batch_size)
 
-    # Process the data
-    processing_result = processor.process(data, entity_name=name)
+    def flush_batch() -> None:
+        if not batch:
+            return
+        flattened_records, child_tables = process_record_batch(
+            records=batch,
+            entity_name=name,
+            config=config,
+            _context=context,
+        )
+        result._merge_child_tables(child_tables)
+        result._extend_main(flattened_records)
+        batch.clear()
 
-    # Return wrapped result
-    return FlattenResult(processing_result)
+    for record in iterator:
+        if not isinstance(record, dict):
+            raise ConfigurationError(
+                f"Unsupported record type: {type(record).__name__}"
+            )
+        batch.append(record)
+        if len(batch) >= batch_size:
+            flush_batch()
 
+    flush_batch()
 
-def flatten_file(
-    path: Union[str, Path],
-    *,
-    name: Optional[str] = None,
-    file_format: Optional[str] = None,
-    **options: Any,
-) -> FlattenResult:
-    """Flatten data from a file.
-
-    Convenience function for processing files with auto-detection of format.
-
-    Args:
-        path: Path to input file
-        name: Base name for tables (defaults to filename without extension)
-        file_format: File format (auto-detected if not specified)
-        **options: Same options as flatten()
-
-    Returns:
-        FlattenResult with flattened tables
-
-    Examples:
-        >>> result = flatten_file("products.json")
-        >>> result = flatten_file("data.csv", separator=".")
-    """
-    # Validate API parameters
-    validate_api_parameters(format=file_format)
-
-    path = Path(path)
-
-    # Auto-detect name from filename
-    if name is None:
-        name = path.stem
-
-    # Pass to main flatten function
-    return flatten(str(path), name=name, **options)
+    return result
 
 
 def flatten_stream(
-    data: DataInput,
-    output_path: Union[str, Path],
-    *,
+    data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes,
+    output_path: str | Path,
     name: str = "data",
-    output_format: str = "json",
-    # All the same options as flatten()
-    separator: str = "_",
-    nested_threshold: int = 4,
-    id_field: IdSource = None,
-    parent_id_field: str = "_parent_id",
-    add_timestamp: bool = False,
-    arrays: ArrayHandling = "smart",
-    preserve_types: bool = False,
-    skip_null: bool = True,
-    skip_empty: bool = True,
-    errors: ErrorHandling = "raise",
-    batch_size: int = 1000,
-    # Streaming-specific options
+    output_format: str = "csv",
+    config: TransmogConfig | None = None,
     **format_options: Any,
 ) -> None:
-    """Stream flatten data directly to files for memory-efficient processing.
+    r"""Stream flatten data directly to files for memory-efficient processing.
 
     This function processes data and writes directly to output files without
     keeping results in memory, making it ideal for very large datasets.
@@ -409,176 +253,46 @@ def flatten_stream(
         data: Input data - can be dict, list of dicts, file path, or JSON string
         output_path: Directory path where output files will be written
         name: Base name for the flattened tables
-        output_format: Output format ("json", "csv", "parquet")
+        output_format: Output format ("csv", "parquet")
+        config: Optional configuration (optimized for memory if not provided)
+        **format_options: Format-specific writer options:
 
-        # Same options as flatten() function
-        separator: Character to separate nested field names
-        nested_threshold: Depth at which to simplify deeply nested names
-        id_field: Field to use as ID
-        parent_id_field: Name for parent reference field
-        add_timestamp: Add timestamp field to records
-        arrays: How to handle arrays ("separate", "inline", "skip")
-        preserve_types: Keep original types instead of converting to strings
-        skip_null: Skip null values in output
-        skip_empty: Skip empty strings/lists/dicts
-        errors: How to handle errors ("raise", "skip", "warn")
-        batch_size: Number of records to process at once
-
-        **format_options: Format-specific options (compression, etc.)
-
-    Returns:
-        None - data is written directly to files
+            Parquet options:
+                - compression: str - Compression codec
+                  ("snappy", "gzip", "brotli", None)
+                - row_group_size: int - Rows per row group (default: 10000)
 
     Examples:
-        >>> # Stream large dataset to JSON files
-        >>> flatten_stream(large_data, "output/", output_format="json")
+        >>> # Stream large dataset to CSV files
+        >>> flatten_stream(large_data, "output/", output_format="csv")
 
-        >>> # Stream to compressed Parquet
+        >>> # Stream with custom config
+        >>> config = TransmogConfig(batch_size=100)
+        >>> flatten_stream(data, "output/", config=config)
+
+        >>> # Stream to compressed Parquet with specific row group size
         >>> flatten_stream(data, "output/", output_format="parquet",
-        ...                compression="snappy")
-
-        >>> # Stream CSV file processing
-        >>> flatten_stream("large_file.csv", "output/", output_format="csv")
+        ...                compression="snappy", row_group_size=50000)
     """
-    # Validate API parameters
-    validate_api_parameters(
-        data=data,
-        name=name,
-        format=output_format,
-        separator=separator,
-        nested_threshold=nested_threshold,
-        id_field=id_field,
-        parent_id_field=parent_id_field,
-        arrays=arrays,
-        errors=errors,
-        batch_size=batch_size,
-    )
+    if config is None:
+        config = TransmogConfig(batch_size=100)
 
-    # Build configuration from options
-    config = _build_config(
-        separator=separator,
-        nested_threshold=nested_threshold,
-        id_field=id_field,
-        parent_id_field=parent_id_field,
-        add_timestamp=add_timestamp,
-        arrays=arrays,
-        preserve_types=preserve_types,
-        skip_null=skip_null,
-        skip_empty=skip_empty,
-        errors=errors,
-        batch_size=batch_size,
-        low_memory=True,  # Always use low memory for streaming
-    )
-
-    # Use the advanced streaming API
-    processor = Processor(config)
-
-    # Handle file paths
-    if isinstance(data, Path):
-        data = str(data)
-
-    # Create output directory
     output_path = Path(output_path)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Import and use streaming function
-
-    # Stream process the data
     stream_process(
-        processor=processor,
+        config=config,
         data=data,
         entity_name=name,
         output_format=output_format,
         output_destination=str(output_path),
-        batch_size=batch_size,
         **format_options,
     )
 
 
-def _build_config(
-    separator: str,
-    nested_threshold: int,
-    id_field: IdSource,
-    parent_id_field: str,
-    add_timestamp: bool,
-    arrays: ArrayHandling,
-    preserve_types: bool,
-    skip_null: bool,
-    skip_empty: bool,
-    errors: ErrorHandling,
-    batch_size: int,
-    low_memory: bool,
-) -> TransmogConfig:
-    """Build internal configuration from simplified options."""
-    if arrays == "smart":
-        array_mode = ArrayMode.SMART
-    elif arrays == "separate":
-        array_mode = ArrayMode.SEPARATE
-    elif arrays == "inline":
-        array_mode = ArrayMode.INLINE
-    elif arrays == "skip":
-        array_mode = ArrayMode.SKIP
-    else:
-        raise ValueError(f"Invalid arrays value: {arrays}")
-
-    # Apply error handling
-    if errors == "raise":
-        strategy = "strict"
-        allow_malformed = False
-    elif errors == "skip":
-        strategy = "skip"
-        allow_malformed = True
-    elif errors == "warn":
-        strategy = "partial"
-        allow_malformed = True
-    else:
-        raise ValueError(f"Invalid error handling option: {errors}")
-
-        # Build metadata configuration with proper timestamp handling
-    metadata_config = MetadataConfig(
-        id_field="_id",
-        parent_field=parent_id_field,
-        time_field="_timestamp" if add_timestamp else None,
-    )
-
-    # Handle ID field configuration by creating a new metadata config
-    if id_field is not None:
-        if isinstance(id_field, str):
-            # Single field name - use for natural ID discovery
-            metadata_config = MetadataConfig(
-                id_field=metadata_config.id_field,
-                parent_field=metadata_config.parent_field,
-                time_field=metadata_config.time_field,
-                id_field_patterns=[id_field],
-            )
-        elif isinstance(id_field, dict):
-            # Mapping of table to field names
-            metadata_config = MetadataConfig(
-                id_field=metadata_config.id_field,
-                parent_field=metadata_config.parent_field,
-                time_field=metadata_config.time_field,
-                id_field_mapping=id_field,
-            )
-
-    # Create configuration with explicit metadata
-    config = TransmogConfig(
-        # Component configs
-        metadata=metadata_config,
-        # Convenience parameters
-        separator=separator,
-        nested_threshold=nested_threshold,
-        cast_to_string=not preserve_types,
-        include_empty=not skip_empty,
-        skip_null=skip_null,
-        array_mode=array_mode,
-        batch_size=batch_size,
-        recovery_strategy=strategy,
-        allow_malformed_data=allow_malformed,
-    )
-
-    # Set processing mode
-    config.processing.processing_mode = (
-        ProcessingMode.LOW_MEMORY if low_memory else ProcessingMode.STANDARD
-    )
-
-    return config
+__all__ = [
+    "flatten",
+    "flatten_stream",
+    "FlattenResult",
+    "TransmogConfig",
+]

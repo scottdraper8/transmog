@@ -12,7 +12,7 @@ import pytest
 
 import transmog as tm
 
-from ...conftest import assert_files_created, count_files_in_dir, load_json_file
+from ...conftest import assert_files_created, count_files_in_dir
 
 
 class TestEndToEndWorkflows:
@@ -27,21 +27,14 @@ class TestEndToEndWorkflows:
         assert len(result.main) == 1
         assert len(result.tables) > 0
 
-        # Step 2: Save to JSON
-        json_paths = result.save(str(output_dir / "json_output"), output_format="json")
-        if isinstance(json_paths, dict):
-            assert_files_created(list(json_paths.values()))
-        else:
-            assert_files_created(json_paths)
-
-        # Step 3: Save to CSV
+        # Step 2: Save to CSV
         csv_paths = result.save(str(output_dir / "csv_output"), output_format="csv")
         if isinstance(csv_paths, dict):
             assert_files_created(list(csv_paths.values()))
         else:
             assert_files_created(csv_paths)
 
-        # Step 4: Save to Parquet
+        # Step 3: Save to Parquet
         parquet_paths = result.save(
             str(output_dir / "parquet_output"), output_format="parquet"
         )
@@ -51,14 +44,13 @@ class TestEndToEndWorkflows:
             assert_files_created(parquet_paths)
 
         # Verify all formats created files in their respective subdirectories
-        assert count_files_in_dir(output_dir / "json_output", "*.json") > 0
         assert count_files_in_dir(output_dir / "csv_output", "*.csv") > 0
         assert count_files_in_dir(output_dir / "parquet_output", "*.parquet") > 0
 
     def test_file_to_file_processing(self, large_json_file, output_dir):
         """Test processing from file to file."""
         # Step 1: Process file directly
-        result = tm.flatten_file(large_json_file, name="large_dataset")
+        result = tm.flatten(large_json_file, name="large_dataset")
 
         # Verify processing
         assert len(result.main) == 1000  # 1000 records from fixture
@@ -86,30 +78,29 @@ class TestEndToEndWorkflows:
             for i in range(1, 101)  # 100 users
         ]
 
-        # Stream process to JSON
+        # Stream process to CSV
+        config = tm.TransmogConfig(batch_size=20)
         result = tm.flatten_stream(
             large_data,
-            output_path=str(output_dir / "streaming_json"),
+            output_path=str(output_dir / "streaming_csv"),
             name="users",
-            format="json",
-            batch_size=20,
+            output_format="csv",
+            config=config,
         )
 
         assert result is None  # Streaming returns None
 
         # Verify files were created
-        json_files = list(output_dir.glob("**/*.json"))
-        assert len(json_files) > 0
+        csv_files = list((output_dir / "streaming_csv").glob("**/*.csv"))
+        assert len(csv_files) > 0
 
     def test_deterministic_id_consistency(self, array_data):
         """Test that deterministic IDs are consistent across runs."""
-        # First run
-        result1 = tm.flatten(array_data, name="test", id_field="id")
+        config = tm.TransmogConfig(id_generation="hash", id_field="id")
+        result1 = tm.flatten(array_data, name="test", config=config)
 
-        # Second run with same data
-        result2 = tm.flatten(array_data, name="test", id_field="id")
+        result2 = tm.flatten(array_data, name="test", config=config)
 
-        # IDs should be consistent
         assert result1.main[0]["id"] == result2.main[0]["id"]
 
 
@@ -179,7 +170,8 @@ class TestRealWorldScenarios:
             }
         ]
 
-        result = tm.flatten(social_data, name="posts", arrays="separate")
+        config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
+        result = tm.flatten(social_data, name="posts", config=config)
 
         # Verify processing
         assert len(result.main) == 1
@@ -218,9 +210,8 @@ class TestPerformanceScenarios:
             large_dataset.append(record)
 
         # Process with memory optimization
-        result = tm.flatten(
-            large_dataset, name="large_data", low_memory=True, batch_size=10
-        )
+        config = tm.TransmogConfig(batch_size=10)
+        result = tm.flatten(large_dataset, name="large_data", config=config)
 
         assert len(result.main) == 50
 
@@ -229,13 +220,13 @@ class TestPerformanceScenarios:
             large_dataset,
             output_path=str(output_dir / "memory_efficient"),
             name="large_data",
-            format="json",
+            output_format="csv",
             batch_size=10,
         )
 
         # Verify output
-        json_files = list(output_dir.glob("**/*.json"))
-        assert len(json_files) > 0
+        csv_files = list((output_dir / "memory_efficient").glob("**/*.csv"))
+        assert len(csv_files) > 0
 
     def test_high_throughput_streaming(self, output_dir):
         """Test high-throughput streaming processing."""
@@ -263,10 +254,10 @@ class TestPerformanceScenarios:
                 batch_data,
                 output_path=str(output_dir / f"batch_{batch_id}"),
                 name="throughput_test",
-                format="json",
+                output_format="csv",
                 batch_size=10,
             )
 
         # Verify all batches processed
-        json_files = list(output_dir.glob("**/*.json"))
-        assert len(json_files) >= 3  # At least one file per batch
+        csv_files = list(output_dir.glob("**/*.csv"))
+        assert len(csv_files) >= 3  # At least one file per batch

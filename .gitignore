@@ -40,11 +40,13 @@ nosetests.xml
 coverage.xml
 *.cover
 .hypothesis/
+benchmark_results.json
 
 # Jupyter Notebook
 .ipynb_checkpoints
 
 # IDE files
+.cursor/
 .idea/
 .vscode/
 *.swp
@@ -52,7 +54,7 @@ coverage.xml
 *~
 
 # Project specific
-benchmark_results.json
+.benchmarks/
 logs/
 CLEAN_AND_OPTIMIZE/
 

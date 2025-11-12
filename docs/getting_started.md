@@ -1,33 +1,18 @@
 # Getting Started
 
-This guide provides everything needed to get up and running quickly with data transformation.
+## Overview
 
-## What is Transmog?
-
-Transmog transforms complex nested data structures into flat, tabular formats while preserving
-relationships between parent and child records. Perfect for:
-
-- Converting JSON data for database storage
-- Preparing API responses for analytics
-- Normalizing document data for SQL queries
-- ETL pipeline data transformation
+Transmog transforms nested data structures into flat, tabular formats while
+preserving relationships between parent and child records.
 
 ## Installation
 
-Install Transmog using pip:
-
 ```bash
-pip install transmog
+pip install transmog              # Standard (includes Parquet and ORC)
+pip install transmog[minimal]     # CSV only
 ```
 
-Verify the installation:
-
-```python
-import transmog as tm
-print(tm.__version__)
-```
-
-## 10 Minutes to Transmog
+## Quick Start
 
 ### Basic Data Transformation
 
@@ -69,9 +54,12 @@ Main table:
     'company': 'TechCorp',
     'location_city': 'San Francisco',
     'location_country': 'USA',
-    '_id': 'auto_generated_id'
+    '_id': 'auto_generated_id',
+    '_timestamp': '2025-01-15 10:30:00.123456'
 }]
 ```
+
+The `_timestamp` field uses a UTC timestamp in `YYYY-MM-DD HH:MM:SS.ssssss` format.
 
 Employee table:
 
@@ -80,27 +68,46 @@ Employee table:
     {
         'name': 'Alice',
         'role': 'Engineer',
-        'salary': '95000',
-        '_parent_id': 'auto_generated_id'
+        'salary': 95000,
+        '_parent_id': 'auto_generated_id',
+        '_id': 'auto_generated_id',
+        '_timestamp': '2025-01-15 10:30:00.123456'
     },
     {
         'name': 'Bob',
         'role': 'Designer',
-        'salary': '75000',
-        '_parent_id': 'auto_generated_id'
+        'salary': 75000,
+        '_parent_id': 'auto_generated_id',
+        '_id': 'auto_generated_id',
+        '_timestamp': '2025-01-15 10:30:00.123456'
     }
 ]
 ```
 
-### How It Works
+## Configuration Examples
 
-The transformation process uses **smart mode** by default:
+```python
+# Default: types preserved, optimized for analytics
+result = tm.flatten(data)
 
-1. **Flattens nested objects** - `location.city` becomes `location_city`
-2. **Intelligently handles arrays**:
-   - Simple arrays (primitives) are kept as native arrays
-   - Complex arrays (objects) are extracted into separate tables
-3. **Preserves relationships** - Links parent and child records with IDs
+# CSV: includes empty/null values
+config = tm.TransmogConfig(include_nulls=True)
+result = tm.flatten(data, config=config)
+
+# Memory: small batches (100)
+config = tm.TransmogConfig(batch_size=100)
+result = tm.flatten(data, config=config)
+
+```
+
+### Behavior
+
+Default configuration:
+
+- Flattens nested objects: `location.city` becomes `location_city`
+- Keeps simple arrays (primitives) as native arrays
+- Extracts complex arrays (objects) into separate tables
+- Links parent and child records with generated IDs
 
 ### Working with Files
 
@@ -108,13 +115,16 @@ Process files directly:
 
 ```python
 # Process a JSON file
-result = tm.flatten_file("data.json", name="products")
+result = tm.flatten("data.json", name="products")
 
 # Save results as CSV
 result.save("output", output_format="csv")
 
-# Save results as JSON
-result.save("output", output_format="json")
+# Save results as Parquet
+result.save("output", output_format="parquet")
+
+# Save results as ORC
+result.save("output", output_format="orc")
 ```
 
 ### Streaming Large Data
@@ -131,63 +141,26 @@ tm.flatten_stream(
 )
 ```
 
-## Core Functions
+## Functions
 
-Transmog provides three main functions:
+- `tm.flatten(data)` - Returns `FlattenResult` object with data in memory
+- `tm.flatten_stream(data, output_path)` - Writes directly to files
 
-| Function | Purpose | Use When |
-|----------|---------|----------|
-| `tm.flatten(data)` | Transform data in memory | Data fits in memory |
-| `tm.flatten_file(path)` | Process files directly | Working with files |
-| `tm.flatten_stream(data, output_path)` | Stream to files | Large datasets |
-
-## Configuration Basics
-
-### Array Handling
-
-Control how arrays are processed:
+## Configuration
 
 ```python
-# Default: arrays become separate tables
-result = tm.flatten(data, arrays="separate")
+# Array handling
+config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
 
-# Keep arrays as JSON strings in main table
-result = tm.flatten(data, arrays="inline")
-
-# Skip arrays entirely
-result = tm.flatten(data, arrays="skip")
+# ID generation
+config = tm.TransmogConfig(id_generation="natural", id_field="product_id")
+config = tm.TransmogConfig(id_generation="hash")
+config = tm.TransmogConfig(id_generation=["user_id", "date"])
 ```
 
-### Field Naming
+See [Array Handling](arrays.md) and [ID Management](ids.md) for details.
 
-Customize how nested fields are named:
-
-```python
-# Use dots instead of underscores
-result = tm.flatten(data, separator=".")
-
-# Simplify deeply nested paths
-result = tm.flatten(data, nested_threshold=2)
-```
-
-### ID Management
-
-Control identifier fields:
-
-```python
-# Use existing field as ID
-result = tm.flatten(data, id_field="product_id")
-
-# Custom parent ID field name
-result = tm.flatten(data, parent_id_field="parent_ref")
-
-# Add timestamp metadata
-result = tm.flatten(data, add_timestamp=True)
-```
-
-## Understanding the Results
-
-The `FlattenResult` object provides easy access to transformed data:
+## Results
 
 ```python
 result = tm.flatten(data, name="products")
@@ -202,122 +175,28 @@ reviews = result.tables["products_reviews"]
 all_tables = result.all_tables
 
 # Table information
-info = result.table_info()
-print(f"Tables: {list(result.keys())}")
-print(f"Main table records: {len(result)}")
+print(f"Tables: {list(result.all_tables.keys())}")
+print(f"Main table records: {len(result.main)}")
 
-# Iterate over main table
-for record in result:
+# Access main table records
+for record in result.main:
     print(record)
-
-# Check if table exists
-if "products_tags" in result:
-    print(result["products_tags"])
 ```
 
 ## Error Handling
 
-Configure how errors are handled using the unified error handling system:
+Errors are raised as exceptions. See [Error Handling](errors.md) for details.
+
+## Reference
 
 ```python
-# Raise errors (default) - stops on first error
-result = tm.flatten(data, errors="raise")
-
-# Skip problematic records - continues processing
-result = tm.flatten(data, errors="skip")
-
-# Warn about issues but continue - logs warnings
-result = tm.flatten(data, errors="warn")
-```
-
-The error handling system provides consistent error messages with standardized templates and
-context information across all processing modules.
-
-## Common Patterns
-
-### JSON API Response Processing
-
-```python
-# API response with nested user data
-api_response = {
-    "users": [
-        {
-            "id": 1,
-            "profile": {"name": "Alice", "email": "alice@example.com"},
-            "preferences": {"theme": "dark", "notifications": True},
-            "posts": [
-                {"title": "Hello World", "likes": 10},
-                {"title": "Python Tips", "likes": 25}
-            ]
-        }
-    ]
-}
-
-result = tm.flatten(api_response["users"], name="users")
-```
-
-### Log File Processing
-
-```python
-# Process log entries
-log_data = [
-    {
-        "timestamp": "2024-01-01T10:00:00Z",
-        "level": "INFO",
-        "source": {"service": "api", "version": "1.2.0"},
-        "metadata": {"request_id": "abc123", "user_id": "user456"}
-    }
-]
-
-result = tm.flatten(log_data, name="logs")
-```
-
-### Configuration Data Normalization
-
-```python
-# Application configuration
-config = {
-    "database": {
-        "host": "localhost",
-        "port": 5432,
-        "credentials": {"username": "admin", "password": "secret"}
-    },
-    "features": {
-        "feature_flags": ["new_ui", "beta_api"],
-        "limits": {"max_users": 1000, "max_requests": 10000}
-    }
-}
-
-result = tm.flatten(config, name="config")
-```
-
-## Next Steps
-
-Understanding the basics:
-
-1. **[User Guide](user_guide/file-processing.md)** - Comprehensive task-oriented guides
-2. **[API Reference](api_reference/api.md)** - Complete function documentation
-3. **[Developer Guide](developer_guide/extending.md)** - Advanced usage and customization
-
-## Quick Reference
-
-```python
-import transmog as tm
-
-# Basic usage
 result = tm.flatten(data, name="table_name")
-
-# File processing
-result = tm.flatten_file("input.json", name="table_name")
-
-# Streaming
+result = tm.flatten("input.json", name="table_name")
 tm.flatten_stream(data, "output/", name="table_name", output_format="parquet")
 
-# Save results
 result.save("output", output_format="csv")
-result.save("output.json")  # Single file for simple data
+result.save("output.csv")
 
-# Access data
 main_table = result.main
 child_tables = result.tables
 all_tables = result.all_tables
