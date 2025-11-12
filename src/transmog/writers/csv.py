@@ -16,6 +16,54 @@ from transmog.writers.base import (
 )
 
 
+def _sanitize_csv_value(value: Any) -> Any:
+    """Sanitize a value to prevent CSV injection attacks.
+
+    Prefixes potentially dangerous strings with a single quote to prevent
+    formula interpretation in spreadsheet applications. Handles both direct
+    injection and bypass attempts using leading whitespace.
+
+    Args:
+        value: The value to sanitize
+
+    Returns:
+        Sanitized value safe for CSV output
+    """
+    if not isinstance(value, str):
+        return value
+
+    if not value:
+        return value
+
+    # Check first character and first non-whitespace character
+    # to prevent bypass with leading spaces
+    stripped = value.lstrip()
+    if not stripped:
+        return value
+
+    first_char = value[0]
+    first_nonwhitespace = stripped[0]
+
+    dangerous_chars = ("=", "+", "-", "@", "|", "\t", "\r")
+
+    if first_char in dangerous_chars or first_nonwhitespace in dangerous_chars:
+        return f"'{value}"
+
+    return value
+
+
+def _sanitize_record(record: dict[str, Any]) -> dict[str, Any]:
+    """Sanitize all values in a record to prevent CSV injection.
+
+    Args:
+        record: Dictionary record to sanitize
+
+    Returns:
+        New dictionary with sanitized values
+    """
+    return {key: _sanitize_csv_value(value) for key, value in record.items()}
+
+
 class CsvWriter(DataWriter):
     """CSV format writer."""
 
@@ -76,7 +124,8 @@ class CsvWriter(DataWriter):
             if not data:
                 return destination
 
-            field_names = _collect_field_names(data)
+            sanitized_data = [_sanitize_record(record) for record in data]
+            field_names = _collect_field_names(sanitized_data)
 
             if isinstance(destination, (str, pathlib.Path)):
                 path = pathlib.Path(destination)
@@ -85,7 +134,7 @@ class CsvWriter(DataWriter):
                 with open(path, "w", encoding="utf-8", newline="") as f:
                     self._write_csv_to_stream(
                         f,
-                        data,
+                        sanitized_data,
                         field_names,
                         use_header,
                         use_delimiter,
@@ -107,7 +156,7 @@ class CsvWriter(DataWriter):
                     )
                     self._write_csv_to_stream(
                         text_wrapper,
-                        data,
+                        sanitized_data,
                         field_names,
                         use_header,
                         use_delimiter,
@@ -121,7 +170,7 @@ class CsvWriter(DataWriter):
                     text_output = cast(TextIO, destination)
                     self._write_csv_to_stream(
                         text_output,
-                        data,
+                        sanitized_data,
                         field_names,
                         use_header,
                         use_delimiter,
@@ -316,10 +365,11 @@ class CsvStreamingWriter(StreamingWriter):
         if not records:
             return
 
-        writer = self._ensure_writer(table_name, records)
+        sanitized_records = [_sanitize_record(record) for record in records]
+        writer = self._ensure_writer(table_name, sanitized_records)
         allowed_fields = self.fieldname_sets.get(table_name, set())
 
-        for record in records:
+        for record in sanitized_records:
             unexpected_fields = set(record.keys()) - allowed_fields
             if unexpected_fields:
                 raise OutputError(

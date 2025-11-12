@@ -605,3 +605,190 @@ class TestCsvWriter:
         # All threads should have written the same number of records
         for _thread_id, record_count in results:
             assert record_count == len(sample_data)
+
+    def test_csv_injection_prevention_formulas(self):
+        """Test CSV injection prevention for formula injection attacks."""
+        injection_data = [
+            {"id": "1", "name": "Alice", "note": "=1+1"},
+            {"id": "2", "name": "Bob", "note": "+2+2"},
+            {"id": "3", "name": "Charlie", "note": "-3-3"},
+            {"id": "4", "name": "Dave", "note": "@SUM(A1:A10)"},
+        ]
+
+        writer = CsvWriter()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            writer.write(injection_data, tmp_path)
+
+            # Read back and verify sanitization
+            with open(tmp_path, newline="") as f:
+                reader = csv.DictReader(f)
+                written_data = list(reader)
+
+            # All dangerous values should be prefixed with single quote
+            assert written_data[0]["note"] == "'=1+1"
+            assert written_data[1]["note"] == "'+2+2"
+            assert written_data[2]["note"] == "'-3-3"
+            assert written_data[3]["note"] == "'@SUM(A1:A10)"
+
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    def test_csv_injection_prevention_commands(self):
+        """Test CSV injection prevention for command injection attacks."""
+        injection_data = [
+            {"id": "1", "cmd": "|calc"},
+            {"id": "2", "cmd": "\t/usr/bin/whoami"},
+            {"id": "3", "cmd": "\rmalicious"},
+        ]
+
+        writer = CsvWriter()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            writer.write(injection_data, tmp_path)
+
+            # Read back and verify sanitization
+            with open(tmp_path, newline="") as f:
+                reader = csv.DictReader(f)
+                written_data = list(reader)
+
+            # All dangerous values should be prefixed with single quote
+            assert written_data[0]["cmd"] == "'|calc"
+            assert written_data[1]["cmd"] == "'\t/usr/bin/whoami"
+            assert written_data[2]["cmd"] == "'\rmalicious"
+
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    def test_csv_injection_prevention_safe_values(self):
+        """Test that safe values are not modified by injection prevention."""
+        safe_data = [
+            {"id": "1", "name": "Alice", "note": "Normal text"},
+            {"id": "2", "name": "Bob", "note": "123456"},
+            {"id": "3", "name": "Charlie", "note": "test@example.com"},
+            {"id": "4", "name": "Dave", "note": ""},
+        ]
+
+        writer = CsvWriter()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            writer.write(safe_data, tmp_path)
+
+            # Read back and verify no changes
+            with open(tmp_path, newline="") as f:
+                reader = csv.DictReader(f)
+                written_data = list(reader)
+
+            # Safe values should not be modified
+            assert written_data[0]["note"] == "Normal text"
+            assert written_data[1]["note"] == "123456"
+            assert written_data[2]["note"] == "test@example.com"
+            assert written_data[3]["note"] == ""
+
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    def test_csv_injection_prevention_mixed_types(self):
+        """Test CSV injection prevention with mixed data types."""
+        mixed_data = [
+            {"id": 1, "formula": "=1+1", "number": 42, "safe": "text"},
+            {"id": 2, "formula": "+A1", "number": 3.14, "safe": None},
+        ]
+
+        writer = CsvWriter()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            writer.write(mixed_data, tmp_path)
+
+            # Read back and verify sanitization
+            with open(tmp_path, newline="") as f:
+                reader = csv.DictReader(f)
+                written_data = list(reader)
+
+            # String formulas should be sanitized
+            assert written_data[0]["formula"] == "'=1+1"
+            assert written_data[1]["formula"] == "'+A1"
+            # Numbers should remain unchanged
+            assert written_data[0]["number"] == "42"
+            assert written_data[1]["number"] == "3.14"
+            # Safe text should remain unchanged
+            assert written_data[0]["safe"] == "text"
+
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    def test_csv_injection_prevention_complex_formulas(self):
+        """Test CSV injection prevention for complex formula attacks."""
+        complex_data = [
+            {"attack": "=cmd|'/c calc'!A0"},
+            {"attack": '=HYPERLINK("http://evil.com","click")'},
+            {"attack": "@cmd|'/c notepad'"},
+            {"attack": '+1+1+IMPORTXML("http://evil.com")'},
+        ]
+
+        writer = CsvWriter()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            writer.write(complex_data, tmp_path)
+
+            # Read back and verify all are sanitized
+            with open(tmp_path, newline="") as f:
+                reader = csv.DictReader(f)
+                written_data = list(reader)
+
+            # All should be prefixed with single quote
+            for row in written_data:
+                assert row["attack"].startswith("'")
+
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    def test_csv_injection_prevention_whitespace_bypass(self):
+        """Test CSV injection prevention for whitespace bypass attacks."""
+        bypass_data = [
+            {"payload": " =cmd"},
+            {"payload": "  =1+1"},
+            {"payload": " +malicious"},
+            {"payload": "  @SUM(A1)"},
+            {"payload": " -formula"},
+            {"payload": "  |command"},
+        ]
+
+        writer = CsvWriter()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            writer.write(bypass_data, tmp_path)
+
+            # Read back and verify sanitization
+            with open(tmp_path, newline="") as f:
+                reader = csv.DictReader(f)
+                written_data = list(reader)
+
+            # All should be prefixed with single quote (including leading spaces)
+            assert written_data[0]["payload"] == "' =cmd"
+            assert written_data[1]["payload"] == "'  =1+1"
+            assert written_data[2]["payload"] == "' +malicious"
+            assert written_data[3]["payload"] == "'  @SUM(A1)"
+            assert written_data[4]["payload"] == "' -formula"
+            assert written_data[5]["payload"] == "'  |command"
+
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
