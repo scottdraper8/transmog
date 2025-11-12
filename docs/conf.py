@@ -141,8 +141,10 @@ html_theme_options = {
 # Add all known domains to the linkcheck_ignore list
 linkcheck_ignore = [
     "http://localhost",  # Local development links
+    r"https://scottdraper8\.github\.io/transmog.*",  # Self-referencing docs URL
 ]
 linkcheck_timeout = 30
+linkcheck_retries = 3
 
 # -- Options for HTMLHelp output ---------------------------------------------
 htmlhelp_basename = "TransmogDoc"

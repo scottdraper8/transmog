@@ -81,8 +81,8 @@ def ensure_poetry() -> None:
 def install_dependencies() -> None:
     """Install project and development dependencies via Poetry."""
     run_command(
-        ["poetry", "install"],
-        description="Installing dependencies with Poetry",
+        ["poetry", "install", "--extras", "dev"],
+        description="Installing dependencies with Poetry (including dev extras)",
         check=True,
     )
 

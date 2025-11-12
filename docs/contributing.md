@@ -34,7 +34,7 @@ poetry help completions
 
 **Alternative installation methods:**
 
-See the [Poetry installation guide](https://python-poetry.org/docs/#installation) for other options.
+See the [Poetry installation guide](https://python-poetry.org/docs/) for other options.
 
 ## Development Setup
 
@@ -191,6 +191,6 @@ When reporting bugs, include:
 ## Questions and Support
 
 - **Issues**: [GitHub issues](https://github.com/scottdraper8/transmog/issues)
-- **Documentation**: Available at [scottdraper8.github.io/transmog](https://scottdraper8.github.io/transmog)
+- **Documentation**: [scottdraper8.github.io/transmog](https://scottdraper8.github.io/transmog)
 
 Thank you for contributing to Transmog!
