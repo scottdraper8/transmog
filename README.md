@@ -116,7 +116,10 @@ result = tm.flatten(data, config=tm.TransmogConfig(batch_size=10000))
 **File Processing:**
 
 ```python
-result = tm.flatten("data.json")
+result = tm.flatten("data.json")      # Standard JSON
+result = tm.flatten("data.jsonl")     # JSON Lines / NDJSON
+result = tm.flatten("data.json5")     # JSON5 (comments, trailing commas)
+result = tm.flatten("data.hjson")     # HJSON (human-friendly JSON)
 ```
 
 ## Advanced Configuration
