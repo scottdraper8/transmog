@@ -253,7 +253,7 @@ def flatten_stream(
         data: Input data - can be dict, list of dicts, file path, or JSON string
         output_path: Directory path where output files will be written
         name: Base name for the flattened tables
-        output_format: Output format ("csv", "parquet")
+        output_format: Output format ("csv", "parquet", "orc")
         config: Optional configuration (optimized for memory if not provided)
         **format_options: Format-specific writer options:
 
@@ -261,6 +261,11 @@ def flatten_stream(
                 - compression: str - Compression codec
                   ("snappy", "gzip", "brotli", None)
                 - row_group_size: int - Rows per row group (default: 10000)
+
+            ORC options:
+                - compression: str - Compression codec
+                  ("zstd", "snappy", "lz4", "zlib", None)
+                - batch_size: int - Rows per batch (default: 10000)
 
     Examples:
         >>> # Stream large dataset to CSV files
@@ -273,6 +278,10 @@ def flatten_stream(
         >>> # Stream to compressed Parquet with specific row group size
         >>> flatten_stream(data, "output/", output_format="parquet",
         ...                compression="snappy", row_group_size=50000)
+
+        >>> # Stream to compressed ORC with specific batch size
+        >>> flatten_stream(data, "output/", output_format="orc",
+        ...                compression="zstd", batch_size=50000)
     """
     if config is None:
         config = TransmogConfig(batch_size=100)

@@ -153,6 +153,13 @@ Container for flattened data.
 
 #### Properties
 
+**entity_name** (*str*): Name of the entity associated with the main table.
+
+```python
+result = tm.flatten(data, name="products")
+entity = result.entity_name  # "products"
+```
+
 **main** (*list[dict[str, Any]]*): Main flattened table.
 
 ```python

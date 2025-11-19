@@ -96,6 +96,7 @@ tm.flatten_stream(data, "output/", output_format="parquet", compression="snappy"
 tm.flatten_stream(data, "output/", output_format="parquet", row_group_size=50000)
 tm.flatten_stream(data, "output/", output_format="orc")
 tm.flatten_stream(data, "output/", output_format="orc", compression="zstd")
+tm.flatten_stream(data, "output/", output_format="orc", compression="snappy", batch_size=50000)
 ```
 
 ## Examples
