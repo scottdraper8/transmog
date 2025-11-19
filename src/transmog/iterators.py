@@ -15,6 +15,16 @@ try:
 except ImportError:
     _orjson = None  # type: ignore[assignment]
 
+try:
+    import json5 as _json5  # type: ignore[import-untyped]
+except ImportError:
+    _json5 = None  # type: ignore[assignment]
+
+try:
+    import hjson as _hjson  # type: ignore[import-untyped]
+except ImportError:
+    _hjson = None  # type: ignore[assignment]
+
 if _orjson is not None:
     JSON_DECODE_ERRORS: tuple[type[Exception], ...] = (
         json.JSONDecodeError,
@@ -56,6 +66,10 @@ def get_data_iterator(
         extension = os.path.splitext(data)[1].lower()
         if extension in (".jsonl", ".ndjson"):
             return get_jsonl_file_iterator(data)
+        if extension == ".json5":
+            return get_json5_file_iterator(data)
+        if extension == ".hjson":
+            return get_hjson_file_iterator(data)
         return get_json_file_iterator(data)
 
     if isinstance(data, (str, bytes)):
@@ -160,6 +174,62 @@ def get_jsonl_data_iterator(data: str | bytes) -> Iterator[dict[str, Any]]:
     yield from _iter_jsonl_lines(lines, "JSONL data")
 
 
+def get_json5_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
+    """Iterate over records in a JSON5 file.
+
+    Args:
+        file_path: Path to the JSON5 file
+
+    Returns:
+        Iterator over data records
+    """
+    if not os.path.exists(file_path):
+        raise ValidationError(f"File not found: {file_path}")
+
+    if _json5 is None:
+        raise ValidationError(
+            "json5 library is required for .json5 files. "
+            "Install with: pip install json5"
+        )
+
+    try:
+        parsed = _load_json5_file(file_path)
+    except ValueError as exc:
+        raise ValidationError(f"Invalid JSON5 in file {file_path}: {exc}") from exc
+    except OSError as exc:
+        raise ValidationError(f"Error reading file {file_path}: {exc}") from exc
+
+    yield from _iter_parsed_json(parsed)
+
+
+def get_hjson_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
+    """Iterate over records in an HJSON file.
+
+    Args:
+        file_path: Path to the HJSON file
+
+    Returns:
+        Iterator over data records
+    """
+    if not os.path.exists(file_path):
+        raise ValidationError(f"File not found: {file_path}")
+
+    if _hjson is None:
+        raise ValidationError(
+            "hjson library is required for .hjson files. "
+            "Install with: pip install hjson"
+        )
+
+    try:
+        parsed = _load_hjson_file(file_path)
+    except ValueError as exc:
+        raise ValidationError(f"Invalid HJSON in file {file_path}: {exc}") from exc
+    except OSError as exc:
+        raise ValidationError(f"Error reading file {file_path}: {exc}") from exc
+
+    yield from _iter_parsed_json(parsed)
+
+
 def _loads(value: str | bytes) -> Any:
     """Load JSON content using the fastest available parser."""
     if _orjson is not None:
@@ -176,6 +246,18 @@ def _load_json_file(path: str) -> Any:
             return _orjson.loads(handle.read())
     with open(path, encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def _load_json5_file(path: str) -> Any:
+    """Load JSON5 payload from disk."""
+    with open(path, encoding="utf-8") as handle:
+        return _json5.load(handle)
+
+
+def _load_hjson_file(path: str) -> Any:
+    """Load HJSON payload from disk."""
+    with open(path, encoding="utf-8") as handle:
+        return _hjson.load(handle)
 
 
 def _iter_parsed_json(payload: Any) -> Iterator[dict[str, Any]]:
@@ -260,4 +342,6 @@ __all__ = [
     "get_json_file_iterator",
     "get_jsonl_file_iterator",
     "get_jsonl_data_iterator",
+    "get_json5_file_iterator",
+    "get_hjson_file_iterator",
 ]

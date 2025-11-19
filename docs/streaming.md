@@ -71,6 +71,22 @@ tm.flatten_stream("large_file.jsonl", "output/", output_format="csv")
 
 JSONL files are processed line-by-line.
 
+### JSON5 Files
+
+```python
+tm.flatten_stream("config.json5", "output/", output_format="parquet")
+```
+
+JSON5 files support comments, trailing commas, unquoted keys, and single quotes.
+
+### HJSON Files
+
+```python
+tm.flatten_stream("data.hjson", "output/", output_format="csv")
+```
+
+HJSON files support comments, unquoted strings, and multiline strings.
+
 ## Output Formats
 
 ```python
@@ -80,6 +96,7 @@ tm.flatten_stream(data, "output/", output_format="parquet", compression="snappy"
 tm.flatten_stream(data, "output/", output_format="parquet", row_group_size=50000)
 tm.flatten_stream(data, "output/", output_format="orc")
 tm.flatten_stream(data, "output/", output_format="orc", compression="zstd")
+tm.flatten_stream(data, "output/", output_format="orc", compression="snappy", batch_size=50000)
 ```
 
 ## Examples

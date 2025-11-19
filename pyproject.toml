@@ -5,7 +5,7 @@ requires = [ "poetry>=1" ]
 
 [project]
 name = "transmog"
-version = "2.0.0"
+version = "2.0.1"
 description = "A data transformation library for flattening complex nested structures into tabular formats while preserving hierarchical relationships"
 readme = "README.md"
 keywords = [
@@ -37,7 +37,7 @@ classifiers = [
   "Topic :: Database :: Database Engines/Servers",
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-dependencies = [ "orjson>=3.8", "pyarrow>=7", "typing-extensions>=4" ]
+dependencies = [ "hjson>=3.1", "json5>=0.9", "orjson>=3.8", "pyarrow>=7", "typing-extensions>=4" ]
 
 optional-dependencies.dev = [
   "bandit>=1.7.5",
@@ -74,7 +74,7 @@ optional-dependencies.dev = [
   "types-toml",
 ]
 
-optional-dependencies.minimal = [ "orjson>=3.8", "typing-extensions>=4" ]
+optional-dependencies.minimal = [ "hjson>=3.1", "json5>=0.9", "orjson>=3.8", "typing-extensions>=4" ]
 
 urls."Bug Tracker" = "https://github.com/scottdraper8/transmog/issues"
 urls."Documentation" = "https://scottdraper8.github.io/transmog/"

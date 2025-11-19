@@ -43,12 +43,16 @@ result = tm.flatten(data, config=tm.TransmogConfig(include_nulls=True))
 # Process file directly
 result = tm.flatten("data.json")
 result = tm.flatten("data.jsonl")
+result = tm.flatten("data.json5")
+result = tm.flatten("data.hjson")
 ```
 
 **Supported File Formats:**
 
 - JSON (.json)
 - JSON Lines (.jsonl, .ndjson)
+- JSON5 (.json5) - Supports comments, trailing commas, unquoted keys, single quotes
+- HJSON (.hjson) - Human JSON with comments, unquoted strings, multiline strings
 
 ### flatten_stream()
 
@@ -148,6 +152,13 @@ TransmogConfig(
 Container for flattened data.
 
 #### Properties
+
+**entity_name** (*str*): Name of the entity associated with the main table.
+
+```python
+result = tm.flatten(data, name="products")
+entity = result.entity_name  # "products"
+```
 
 **main** (*list[dict[str, Any]]*): Main flattened table.
 

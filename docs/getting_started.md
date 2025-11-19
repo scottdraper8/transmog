@@ -117,6 +117,15 @@ Process files directly:
 # Process a JSON file
 result = tm.flatten("data.json", name="products")
 
+# Process JSON Lines / NDJSON
+result = tm.flatten("data.jsonl", name="logs")
+
+# Process JSON5 (with comments, trailing commas, etc.)
+result = tm.flatten("config.json5", name="settings")
+
+# Process HJSON (human-friendly JSON)
+result = tm.flatten("data.hjson", name="records")
+
 # Save results as CSV
 result.save("output", output_format="csv")
 
