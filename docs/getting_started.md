@@ -8,8 +8,8 @@ preserving relationships between parent and child records.
 ## Installation
 
 ```bash
-pip install transmog              # Full install (CSV, Parquet, ORC output)
-pip install transmog[minimal]     # Without Parquet/ORC (no pyarrow dependency)
+pip install transmog              # Full install (CSV, Parquet, ORC, Avro output)
+pip install transmog[minimal]     # CSV only (no pyarrow, fastavro, or cramjam)
 ```
 
 ## Quick Start

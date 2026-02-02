@@ -23,7 +23,7 @@ flat, tabular formats while preserving parent-child relationships.
 # Full install (CSV, Parquet, ORC, Avro output)
 pip install transmog
 
-# Without Parquet/ORC (no pyarrow dependency)
+# CSV only (no pyarrow, fastavro, or cramjam)
 pip install transmog[minimal]
 ```
 

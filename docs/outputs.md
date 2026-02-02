@@ -116,12 +116,49 @@ result.save("output.avro", codec="xz")         # Via cramjam
 # Additional codecs (require separate package installations):
 # codec="zstandard"  # Requires: pip install zstandard
 # codec="lz4"        # Requires: pip install lz4
+
+# Advanced: customize sync interval (bytes between sync markers)
+result.save("output.avro", codec="snappy", sync_interval=32000)
 ```
 
 :::{note}
-The default install includes `cramjam` which provides `snappy`, `bzip2`, and `xz`
-codecs. While `cramjam` also bundles `zstandard` and `lz4` algorithms, `fastavro`
-requires the standalone `zstandard` and `lz4` packages to use those codecs.
+**Codec Dependencies:**
+
+To use additional codecs beyond the defaults:
+
+- **zstandard**: `pip install zstandard`
+- **lz4**: `pip install lz4`
+
+Technical detail: While cramjam (included by default) bundles these compression
+algorithms, fastavro's codec interface requires the standalone packages to expose them.
+:::
+
+### Avro Schema Inference
+
+Avro schemas are automatically inferred from your data:
+
+```python
+data = [
+    {"name": "Alice", "age": 30, "score": 95.5},
+    {"name": "Bob", "age": None, "score": 88.0}
+]
+
+result = tm.flatten(data, name="users")
+result.save("output.avro")
+```
+
+Schema inference behavior:
+
+- Field types are detected from values (string, long, double, boolean, bytes)
+- Nullable fields use Avro union types: `["null", "type"]`
+- NaN and Infinity float values are automatically converted to null
+- Mixed types in a field result in union types with multiple type options
+- Schema is locked after the first batch in streaming mode
+
+:::{warning}
+When using `flatten_stream()` with Avro output, the schema is determined from the
+first batch of records. If subsequent batches contain new fields not present in
+the first batch, a schema drift error will be raised.
 :::
 
 ## Null Handling

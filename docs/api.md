@@ -92,6 +92,7 @@ flatten_stream(
 - **"csv"**: CSV files
 - **"parquet"**: Parquet files (requires pyarrow)
 - **"orc"**: ORC files (requires pyarrow)
+- **"avro"**: Avro files (requires fastavro, cramjam)
 
 **Returns:**
 
@@ -294,11 +295,19 @@ class MissingDependencyError(TransmogError):
 **Examples:**
 
 ```python
+# Parquet dependency error
 try:
     tm.flatten_stream(data, "output/", output_format="parquet")
 except tm.MissingDependencyError as e:
     print(f"Missing dependency: {e}")
     print(f"Install with: pip install pyarrow")
+
+# Avro dependency error
+try:
+    tm.flatten_stream(data, "output/", output_format="avro")
+except tm.MissingDependencyError as e:
+    print(f"Missing dependency: {e}")
+    print(f"Install with: pip install fastavro cramjam")
 ```
 
 :::{note}
