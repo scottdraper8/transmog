@@ -19,7 +19,7 @@ from transmog.types import ArrayMode, JsonDict, ProcessingContext
 TRANSMOG_NAMESPACE = uuid.UUID("a9b8c7d6-e5f4-1234-abcd-0123456789ab")
 
 
-def _is_null_like(value: Any) -> bool:
+def is_null_like(value: Any) -> bool:
     """Check if a value should be treated as null-like.
 
     Null-like values include None, empty strings, NaN, and Infinity.
@@ -211,7 +211,7 @@ def _process_array_items(
     is_simple = True
 
     for item in array:  # Single iteration through the array
-        if _is_null_like(item) and not config.include_nulls:
+        if is_null_like(item) and not config.include_nulls:
             continue
 
         if isinstance(item, dict):
@@ -239,7 +239,7 @@ def _process_array_items(
             if (
                 config.stringify_values
                 and not isinstance(item, str)
-                and not _is_null_like(item)
+                and not is_null_like(item)
             ):
                 metadata_dict = {"value": str(item)}
             else:
@@ -359,7 +359,7 @@ def flatten_json(
                     if config.stringify_values:
                         result[current_path] = [
                             str(v)
-                            if not isinstance(v, str) and not _is_null_like(v)
+                            if not isinstance(v, str) and not is_null_like(v)
                             else v
                             for v in value
                         ]
@@ -389,7 +389,7 @@ def flatten_json(
                 )
 
         else:
-            if not _is_null_like(value):
+            if not is_null_like(value):
                 # Apply stringify if configured (skip if already string)
                 if config.stringify_values and not isinstance(value, str):
                     value = str(value)
@@ -575,5 +575,5 @@ __all__ = [
     "get_current_timestamp",
     "annotate_with_metadata",
     "process_record_batch",
-    "_is_null_like",
+    "is_null_like",
 ]

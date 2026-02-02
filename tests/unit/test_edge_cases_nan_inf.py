@@ -12,51 +12,51 @@ import pytest
 
 import transmog as tm
 from transmog.config import TransmogConfig
-from transmog.flattening import _is_null_like
+from transmog.flattening import is_null_like
 
 
 class TestIsNullLikeHelper:
-    """Test the _is_null_like helper function."""
+    """Test the is_null_like helper function."""
 
     def test_none_is_null_like(self):
         """Test that None is considered null-like."""
-        assert _is_null_like(None) is True
+        assert is_null_like(None) is True
 
     def test_empty_string_is_null_like(self):
         """Test that empty string is considered null-like."""
-        assert _is_null_like("") is True
+        assert is_null_like("") is True
 
     def test_nan_is_null_like(self):
         """Test that NaN is considered null-like."""
-        assert _is_null_like(float("nan")) is True
+        assert is_null_like(float("nan")) is True
 
     def test_positive_inf_is_null_like(self):
         """Test that positive infinity is considered null-like."""
-        assert _is_null_like(float("inf")) is True
+        assert is_null_like(float("inf")) is True
 
     def test_negative_inf_is_null_like(self):
         """Test that negative infinity is considered null-like."""
-        assert _is_null_like(float("-inf")) is True
+        assert is_null_like(float("-inf")) is True
 
     def test_valid_float_is_not_null_like(self):
         """Test that valid floats are not null-like."""
-        assert _is_null_like(3.14) is False
-        assert _is_null_like(0.0) is False
-        assert _is_null_like(-1.5) is False
+        assert is_null_like(3.14) is False
+        assert is_null_like(0.0) is False
+        assert is_null_like(-1.5) is False
 
     def test_zero_is_not_null_like(self):
         """Test that zero values are not null-like."""
-        assert _is_null_like(0) is False
-        assert _is_null_like(0.0) is False
+        assert is_null_like(0) is False
+        assert is_null_like(0.0) is False
 
     def test_false_is_not_null_like(self):
         """Test that False is not null-like."""
-        assert _is_null_like(False) is False
+        assert is_null_like(False) is False
 
     def test_non_empty_string_is_not_null_like(self):
         """Test that non-empty strings are not null-like."""
-        assert _is_null_like("hello") is False
-        assert _is_null_like(" ") is False
+        assert is_null_like("hello") is False
+        assert is_null_like(" ") is False
 
 
 class TestNanFlatteningSkipMode:
