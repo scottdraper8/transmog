@@ -319,7 +319,11 @@ class AvroWriter(DataWriter):
 
 
 class AvroStreamingWriter(StreamingWriter):
-    """Streaming writer for Avro format using fastavro."""
+    """Streaming writer for Avro format using fastavro.
+
+    Uses fastavro's append mode (a+b) to write records incrementally,
+    avoiding memory accumulation of all records until close().
+    """
 
     def __init__(
         self,
@@ -355,41 +359,41 @@ class AvroStreamingWriter(StreamingWriter):
         self.codec = codec
         self.sync_interval = sync_interval
         self.base_dir: str | None = None
-        self.file_objects: dict[str, BinaryIO] = {}
+        self.single_file_path: str | None = None
+        self.file_paths: dict[str, str] = {}
         self.schemas: dict[str, dict[str, Any]] = {}
         self.schema_field_sets: dict[str, set[str]] = {}
-        self.buffers: dict[str, list[dict[str, Any]]] = {}
-        self.should_close_files: bool = False
+        self.initialized_tables: set[str] = set()
+        # For file-like object destinations (non-path based)
+        self.file_object_dest: BinaryIO | None = None
 
         if isinstance(destination, str):
             if destination.endswith(".avro"):
                 os.makedirs(os.path.dirname(destination) or ".", exist_ok=True)
-                self.file_objects["main"] = open(destination, "wb")
-                self.should_close_files = True
+                self.single_file_path = destination
+                self.file_paths["main"] = destination
             else:
                 self.base_dir = destination
                 os.makedirs(self.base_dir, exist_ok=True)
-                self.should_close_files = True
         elif destination is not None:
             mode = getattr(destination, "mode", "")
             if mode and "b" not in mode:
                 raise OutputError(
                     "Avro format requires binary streams, text streams not supported"
                 )
-            self.file_objects["main"] = destination  # type: ignore[assignment]
-            self.should_close_files = False
+            self.file_object_dest = destination  # type: ignore[assignment]
 
-    def _get_file_for_table(self, table_name: str) -> BinaryIO:
-        """Get or create a binary file object for the given table.
+    def _get_file_path_for_table(self, table_name: str) -> str | None:
+        """Get the file path for a table.
 
         Args:
             table_name: Name of the table
 
         Returns:
-            Binary file object for writing
+            File path string, or None if using file-like object destination
         """
-        if table_name in self.file_objects:
-            return self.file_objects[table_name]
+        if table_name in self.file_paths:
+            return self.file_paths[table_name]
 
         if self.base_dir:
             if table_name == "main":
@@ -398,12 +402,11 @@ class AvroStreamingWriter(StreamingWriter):
                 filename = _sanitize_filename(table_name)
 
             file_path = os.path.join(self.base_dir, f"{filename}.avro")
-            file_obj = open(file_path, "wb")
+            self.file_paths[table_name] = file_path
+            return file_path
 
-            self.file_objects[table_name] = file_obj
-            return file_obj
-        else:
-            raise OutputError(f"Cannot create file for table {table_name}")
+        # For file-like object destinations, only "main" table is supported
+        return None
 
     def _ensure_schema(
         self, table_name: str, records: list[dict[str, Any]]
@@ -466,7 +469,10 @@ class AvroStreamingWriter(StreamingWriter):
                 )
 
     def _write_records(self, table_name: str, records: list[dict[str, Any]]) -> None:
-        """Write records to the specified table.
+        """Write records to the specified table using incremental streaming.
+
+        Uses fastavro's append mode (a+b) for subsequent writes to avoid
+        buffering all records in memory.
 
         Args:
             table_name: Name of the table
@@ -489,29 +495,61 @@ class AvroStreamingWriter(StreamingWriter):
             _prepare_record_for_schema(r, schema) for r in normalized_records
         ]
 
-        # Get file and write
-        file_obj = self._get_file_for_table(table_name)
+        # Handle file-like object destination (non-path based)
+        if self.file_object_dest is not None and table_name == "main":
+            # For file-like objects, we must buffer since we can't reopen
+            # This is a limitation when using file-like objects directly
+            if table_name not in self.initialized_tables:
+                # First write - write with schema
+                avro_writer(
+                    self.file_object_dest,
+                    parsed_schema,
+                    prepared_records,
+                    codec=self.codec,
+                    sync_interval=self.sync_interval,
+                )
+                self.initialized_tables.add(table_name)
+            else:
+                # Subsequent writes to file-like objects not supported for append
+                raise OutputError(
+                    "Multiple batch writes to file-like object destinations "
+                    "are not supported. Use a file path destination instead."
+                )
+            return
 
-        # Check if file is empty (new file) or has existing content
-        current_pos = file_obj.tell()
-        if current_pos == 0:
-            # New file - write with header and add to buffer
-            avro_writer(
-                file_obj,
-                parsed_schema,
-                prepared_records,
-                codec=self.codec,
-                sync_interval=self.sync_interval,
+        if self.file_object_dest is not None and table_name != "main":
+            raise OutputError(
+                f"Cannot write child table '{table_name}' when using "
+                "file-like object destination. Use a directory path instead."
             )
-            # Buffer these records for rewrite on close
-            if table_name not in self.buffers:
-                self.buffers[table_name] = []
-            self.buffers[table_name].extend(prepared_records)
+
+        # Get file path for this table
+        file_path = self._get_file_path_for_table(table_name)
+        if file_path is None:
+            raise OutputError(f"Cannot determine file path for table {table_name}")
+
+        if table_name not in self.initialized_tables:
+            # First write - create new file with schema
+            with open(file_path, "wb") as f:
+                avro_writer(
+                    f,
+                    parsed_schema,
+                    prepared_records,
+                    codec=self.codec,
+                    sync_interval=self.sync_interval,
+                )
+            self.initialized_tables.add(table_name)
         else:
-            # Existing file - buffer records for rewrite on close
-            if table_name not in self.buffers:
-                self.buffers[table_name] = []
-            self.buffers[table_name].extend(prepared_records)
+            # Subsequent writes - append to existing file using a+b mode
+            # fastavro reuses the schema from the existing file when schema=None
+            with open(file_path, "a+b") as f:
+                avro_writer(
+                    f,
+                    None,  # Schema is read from existing file
+                    prepared_records,
+                    codec=self.codec,
+                    sync_interval=self.sync_interval,
+                )
 
     def write_main_records(self, records: list[dict[str, Any]]) -> None:
         """Write a batch of main records.
@@ -533,43 +571,24 @@ class AvroStreamingWriter(StreamingWriter):
         self._write_records(table_name, records)
 
     def close(self) -> None:
-        """Finalize output, flush buffered data, and clean up resources."""
+        """Finalize output and clean up resources.
+
+        Since records are written incrementally using append mode,
+        there is no buffered data to flush at close time.
+        """
         if getattr(self, "_closed", False):
             return
 
-        # Write any buffered records
-        for table_name, buffered_records in self.buffers.items():
-            if buffered_records and table_name in self.schemas:
-                schema = self.schemas[table_name]
-                parsed_schema = fastavro.parse_schema(schema)
-                file_obj = self.file_objects.get(table_name)
+        # Flush file-like object destination if present
+        if self.file_object_dest is not None:
+            if hasattr(self.file_object_dest, "flush"):
+                self.file_object_dest.flush()
 
-                if file_obj:
-                    # Seek to beginning and rewrite entire file
-                    file_obj.seek(0)
-                    file_obj.truncate()
-                    avro_writer(
-                        file_obj,
-                        parsed_schema,
-                        buffered_records,
-                        codec=self.codec,
-                        sync_interval=self.sync_interval,
-                    )
-
-        # Flush and close files
-        for file_obj in self.file_objects.values():
-            if hasattr(file_obj, "flush"):
-                file_obj.flush()
-
-        if self.should_close_files:
-            for file_obj in self.file_objects.values():
-                if hasattr(file_obj, "close"):
-                    file_obj.close()
-
-        self.file_objects.clear()
+        # Clear metadata
+        self.file_paths.clear()
         self.schemas.clear()
         self.schema_field_sets.clear()
-        self.buffers.clear()
+        self.initialized_tables.clear()
         self._closed = True
 
 
