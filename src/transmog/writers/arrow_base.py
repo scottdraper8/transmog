@@ -137,6 +137,7 @@ class PyArrowStreamingWriter(StreamingWriter):
         entity_name: str = "entity",
         compression: str = "snappy",
         batch_size: int = 10000,
+        stringify_mode: bool = False,
         **options: Any,
     ) -> None:
         """Initialize the PyArrow streaming writer.
@@ -146,6 +147,7 @@ class PyArrowStreamingWriter(StreamingWriter):
             entity_name: Name of the entity for output files
             compression: Compression algorithm
             batch_size: Number of records per batch
+            stringify_mode: If True, all fields are strings (skip type inference)
             **options: Additional options for PyArrow
         """
         super().__init__(destination, entity_name, **options)
@@ -159,6 +161,7 @@ class PyArrowStreamingWriter(StreamingWriter):
 
         self.compression = compression
         self.batch_size = batch_size
+        self.stringify_mode = stringify_mode
         self.writers: dict[str, Any] = {}
         self.schemas: dict[str, Any] = {}
         self.buffers: dict[str, list[dict[str, Any]]] = {}
@@ -214,7 +217,9 @@ class PyArrowStreamingWriter(StreamingWriter):
         self.file_paths[table_name] = file_path
         return file_path
 
-    def _create_schema(self, records: list[dict[str, Any]]) -> Any:
+    def _create_schema(
+        self, records: list[dict[str, Any]], stringify_mode: bool = False
+    ) -> Any:
         """Create PyArrow schema from records.
 
         Handles special float values (NaN, Inf) by skipping them during type
@@ -222,6 +227,7 @@ class PyArrowStreamingWriter(StreamingWriter):
 
         Args:
             records: Records to infer schema from
+            stringify_mode: If True, all fields are strings (skip type inference)
 
         Returns:
             PyArrow schema
@@ -230,6 +236,12 @@ class PyArrowStreamingWriter(StreamingWriter):
             return pa.schema([])
 
         field_names = _collect_field_names(records)
+
+        # If stringify mode, all fields are strings - skip type inference
+        if stringify_mode:
+            fields = [pa.field(key, pa.string()) for key in field_names]
+            return pa.schema(fields)
+
         fields = []
 
         for key in field_names:
@@ -288,7 +300,9 @@ class PyArrowStreamingWriter(StreamingWriter):
             return pa.table({})
 
         if table_name not in self.schemas:
-            self.schemas[table_name] = self._create_schema(records)
+            self.schemas[table_name] = self._create_schema(
+                records, stringify_mode=self.stringify_mode
+            )
 
         schema = self.schemas[table_name]
 

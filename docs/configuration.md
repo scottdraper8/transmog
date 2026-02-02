@@ -11,6 +11,7 @@ config = tm.TransmogConfig(
     # Data Transformation
     array_mode=tm.ArrayMode.SMART,       # How to handle arrays
     include_nulls=False,                 # Include null and empty values
+    stringify_values=False,              # Convert all values to strings
     max_depth=100,                       # Maximum recursion depth
 
     # ID and Metadata
@@ -39,6 +40,36 @@ Include null and empty values in output:
 config = tm.TransmogConfig(include_nulls=False)  # Default
 config = tm.TransmogConfig(include_nulls=True)   # For CSV
 ```
+
+### stringify_values
+
+**Type:** `bool`
+**Default:** `False`
+
+Convert all leaf values to strings after flattening. Useful for ensuring
+consistent string types across all output formats and eliminating type
+conversion issues.
+
+When enabled:
+
+- Numbers become strings: `42` → `"42"`, `3.14` → `"3.14"`
+- Booleans become strings: `True` → `"True"`, `False` → `"False"`
+- Strings remain unchanged
+- Null values remain as None/null (not stringified)
+- Arrays respect `array_mode` setting, items are stringified individually
+
+```python
+config = tm.TransmogConfig(stringify_values=True)
+result = tm.flatten({"price": 19.99, "active": True}, config=config)
+# Result: {"price": "19.99", "active": "True"}
+```
+
+Benefits:
+
+- Eliminates type inference overhead in Parquet/ORC writers
+- Consistent behavior across CSV, Parquet, and ORC formats
+- No type coercion errors
+- Simplified downstream processing
 
 ### array_mode
 

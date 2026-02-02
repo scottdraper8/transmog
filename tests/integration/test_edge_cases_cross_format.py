@@ -426,3 +426,114 @@ class TestSpecialCharactersConsistency:
             assert "日本語" in unicode_vals
             assert "Ελληνικά" in unicode_vals
             assert "العربية" in unicode_vals
+
+
+class TestStringifyAcrossFormats:
+    """Test stringify_values works consistently across output formats."""
+
+    def test_stringify_csv_output(self):
+        """Test stringify with CSV output."""
+        data = {"id": 1, "price": 19.99, "active": True}
+        config = TransmogConfig(stringify_values=True)
+        result = tm.flatten(data, config=config)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "output.csv"
+            result.save(str(output), output_format="csv")
+
+            # CSV already strings, verify content
+            with open(output, newline="") as f:
+                reader = csv.DictReader(f)
+                row = next(reader)
+                assert row["id"] == "1"
+                assert row["price"] == "19.99"
+                assert row["active"] == "True"
+
+    @pytest.mark.skipif(
+        not pytest.importorskip("pyarrow", reason="PyArrow not available"),
+        reason="PyArrow required",
+    )
+    def test_stringify_parquet_output(self):
+        """Test stringify with Parquet output."""
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        data = {"id": 1, "price": 19.99, "active": True}
+        config = TransmogConfig(stringify_values=True)
+        result = tm.flatten(data, config=config)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "output.parquet"
+            result.save(str(output), output_format="parquet")
+
+            # Verify schema is all strings
+            table = pq.read_table(str(output))
+            for field in table.schema:
+                if field.name not in ["_id", "_timestamp"]:
+                    assert field.type == pa.string(), (
+                        f"Field {field.name} should be string"
+                    )
+
+            # Verify values using PyArrow directly (no pandas)
+            id_col = table.column("id").to_pylist()
+            price_col = table.column("price").to_pylist()
+            active_col = table.column("active").to_pylist()
+            assert id_col[0] == "1"
+            assert price_col[0] == "19.99"
+            assert active_col[0] == "True"
+
+    @pytest.mark.skipif(
+        not pytest.importorskip("pyarrow.orc", reason="PyArrow ORC not available"),
+        reason="PyArrow ORC required",
+    )
+    def test_stringify_orc_output(self):
+        """Test stringify with ORC output."""
+        import pyarrow as pa
+        import pyarrow.orc as orc
+
+        data = {"id": 1, "price": 19.99, "active": True}
+        config = TransmogConfig(stringify_values=True)
+        result = tm.flatten(data, config=config)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "output.orc"
+            result.save(str(output), output_format="orc")
+
+            # Verify schema is all strings
+            table = orc.read_table(str(output))
+            for field in table.schema:
+                if field.name not in ["_id", "_timestamp"]:
+                    assert field.type == pa.string(), (
+                        f"Field {field.name} should be string"
+                    )
+
+    def test_stringify_preserves_data_integrity(self):
+        """Test that stringify preserves data integrity across formats."""
+        data = [
+            {"id": 1, "value": 100, "ratio": 0.5, "flag": True},
+            {"id": 2, "value": 200, "ratio": 0.75, "flag": False},
+        ]
+        config = TransmogConfig(stringify_values=True)
+        result = tm.flatten(data, config=config)
+
+        # Verify in-memory data is stringified
+        assert result.main[0]["id"] == "1"
+        assert result.main[0]["value"] == "100"
+        assert result.main[0]["ratio"] == "0.5"
+        assert result.main[0]["flag"] == "True"
+        assert result.main[1]["flag"] == "False"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Save to CSV and verify
+            csv_path = Path(tmpdir) / "output.csv"
+            result.save(str(csv_path), output_format="csv")
+
+            with open(csv_path, newline="") as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+
+            assert len(rows) == 2
+            assert rows[0]["id"] == "1"
+            assert rows[0]["value"] == "100"
+            assert rows[1]["id"] == "2"
+            assert rows[1]["flag"] == "False"

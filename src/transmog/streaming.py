@@ -39,11 +39,16 @@ def stream_process(
         batch_size: Size of batches to process
         **format_options: Format-specific options for the writer
     """
+    # Pass stringify_mode to writer for optimization (skip type inference)
+    writer_options = dict(format_options)
+    if hasattr(config, "stringify_values") and config.stringify_values:
+        writer_options["stringify_mode"] = True
+
     writer = create_streaming_writer(
         format_name=output_format,
         destination=output_destination,
         entity_name=entity_name,
-        **format_options,
+        **writer_options,
     )
 
     try:

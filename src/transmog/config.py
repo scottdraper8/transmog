@@ -21,6 +21,17 @@ class TransmogConfig:
     include_nulls: bool = False
     """Include null and empty values in output. False (default) skips them."""
 
+    stringify_values: bool = False
+    """Convert all leaf values to strings after flattening.
+
+    When enabled:
+    - Primitive values (numbers, booleans) are converted to strings
+    - Existing strings remain unchanged
+    - Null values remain as None
+    - Arrays respect array_mode, individual items are stringified
+    - Objects are flattened first, then leaf values stringified
+    """
+
     max_depth: int = 100
     """Maximum recursion depth to prevent stack overflow."""
 
@@ -60,6 +71,12 @@ class TransmogConfig:
             raise ConfigurationError(
                 f"include_nulls must be a boolean, "
                 f"got {type(self.include_nulls).__name__}"
+            )
+
+        if not isinstance(self.stringify_values, bool):
+            raise ConfigurationError(
+                f"stringify_values must be a boolean, "
+                f"got {type(self.stringify_values).__name__}"
             )
 
         if isinstance(self.id_generation, str):

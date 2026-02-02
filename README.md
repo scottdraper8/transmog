@@ -113,6 +113,7 @@ config = tm.TransmogConfig(
     parent_field="_parent_id",
     time_field="_timestamp",
     include_nulls=False,
+    stringify_values=False,          # Convert all values to strings
     max_depth=100,
     batch_size=1000
 )
@@ -122,21 +123,21 @@ result = tm.flatten(data, config=config)
 
 ### Array Modes
 
-| Mode | Behavior |
-|------|----------|
-| `SMART` | Preserve simple arrays, extract complex arrays to child tables |
-| `SEPARATE` | Extract all arrays to child tables |
-| `INLINE` | Serialize arrays as JSON strings |
-| `SKIP` | Omit arrays from output |
+| Mode       | Behavior                                                        |
+| ---------- | --------------------------------------------------------------- |
+| `SMART`    | Preserve simple arrays, extract complex arrays to child tables  |
+| `SEPARATE` | Extract all arrays to child tables                              |
+| `INLINE`   | Serialize arrays as JSON strings                                |
+| `SKIP`     | Omit arrays from output                                         |
 
 ### ID Generation
 
-| Strategy | Description |
-|----------|-------------|
-| `random` | Generate random UUID (default) |
-| `natural` | Use existing ID field from data |
-| `hash` | Deterministic hash of entire record |
-| `["field1", ...]` | Deterministic hash of specified fields |
+| Strategy          | Description                                        |
+| ----------------- | -------------------------------------------------- |
+| `random`          | Generate random UUID (default)                     |
+| `natural`         | Use existing ID field from data                    |
+| `hash`            | Deterministic hash of entire record                |
+| `["field1", ...]` | Deterministic hash of specified fields             |
 
 ## Documentation
 

@@ -235,8 +235,11 @@ def _process_array_items(
             )
             metadata_dict = flattened
         else:
-            # Simple primitive value
-            metadata_dict = {"value": item}
+            # Simple primitive value - apply stringify if configured
+            if config.stringify_values and not isinstance(item, str):
+                metadata_dict = {"value": str(item)}
+            else:
+                metadata_dict = {"value": item}
             item_arrays = {}
 
         if _collect_arrays:
@@ -348,7 +351,16 @@ def flatten_json(
                 )
 
                 if is_simple:
-                    result[current_path] = value
+                    # Stringify array items if configured
+                    if config.stringify_values:
+                        result[current_path] = [
+                            str(v)
+                            if not isinstance(v, str) and not _is_null_like(v)
+                            else v
+                            for v in value
+                        ]
+                    else:
+                        result[current_path] = value
                 elif _collect_arrays:
                     for table_name, table_records in array_items.items():
                         arrays.setdefault(table_name, []).extend(table_records)
@@ -374,11 +386,16 @@ def flatten_json(
 
         else:
             if not _is_null_like(value):
+                # Apply stringify if configured (skip if already string)
+                if config.stringify_values and not isinstance(value, str):
+                    value = str(value)
+
                 if _context.path_components:
                     result[current_path] = value
                 else:
                     result[key] = value
             elif config.include_nulls:
+                # Null values remain as None, not stringified
                 if _context.path_components:
                     result[current_path] = None
                 else:
