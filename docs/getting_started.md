@@ -8,8 +8,8 @@ preserving relationships between parent and child records.
 ## Installation
 
 ```bash
-pip install transmog              # Standard (includes Parquet and ORC)
-pip install transmog[minimal]     # CSV only
+pip install transmog              # Full install (CSV, Parquet, ORC output)
+pip install transmog[minimal]     # Without Parquet/ORC (no pyarrow dependency)
 ```
 
 ## Quick Start
@@ -60,6 +60,11 @@ Main table:
 ```
 
 The `_timestamp` field uses a UTC timestamp in `YYYY-MM-DD HH:MM:SS.ssssss` format.
+
+:::{note}
+Timestamp tracking can be disabled by setting `time_field=None` in
+`TransmogConfig`. See [Configuration](configuration.md) for details.
+:::
 
 Employee table:
 
@@ -119,11 +124,20 @@ result = tm.flatten("data.json", name="products")
 
 # Process JSON Lines / NDJSON
 result = tm.flatten("data.jsonl", name="logs")
+result = tm.flatten("data.ndjson", name="logs")
+```
 
+:::{important}
+JSON5 and HJSON formats require additional packages:
+:::
+
+```python
 # Process JSON5 (with comments, trailing commas, etc.)
+# Requires: pip install json5
 result = tm.flatten("config.json5", name="settings")
 
 # Process HJSON (human-friendly JSON)
+# Requires: pip install hjson
 result = tm.flatten("data.hjson", name="records")
 
 # Save results as CSV
@@ -149,6 +163,12 @@ tm.flatten_stream(
     output_format="parquet"
 )
 ```
+
+:::{tip}
+Use `flatten_stream()` for datasets larger than available RAM. It processes
+data in batches and writes directly to disk, using significantly less memory
+than `flatten()`.
+:::
 
 ## Functions
 

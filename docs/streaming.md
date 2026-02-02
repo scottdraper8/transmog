@@ -37,6 +37,11 @@ tm.flatten_stream(
 `flatten()` keeps results in memory and returns a `FlattenResult` object.
 `flatten_stream()` writes directly to disk and returns nothing.
 
+:::{warning}
+When using `flatten_stream()`, ensure the output directory has sufficient disk
+space for the processed data. Large datasets can generate substantial output files.
+:::
+
 ## Batch Size
 
 ```python

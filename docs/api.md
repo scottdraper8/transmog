@@ -52,7 +52,16 @@ result = tm.flatten("data.hjson")
 - JSON (.json)
 - JSON Lines (.jsonl, .ndjson)
 - JSON5 (.json5) - Supports comments, trailing commas, unquoted keys, single quotes
+
+:::{important}
+JSON5 support requires: `pip install json5`
+:::
+
 - HJSON (.hjson) - Human JSON with comments, unquoted strings, multiline strings
+
+:::{important}
+HJSON support requires: `pip install hjson`
+:::
 
 ### flatten_stream()
 
@@ -101,6 +110,11 @@ tm.flatten_stream(data, "output/", output_format="parquet")
 config = tm.TransmogConfig(batch_size=5000)
 tm.flatten_stream(data, "output/", output_format="orc", config=config)
 ```
+
+:::{seealso}
+For large datasets that don't fit in memory, use `flatten_stream()` instead of
+`flatten()`. It writes directly to disk without keeping all data in memory.
+:::
 
 ## Classes
 
@@ -287,9 +301,11 @@ except tm.MissingDependencyError as e:
     print(f"Install with: pip install pyarrow")
 ```
 
-**Note:** Other exception types (`ConfigurationError`, `OutputError`) exist
+:::{note}
+Other exception types (`ConfigurationError`, `OutputError`) exist
 internally but are not exported in the public API. Catch them using generic
 exception handling or `TransmogError` as the base class.
+:::
 
 ## Type Definitions
 

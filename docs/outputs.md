@@ -44,7 +44,15 @@ result.save("output/products.csv")
 ```python
 result = tm.flatten(data, name="products")
 result.save("output.csv")
+```
 
+:::{tip}
+For consistent CSV columns across all rows, use `include_nulls=True` in
+`TransmogConfig`. This ensures fields that are missing in some records appear
+as empty strings in the CSV output.
+:::
+
+```python
 # Include nulls for consistent columns
 config = tm.TransmogConfig(include_nulls=True)
 result = tm.flatten(data, config=config)

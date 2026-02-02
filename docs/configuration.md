@@ -83,17 +83,40 @@ Options: `SMART`, `SEPARATE`, `INLINE`, `SKIP`. See [Array Handling](arrays.md).
 **Type:** `int`
 **Default:** `1000`
 
+Number of records to process in each batch. Affects memory usage and throughput.
+
 ```python
 config = tm.TransmogConfig(batch_size=100)    # Small batches
 config = tm.TransmogConfig(batch_size=10000)  # Large batches
 ```
+
+:::{tip} Choosing batch_size
+
+- **Small batches (100-500):** Use for memory-constrained environments or very
+  large records. `flatten_stream()` defaults to 100 for memory efficiency.
+- **Medium batches (1000-5000):** Default choice, balances memory and throughput.
+- **Large batches (10000+):** Use when memory is plentiful and throughput is
+  critical. Reduces per-batch overhead.
+
+:::
 
 ### max_depth
 
 **Type:** `int`
 **Default:** `100`
 
-Maximum recursion depth. Fields deeper than this limit are omitted.
+Maximum recursion depth for nested structures. Fields nested deeper than this
+limit are silently omitted from the output. This prevents stack overflow on
+deeply nested or circular-like structures.
+
+```python
+config = tm.TransmogConfig(max_depth=10)  # Limit to 10 levels of nesting
+```
+
+:::{note}
+In practice, most JSON data is well under 100 levels deep. Adjust only if
+processing unusually deep structures or to intentionally truncate output.
+:::
 
 ### id_generation
 

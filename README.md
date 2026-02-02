@@ -20,10 +20,10 @@ flat, tabular formats while preserving parent-child relationships.
 ## Installation
 
 ```bash
-# Standard install (includes Parquet and ORC support)
+# Full install (CSV, Parquet, ORC output)
 pip install transmog
 
-# Minimal install (CSV output only)
+# Without Parquet/ORC (no pyarrow dependency)
 pip install transmog[minimal]
 ```
 
@@ -103,10 +103,10 @@ result = tm.flatten(data, config=config)
 
 Full documentation: [scottdraper8.github.io/transmog](https://scottdraper8.github.io/transmog)
 
-- [Getting Started Guide](https://scottdraper8.github.io/transmog/getting_started.html)
-- [User Guide](https://scottdraper8.github.io/transmog/user_guide/file-processing.html)
-- [API Reference](https://scottdraper8.github.io/transmog/api_reference/api.html)
-- [Developer Guide](https://scottdraper8.github.io/transmog/developer_guide/contributing.html)
+- [Getting Started](https://scottdraper8.github.io/transmog/getting_started.html)
+- [Configuration](https://scottdraper8.github.io/transmog/configuration.html)
+- [API Reference](https://scottdraper8.github.io/transmog/api.html)
+- [Contributing](https://scottdraper8.github.io/transmog/contributing.html)
 
 ## License
 
