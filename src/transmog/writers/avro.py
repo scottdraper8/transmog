@@ -510,7 +510,7 @@ class AvroStreamingWriter(StreamingWriter):
         # Check if file is empty (new file) or has existing content
         current_pos = file_obj.tell()
         if current_pos == 0:
-            # New file - write with header
+            # New file - write with header and add to buffer
             avro_writer(
                 file_obj,
                 parsed_schema,
@@ -518,9 +518,12 @@ class AvroStreamingWriter(StreamingWriter):
                 codec=self.codec,
                 sync_interval=self.sync_interval,
             )
+            # Buffer these records for rewrite on close
+            if table_name not in self.buffers:
+                self.buffers[table_name] = []
+            self.buffers[table_name].extend(prepared_records)
         else:
-            # Existing file - append records
-            # fastavro doesn't support true append, so buffer and rewrite
+            # Existing file - buffer records for rewrite on close
             if table_name not in self.buffers:
                 self.buffers[table_name] = []
             self.buffers[table_name].extend(prepared_records)

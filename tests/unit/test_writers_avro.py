@@ -474,6 +474,101 @@ class TestAvroStreamingWriter:
         records = read_avro_records(str(avro_temp_file))
         assert len(records) == 1
 
+    def test_streaming_writer_multiple_batches(self, avro_temp_dir):
+        """Test streaming writer with multiple batches to verify no data loss."""
+        writer = AvroStreamingWriter(
+            destination=str(avro_temp_dir),
+            entity_name="test_batches",
+        )
+
+        # Write first batch
+        batch1 = [
+            {"id": "1", "name": "Alice", "value": 100},
+            {"id": "2", "name": "Bob", "value": 200},
+        ]
+        writer.write_main_records(batch1)
+
+        # Write second batch
+        batch2 = [
+            {"id": "3", "name": "Charlie", "value": 300},
+            {"id": "4", "name": "Diana", "value": 400},
+        ]
+        writer.write_main_records(batch2)
+
+        # Write third batch
+        batch3 = [
+            {"id": "5", "name": "Eve", "value": 500},
+        ]
+        writer.write_main_records(batch3)
+
+        writer.close()
+
+        output_file = avro_temp_dir / "test_batches.avro"
+        assert output_file.exists()
+
+        records = read_avro_records(str(output_file))
+        assert len(records) == 5, f"Expected 5 records but got {len(records)}"
+
+        # Verify all records are present
+        ids = {r["id"] for r in records}
+        assert ids == {"1", "2", "3", "4", "5"}
+
+        # Verify data integrity
+        assert records[0]["name"] == "Alice"
+        assert records[0]["value"] == 100
+        assert records[4]["name"] == "Eve"
+        assert records[4]["value"] == 500
+
+    def test_streaming_writer_multiple_batches_with_child_tables(self, avro_temp_dir):
+        """Test streaming writer with multiple batches including child tables."""
+        writer = AvroStreamingWriter(
+            destination=str(avro_temp_dir),
+            entity_name="test_parent",
+        )
+
+        # Write first batch of main records
+        main_batch1 = [
+            {"id": "1", "name": "Parent1"},
+            {"id": "2", "name": "Parent2"},
+        ]
+        writer.write_main_records(main_batch1)
+
+        # Write first batch of child records
+        child_batch1 = [
+            {"id": "c1", "parent_id": "1", "value": "child1"},
+            {"id": "c2", "parent_id": "1", "value": "child2"},
+        ]
+        writer.write_child_records("children", child_batch1)
+
+        # Write second batch of main records
+        main_batch2 = [
+            {"id": "3", "name": "Parent3"},
+        ]
+        writer.write_main_records(main_batch2)
+
+        # Write second batch of child records
+        child_batch2 = [
+            {"id": "c3", "parent_id": "2", "value": "child3"},
+            {"id": "c4", "parent_id": "3", "value": "child4"},
+        ]
+        writer.write_child_records("children", child_batch2)
+
+        writer.close()
+
+        # Verify main records
+        main_file = avro_temp_dir / "test_parent.avro"
+        assert main_file.exists()
+        main_records = read_avro_records(str(main_file))
+        assert len(main_records) == 3
+        assert {r["id"] for r in main_records} == {"1", "2", "3"}
+
+        # Verify child records
+        child_file = avro_temp_dir / "children.avro"
+        assert child_file.exists()
+        child_records = read_avro_records(str(child_file))
+        assert len(child_records) == 4
+        assert {r["id"] for r in child_records} == {"c1", "c2", "c3", "c4"}
+
 
 class TestAvroWriterErrorHandling:
     """Test AvroWriter error handling."""
