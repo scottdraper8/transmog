@@ -6,6 +6,7 @@ hierarchical relationship preservation.
 """
 
 import json
+import math
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -16,6 +17,25 @@ from transmog.types import ArrayMode, JsonDict, ProcessingContext
 
 # Namespace UUID for deterministic ID generation
 TRANSMOG_NAMESPACE = uuid.UUID("a9b8c7d6-e5f4-1234-abcd-0123456789ab")
+
+
+def _is_null_like(value: Any) -> bool:
+    """Check if a value should be treated as null-like.
+
+    Null-like values include None, empty strings, NaN, and Infinity.
+    These are treated consistently for null handling purposes.
+
+    Args:
+        value: Value to check
+
+    Returns:
+        True if value is null-like
+    """
+    if value is None or value == "":
+        return True
+    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+        return True
+    return False
 
 
 # ============================================================================
@@ -191,7 +211,7 @@ def _process_array_items(
     is_simple = True
 
     for item in array:  # Single iteration through the array
-        if item is None and not config.include_nulls:
+        if _is_null_like(item) and not config.include_nulls:
             continue
 
         if isinstance(item, dict):
@@ -353,16 +373,16 @@ def flatten_json(
                 )
 
         else:
-            if value is not None and value != "":
+            if not _is_null_like(value):
                 if _context.path_components:
                     result[current_path] = value
                 else:
                     result[key] = value
             elif config.include_nulls:
                 if _context.path_components:
-                    result[current_path] = ""
+                    result[current_path] = None
                 else:
-                    result[key] = ""
+                    result[key] = None
 
     return result, arrays
 
@@ -534,4 +554,5 @@ __all__ = [
     "get_current_timestamp",
     "annotate_with_metadata",
     "process_record_batch",
+    "_is_null_like",
 ]

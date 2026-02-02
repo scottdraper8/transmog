@@ -1,5 +1,6 @@
 """Base classes for PyArrow-based writers (Parquet, ORC)."""
 
+import math
 import os
 import pathlib
 from abc import abstractmethod
@@ -15,6 +16,23 @@ try:
 except ImportError:
     pa = None
     PYARROW_AVAILABLE = False
+
+
+def _is_valid_float_for_inference(value: Any) -> bool:
+    """Check if a float value is valid for type inference.
+
+    NaN and Infinity values should not be used for type inference as they
+    don't represent typical float data patterns.
+
+    Args:
+        value: Value to check
+
+    Returns:
+        True if value is a valid float for inference purposes
+    """
+    if not isinstance(value, float):
+        return False
+    return not (math.isnan(value) or math.isinf(value))
 
 
 class PyArrowWriter(DataWriter):
@@ -199,6 +217,9 @@ class PyArrowStreamingWriter(StreamingWriter):
     def _create_schema(self, records: list[dict[str, Any]]) -> Any:
         """Create PyArrow schema from records.
 
+        Handles special float values (NaN, Inf) by skipping them during type
+        inference, as they don't represent typical data patterns.
+
         Args:
             records: Records to infer schema from
 
@@ -213,12 +234,32 @@ class PyArrowStreamingWriter(StreamingWriter):
 
         for key in field_names:
             value = None
+            found_float = False
+
             for record in records:
-                if key in record and record[key] is not None:
-                    value = record[key]
+                if key not in record:
+                    continue
+
+                val = record[key]
+                if val is None:
+                    continue
+
+                # For floats, skip NaN/Inf for type inference but note that
+                # the field contains float data
+                if isinstance(val, float):
+                    found_float = True
+                    if _is_valid_float_for_inference(val):
+                        value = val
+                        break
+                else:
+                    value = val
                     break
 
-            if value is None:
+            # Determine type based on found value or float flag
+            if value is None and found_float:
+                # All float values were NaN/Inf, but field is still float type
+                pa_type = pa.float64()
+            elif value is None:
                 pa_type = pa.string()
             elif isinstance(value, bool):
                 pa_type = pa.bool_()
