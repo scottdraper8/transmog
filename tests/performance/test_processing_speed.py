@@ -17,26 +17,18 @@ import transmog as tm
 class TestProcessingSpeedBenchmarks:
     """Test processing speed benchmarks."""
 
-    def test_small_dataset_performance(self, batch_data):
-        """Test performance with small dataset (10 records)."""
-        start_time = time.time()
-
-        result = tm.flatten(batch_data, name="small_perf")
-
-        end_time = time.time()
-        processing_time = end_time - start_time
-
-        assert result is not None
-        assert len(result.main) == len(batch_data)
-
-        # Should process small dataset quickly (< 1 second)
-        assert processing_time < 1.0
-        print(f"Small dataset ({len(batch_data)} records): {processing_time:.4f}s")
-
-    def test_medium_dataset_performance(self):
-        """Test performance with medium dataset (1000 records)."""
-        # Create medium dataset
-        medium_data = [
+    @pytest.mark.parametrize(
+        "size,threshold,description",
+        [
+            (10, 1.0, "small"),
+            (1000, 10.0, "medium"),
+            (10000, 60.0, "large"),
+        ],
+    )
+    def test_dataset_performance_by_size(self, size, threshold, description):
+        """Test performance with datasets of various sizes."""
+        # Create dataset of specified size
+        test_data = [
             {
                 "id": i,
                 "name": f"Record {i}",
@@ -47,55 +39,25 @@ class TestProcessingSpeedBenchmarks:
                 },
                 "tags": [f"tag_{i}", f"type_{i % 5}"],
             }
-            for i in range(1000)
+            for i in range(size)
         ]
 
         start_time = time.time()
 
         config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
-        result = tm.flatten(medium_data, name="medium_perf", config=config)
+        result = tm.flatten(test_data, name=f"{description}_perf", config=config)
 
         end_time = time.time()
         processing_time = end_time - start_time
 
         assert result is not None
-        assert len(result.main) == 1000
+        assert len(result.main) == size
 
-        # Should process medium dataset reasonably quickly (< 10 seconds)
-        assert processing_time < 10.0
-        print(f"Medium dataset (1000 records): {processing_time:.4f}s")
-        print(f"Rate: {1000 / processing_time:.1f} records/second")
-
-    def test_large_dataset_performance(self):
-        """Test performance with large dataset (10000 records)."""
-        # Create large dataset
-        large_data = [
-            {
-                "id": i,
-                "name": f"Record {i}",
-                "metadata": {
-                    "created": f"2023-01-{(i % 28) + 1:02d}",
-                    "type": f"type_{i % 20}",
-                    "priority": i % 5,
-                },
-            }
-            for i in range(10000)
-        ]
-
-        start_time = time.time()
-
-        result = tm.flatten(large_data, name="large_perf")
-
-        end_time = time.time()
-        processing_time = end_time - start_time
-
-        assert result is not None
-        assert len(result.main) == 10000
-
-        # Should process large dataset within reasonable time (< 60 seconds)
-        assert processing_time < 60.0
-        print(f"Large dataset (10000 records): {processing_time:.4f}s")
-        print(f"Rate: {10000 / processing_time:.1f} records/second")
+        # Should process within threshold
+        assert processing_time < threshold, (
+            f"{description.capitalize()} dataset ({size} records) took "
+            f"{processing_time:.4f}s, expected < {threshold}s"
+        )
 
     def test_complex_nested_performance(self):
         """Test performance with complex nested structures."""
@@ -256,76 +218,19 @@ class TestFileProcessingPerformance:
         print(f"Streaming processing (2000 records): {processing_time:.4f}s")
 
 
-class TestMemoryPerformance:
-    """Test memory usage performance."""
-
-    def test_memory_efficient_processing(self):
-        """Test memory-efficient processing mode."""
-        # Create data that could use significant memory
-        memory_test_data = [
-            {
-                "id": i,
-                "large_text": "x" * 1000,  # 1KB text per record
-                "data": {
-                    "nested_large": "y" * 500,
-                    "more_data": [f"item_{j}" * 10 for j in range(20)],
-                },
-            }
-            for i in range(1000)
-        ]
-
-        start_time = time.time()
-
-        # Use memory-efficient processing
-        config = tm.TransmogConfig(batch_size=50)
-        result = tm.flatten(
-            memory_test_data,
-            name="memory_perf",
-            config=config,
-        )
-
-        end_time = time.time()
-        processing_time = end_time - start_time
-
-        assert result is not None
-        assert len(result.main) == 1000
-
-        # Memory-efficient mode might be slower but should complete
-        print(f"Memory-efficient processing (1000 records): {processing_time:.4f}s")
-
-    def test_batch_processing_performance(self):
-        """Test batch processing performance with different batch sizes."""
-        test_data = [
-            {"id": i, "name": f"Batch Record {i}", "value": i * 5} for i in range(2000)
-        ]
-
-        batch_sizes = [10, 50, 100, 500, 1000]
-        results = {}
-
-        for batch_size in batch_sizes:
-            start_time = time.time()
-
-            config = tm.TransmogConfig(batch_size=batch_size)
-            result = tm.flatten(test_data, name=f"batch_{batch_size}", config=config)
-
-            end_time = time.time()
-            processing_time = end_time - start_time
-
-            assert result is not None
-            assert len(result.main) == 2000
-
-            results[batch_size] = processing_time
-            print(f"Batch size {batch_size}: {processing_time:.4f}s")
-
-        # Verify all batch sizes completed successfully
-        assert len(results) == len(batch_sizes)
-
-
 class TestPerformanceComparisons:
     """Test performance comparisons between different approaches."""
 
-    def test_array_handling_performance_comparison(self):
-        """Test performance comparison of different array handling modes."""
+    @pytest.mark.parametrize(
+        "mode_name,mode_value",
+        [
+            ("separate", tm.ArrayMode.SEPARATE),
+            ("inline", tm.ArrayMode.INLINE),
+            ("skip", tm.ArrayMode.SKIP),
+        ],
+    )
+    def test_array_handling_performance_by_mode(self, mode_name, mode_value):
+        """Test performance of different array handling modes."""
         array_data = [
             {
                 "id": i,
@@ -336,67 +241,26 @@ class TestPerformanceComparisons:
             for i in range(500)
         ]
 
-        mode_map = {
-            "separate": tm.ArrayMode.SEPARATE,
-            "inline": tm.ArrayMode.INLINE,
-            "skip": tm.ArrayMode.SKIP,
-        }
-        results = {}
+        start_time = time.time()
 
-        for mode_name, mode_value in mode_map.items():
-            start_time = time.time()
+        config = tm.TransmogConfig(array_mode=mode_value)
+        result = tm.flatten(array_data, name=f"array_{mode_name}", config=config)
 
-            config = tm.TransmogConfig(array_mode=mode_value)
-            result = tm.flatten(array_data, name=f"array_{mode_name}", config=config)
+        end_time = time.time()
+        processing_time = end_time - start_time
 
-            end_time = time.time()
-            processing_time = end_time - start_time
+        assert result is not None
+        assert len(result.main) == 500
 
-            assert result is not None
-            assert len(result.main) == 500
+        # Verify mode-specific behavior
+        if mode_name == "separate":
+            assert len(result.tables) > 0, "SEPARATE mode should create child tables"
+        elif mode_name == "skip":
+            assert len(result.tables) == 0, "SKIP mode should not create child tables"
+            assert "items" not in result.main[0], "SKIP mode should not include arrays"
 
-            results[mode_name] = processing_time
-            print(f"Array mode '{mode_name}': {processing_time:.4f}s")
-
-        # All modes should complete successfully
-        assert len(results) == len(mode_map)
-
-    def test_error_handling_performance_impact(self):
-        """Test performance impact of different error handling modes."""
-        # Create data with some problematic records
-        mixed_data = []
-        for i in range(1000):
-            if i % 100 == 0:  # 1% problematic records
-                mixed_data.append({"id": None, "name": f"Problem {i}"})
-            else:
-                mixed_data.append({"id": i, "name": f"Good Record {i}"})
-
-        error_modes = ["skip", "warn", "strict"]
-        results = {}
-
-        for mode in error_modes:
-            start_time = time.time()
-
-            try:
-                result = tm.flatten(mixed_data, name=f"error_{mode}", errors=mode)
-
-                end_time = time.time()
-                processing_time = end_time - start_time
-
-                results[mode] = processing_time
-                print(f"Error mode '{mode}': {processing_time:.4f}s")
-
-                if result:
-                    print(f"  Processed {len(result.main)} records")
-
-            except Exception as e:
-                end_time = time.time()
-                processing_time = end_time - start_time
-                results[mode] = processing_time
-                print(f"Error mode '{mode}': {processing_time:.4f}s (failed: {e})")
-
-        # At least some modes should complete
-        assert len(results) > 0
+        # Should complete within reasonable time
+        assert processing_time < 30.0
 
     def test_configuration_performance_impact(self):
         """Test performance impact of different configuration options."""

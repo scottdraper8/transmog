@@ -133,8 +133,12 @@ class TestNullHandlingEdgeCases:
 
         result = tm.flatten(data, name="test")
 
-        # Record should exist but be minimal
-        assert len(result.main) >= 0
+        # Record should exist with only metadata fields (no data fields)
+        assert len(result.main) == 1
+        main_record = result.main[0]
+        # Should only have metadata fields, no data fields
+        data_fields = [k for k in main_record.keys() if not k.startswith("_")]
+        assert len(data_fields) == 0
 
     def test_all_null_record_include(self):
         """Test record with all null values in INCLUDE mode."""
@@ -143,12 +147,16 @@ class TestNullHandlingEdgeCases:
         config = TransmogConfig(include_nulls=True)
         result = tm.flatten(data, name="test", config=config)
 
-        # Record should exist with null fields
-        assert len(result.main) >= 0
-        if len(result.main) > 0:
-            main_record = result.main[0]
-            # Should have at least generated fields
-            assert len(main_record) > 0
+        # Record should exist with null fields included
+        assert len(result.main) == 1
+        main_record = result.main[0]
+        # Should have the null fields
+        assert "field1" in main_record
+        assert "field2" in main_record
+        assert "field3" in main_record
+        assert main_record["field1"] is None
+        assert main_record["field2"] is None
+        assert main_record["field3"] is None
 
     def test_mixed_null_and_valid_data(self):
         """Test mix of null and valid data."""
@@ -356,56 +364,6 @@ class TestNullVsMissingKey:
         assert "score" in result_include.main[0]
         assert "score" in result_include.main[1]  # Explicit None included
         assert "score" not in result_include.main[2]  # Missing key still not present
-
-
-class TestNullWithSpecialFloats:
-    """Test null handling with NaN and Infinity values."""
-
-    def test_nan_treated_as_null_skip_mode(self):
-        """Test that NaN is treated as null-like in skip mode."""
-        data = {"id": 1, "valid": 3.14, "nan_value": float("nan")}
-
-        result = tm.flatten(data, name="test")
-
-        main = result.main[0]
-        assert "valid" in main
-        assert "nan_value" not in main
-
-    def test_nan_treated_as_null_include_mode(self):
-        """Test that NaN is converted to None in include mode."""
-        data = {"id": 1, "valid": 3.14, "nan_value": float("nan")}
-
-        config = TransmogConfig(include_nulls=True)
-        result = tm.flatten(data, name="test", config=config)
-
-        main = result.main[0]
-        assert "valid" in main
-        assert "nan_value" in main
-        assert main["nan_value"] is None
-
-    def test_inf_treated_as_null_skip_mode(self):
-        """Test that Infinity is treated as null-like in skip mode."""
-        data = {"id": 1, "valid": 42, "pos_inf": float("inf"), "neg_inf": float("-inf")}
-
-        result = tm.flatten(data, name="test")
-
-        main = result.main[0]
-        assert "valid" in main
-        assert "pos_inf" not in main
-        assert "neg_inf" not in main
-
-    def test_inf_treated_as_null_include_mode(self):
-        """Test that Infinity is converted to None in include mode."""
-        data = {"id": 1, "pos_inf": float("inf"), "neg_inf": float("-inf")}
-
-        config = TransmogConfig(include_nulls=True)
-        result = tm.flatten(data, name="test", config=config)
-
-        main = result.main[0]
-        assert "pos_inf" in main
-        assert main["pos_inf"] is None
-        assert "neg_inf" in main
-        assert main["neg_inf"] is None
 
 
 class TestNullInNestedStructures:

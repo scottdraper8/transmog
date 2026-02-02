@@ -294,7 +294,11 @@ class TestParquetWriterErrorHandling:
             Path(output_file).unlink(missing_ok=True)
 
     def test_parquet_writer_complex_nested_data(self):
-        """Test writing complex nested data."""
+        """Test writing complex nested data.
+
+        Complex nested data (dicts/lists within records) should be serialized
+        to JSON strings before writing to Parquet.
+        """
         data = [
             {"id": "1", "name": "Alice", "nested": {"key": "value"}, "array": [1, 2, 3]}
         ]
@@ -304,13 +308,22 @@ class TestParquetWriterErrorHandling:
 
         try:
             writer = ParquetWriter()
-            # This might fail or succeed depending on implementation
+            writer.write(data, output_file)
+
+            # Verify file was created and is valid
+            assert Path(output_file).exists()
+            assert Path(output_file).stat().st_size > 0
+
+            # Verify we can read it back
             try:
-                writer.write(data, output_file)
-                assert Path(output_file).exists()
-            except (OutputError, ValueError):
-                # Acceptable if complex nested data is not supported
-                pass
+                import pyarrow.parquet as pq
+
+                table = pq.read_table(output_file)
+                assert table.num_rows == 1
+                assert "id" in table.schema.names
+                assert "name" in table.schema.names
+            except ImportError:
+                pass  # PyArrow not available for verification
         finally:
             Path(output_file).unlink(missing_ok=True)
 

@@ -6,7 +6,6 @@ All tests use real functionality without mocks.
 """
 
 import json
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -150,7 +149,6 @@ def problematic_data() -> list[dict[str, Any]]:
         {"id": "", "name": "Empty ID"},
         {"id": 2, "name": None},
         {"id": 3, "name": ""},
-        {"id": 4, "circular_ref": None},  # Will be modified in tests
     ]
 
 
@@ -226,21 +224,10 @@ def assert_valid_result(result: tm.FlattenResult) -> None:
     assert isinstance(result.tables, dict)
 
 
-def assert_record_has_id(record: dict[str, Any]) -> None:
-    """Assert that a record has some form of ID."""
-    assert "_id" in record or "id" in record, f"Record missing ID: {record}"
-
-
 def assert_files_created(paths: list[str]) -> None:
     """Assert that all specified file paths exist."""
     for path in paths:
         assert Path(path).exists(), f"File not created: {path}"
-
-
-def load_json_file(file_path: str) -> Any:
-    """Load data from a JSON file."""
-    with open(file_path) as f:
-        return json.load(f)
 
 
 def count_files_in_dir(directory: Path, pattern: str = "*") -> int:

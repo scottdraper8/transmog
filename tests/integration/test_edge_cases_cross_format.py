@@ -50,7 +50,12 @@ class TestNullConsistencyAcrossFormats:
 
             assert len(rows) == 3
             # CSV represents nulls as empty strings
-            # Check that we have the expected number of rows
+            # Verify null values are represented as empty strings
+            assert rows[1]["value"] == ""  # Second record has None value
+            assert rows[2]["name"] == ""  # Third record has None name
+            # Verify non-null values are preserved
+            assert rows[0]["name"] == "Alice"
+            assert rows[0]["value"] == "100"
 
     @pytest.mark.skipif(
         not pytest.importorskip("pyarrow", reason="PyArrow not available"),
@@ -71,7 +76,12 @@ class TestNullConsistencyAcrossFormats:
             table = pq.read_table(pq_path)
 
             assert len(table) == 3
-            # Parquet preserves null semantics
+            # Parquet preserves null semantics - verify null values
+            values = table.column("value").to_pylist()
+            names = table.column("name").to_pylist()
+            assert values[0] == 100  # First record has value
+            assert values[1] is None  # Second record has None value
+            assert names[2] is None  # Third record has None name
 
     @pytest.mark.skipif(
         not pytest.importorskip("pyarrow.orc", reason="PyArrow ORC not available"),
@@ -92,6 +102,12 @@ class TestNullConsistencyAcrossFormats:
             table = orc.read_table(orc_path)
 
             assert len(table) == 3
+            # ORC preserves null semantics - verify null values
+            values = table.column("value").to_pylist()
+            names = table.column("name").to_pylist()
+            assert values[0] == 100  # First record has value
+            assert values[1] is None  # Second record has None value
+            assert names[2] is None  # Third record has None name
 
 
 class TestSparseDataConsistency:
@@ -270,15 +286,15 @@ class TestEdgeCasesAllFormats:
             pq_path = _get_file_path(paths, ".parquet")
             table = pq.read_table(pq_path)
 
-            # Zero values should be present
+            # Zero values should be present at specific positions
             zero_ints = table.column("zero_int").to_pylist()
-            assert 0 in zero_ints
+            assert zero_ints[0] == 0  # First record has zero
 
             zero_floats = table.column("zero_float").to_pylist()
-            assert 0.0 in zero_floats
+            assert zero_floats[0] == 0.0  # First record has zero float
 
             false_bools = table.column("false_bool").to_pylist()
-            assert False in false_bools
+            assert false_bools[0] is False  # First record has False
 
 
 class TestCompleteWorkflowConsistency:
@@ -286,6 +302,8 @@ class TestCompleteWorkflowConsistency:
 
     def test_same_data_all_formats(self):
         """Test that same data produces consistent results across formats."""
+        pytest.importorskip("pyarrow")
+
         data = {
             "id": 1,
             "name": "Test Entity",
@@ -296,21 +314,17 @@ class TestCompleteWorkflowConsistency:
         result = tm.flatten(data, name="entity")
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Save to all formats
+            # Save to CSV (always available)
             csv_paths = result.save(f"{tmpdir}/csv", output_format="csv")
             assert len(csv_paths) >= 1
 
-            try:
-                pq_paths = result.save(f"{tmpdir}/parquet", output_format="parquet")
-                assert len(pq_paths) >= 1
-            except Exception:
-                pass  # PyArrow may not be available
+            # Save to Parquet
+            pq_paths = result.save(f"{tmpdir}/parquet", output_format="parquet")
+            assert len(pq_paths) >= 1
 
-            try:
-                orc_paths = result.save(f"{tmpdir}/orc", output_format="orc")
-                assert len(orc_paths) >= 1
-            except Exception:
-                pass  # PyArrow ORC may not be available
+            # Save to ORC
+            orc_paths = result.save(f"{tmpdir}/orc", output_format="orc")
+            assert len(orc_paths) >= 1
 
     def test_batch_data_all_formats(self):
         """Test batch data produces consistent results across formats."""

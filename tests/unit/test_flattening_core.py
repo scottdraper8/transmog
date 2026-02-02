@@ -93,44 +93,63 @@ class TestFlattenJson:
         data = {"key-with-dash": "value1", "key.with.dots": "value2"}
         config = TransmogConfig()
 
-        config = TransmogConfig()
-
-        result = flatten_json(data, config)
+        result, _ = flatten_json(data, config)
 
         # Should handle special characters in keys
-        assert len(result) >= 2
+        assert isinstance(result, dict)
+        # Verify the values are preserved
+        assert "value1" in result.values()
+        assert "value2" in result.values()
 
     def test_flatten_preserves_original(self):
         """Test that flattening preserves original data."""
+        import copy
+
         original = {"nested": {"value": 42}}
-        data = original.copy()
+        data = copy.deepcopy(original)
 
         config = TransmogConfig()
 
-        result = flatten_json(data, config)
+        result, _ = flatten_json(data, config)
 
         # Original should be unchanged
         assert data == original
-        assert result != original
+        assert data["nested"]["value"] == 42
+        # Result should be flattened
+        assert "nested_value" in result
+        assert result["nested_value"] == 42
 
 
 class TestFlattenJsonEdgeCases:
     """Test edge cases for flatten_json."""
 
     def test_flatten_circular_reference_safe(self):
-        """Test that circular references are handled safely."""
+        """Test that circular references are handled safely.
+
+        Circular references should either be handled gracefully (by detecting
+        and skipping them) or raise a specific error. The function should not
+        cause infinite recursion.
+        """
         data = {"name": "test"}
         data["self"] = data  # Create circular reference
 
-        # Should not cause infinite recursion
+        config = TransmogConfig()
+
+        # The function should either succeed with partial data or raise ValueError
         try:
-            config = TransmogConfig()
-            result = flatten_json(data, config)
-            # If it doesn't crash, that's good
+            result, _ = flatten_json(data, config)
+            # If it succeeds, verify it returned valid data
             assert isinstance(result, dict)
-        except (RecursionError, ValueError, Exception):
-            # Circular reference detection/error is acceptable
-            pass
+            assert "name" in result
+            assert result["name"] == "test"
+        except ValueError as e:
+            # Circular reference detection is acceptable
+            assert "circular" in str(e).lower() or "recursion" in str(e).lower()
+        except RecursionError:
+            # RecursionError indicates the function doesn't handle circular refs
+            pytest.fail(
+                "Function should handle circular references without RecursionError"
+            )
 
     def test_flatten_very_deep_nesting(self):
         """Test flattening very deeply nested objects."""

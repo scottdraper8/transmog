@@ -240,8 +240,11 @@ class TestAllEmptyRecord:
 
         result = tm.flatten(data, name="test")
 
-        # Record should exist but only have metadata fields
-        assert len(result.main) >= 0
+        # Record should exist with only metadata fields
+        assert len(result.main) == 1
+        main = result.main[0]
+        data_fields = [k for k in main.keys() if not k.startswith("_")]
+        assert len(data_fields) == 0
 
     def test_all_none_values_include_mode(self):
         """Test record with all None values in include mode."""
@@ -250,13 +253,15 @@ class TestAllEmptyRecord:
         config = TransmogConfig(include_nulls=True)
         result = tm.flatten(data, name="test", config=config)
 
-        assert len(result.main) >= 1
-        if result.main:
-            main = result.main[0]
-            # Should have the null fields
-            assert "field1" in main
-            assert "field2" in main
-            assert "field3" in main
+        assert len(result.main) == 1
+        main = result.main[0]
+        # Should have the null fields
+        assert "field1" in main
+        assert "field2" in main
+        assert "field3" in main
+        assert main["field1"] is None
+        assert main["field2"] is None
+        assert main["field3"] is None
 
     def test_all_empty_strings_skip_mode(self):
         """Test record with all empty strings in skip mode."""
@@ -264,8 +269,11 @@ class TestAllEmptyRecord:
 
         result = tm.flatten(data, name="test")
 
-        # Record should exist but fields should be skipped
-        assert len(result.main) >= 0
+        # Record should exist with only metadata fields (empty strings skipped)
+        assert len(result.main) == 1
+        main = result.main[0]
+        data_fields = [k for k in main.keys() if not k.startswith("_")]
+        assert len(data_fields) == 0
 
     def test_mixed_empty_values(self):
         """Test record with mix of empty value types."""
