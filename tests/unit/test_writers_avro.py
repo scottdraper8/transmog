@@ -260,6 +260,33 @@ class TestAvroWriter:
         assert records[2]["value"] is None
         assert records[3]["value"] is None
 
+    def test_avro_writer_nan_inf_only_preserves_float_type(self, avro_temp_file):
+        """Test that fields with only NaN/Inf values are typed as double.
+
+        When a field contains only NaN/Inf values (which normalize to None),
+        the schema should still infer the field as ['null', 'double'] not ['null', 'string'].
+        This ensures consistency with Parquet/ORC writers.
+        """
+        data = [
+            {"id": 1, "value": float("nan")},
+            {"id": 2, "value": float("inf")},
+            {"id": 3, "value": float("-inf")},
+        ]
+
+        writer = AvroWriter()
+        writer.write(data, str(avro_temp_file))
+
+        assert avro_temp_file.exists()
+
+        schema = read_avro_schema(str(avro_temp_file))
+        field_types = {f["name"]: f["type"] for f in schema["fields"]}
+
+        # Field should be typed as double union, not string
+        assert field_types["value"] == ["null", "double"]
+
+        records = read_avro_records(str(avro_temp_file))
+        assert all(r["value"] is None for r in records)
+
 
 class TestAvroWriterOptions:
     """Test AvroWriter with various options."""

@@ -75,13 +75,19 @@ def _infer_avro_schema(
     field_names = _collect_field_names(records)
     field_types: dict[str, set[str]] = {field: set() for field in field_names}
     field_has_null: dict[str, bool] = dict.fromkeys(field_names, False)
+    field_found_float: dict[str, bool] = dict.fromkeys(field_names, False)
 
     for record in records:
         for field in field_names:
             if field not in record or record[field] is None:
                 field_has_null[field] = True
             else:
-                value = _normalize_special_floats(record[field])
+                raw_value = record[field]
+                # Track if field contains float values before normalization
+                if isinstance(raw_value, float):
+                    field_found_float[field] = True
+
+                value = _normalize_special_floats(raw_value)
                 if value is None:
                     field_has_null[field] = True
                 else:
@@ -92,10 +98,14 @@ def _infer_avro_schema(
     for field in field_names:
         types = field_types[field]
         has_null = field_has_null[field]
+        found_float = field_found_float[field]
 
         if not types:
-            # Field only has null values
-            field_type: Any = ["null", "string"]
+            # Field only has null values - check if they were originally floats
+            if found_float:
+                field_type: Any = ["null", "double"]
+            else:
+                field_type = ["null", "string"]
         elif len(types) == 1:
             base_type = next(iter(types))
             if has_null:
