@@ -1,13 +1,18 @@
 """Data writers for various output formats.
 
 This module provides writers for converting flattened data into various
-output formats (CSV, Parquet). Each format has both a standard writer
+output formats (CSV, Parquet, ORC, Avro). Each format has both a standard writer
 and a streaming writer for memory-efficient processing.
 """
 
 from typing import Any, BinaryIO
 
 from transmog.exceptions import ConfigurationError, MissingDependencyError
+from transmog.writers.avro import (
+    AVRO_AVAILABLE,
+    AvroStreamingWriter,
+    AvroWriter,
+)
 from transmog.writers.base import DataWriter, StreamingWriter
 from transmog.writers.csv import CsvStreamingWriter, CsvWriter
 from transmog.writers.orc import (
@@ -33,12 +38,16 @@ if ORC_AVAILABLE:
     FORMATS["orc"] = OrcWriter
     STREAMING_FORMATS["orc"] = OrcStreamingWriter
 
+if AVRO_AVAILABLE:
+    FORMATS["avro"] = AvroWriter
+    STREAMING_FORMATS["avro"] = AvroStreamingWriter
+
 
 def create_writer(format_name: str, **kwargs: Any) -> DataWriter:
     """Create a writer for the given format.
 
     Args:
-        format_name: Format name (csv, parquet)
+        format_name: Format name (csv, parquet, orc, avro)
         **kwargs: Format-specific options
 
     Returns:
@@ -61,6 +70,11 @@ def create_writer(format_name: str, **kwargs: Any) -> DataWriter:
             raise MissingDependencyError(
                 "PyArrow is required for ORC support. Install with: pip install pyarrow"
             )
+        if format_name == "avro" and not AVRO_AVAILABLE:
+            raise MissingDependencyError(
+                "fastavro is required for Avro support. "
+                "Install with: pip install fastavro"
+            )
         raise ConfigurationError(
             f"Unsupported format: {format_name}. Supported: {', '.join(FORMATS.keys())}"
         )
@@ -77,7 +91,7 @@ def create_streaming_writer(
     """Create a streaming writer for the given format.
 
     Args:
-        format_name: Format name (csv, parquet)
+        format_name: Format name (csv, parquet, orc, avro)
         destination: File path or file-like object to write to
         entity_name: Name of the entity being processed
         **kwargs: Format-specific options
@@ -103,6 +117,11 @@ def create_streaming_writer(
                 "PyArrow is required for ORC streaming. "
                 "Install with: pip install pyarrow"
             )
+        if format_name == "avro" and not AVRO_AVAILABLE:
+            raise MissingDependencyError(
+                "fastavro is required for Avro streaming. "
+                "Install with: pip install fastavro"
+            )
         raise ConfigurationError(
             f"Unsupported format: {format_name}. "
             f"Supported: {', '.join(STREAMING_FORMATS.keys())}"
@@ -114,6 +133,8 @@ def create_streaming_writer(
 __all__ = [
     "DataWriter",
     "StreamingWriter",
+    "AvroWriter",
+    "AvroStreamingWriter",
     "CsvWriter",
     "CsvStreamingWriter",
     "OrcWriter",

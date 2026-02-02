@@ -9,6 +9,7 @@ version = "2.0.1"
 description = "A data transformation library for flattening complex nested structures into tabular formats while preserving hierarchical relationships"
 readme = "README.md"
 keywords = [
+  "avro",
   "csv",
   "data-pipeline",
   "data-processing",
@@ -37,6 +38,8 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
+  "cramjam>=2.7",
+  "fastavro>=1.9",
   "hjson>=3.1",
   "json5>=0.13",
   "orjson>=3.11",

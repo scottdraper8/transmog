@@ -1,6 +1,6 @@
 # Output Formats
 
-Supported formats: CSV, Parquet, and ORC.
+Supported formats: CSV, Parquet, ORC, and Avro.
 
 ## Saving Results
 
@@ -15,6 +15,7 @@ result = tm.flatten(data, name="products")
 result.save("output.csv")          # CSV
 result.save("output.parquet")      # Parquet
 result.save("output.orc")          # ORC
+result.save("output.avro")         # Avro
 ```
 
 ### Explicit Format
@@ -24,6 +25,7 @@ result.save("output.orc")          # ORC
 result.save("output", output_format="csv")
 result.save("output", output_format="parquet")
 result.save("output", output_format="orc")
+result.save("output", output_format="avro")
 ```
 
 ### Multiple Tables
@@ -97,6 +99,30 @@ result.save("output.orc", compression="snappy")
 result.save("output.orc", compression="lz4")
 result.save("output.orc", compression="zlib")
 ```
+
+## Avro Output
+
+```python
+result = tm.flatten(data, name="products")
+result.save("output.avro")
+
+# Compression options (codec parameter)
+result.save("output.avro", codec="snappy")     # Default (via cramjam)
+result.save("output.avro", codec="deflate")    # Built-in compression
+result.save("output.avro", codec="null")       # No compression
+result.save("output.avro", codec="bzip2")      # Via cramjam
+result.save("output.avro", codec="xz")         # Via cramjam
+
+# Additional codecs (require separate package installations):
+# codec="zstandard"  # Requires: pip install zstandard
+# codec="lz4"        # Requires: pip install lz4
+```
+
+:::{note}
+The default install includes `cramjam` which provides `snappy`, `bzip2`, and `xz`
+codecs. While `cramjam` also bundles `zstandard` and `lz4` algorithms, `fastavro`
+requires the standalone `zstandard` and `lz4` packages to use those codecs.
+:::
 
 ## Null Handling
 

@@ -20,7 +20,7 @@ flat, tabular formats while preserving parent-child relationships.
 ## Installation
 
 ```bash
-# Full install (CSV, Parquet, ORC output)
+# Full install (CSV, Parquet, ORC, Avro output)
 pip install transmog
 
 # Without Parquet/ORC (no pyarrow dependency)
