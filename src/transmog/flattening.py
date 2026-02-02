@@ -236,7 +236,11 @@ def _process_array_items(
             metadata_dict = flattened
         else:
             # Simple primitive value - apply stringify if configured
-            if config.stringify_values and not isinstance(item, str):
+            if (
+                config.stringify_values
+                and not isinstance(item, str)
+                and not _is_null_like(item)
+            ):
                 metadata_dict = {"value": str(item)}
             else:
                 metadata_dict = {"value": item}
