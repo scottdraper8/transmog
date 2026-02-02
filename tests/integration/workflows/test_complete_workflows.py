@@ -43,9 +43,17 @@ class TestEndToEndWorkflows:
         else:
             assert_files_created(parquet_paths)
 
+        # Step 4: Save to Avro
+        avro_paths = result.save(str(output_dir / "avro_output"), output_format="avro")
+        if isinstance(avro_paths, dict):
+            assert_files_created(list(avro_paths.values()))
+        else:
+            assert_files_created(avro_paths)
+
         # Verify all formats created files in their respective subdirectories
         assert count_files_in_dir(output_dir / "csv_output", "*.csv") > 0
         assert count_files_in_dir(output_dir / "parquet_output", "*.parquet") > 0
+        assert count_files_in_dir(output_dir / "avro_output", "*.avro") > 0
 
     def test_file_to_file_processing(self, large_json_file, output_dir):
         """Test processing from file to file."""

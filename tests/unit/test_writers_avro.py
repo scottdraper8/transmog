@@ -14,11 +14,68 @@ import pytest
 from transmog.exceptions import OutputError
 from transmog.writers import AvroStreamingWriter, AvroWriter
 
+# ---- Helper Functions ----
+
+
+def read_avro_records(file_path):
+    """Read records from an Avro file.
+
+    Args:
+        file_path: Path to Avro file
+
+    Returns:
+        List of records from the file
+    """
+    import fastavro
+
+    with open(file_path, "rb") as f:
+        reader = fastavro.reader(f)
+        return list(reader)
+
+
+def read_avro_schema(file_path):
+    """Read schema from an Avro file.
+
+    Args:
+        file_path: Path to Avro file
+
+    Returns:
+        Schema dictionary from the file
+    """
+    import fastavro
+
+    with open(file_path, "rb") as f:
+        reader = fastavro.reader(f)
+        return reader.writer_schema
+
+
+# ---- Fixtures ----
+
+
+@pytest.fixture
+def avro_temp_file(tmp_path):
+    """Create a temporary Avro file path.
+
+    Returns path to a temporary .avro file that will be cleaned up after test.
+    """
+    return tmp_path / "test.avro"
+
+
+@pytest.fixture
+def avro_temp_dir(tmp_path):
+    """Create a temporary directory for Avro output.
+
+    Returns path to a temporary directory that will be cleaned up after test.
+    """
+    output_dir = tmp_path / "avro_output"
+    output_dir.mkdir()
+    return output_dir
+
 
 class TestAvroWriter:
     """Test the AvroWriter class."""
 
-    def test_avro_writer_basic(self):
+    def test_avro_writer_basic(self, avro_temp_file):
         """Test basic Avro writing functionality."""
         data = [
             {"id": "1", "name": "Alice", "age": "25"},
@@ -26,47 +83,37 @@ class TestAvroWriter:
             {"id": "3", "name": "Charlie", "age": "35"},
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".avro", delete=False) as f:
-            output_file = f.name
+        writer = AvroWriter()
+        writer.write(data, str(avro_temp_file))
 
-        try:
-            writer = AvroWriter()
-            writer.write(data, output_file)
+        assert avro_temp_file.exists()
+        assert avro_temp_file.stat().st_size > 0
 
-            assert Path(output_file).exists()
-            assert Path(output_file).stat().st_size > 0
+        # Verify by reading back
+        records = read_avro_records(str(avro_temp_file))
+        assert len(records) == 3
+        assert records[0]["id"] == "1"
+        assert records[0]["name"] == "Alice"
 
-            # Verify by reading back
-            import fastavro
+    def test_avro_writer_empty_data(self, avro_temp_file):
+        """Test writing empty data to Avro.
 
-            with open(output_file, "rb") as f:
-                reader = fastavro.reader(f)
-                records = list(reader)
-                assert len(records) == 3
-                assert records[0]["id"] == "1"
-                assert records[0]["name"] == "Alice"
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
-
-    def test_avro_writer_empty_data(self):
-        """Test writing empty data to Avro."""
+        Empty data should return the destination path without creating a file
+        or creating an empty file, depending on implementation.
+        """
         data = []
 
-        with tempfile.NamedTemporaryFile(suffix=".avro", delete=False) as f:
-            output_file = f.name
+        writer = AvroWriter()
+        result = writer.write(data, str(avro_temp_file))
 
-        try:
-            writer = AvroWriter()
-            result = writer.write(data, output_file)
+        # Empty data returns destination path
+        assert result == str(avro_temp_file)
 
-            # Empty data returns destination without writing
-            assert result == output_file
+        # Verify no file was created or file is empty if created
+        if avro_temp_file.exists():
+            assert avro_temp_file.stat().st_size == 0
 
-        finally:
-            Path(output_file).unlink(missing_ok=True)
-
-    def test_avro_writer_mixed_types(self):
+    def test_avro_writer_mixed_types(self, avro_temp_file):
         """Test writing mixed data types to Avro."""
         data = [
             {"id": 1, "name": "Alice", "score": 95.5, "active": True},
@@ -74,30 +121,19 @@ class TestAvroWriter:
             {"id": 3, "name": "Charlie", "score": 92.0, "active": True},
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".avro", delete=False) as f:
-            output_file = f.name
+        writer = AvroWriter()
+        writer.write(data, str(avro_temp_file))
 
-        try:
-            writer = AvroWriter()
-            writer.write(data, output_file)
+        assert avro_temp_file.exists()
+        assert avro_temp_file.stat().st_size > 0
 
-            assert Path(output_file).exists()
-            assert Path(output_file).stat().st_size > 0
+        # Verify types are preserved
+        records = read_avro_records(str(avro_temp_file))
+        assert records[0]["id"] == 1
+        assert records[0]["score"] == 95.5
+        assert records[0]["active"] is True
 
-            # Verify types are preserved
-            import fastavro
-
-            with open(output_file, "rb") as f:
-                reader = fastavro.reader(f)
-                records = list(reader)
-                assert records[0]["id"] == 1
-                assert records[0]["score"] == 95.5
-                assert records[0]["active"] is True
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
-
-    def test_avro_writer_unicode_data(self):
+    def test_avro_writer_unicode_data(self, avro_temp_file):
         """Test writing Unicode data to Avro."""
         data = [
             {"id": "1", "name": "José", "city": "São Paulo"},
@@ -105,27 +141,16 @@ class TestAvroWriter:
             {"id": "3", "name": "张三", "city": "北京"},
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".avro", delete=False) as f:
-            output_file = f.name
+        writer = AvroWriter()
+        writer.write(data, str(avro_temp_file))
 
-        try:
-            writer = AvroWriter()
-            writer.write(data, output_file)
+        assert avro_temp_file.exists()
+        assert avro_temp_file.stat().st_size > 0
 
-            assert Path(output_file).exists()
-            assert Path(output_file).stat().st_size > 0
-
-            # Verify Unicode is preserved
-            import fastavro
-
-            with open(output_file, "rb") as f:
-                reader = fastavro.reader(f)
-                records = list(reader)
-                assert records[0]["name"] == "José"
-                assert records[2]["name"] == "张三"
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
+        # Verify Unicode is preserved
+        records = read_avro_records(str(avro_temp_file))
+        assert records[0]["name"] == "José"
+        assert records[2]["name"] == "张三"
 
     def test_avro_writer_large_dataset(self):
         """Test writing large dataset to Avro."""
@@ -193,7 +218,7 @@ class TestAvroWriter:
         finally:
             Path(output_file).unlink(missing_ok=True)
 
-    def test_avro_writer_null_values(self):
+    def test_avro_writer_null_values(self, avro_temp_file):
         """Test writing null values to Avro."""
         data = [
             {"id": "1", "name": "Alice", "optional_field": "value1"},
@@ -201,29 +226,21 @@ class TestAvroWriter:
             {"id": "3", "name": "Charlie", "optional_field": ""},
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".avro", delete=False) as f:
-            output_file = f.name
+        writer = AvroWriter()
+        writer.write(data, str(avro_temp_file))
 
-        try:
-            writer = AvroWriter()
-            writer.write(data, output_file)
+        assert avro_temp_file.exists()
 
-            assert Path(output_file).exists()
+        records = read_avro_records(str(avro_temp_file))
+        assert records[0]["optional_field"] == "value1"
+        assert records[1]["optional_field"] is None
+        assert records[2]["optional_field"] == ""
 
-            import fastavro
+    def test_avro_writer_nan_inf_values(self, avro_temp_file):
+        """Test writing NaN and Infinity values to Avro.
 
-            with open(output_file, "rb") as f:
-                reader = fastavro.reader(f)
-                records = list(reader)
-                assert records[0]["optional_field"] == "value1"
-                assert records[1]["optional_field"] is None
-                assert records[2]["optional_field"] == ""
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
-
-    def test_avro_writer_nan_inf_values(self):
-        """Test writing NaN and Infinity values to Avro."""
+        NaN and Infinity should be converted to None for Avro compatibility.
+        """
         data = [
             {"id": "1", "value": 1.5},
             {"id": "2", "value": float("nan")},
@@ -231,305 +248,231 @@ class TestAvroWriter:
             {"id": "4", "value": float("-inf")},
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".avro", delete=False) as f:
-            output_file = f.name
+        writer = AvroWriter()
+        writer.write(data, str(avro_temp_file))
 
-        try:
-            writer = AvroWriter()
-            writer.write(data, output_file)
+        assert avro_temp_file.exists()
 
-            assert Path(output_file).exists()
-
-            import fastavro
-
-            with open(output_file, "rb") as f:
-                reader = fastavro.reader(f)
-                records = list(reader)
-                assert records[0]["value"] == 1.5
-                # NaN and Inf should be converted to None
-                assert records[1]["value"] is None
-                assert records[2]["value"] is None
-                assert records[3]["value"] is None
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
+        records = read_avro_records(str(avro_temp_file))
+        assert records[0]["value"] == 1.5
+        # NaN and Inf should be converted to None
+        assert records[1]["value"] is None
+        assert records[2]["value"] is None
+        assert records[3]["value"] is None
 
 
 class TestAvroWriterOptions:
     """Test AvroWriter with various options."""
 
-    def test_avro_writer_compression_codecs(self):
-        """Test Avro writer with different compression codecs."""
+    @pytest.mark.parametrize(
+        "codec",
+        ["null", "deflate", "snappy", "bzip2", "xz"],
+        ids=["no_compression", "deflate", "snappy", "bzip2", "xz"],
+    )
+    def test_avro_writer_compression_codecs(self, codec, avro_temp_file):
+        """Test Avro writer with different compression codecs.
+
+        Tests codecs supported with cramjam dependency.
+        zstandard and lz4 require additional Python packages.
+        """
         data = [
             {"id": "1", "name": "Alice", "data": "x" * 100},
             {"id": "2", "name": "Bob", "data": "y" * 100},
             {"id": "3", "name": "Charlie", "data": "z" * 100},
         ]
 
-        # Test codecs supported with cramjam dependency
-        # snappy, bzip2, and xz are provided by cramjam
-        # zstandard and lz4 require additional Python packages
-        codecs = ["null", "deflate", "snappy", "bzip2", "xz"]
+        writer = AvroWriter(codec=codec)
+        writer.write(data, str(avro_temp_file))
 
-        for codec in codecs:
-            with tempfile.NamedTemporaryFile(suffix=".avro", delete=False) as f:
-                output_file = f.name
+        assert avro_temp_file.exists()
+        assert avro_temp_file.stat().st_size > 0
 
-            try:
-                writer = AvroWriter(codec=codec)
-                writer.write(data, output_file)
+        # Verify data can be read back
+        records = read_avro_records(str(avro_temp_file))
+        assert len(records) == 3
+        assert records[0]["name"] == "Alice"
 
-                assert Path(output_file).exists()
-                assert Path(output_file).stat().st_size > 0
-
-            except (ValueError, ImportError):
-                # Some codecs might not be available
-                pass
-            finally:
-                Path(output_file).unlink(missing_ok=True)
-
-    def test_avro_writer_invalid_codec(self):
-        """Test Avro writer with invalid codec."""
+    def test_avro_writer_invalid_codec(self, avro_temp_file):
+        """Test Avro writer with invalid codec raises appropriate error."""
         data = [{"id": "1", "name": "Alice"}]
 
-        with tempfile.NamedTemporaryFile(suffix=".avro", delete=False) as f:
-            output_file = f.name
+        writer = AvroWriter(codec="invalid_codec")
+        with pytest.raises(OutputError) as exc_info:
+            writer.write(data, str(avro_temp_file))
 
-        try:
-            writer = AvroWriter(codec="invalid_codec")
-            with pytest.raises(OutputError):
-                writer.write(data, output_file)
-        finally:
-            Path(output_file).unlink(missing_ok=True)
+        # Verify error message mentions the invalid codec
+        assert (
+            "invalid_codec" in str(exc_info.value).lower()
+            or "codec" in str(exc_info.value).lower()
+        )
+
+    def test_avro_writer_sync_interval(self, avro_temp_file):
+        """Test Avro writer with custom sync_interval parameter."""
+        data = [{"id": str(i), "data": "x" * 1000} for i in range(100)]
+
+        # Test with default sync_interval
+        writer_default = AvroWriter()
+        writer_default.write(data, str(avro_temp_file))
+        default_size = avro_temp_file.stat().st_size
+
+        # Test with larger sync_interval (should result in slightly smaller file)
+        avro_temp_file.unlink()
+        writer_large = AvroWriter(sync_interval=64000)
+        writer_large.write(data, str(avro_temp_file))
+        large_interval_size = avro_temp_file.stat().st_size
+
+        # Test sync_interval passed via write options
+        avro_temp_file.unlink()
+        writer_option = AvroWriter()
+        writer_option.write(data, str(avro_temp_file), sync_interval=64000)
+        option_size = avro_temp_file.stat().st_size
+
+        # Verify all files are readable
+        records = read_avro_records(str(avro_temp_file))
+        assert len(records) == 100
+
+        # File sizes should be comparable (sync markers make small difference)
+        # Larger sync_interval typically means fewer markers, slightly smaller file
+        assert large_interval_size <= default_size + 100  # Allow small variance
+        assert option_size == large_interval_size  # Both use same sync_interval
 
 
 class TestAvroWriterSchemaInference:
     """Test Avro schema inference functionality."""
 
-    def test_schema_inference_string_fields(self):
-        """Test schema inference for string fields."""
-        data = [
-            {"name": "Alice", "city": "NYC"},
-            {"name": "Bob", "city": "LA"},
-        ]
+    @pytest.mark.parametrize(
+        "data,field_name,expected_type",
+        [
+            ([{"name": "Alice"}, {"name": "Bob"}], "name", "string"),
+            ([{"int_val": 42}, {"int_val": 100}], "int_val", "long"),
+            ([{"float_val": 3.14}, {"float_val": 2.71}], "float_val", "double"),
+            ([{"active": True}, {"active": False}], "active", "boolean"),
+        ],
+        ids=["string_fields", "numeric_int", "numeric_float", "boolean_fields"],
+    )
+    def test_schema_inference_basic_types(
+        self, data, field_name, expected_type, avro_temp_file
+    ):
+        """Test schema inference for basic data types."""
+        writer = AvroWriter()
+        writer.write(data, str(avro_temp_file))
 
-        with tempfile.NamedTemporaryFile(suffix=".avro", delete=False) as f:
-            output_file = f.name
+        schema = read_avro_schema(str(avro_temp_file))
+        field_types = {f["name"]: f["type"] for f in schema["fields"]}
+        assert field_types[field_name] == expected_type
 
-        try:
-            writer = AvroWriter()
-            writer.write(data, output_file)
-
-            import fastavro
-
-            with open(output_file, "rb") as f:
-                reader = fastavro.reader(f)
-                schema = reader.writer_schema
-                field_types = {f["name"]: f["type"] for f in schema["fields"]}
-                assert field_types["name"] == "string"
-                assert field_types["city"] == "string"
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
-
-    def test_schema_inference_numeric_fields(self):
-        """Test schema inference for numeric fields."""
-        data = [
-            {"int_val": 42, "float_val": 3.14},
-            {"int_val": 100, "float_val": 2.71},
-        ]
-
-        with tempfile.NamedTemporaryFile(suffix=".avro", delete=False) as f:
-            output_file = f.name
-
-        try:
-            writer = AvroWriter()
-            writer.write(data, output_file)
-
-            import fastavro
-
-            with open(output_file, "rb") as f:
-                reader = fastavro.reader(f)
-                schema = reader.writer_schema
-                field_types = {f["name"]: f["type"] for f in schema["fields"]}
-                assert field_types["int_val"] == "long"
-                assert field_types["float_val"] == "double"
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
-
-    def test_schema_inference_boolean_fields(self):
-        """Test schema inference for boolean fields."""
-        data = [
-            {"active": True, "verified": False},
-            {"active": False, "verified": True},
-        ]
-
-        with tempfile.NamedTemporaryFile(suffix=".avro", delete=False) as f:
-            output_file = f.name
-
-        try:
-            writer = AvroWriter()
-            writer.write(data, output_file)
-
-            import fastavro
-
-            with open(output_file, "rb") as f:
-                reader = fastavro.reader(f)
-                schema = reader.writer_schema
-                field_types = {f["name"]: f["type"] for f in schema["fields"]}
-                assert field_types["active"] == "boolean"
-                assert field_types["verified"] == "boolean"
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
-
-    def test_schema_inference_nullable_fields(self):
+    def test_schema_inference_nullable_fields(self, avro_temp_file):
         """Test schema inference for nullable fields."""
         data = [
             {"name": "Alice", "email": "alice@example.com"},
             {"name": "Bob", "email": None},
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".avro", delete=False) as f:
-            output_file = f.name
+        writer = AvroWriter()
+        writer.write(data, str(avro_temp_file))
 
-        try:
-            writer = AvroWriter()
-            writer.write(data, output_file)
-
-            import fastavro
-
-            with open(output_file, "rb") as f:
-                reader = fastavro.reader(f)
-                schema = reader.writer_schema
-                field_types = {f["name"]: f["type"] for f in schema["fields"]}
-                # Nullable fields should be union types
-                assert isinstance(field_types["email"], list)
-                assert "null" in field_types["email"]
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
+        schema = read_avro_schema(str(avro_temp_file))
+        field_types = {f["name"]: f["type"] for f in schema["fields"]}
+        # Nullable fields should be union types
+        assert isinstance(field_types["email"], list)
+        assert "null" in field_types["email"]
 
 
 class TestAvroStreamingWriter:
     """Test the AvroStreamingWriter class."""
 
-    def test_streaming_writer_basic(self):
+    def test_streaming_writer_basic(self, avro_temp_dir):
         """Test basic streaming writer functionality."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            writer = AvroStreamingWriter(
-                destination=temp_dir,
-                entity_name="test_entity",
-            )
+        writer = AvroStreamingWriter(
+            destination=str(avro_temp_dir),
+            entity_name="test_entity",
+        )
 
-            records = [
-                {"id": "1", "name": "Alice"},
-                {"id": "2", "name": "Bob"},
-            ]
+        records = [
+            {"id": "1", "name": "Alice"},
+            {"id": "2", "name": "Bob"},
+        ]
 
-            writer.write_main_records(records)
-            writer.close()
+        writer.write_main_records(records)
+        writer.close()
 
-            output_file = Path(temp_dir) / "test_entity.avro"
-            assert output_file.exists()
+        output_file = avro_temp_dir / "test_entity.avro"
+        assert output_file.exists()
 
-            import fastavro
+        read_records = read_avro_records(str(output_file))
+        assert len(read_records) == 2
 
-            with open(output_file, "rb") as f:
-                reader = fastavro.reader(f)
-                read_records = list(reader)
-                assert len(read_records) == 2
-
-    def test_streaming_writer_child_tables(self):
+    def test_streaming_writer_child_tables(self, avro_temp_dir):
         """Test streaming writer with child tables."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            writer = AvroStreamingWriter(
-                destination=temp_dir,
-                entity_name="parent",
-            )
+        writer = AvroStreamingWriter(
+            destination=str(avro_temp_dir),
+            entity_name="parent",
+        )
 
-            main_records = [{"id": "1", "name": "Parent1"}]
-            child_records = [
-                {"id": "c1", "parent_id": "1", "value": "child1"},
-                {"id": "c2", "parent_id": "1", "value": "child2"},
-            ]
+        main_records = [{"id": "1", "name": "Parent1"}]
+        child_records = [
+            {"id": "c1", "parent_id": "1", "value": "child1"},
+            {"id": "c2", "parent_id": "1", "value": "child2"},
+        ]
 
-            writer.write_main_records(main_records)
-            writer.write_child_records("parent_children", child_records)
-            writer.close()
+        writer.write_main_records(main_records)
+        writer.write_child_records("parent_children", child_records)
+        writer.close()
 
-            main_file = Path(temp_dir) / "parent.avro"
-            child_file = Path(temp_dir) / "parent_children.avro"
+        main_file = avro_temp_dir / "parent.avro"
+        child_file = avro_temp_dir / "parent_children.avro"
 
-            assert main_file.exists()
-            assert child_file.exists()
+        assert main_file.exists()
+        assert child_file.exists()
 
-            import fastavro
+        read_records = read_avro_records(str(child_file))
+        assert len(read_records) == 2
 
-            with open(child_file, "rb") as f:
-                reader = fastavro.reader(f)
-                read_records = list(reader)
-                assert len(read_records) == 2
-
-    def test_streaming_writer_schema_drift_detection(self):
+    def test_streaming_writer_schema_drift_detection(self, avro_temp_dir):
         """Test that schema drift is detected and raises error."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            writer = AvroStreamingWriter(
-                destination=temp_dir,
-                entity_name="test",
-            )
+        writer = AvroStreamingWriter(
+            destination=str(avro_temp_dir),
+            entity_name="test",
+        )
 
-            # First batch establishes schema
-            records1 = [{"id": "1", "name": "Alice"}]
-            writer.write_main_records(records1)
+        # First batch establishes schema
+        records1 = [{"id": "1", "name": "Alice"}]
+        writer.write_main_records(records1)
 
-            # Second batch with new field should raise error
-            records2 = [{"id": "2", "name": "Bob", "new_field": "value"}]
+        # Second batch with new field should raise error
+        records2 = [{"id": "2", "name": "Bob", "new_field": "value"}]
 
-            with pytest.raises(OutputError) as exc_info:
-                writer.write_main_records(records2)
+        with pytest.raises(OutputError) as exc_info:
+            writer.write_main_records(records2)
 
-            assert "schema changed" in str(exc_info.value).lower()
-            writer.close()
+        assert "schema changed" in str(exc_info.value).lower()
+        writer.close()
 
-    def test_streaming_writer_context_manager(self):
+    def test_streaming_writer_context_manager(self, avro_temp_dir):
         """Test streaming writer as context manager."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with AvroStreamingWriter(
-                destination=temp_dir,
-                entity_name="test",
-            ) as writer:
-                writer.write_main_records([{"id": "1", "name": "Alice"}])
-
-            output_file = Path(temp_dir) / "test.avro"
-            assert output_file.exists()
-
-    def test_streaming_writer_single_file(self):
-        """Test streaming writer to single file."""
-        with tempfile.NamedTemporaryFile(suffix=".avro", delete=False) as f:
-            output_file = f.name
-
-        try:
-            writer = AvroStreamingWriter(
-                destination=output_file,
-                entity_name="test",
-            )
-
+        with AvroStreamingWriter(
+            destination=str(avro_temp_dir),
+            entity_name="test",
+        ) as writer:
             writer.write_main_records([{"id": "1", "name": "Alice"}])
-            writer.close()
 
-            assert Path(output_file).exists()
+        output_file = avro_temp_dir / "test.avro"
+        assert output_file.exists()
 
-            import fastavro
+    def test_streaming_writer_single_file(self, avro_temp_file):
+        """Test streaming writer to single file."""
+        writer = AvroStreamingWriter(
+            destination=str(avro_temp_file),
+            entity_name="test",
+        )
 
-            with open(output_file, "rb") as f:
-                reader = fastavro.reader(f)
-                records = list(reader)
-                assert len(records) == 1
+        writer.write_main_records([{"id": "1", "name": "Alice"}])
+        writer.close()
 
-        finally:
-            Path(output_file).unlink(missing_ok=True)
+        assert avro_temp_file.exists()
+
+        records = read_avro_records(str(avro_temp_file))
+        assert len(records) == 1
 
 
 class TestAvroWriterErrorHandling:

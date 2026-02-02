@@ -109,6 +109,32 @@ class TestNullConsistencyAcrossFormats:
             assert values[1] is None  # Second record has None value
             assert names[2] is None  # Third record has None name
 
+    @pytest.mark.skipif(
+        not pytest.importorskip("fastavro", reason="fastavro not available"),
+        reason="fastavro required",
+    )
+    def test_null_handling_avro(self, data_with_nulls):
+        """Test null handling in Avro output."""
+        import fastavro
+
+        config = TransmogConfig(include_nulls=True)
+        result = tm.flatten(data_with_nulls, name="test", config=config)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = result.save(tmpdir, output_format="avro")
+
+            # Read back Avro
+            avro_path = _get_file_path(paths, ".avro")
+            with open(avro_path, "rb") as f:
+                reader = fastavro.reader(f)
+                records = list(reader)
+
+            assert len(records) == 3
+            # Avro preserves null semantics - verify null values
+            assert records[0]["value"] == 100  # First record has value
+            assert records[1]["value"] is None  # Second record has None value
+            assert records[2]["name"] is None  # Third record has None name
+
 
 class TestSparseDataConsistency:
     """Test that sparse data (different fields per record) is handled consistently."""
@@ -160,6 +186,32 @@ class TestSparseDataConsistency:
             assert len(table) == 3
             # All fields should be in schema
             schema_names = table.schema.names
+            assert "name" in schema_names
+            assert "email" in schema_names
+            assert "phone" in schema_names
+
+    @pytest.mark.skipif(
+        not pytest.importorskip("fastavro", reason="fastavro not available"),
+        reason="fastavro required",
+    )
+    def test_sparse_data_avro(self, sparse_data):
+        """Test sparse data in Avro output."""
+        import fastavro
+
+        result = tm.flatten(sparse_data, name="test")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = result.save(tmpdir, output_format="avro")
+
+            avro_path = _get_file_path(paths, ".avro")
+            with open(avro_path, "rb") as f:
+                reader = fastavro.reader(f)
+                records = list(reader)
+                schema = reader.writer_schema
+
+            assert len(records) == 3
+            # All fields should be in schema
+            schema_names = [f["name"] for f in schema["fields"]]
             assert "name" in schema_names
             assert "email" in schema_names
             assert "phone" in schema_names
@@ -228,6 +280,32 @@ class TestMixedTypesConsistency:
             schema = table.schema
             assert schema.field("int_val").type == pa.int64()
             assert schema.field("float_val").type == pa.float64()
+
+    @pytest.mark.skipif(
+        not pytest.importorskip("fastavro", reason="fastavro not available"),
+        reason="fastavro required",
+    )
+    def test_mixed_types_avro(self, mixed_type_data):
+        """Test mixed types in Avro output."""
+        import fastavro
+
+        result = tm.flatten(mixed_type_data, name="test")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = result.save(tmpdir, output_format="avro")
+
+            avro_path = _get_file_path(paths, ".avro")
+            with open(avro_path, "rb") as f:
+                reader = fastavro.reader(f)
+                records = list(reader)
+                schema = reader.writer_schema
+
+            assert len(records) == 3
+            # Avro preserves types - verify schema
+            field_types = {f["name"]: f["type"] for f in schema["fields"]}
+            assert field_types["int_val"] == "long"
+            assert field_types["float_val"] == "double"
+            assert field_types["bool_val"] == "boolean"
 
 
 class TestEdgeCasesAllFormats:
@@ -441,6 +519,29 @@ class TestSpecialCharactersConsistency:
             assert "Ελληνικά" in unicode_vals
             assert "العربية" in unicode_vals
 
+    @pytest.mark.skipif(
+        not pytest.importorskip("fastavro", reason="fastavro not available"),
+        reason="fastavro required",
+    )
+    def test_special_chars_avro(self, special_char_data):
+        """Test special characters in Avro output."""
+        import fastavro
+
+        result = tm.flatten(special_char_data, name="test")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = result.save(tmpdir, output_format="avro")
+
+            avro_path = _get_file_path(paths, ".avro")
+            with open(avro_path, "rb") as f:
+                reader = fastavro.reader(f)
+                records = list(reader)
+
+            unicode_vals = [r["unicode"] for r in records]
+            assert "日本語" in unicode_vals
+            assert "Ελληνικά" in unicode_vals
+            assert "العربية" in unicode_vals
+
 
 class TestStringifyAcrossFormats:
     """Test stringify_values works consistently across output formats."""
@@ -520,6 +621,40 @@ class TestStringifyAcrossFormats:
                     assert field.type == pa.string(), (
                         f"Field {field.name} should be string"
                     )
+
+    @pytest.mark.skipif(
+        not pytest.importorskip("fastavro", reason="fastavro not available"),
+        reason="fastavro required",
+    )
+    def test_stringify_avro_output(self):
+        """Test stringify with Avro output."""
+        import fastavro
+
+        data = {"id": 1, "price": 19.99, "active": True}
+        config = TransmogConfig(stringify_values=True)
+        result = tm.flatten(data, config=config)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "output.avro"
+            result.save(str(output), output_format="avro")
+
+            # Verify schema is all strings
+            with open(output, "rb") as f:
+                reader = fastavro.reader(f)
+                schema = reader.writer_schema
+                records = list(reader)
+
+            field_types = {f["name"]: f["type"] for f in schema["fields"]}
+            # Check non-metadata fields are strings
+            for field_name in ["id", "price", "active"]:
+                assert field_types[field_name] == "string", (
+                    f"Field {field_name} should be string"
+                )
+
+            # Verify values
+            assert records[0]["id"] == "1"
+            assert records[0]["price"] == "19.99"
+            assert records[0]["active"] == "True"
 
     def test_stringify_preserves_data_integrity(self):
         """Test that stringify preserves data integrity across formats."""
