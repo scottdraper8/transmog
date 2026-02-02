@@ -377,6 +377,44 @@ class TestAvroWriterSchemaInference:
         assert isinstance(field_types["email"], list)
         assert "null" in field_types["email"]
 
+    def test_union_type_coercion_preserves_data(self, avro_temp_file):
+        """Test that union type coercion doesn't cause silent data loss.
+
+        When a field has mixed types (e.g., ["null", "long", "string"]),
+        the coercion logic should try each type in the union and preserve
+        the original value if it matches any type, rather than silently
+        converting to null when it doesn't match the first non-null type.
+        """
+        data = [
+            {"id": 1, "value": 42},  # Integer
+            {"id": 2, "value": "hello"},  # String that cannot be coerced to numeric
+            {"id": 3, "value": "3.14"},  # Numeric string
+            {"id": 4, "value": None},  # Null
+        ]
+
+        writer = AvroWriter()
+        writer.write(data, str(avro_temp_file))
+
+        # Read back and verify no data was lost
+        records = read_avro_records(str(avro_temp_file))
+        assert len(records) == 4
+
+        # Verify the integer value was preserved
+        assert records[0]["value"] == 42
+
+        # Critical test: string value should NOT be converted to null
+        # This is the key test that would fail before the fix
+        assert records[1]["value"] == "hello"
+        assert records[1]["value"] is not None
+
+        # Numeric string gets coerced to the first matching type in union
+        # The schema will be ['null', 'long', 'string'] since all values can be strings
+        # "3.14" will match long as 3 or string as "3.14"
+        assert records[2]["value"] is not None
+
+        # Null should remain null
+        assert records[3]["value"] is None
+
 
 class TestAvroStreamingWriter:
     """Test the AvroStreamingWriter class."""

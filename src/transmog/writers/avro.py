@@ -139,54 +139,75 @@ def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:
 def _coerce_value_to_schema(value: Any, field_type: Any) -> Any:
     """Coerce a value to match the expected Avro schema type.
 
+    For union types, attempts to match the value to each type in the union
+    in order, returning the first successful coercion. This prevents silent
+    data loss when a value doesn't match the first non-null type.
+
     Args:
         value: Value to coerce
         field_type: Avro field type (string or list for union)
 
     Returns:
-        Coerced value
+        Coerced value, or None if no type in the union can handle it
     """
     normalized = _normalize_special_floats(value, null_replacement=None)
 
     if normalized is None:
         return None
 
-    # Handle union types
+    # Handle union types - try each type in order
     if isinstance(field_type, list):
-        # Find the first non-null type in the union
         non_null_types = [t for t in field_type if t != "null"]
-        if non_null_types:
-            target_type = non_null_types[0]
-        else:
+        if not non_null_types:
             return None
-    else:
-        target_type = field_type
 
-    # Coerce to target type
+        # Try to coerce to each type in the union
+        for target_type in non_null_types:
+            result = _try_coerce_to_type(normalized, target_type)
+            if result is not None or (result is None and target_type == "null"):
+                return result
+
+        # If no type succeeded, return None
+        return None
+    else:
+        # Single type
+        return _try_coerce_to_type(normalized, field_type)
+
+
+def _try_coerce_to_type(value: Any, target_type: str) -> Any:
+    """Try to coerce a value to a specific Avro type.
+
+    Args:
+        value: Value to coerce
+        target_type: Avro type name
+
+    Returns:
+        Coerced value if successful, None if coercion fails
+    """
     if target_type == "string":
-        return str(normalized)
+        return str(value)
     elif target_type == "long":
         try:
-            return int(normalized)
+            return int(value)
         except (ValueError, TypeError):
             return None
     elif target_type == "double":
         try:
-            return float(normalized)
+            return float(value)
         except (ValueError, TypeError):
             return None
     elif target_type == "boolean":
-        if isinstance(normalized, bool):
-            return normalized
-        if isinstance(normalized, str):
-            return normalized.lower() in ("true", "1", "yes")
-        return bool(normalized)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.lower() in ("true", "1", "yes")
+        return bool(value)
     elif target_type == "bytes":
-        if isinstance(normalized, bytes):
-            return normalized
-        return str(normalized).encode("utf-8")
+        if isinstance(value, bytes):
+            return value
+        return str(value).encode("utf-8")
 
-    return normalized
+    return value
 
 
 def _prepare_record_for_schema(
