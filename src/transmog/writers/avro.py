@@ -232,14 +232,18 @@ def _prepare_record_for_schema(
 class AvroWriter(DataWriter):
     """Avro format writer using fastavro."""
 
-    def __init__(self, codec: str = "snappy", **options: Any) -> None:
+    def __init__(
+        self, codec: str = "snappy", sync_interval: int = 16000, **options: Any
+    ) -> None:
         """Initialize the Avro writer.
 
         Args:
             codec: Compression codec (null, deflate, snappy, zstandard, lz4, bzip2, xz)
+            sync_interval: Approximate size of sync blocks in bytes (default: 16000)
             **options: Additional Avro writer options
         """
         self.codec = codec
+        self.sync_interval = sync_interval
         self.options = options
 
     def write(
@@ -269,6 +273,7 @@ class AvroWriter(DataWriter):
 
         try:
             codec = options.get("codec", self.codec)
+            sync_interval = options.get("sync_interval", self.sync_interval)
 
             if codec not in AVRO_CODECS:
                 raise OutputError(
@@ -293,7 +298,13 @@ class AvroWriter(DataWriter):
                 path.parent.mkdir(parents=True, exist_ok=True)
 
                 with open(path, "wb") as f:
-                    avro_writer(f, parsed_schema, prepared_records, codec=codec)
+                    avro_writer(
+                        f,
+                        parsed_schema,
+                        prepared_records,
+                        codec=codec,
+                        sync_interval=sync_interval,
+                    )
 
                 return str(path) if isinstance(destination, str) else path
 
@@ -305,7 +316,13 @@ class AvroWriter(DataWriter):
                         "text streams not supported"
                     )
 
-                avro_writer(destination, parsed_schema, prepared_records, codec=codec)
+                avro_writer(
+                    destination,
+                    parsed_schema,
+                    prepared_records,
+                    codec=codec,
+                    sync_interval=sync_interval,
+                )
                 return destination
             else:
                 raise OutputError(f"Invalid destination type: {type(destination)}")
