@@ -217,19 +217,15 @@ def _prepare_record_for_schema(
 class AvroWriter(DataWriter):
     """Avro format writer using fastavro."""
 
-    def __init__(
-        self, codec: str = "snappy", sync_interval: int = 16000, **options: Any
-    ) -> None:
+    def __init__(self, codec: str = "snappy", sync_interval: int = 16000) -> None:
         """Initialize the Avro writer.
 
         Args:
             codec: Compression codec (null, deflate, snappy, zstandard, lz4, bzip2, xz)
             sync_interval: Approximate size of sync blocks in bytes (default: 16000)
-            **options: Additional Avro writer options
         """
         self.codec = codec
         self.sync_interval = sync_interval
-        self.options = options
 
     def write(
         self,
