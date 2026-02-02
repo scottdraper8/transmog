@@ -2,7 +2,6 @@
 
 import csv
 import io
-import math
 import os
 import pathlib
 import sys
@@ -13,26 +12,9 @@ from transmog.writers.base import (
     DataWriter,
     StreamingWriter,
     _collect_field_names,
+    _normalize_special_floats,
     _sanitize_filename,
 )
-
-
-def _normalize_special_floats(value: Any) -> Any:
-    """Normalize special float values (NaN, Inf) for CSV output.
-
-    Converts NaN and Infinity to empty string for consistent null representation
-    in CSV format.
-
-    Args:
-        value: Value to normalize
-
-    Returns:
-        Normalized value (empty string for NaN/Inf, original value otherwise)
-    """
-    if isinstance(value, float):
-        if math.isnan(value) or math.isinf(value):
-            return ""
-    return value
 
 
 def _sanitize_csv_value(value: Any) -> Any:
@@ -83,7 +65,7 @@ def _sanitize_record(record: dict[str, Any]) -> dict[str, Any]:
         New dictionary with sanitized values
     """
     return {
-        key: _sanitize_csv_value(_normalize_special_floats(value))
+        key: _sanitize_csv_value(_normalize_special_floats(value, null_replacement=""))
         for key, value in record.items()
     }
 

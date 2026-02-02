@@ -1,6 +1,5 @@
 """Avro format writers using fastavro."""
 
-import math
 import os
 import pathlib
 from typing import Any, BinaryIO, TextIO
@@ -10,6 +9,7 @@ from transmog.writers.base import (
     DataWriter,
     StreamingWriter,
     _collect_field_names,
+    _normalize_special_floats,
     _sanitize_filename,
 )
 
@@ -25,24 +25,6 @@ except ImportError:
 
 # Supported Avro compression codecs
 AVRO_CODECS = ("null", "deflate", "snappy", "zstandard", "lz4", "bzip2", "xz")
-
-
-def _normalize_special_floats(value: Any) -> Any:
-    """Normalize special float values (NaN, Inf) for Avro output.
-
-    Converts NaN and Infinity to None for consistent null representation
-    in Avro format.
-
-    Args:
-        value: Value to normalize
-
-    Returns:
-        Normalized value (None for NaN/Inf, original value otherwise)
-    """
-    if isinstance(value, float):
-        if math.isnan(value) or math.isinf(value):
-            return None
-    return value
 
 
 def _python_type_to_avro(value: Any) -> str:
@@ -148,7 +130,10 @@ def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:
     Returns:
         New dictionary with normalized values
     """
-    return {key: _normalize_special_floats(value) for key, value in record.items()}
+    return {
+        key: _normalize_special_floats(value, null_replacement=None)
+        for key, value in record.items()
+    }
 
 
 def _coerce_value_to_schema(value: Any, field_type: Any) -> Any:
@@ -161,7 +146,7 @@ def _coerce_value_to_schema(value: Any, field_type: Any) -> Any:
     Returns:
         Coerced value
     """
-    normalized = _normalize_special_floats(value)
+    normalized = _normalize_special_floats(value, null_replacement=None)
 
     if normalized is None:
         return None
