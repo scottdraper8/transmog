@@ -1,6 +1,6 @@
 # Output Formats
 
-Supported formats: CSV, Parquet, and ORC.
+Supported formats: CSV, Parquet, ORC, and Avro.
 
 ## Saving Results
 
@@ -15,6 +15,7 @@ result = tm.flatten(data, name="products")
 result.save("output.csv")          # CSV
 result.save("output.parquet")      # Parquet
 result.save("output.orc")          # ORC
+result.save("output.avro")         # Avro
 ```
 
 ### Explicit Format
@@ -24,6 +25,7 @@ result.save("output.orc")          # ORC
 result.save("output", output_format="csv")
 result.save("output", output_format="parquet")
 result.save("output", output_format="orc")
+result.save("output", output_format="avro")
 ```
 
 ### Multiple Tables
@@ -44,7 +46,15 @@ result.save("output/products.csv")
 ```python
 result = tm.flatten(data, name="products")
 result.save("output.csv")
+```
 
+:::{tip}
+For consistent CSV columns across all rows, use `include_nulls=True` in
+`TransmogConfig`. This ensures fields that are missing in some records appear
+as empty strings in the CSV output.
+:::
+
+```python
 # Include nulls for consistent columns
 config = tm.TransmogConfig(include_nulls=True)
 result = tm.flatten(data, config=config)
@@ -89,6 +99,67 @@ result.save("output.orc", compression="snappy")
 result.save("output.orc", compression="lz4")
 result.save("output.orc", compression="zlib")
 ```
+
+## Avro Output
+
+```python
+result = tm.flatten(data, name="products")
+result.save("output.avro")
+
+# Compression options (codec parameter)
+result.save("output.avro", codec="snappy")     # Default (via cramjam)
+result.save("output.avro", codec="deflate")    # Built-in compression
+result.save("output.avro", codec="null")       # No compression
+result.save("output.avro", codec="bzip2")      # Via cramjam
+result.save("output.avro", codec="xz")         # Via cramjam
+
+# Additional codecs (require separate package installations):
+# codec="zstandard"  # Requires: pip install zstandard
+# codec="lz4"        # Requires: pip install lz4
+
+# Advanced: customize sync interval (bytes between sync markers)
+result.save("output.avro", codec="snappy", sync_interval=32000)
+```
+
+:::{note}
+**Codec Dependencies:**
+
+To use additional codecs beyond the defaults:
+
+- **zstandard**: `pip install zstandard`
+- **lz4**: `pip install lz4`
+
+Technical detail: While cramjam (included by default) bundles these compression
+algorithms, fastavro's codec interface requires the standalone packages to expose them.
+:::
+
+### Avro Schema Inference
+
+Avro schemas are automatically inferred from your data:
+
+```python
+data = [
+    {"name": "Alice", "age": 30, "score": 95.5},
+    {"name": "Bob", "age": None, "score": 88.0}
+]
+
+result = tm.flatten(data, name="users")
+result.save("output.avro")
+```
+
+Schema inference behavior:
+
+- Field types are detected from values (string, long, double, boolean, bytes)
+- Nullable fields use Avro union types: `["null", "type"]`
+- NaN and Infinity float values are automatically converted to null
+- Mixed types in a field result in union types with multiple type options
+- Schema is locked after the first batch in streaming mode
+
+:::{warning}
+When using `flatten_stream()` with Avro output, the schema is determined from the
+first batch of records. If subsequent batches contain new fields not present in
+the first batch, a schema drift error will be raised.
+:::
 
 ## Null Handling
 

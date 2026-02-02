@@ -79,7 +79,11 @@ def ensure_poetry() -> None:
 
 
 def install_dependencies() -> None:
-    """Install project and development dependencies via Poetry."""
+    """Install project and development dependencies via Poetry.
+
+    Poetry resolves dependencies to the latest compatible versions
+    based on the version constraints specified in pyproject.toml.
+    """
     run_command(
         ["poetry", "install", "--extras", "dev"],
         description="Installing dependencies with Poetry (including dev extras)",
@@ -97,7 +101,7 @@ def install_pre_commit_hooks() -> None:
     run_command(
         ["poetry", "run", "pre-commit", "install", "--hook-type", "pre-push"],
         description="Installing pre-push hook",
-        check=False,
+        check=True,
     )
 
 

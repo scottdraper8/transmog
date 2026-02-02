@@ -6,6 +6,7 @@ hierarchical relationship preservation.
 """
 
 import json
+import math
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -16,6 +17,25 @@ from transmog.types import ArrayMode, JsonDict, ProcessingContext
 
 # Namespace UUID for deterministic ID generation
 TRANSMOG_NAMESPACE = uuid.UUID("a9b8c7d6-e5f4-1234-abcd-0123456789ab")
+
+
+def is_null_like(value: Any) -> bool:
+    """Check if a value should be treated as null-like.
+
+    Null-like values include None, empty strings, NaN, and Infinity.
+    These are treated consistently for null handling purposes.
+
+    Args:
+        value: Value to check
+
+    Returns:
+        True if value is null-like
+    """
+    if value is None or value == "":
+        return True
+    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+        return True
+    return False
 
 
 # ============================================================================
@@ -191,7 +211,7 @@ def _process_array_items(
     is_simple = True
 
     for item in array:  # Single iteration through the array
-        if item is None and not config.include_nulls:
+        if is_null_like(item) and not config.include_nulls:
             continue
 
         if isinstance(item, dict):
@@ -215,8 +235,15 @@ def _process_array_items(
             )
             metadata_dict = flattened
         else:
-            # Simple primitive value
-            metadata_dict = {"value": item}
+            # Simple primitive value - apply stringify if configured
+            if (
+                config.stringify_values
+                and not isinstance(item, str)
+                and not is_null_like(item)
+            ):
+                metadata_dict = {"value": str(item)}
+            else:
+                metadata_dict = {"value": item}
             item_arrays = {}
 
         if _collect_arrays:
@@ -328,7 +355,16 @@ def flatten_json(
                 )
 
                 if is_simple:
-                    result[current_path] = value
+                    # Stringify array items if configured
+                    if config.stringify_values:
+                        result[current_path] = [
+                            str(v)
+                            if not isinstance(v, str) and not is_null_like(v)
+                            else v
+                            for v in value
+                        ]
+                    else:
+                        result[current_path] = value
                 elif _collect_arrays:
                     for table_name, table_records in array_items.items():
                         arrays.setdefault(table_name, []).extend(table_records)
@@ -353,16 +389,21 @@ def flatten_json(
                 )
 
         else:
-            if value is not None and value != "":
+            if not is_null_like(value):
+                # Apply stringify if configured (skip if already string)
+                if config.stringify_values and not isinstance(value, str):
+                    value = str(value)
+
                 if _context.path_components:
                     result[current_path] = value
                 else:
                     result[key] = value
             elif config.include_nulls:
+                # Null values remain as None, not stringified
                 if _context.path_components:
-                    result[current_path] = ""
+                    result[current_path] = None
                 else:
-                    result[key] = ""
+                    result[key] = None
 
     return result, arrays
 
@@ -534,4 +575,5 @@ __all__ = [
     "get_current_timestamp",
     "annotate_with_metadata",
     "process_record_batch",
+    "is_null_like",
 ]

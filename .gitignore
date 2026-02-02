@@ -3,7 +3,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
 build/
 develop-eggs/
 dist/
@@ -17,12 +16,9 @@ sdist/
 var/
 wheels/
 *.egg-info/
-.installed.cfg
 *.egg
 
 # Distribution / packaging
-.env
-.venv
 env/
 venv/
 ENV/
@@ -30,34 +26,28 @@ env.bak/
 venv.bak/
 
 # Testing
-.pytest_cache/
 htmlcov/
 .tox/
-.coverage
-.coverage.*
-.cache
 nosetests.xml
 coverage.xml
 *.cover
-.hypothesis/
 benchmark_results.json
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IDE files
-.cursor/
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-
 # Project specific
-.benchmarks/
 logs/
 CLEAN_AND_OPTIMIZE/
 
 # Documentation
 docs/_build/
 docs/_autosummary/
+
+# Generic configs & hidden files
+.*
+!.git*
+!.pre-commit-config.yaml
+
+# Tracking Cursor rules and commands
+!.cursor/
+.cursor/*
+!.cursor/rules/
+!.cursor/commands/

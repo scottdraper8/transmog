@@ -1,8 +1,28 @@
 """Base classes for data writers."""
 
+import math
 import re
 from abc import ABC, abstractmethod
 from typing import Any, BinaryIO, Literal, TextIO
+
+
+def _normalize_special_floats(value: Any, null_replacement: Any = None) -> Any:
+    """Normalize special float values (NaN, Inf) for output.
+
+    Converts NaN and Infinity to the specified null_replacement value
+    for consistent null representation across different formats.
+
+    Args:
+        value: Value to normalize
+        null_replacement: Value to use for NaN/Inf (default: None)
+
+    Returns:
+        Normalized value (null_replacement for NaN/Inf, original value otherwise)
+    """
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            return null_replacement
+    return value
 
 
 def _collect_field_names(data: list[dict[str, Any]]) -> list[str]:
@@ -117,4 +137,4 @@ class StreamingWriter(ABC):
         return False
 
 
-__all__ = ["DataWriter", "StreamingWriter"]
+__all__ = ["DataWriter", "StreamingWriter", "_normalize_special_floats"]

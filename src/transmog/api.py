@@ -86,7 +86,7 @@ class FlattenResult:
         Args:
             path: Output path (file or directory depending on format)
             output_format: Output format (auto-detected from extension if not specified)
-                          Options: 'csv', 'parquet', 'orc'
+                          Options: 'csv', 'parquet', 'orc', 'avro'
             **format_options: Additional writer-specific options forwarded to
                 the underlying writer implementation.
 
@@ -100,7 +100,7 @@ class FlattenResult:
             if not output_format:
                 output_format = "csv"
 
-        valid_formats = ["csv", "parquet", "orc"]
+        valid_formats = ["csv", "parquet", "orc", "avro"]
         if output_format not in valid_formats:
             raise ValueError(
                 f"Unsupported format: {output_format}. Must be one of {valid_formats}"
@@ -253,7 +253,7 @@ def flatten_stream(
         data: Input data - can be dict, list of dicts, file path, or JSON string
         output_path: Directory path where output files will be written
         name: Base name for the flattened tables
-        output_format: Output format ("csv", "parquet", "orc")
+        output_format: Output format ("csv", "parquet", "orc", "avro")
         config: Optional configuration (optimized for memory if not provided)
         **format_options: Format-specific writer options:
 
@@ -266,6 +266,14 @@ def flatten_stream(
                 - compression: str - Compression codec
                   ("zstd", "snappy", "lz4", "zlib", None)
                 - batch_size: int - Rows per batch (default: 10000)
+
+            Avro options:
+                - codec: str - Compression codec
+                  ("null", "deflate", "snappy", "bzip2", "xz")
+                  Note: snappy/bzip2/xz provided via cramjam (included by default)
+                        zstandard/lz4 require separate packages (fastavro limitation)
+                - sync_interval: int - Approximate sync block size in bytes
+                  (default: 16000)
 
     Examples:
         >>> # Stream large dataset to CSV files
@@ -282,6 +290,10 @@ def flatten_stream(
         >>> # Stream to compressed ORC with specific batch size
         >>> flatten_stream(data, "output/", output_format="orc",
         ...                compression="zstd", batch_size=50000)
+
+        >>> # Stream to Avro with snappy compression
+        >>> flatten_stream(data, "output/", output_format="avro",
+        ...                codec="snappy")
     """
     if config is None:
         config = TransmogConfig(batch_size=100)

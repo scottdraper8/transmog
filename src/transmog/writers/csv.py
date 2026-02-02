@@ -12,6 +12,7 @@ from transmog.writers.base import (
     DataWriter,
     StreamingWriter,
     _collect_field_names,
+    _normalize_special_floats,
     _sanitize_filename,
 )
 
@@ -53,7 +54,9 @@ def _sanitize_csv_value(value: Any) -> Any:
 
 
 def _sanitize_record(record: dict[str, Any]) -> dict[str, Any]:
-    """Sanitize all values in a record to prevent CSV injection.
+    """Sanitize all values in a record for CSV output.
+
+    Normalizes special float values (NaN, Inf) and prevents CSV injection.
 
     Args:
         record: Dictionary record to sanitize
@@ -61,7 +64,10 @@ def _sanitize_record(record: dict[str, Any]) -> dict[str, Any]:
     Returns:
         New dictionary with sanitized values
     """
-    return {key: _sanitize_csv_value(value) for key, value in record.items()}
+    return {
+        key: _sanitize_csv_value(_normalize_special_floats(value, null_replacement=""))
+        for key, value in record.items()
+    }
 
 
 class CsvWriter(DataWriter):

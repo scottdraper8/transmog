@@ -5,10 +5,11 @@ requires = [ "poetry>=1" ]
 
 [project]
 name = "transmog"
-version = "2.0.1"
+version = "2.0.2"
 description = "A data transformation library for flattening complex nested structures into tabular formats while preserving hierarchical relationships"
 readme = "README.md"
 keywords = [
+  "avro",
   "csv",
   "data-pipeline",
   "data-processing",
@@ -37,32 +38,40 @@ classifiers = [
   "Topic :: Database :: Database Engines/Servers",
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-dependencies = [ "hjson>=3.1", "json5>=0.9", "orjson>=3.8", "pyarrow>=7", "typing-extensions>=4" ]
+dependencies = [
+  "cramjam>=2.7",
+  "fastavro>=1.9",
+  "hjson>=3.1",
+  "json5>=0.13",
+  "orjson>=3.11",
+  "pyarrow>=23",
+  "typing-extensions>=4",
+]
 
 optional-dependencies.dev = [
-  "bandit>=1.7.5",
+  "bandit>=1.9",
   # Documentation dependencies
-  "furo>=2024.1.29",
-  "interrogate>=1.5",
+  "furo>=2024.8",
+  "interrogate>=1.7",
   "linkify-it-py>=2",
   "memory-profiler>=0.60",
-  "mypy>=0.9",
-  "myst-parser>=2",
-  "pre-commit>=3.5",
+  "mypy>=1.19",
+  "myst-parser>=4",
+  "pre-commit>=4.5",
   "psutil>=5.8",
-  "pyproject-fmt>=1.5.1",
+  "pyproject-fmt>=2.6",
   "pyproject-parser>=0.7",
-  "pytest>=7",
+  "pytest>=9",
   "pytest-benchmark>=4",
   "pytest-cov>=3",
-  "ruff>=0.3",
+  "ruff>=0.14",
   "safety>=2.3.5",
-  "sphinx>=7.2",
+  "sphinx>=7,<9",
   "sphinx-autobuild>=2021.3.14",
   "sphinx-autodoc-typehints>=1.24",
   "sphinx-copybutton>=0.5",
   "sphinx-design>=0.5",
-  "sphinx-rtd-theme>=2",
+  "sphinx-rtd-theme>=3",
   "sphinxcontrib-applehelp>=1",
   "sphinxcontrib-htmlhelp>=2",
   "sphinxcontrib-jsmath>=1",
@@ -74,7 +83,12 @@ optional-dependencies.dev = [
   "types-toml",
 ]
 
-optional-dependencies.minimal = [ "hjson>=3.1", "json5>=0.9", "orjson>=3.8", "typing-extensions>=4" ]
+optional-dependencies.minimal = [
+  "hjson>=3.1",
+  "json5>=0.13",
+  "orjson>=3.11",
+  "typing-extensions>=4",
+]
 
 urls."Bug Tracker" = "https://github.com/scottdraper8/transmog/issues"
 urls."Documentation" = "https://scottdraper8.github.io/transmog/"

@@ -44,6 +44,12 @@ print(result.tables["products_reviews"])
 Simple arrays contain only primitive values (strings, numbers, booleans,
 null). Complex arrays contain objects or nested structures.
 
+:::{tip} When to use SMART mode
+Default choice for most use cases. Balances data normalization
+with simplicity by keeping simple lists inline while properly normalizing
+complex nested data.
+:::
+
 ### SEPARATE Mode
 
 Extract all arrays into child tables:
@@ -56,6 +62,15 @@ result = tm.flatten(data, name="products", config=config)
 print(result.tables.keys())
 # ['products_tags', 'products_reviews']
 ```
+
+:::{tip} When to use SEPARATE mode
+Choose SEPARATE when:
+
+- Child records need to be queried independently
+- Building a fully normalized relational schema
+- Array items have their own identity or lifecycle
+- Performing analytics that aggregate across array items
+:::
 
 ### INLINE Mode
 
@@ -76,6 +91,15 @@ print(result.main)
 # ]
 ```
 
+:::{tip} When to use INLINE mode
+Choose INLINE when:
+
+- Arrays are treated as opaque blobs
+- Downstream systems parse JSON natively
+- Preserving exact array structure is important
+- Minimizing table count is a priority
+:::
+
 ### SKIP Mode
 
 Ignore arrays entirely:
@@ -88,6 +112,14 @@ result = tm.flatten(data, name="products", config=config)
 print(result.main)
 # [{'product_name': 'Laptop', '_id': '...'}]
 ```
+
+:::{tip} When to use SKIP mode
+Choose SKIP when:
+
+- Arrays are not relevant to the analysis
+- Extracting only top-level scalar fields
+- Reducing output size by excluding nested data
+:::
 
 ## Nested Arrays
 

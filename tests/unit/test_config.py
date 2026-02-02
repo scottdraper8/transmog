@@ -16,6 +16,7 @@ class TestConfigCreation:
 
         assert isinstance(config, TransmogConfig)
         assert config.include_nulls is False
+        assert config.stringify_values is False
         assert config.batch_size == 1000
         assert config.id_field == "_id"
         assert config.parent_field == "_parent_id"
@@ -30,6 +31,16 @@ class TestConfigCreation:
 
         assert config.batch_size == 500
         assert config.include_nulls is True
+
+    def test_stringify_values_default(self):
+        """Test stringify_values defaults to False."""
+        config = TransmogConfig()
+        assert config.stringify_values is False
+
+    def test_stringify_values_enabled(self):
+        """Test stringify_values can be enabled."""
+        config = TransmogConfig(stringify_values=True)
+        assert config.stringify_values is True
 
 
 class TestConfigValidation:
@@ -57,6 +68,14 @@ class TestConfigValidation:
 
         with pytest.raises(ConfigurationError):
             TransmogConfig(id_field="test", time_field="test")
+
+    def test_stringify_values_must_be_boolean(self):
+        """Test that stringify_values must be a boolean."""
+        with pytest.raises(ConfigurationError, match="must be a boolean"):
+            TransmogConfig(stringify_values="true")
+
+        with pytest.raises(ConfigurationError, match="must be a boolean"):
+            TransmogConfig(stringify_values=1)
 
 
 class TestConfigArrayModes:

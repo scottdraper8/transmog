@@ -11,7 +11,8 @@
             "mermaid",
             "br",
             "details",
-            "summary"
+            "summary",
+            "div"
         ]
     },
     "MD048": {
@@ -36,5 +37,6 @@
     "MD040": true,
     "MD004": {
         "style": "dash"
-    }
+    },
+    "MD041": false
 }

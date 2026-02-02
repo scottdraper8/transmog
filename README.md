@@ -1,18 +1,29 @@
-# Transmog
+<div align="center">
 
-[![PyPI version](https://img.shields.io/pypi/v/transmog.svg?logo=pypi&color=ff79c6&labelColor=282a36)](https://pypi.org/project/transmog/)
-[![Python versions](https://img.shields.io/badge/python-3.10%2B-bd93f9?logo=python&logoColor=white&labelColor=282a36)](https://pypi.org/project/transmog/)
-[![License](https://img.shields.io/github/license/scottdraper8/transmog.svg?logo=github&color=50fa7b&labelColor=282a36)](https://github.com/scottdraper8/transmog/blob/main/LICENSE)
+# Transmog - Flatten Nested JSON to Tabular Formats
 
-Flatten nested JSON data into tabular formats while preserving parent-child relationships.
+[![Transmog Version](https://img.shields.io/badge/transmog-2.0.1-ff79c6?logo=github&logoColor=white&labelColor=6272a4)](https://github.com/scottdraper8/transmog/releases)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-ffb86c?logo=python&logoColor=white&labelColor=6272a4)](https://www.python.org/downloads/)
+[![Poetry](https://img.shields.io/badge/Poetry-1.0+-f1fa8c?logo=poetry&logoColor=282a36&labelColor=6272a4)](https://python-poetry.org/)
+[![pre-commit](https://img.shields.io/badge/pre--commit-6.0.0-50fa7b?logo=pre-commit&logoColor=282a36&labelColor=6272a4)](https://github.com/pre-commit/pre-commit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-8be9fd?logo=opensourceinitiative&logoColor=white&labelColor=6272a4)](LICENSE)
+
+---
+
+A configurable data flattening tool that transforms nested JSON data into
+flat, tabular formats while preserving parent-child relationships.
+
+---
+
+</div>
 
 ## Installation
 
 ```bash
-# Standard install (includes Parquet and ORC support)
+# Full install (CSV, Parquet, ORC, Avro output)
 pip install transmog
 
-# Minimal install (CSV output only)
+# CSV only (no pyarrow, fastavro, or cramjam)
 pip install transmog[minimal]
 ```
 
@@ -29,92 +40,42 @@ result.tables["users_orders"]  # Child tables
 result.save("output.csv")      # Save to file
 ```
 
-**How it works:** Nested JSON is flattened into related tables with foreign key relationships:
+### In-Memory vs Streaming
 
-```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': {
-    'primaryColor': '#ff79c6',
-    'secondaryColor': '#bd93f9',
-    'tertiaryColor': '#44475a',
-    'mainBkg': '#282a36',
-    'nodeBorder': '#ff79c6',
-    'clusterBkg': '#44475a',
-    'clusterBorder': '#bd93f9',
-    'textColor': '#f8f8f2'
-}}}%%
-flowchart LR
-    subgraph Input["INPUT"]
-        JSON["user: Alice
-        orders: [
-          • id: 101
-          • id: 102
-        ]"]
-    end
+1. **flatten(data, name, config)** — Flatten data in memory
 
-    Input --> |flatten| ERD
+    ```python
+    result = tm.flatten("data.json", name="products")
+    result = tm.flatten([{"id": 1}, {"id": 2}])
+    result.save("output.parquet")
+    ```
 
-    subgraph ERD["OUTPUT"]
-        direction LR
+2. **flatten_stream(data, output_path, name, output_format)** — Stream directly to disk
 
-        users["users
-        ━━━━━━━━━━━━━━
-        _id PK
-        user
-        _timestamp"]
-
-        users_orders["users_orders
-        ━━━━━━━━━━━━━━━━
-        _id PK
-        _parent_id FK
-        id
-        _timestamp"]
-
-        users -->|1:N| users_orders
-    end
-
-    style Input fill:#44475a,stroke:#ff79c6,stroke-width:3px
-    style ERD fill:#44475a,stroke:#bd93f9,stroke-width:3px
-    style JSON fill:#282a36,stroke:#ff79c6,stroke-width:2px,color:#f8f8f2
-    style users fill:#282a36,stroke:#50fa7b,stroke-width:2px,color:#f8f8f2
-    style users_orders fill:#282a36,stroke:#8be9fd,stroke-width:2px,color:#f8f8f2
-```
-
-## Features
-
-- Flatten nested JSON to CSV, Parquet, or ORC
-- Smart array handling preserves simple arrays, extracts complex arrays to child tables
-- Read JSON, JSON Lines, JSON5, HJSON files
-- Stream processing for large datasets
-- Configurable ID generation strategies
-
-## API
-
-**flatten(data, name, config)** — Flatten data in memory
-
-```python
-result = tm.flatten("data.json", name="products")
-result = tm.flatten([{"id": 1}, {"id": 2}])
-result.save("output.parquet")
-```
-
-**flatten_stream(data, output_path, name, output_format)** — Stream directly to disk
-
-```python
-tm.flatten_stream("large.jsonl", "output/", name="events", output_format="parquet")
-```
+    ```python
+    tm.flatten_stream("large.jsonl", "output/", name="events", output_format="parquet")
+    ```
 
 ## Configuration
 
 ```python
 config = tm.TransmogConfig(
-    array_mode=tm.ArrayMode.SMART,   # SMART, SEPARATE, INLINE, SKIP
-    id_generation="random",          # random, natural, hash, or ["field1", "field2"]
-    id_field="_id",
-    parent_field="_parent_id",
-    time_field="_timestamp",
-    include_nulls=False,
-    max_depth=100,
-    batch_size=1000
+    # Array handling
+    array_mode=tm.ArrayMode.SMART,   # SMART (default), SEPARATE, INLINE, SKIP
+
+    # ID generation and metadata fields
+    id_generation="random",          # random (default), natural, hash, or ["field1", "field2"]
+    id_field="_id",                  # Field name for record IDs
+    parent_field="_parent_id",       # Field name for parent references
+    time_field="_timestamp",         # Field name for timestamps (None to disable)
+
+    # Data transformation
+    include_nulls=False,             # Include null/empty values in output
+    stringify_values=False,          # Convert all leaf values to strings
+
+    # Processing controls
+    max_depth=100,                   # Maximum recursion depth
+    batch_size=1000                  # Records per batch for streaming
 )
 
 result = tm.flatten(data, config=config)
@@ -122,30 +83,30 @@ result = tm.flatten(data, config=config)
 
 ### Array Modes
 
-| Mode | Behavior |
-|------|----------|
-| `SMART` | Preserve simple arrays, extract complex arrays to child tables |
-| `SEPARATE` | Extract all arrays to child tables |
-| `INLINE` | Serialize arrays as JSON strings |
-| `SKIP` | Omit arrays from output |
+| Mode       | Behavior                                                        |
+| ---------- | --------------------------------------------------------------- |
+| `SMART`    | Preserve simple arrays, extract complex arrays to child tables  |
+| `SEPARATE` | Extract all arrays to child tables                              |
+| `INLINE`   | Serialize arrays as JSON strings                                |
+| `SKIP`     | Omit arrays from output                                         |
 
 ### ID Generation
 
-| Strategy | Description |
-|----------|-------------|
-| `random` | Generate random UUID (default) |
-| `natural` | Use existing ID field from data |
-| `hash` | Deterministic hash of entire record |
-| `["field1", ...]` | Deterministic hash of specified fields |
+| Strategy          | Description                                        |
+| ----------------- | -------------------------------------------------- |
+| `random`          | Generate random UUID (default)                     |
+| `natural`         | Use existing ID field from data                    |
+| `hash`            | Deterministic hash of entire record                |
+| `["field1", ...]` | Deterministic hash of specified fields             |
 
 ## Documentation
 
 Full documentation: [scottdraper8.github.io/transmog](https://scottdraper8.github.io/transmog)
 
-- [Getting Started Guide](https://scottdraper8.github.io/transmog/getting_started.html)
-- [User Guide](https://scottdraper8.github.io/transmog/user_guide/file-processing.html)
-- [API Reference](https://scottdraper8.github.io/transmog/api_reference/api.html)
-- [Developer Guide](https://scottdraper8.github.io/transmog/developer_guide/contributing.html)
+- [Getting Started](https://scottdraper8.github.io/transmog/getting_started.html)
+- [Configuration](https://scottdraper8.github.io/transmog/configuration.html)
+- [API Reference](https://scottdraper8.github.io/transmog/api.html)
+- [Contributing](https://scottdraper8.github.io/transmog/contributing.html)
 
 ## License
 

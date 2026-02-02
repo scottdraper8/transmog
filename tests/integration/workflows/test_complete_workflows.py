@@ -43,9 +43,17 @@ class TestEndToEndWorkflows:
         else:
             assert_files_created(parquet_paths)
 
+        # Step 4: Save to Avro
+        avro_paths = result.save(str(output_dir / "avro_output"), output_format="avro")
+        if isinstance(avro_paths, dict):
+            assert_files_created(list(avro_paths.values()))
+        else:
+            assert_files_created(avro_paths)
+
         # Verify all formats created files in their respective subdirectories
         assert count_files_in_dir(output_dir / "csv_output", "*.csv") > 0
         assert count_files_in_dir(output_dir / "parquet_output", "*.parquet") > 0
+        assert count_files_in_dir(output_dir / "avro_output", "*.avro") > 0
 
     def test_file_to_file_processing(self, large_json_file, output_dir):
         """Test processing from file to file."""
@@ -90,18 +98,44 @@ class TestEndToEndWorkflows:
 
         assert result is None  # Streaming returns None
 
-        # Verify files were created
+        # Verify files were created and contain data
         csv_files = list((output_dir / "streaming_csv").glob("**/*.csv"))
         assert len(csv_files) > 0
+
+        # Verify content by reading back the main CSV
+        import csv
+
+        main_csv = [
+            f for f in csv_files if "users" in f.name and "profile" not in f.name
+        ]
+        if main_csv:
+            with open(main_csv[0], newline="") as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+            # Should have processed all 100 records
+            assert len(rows) == 100
+            # Verify first and last records
+            assert rows[0]["name"] == "User 1"
+            assert rows[-1]["name"] == "User 100"
 
     def test_deterministic_id_consistency(self, array_data):
         """Test that deterministic IDs are consistent across runs."""
         config = tm.TransmogConfig(id_generation="hash", id_field="id")
         result1 = tm.flatten(array_data, name="test", config=config)
-
         result2 = tm.flatten(array_data, name="test", config=config)
 
+        # Main table IDs should be identical
         assert result1.main[0]["id"] == result2.main[0]["id"]
+
+        # Child table IDs should also be identical
+        for table_name in result1.tables:
+            if table_name in result2.tables:
+                for i, record in enumerate(result1.tables[table_name]):
+                    if "_id" in record and i < len(result2.tables[table_name]):
+                        assert record["_id"] == result2.tables[table_name][i]["_id"]
+
+        # Data content should be identical
+        assert result1.main[0]["name"] == result2.main[0]["name"]
 
 
 class TestRealWorldScenarios:
@@ -193,7 +227,7 @@ class TestPerformanceScenarios:
     """Test performance-related scenarios."""
 
     def test_memory_efficient_processing(self, output_dir):
-        """Test memory-efficient processing of large datasets."""
+        """Test batch processing with memory-efficient configuration."""
         # Create a dataset with complex structure
         large_dataset = []
         for i in range(50):  # Smaller for testing
@@ -209,13 +243,16 @@ class TestPerformanceScenarios:
             }
             large_dataset.append(record)
 
-        # Process with memory optimization
+        # Process with batch configuration
         config = tm.TransmogConfig(batch_size=10)
         result = tm.flatten(large_dataset, name="large_data", config=config)
 
         assert len(result.main) == 50
+        # Verify data integrity
+        assert result.main[0]["id"] == 0
+        assert result.main[49]["id"] == 49
 
-        # Stream process for even better memory efficiency
+        # Stream process for comparison
         tm.flatten_stream(
             large_dataset,
             output_path=str(output_dir / "memory_efficient"),
@@ -224,7 +261,7 @@ class TestPerformanceScenarios:
             batch_size=10,
         )
 
-        # Verify output
+        # Verify output files exist and contain data
         csv_files = list((output_dir / "memory_efficient").glob("**/*.csv"))
         assert len(csv_files) > 0
 

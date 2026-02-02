@@ -106,7 +106,8 @@ class TestNullHandlingInclude:
         main_record = result.main[0]
         assert "valid" in main_record
         assert "empty" in main_record
-        assert main_record["empty"] == ""
+        # Empty strings are converted to None for consistent null representation
+        assert main_record["empty"] is None
 
     def test_include_preserves_zero_values(self):
         """Test that zero values are preserved (not treated as null)."""
@@ -132,8 +133,12 @@ class TestNullHandlingEdgeCases:
 
         result = tm.flatten(data, name="test")
 
-        # Record should exist but be minimal
-        assert len(result.main) >= 0
+        # Record should exist with only metadata fields (no data fields)
+        assert len(result.main) == 1
+        main_record = result.main[0]
+        # Should only have metadata fields, no data fields
+        data_fields = [k for k in main_record.keys() if not k.startswith("_")]
+        assert len(data_fields) == 0
 
     def test_all_null_record_include(self):
         """Test record with all null values in INCLUDE mode."""
@@ -142,12 +147,16 @@ class TestNullHandlingEdgeCases:
         config = TransmogConfig(include_nulls=True)
         result = tm.flatten(data, name="test", config=config)
 
-        # Record should exist with null fields
-        assert len(result.main) >= 0
-        if len(result.main) > 0:
-            main_record = result.main[0]
-            # Should have at least generated fields
-            assert len(main_record) > 0
+        # Record should exist with null fields included
+        assert len(result.main) == 1
+        main_record = result.main[0]
+        # Should have the null fields
+        assert "field1" in main_record
+        assert "field2" in main_record
+        assert "field3" in main_record
+        assert main_record["field1"] is None
+        assert main_record["field2"] is None
+        assert main_record["field3"] is None
 
     def test_mixed_null_and_valid_data(self):
         """Test mix of null and valid data."""
@@ -239,3 +248,166 @@ class TestNullHandlingConsistency:
 
         # Results should be identical
         assert set(result1.main[0].keys()) == set(result2.main[0].keys())
+
+
+class TestNullHandlingWithArrayModes:
+    """Test null handling interaction with different array modes."""
+
+    def test_null_in_array_smart_mode(self):
+        """Test null values in arrays with SMART mode."""
+        from transmog.types import ArrayMode
+
+        data = {"id": 1, "values": [1, None, 2, None, 3]}
+
+        config = TransmogConfig(array_mode=ArrayMode.SMART, include_nulls=False)
+        result = tm.flatten(data, name="test", config=config)
+
+        main = result.main[0]
+        # Simple array should be preserved
+        assert "values" in main
+
+    def test_null_in_array_separate_mode(self):
+        """Test null values in arrays with SEPARATE mode."""
+        from transmog.types import ArrayMode
+
+        data = {
+            "id": 1,
+            "items": [
+                {"name": "Item1", "value": 10},
+                {"name": None, "value": 20},
+                {"name": "Item3", "value": None},
+            ],
+        }
+
+        config = TransmogConfig(array_mode=ArrayMode.SEPARATE, include_nulls=False)
+        result = tm.flatten(data, name="test", config=config)
+
+        # Should have child table
+        assert len(result.tables) > 0
+
+    def test_null_in_array_inline_mode(self):
+        """Test null values in arrays with INLINE mode."""
+        from transmog.types import ArrayMode
+
+        data = {"id": 1, "values": [1, None, 2]}
+
+        config = TransmogConfig(array_mode=ArrayMode.INLINE)
+        result = tm.flatten(data, name="test", config=config)
+
+        main = result.main[0]
+        # Array should be JSON-serialized
+        assert "values" in main
+
+    def test_null_in_array_skip_mode(self):
+        """Test null values in arrays with SKIP mode."""
+        from transmog.types import ArrayMode
+
+        data = {"id": 1, "values": [1, None, 2], "name": "test"}
+
+        config = TransmogConfig(array_mode=ArrayMode.SKIP)
+        result = tm.flatten(data, name="test", config=config)
+
+        main = result.main[0]
+        # Array should be skipped entirely
+        assert "values" not in main
+        assert "name" in main
+
+
+class TestNullVsMissingKey:
+    """Test distinction between explicit None and missing keys."""
+
+    def test_explicit_none_vs_missing_skip_mode(self):
+        """Test that explicit None and missing key behave same in skip mode."""
+        data_with_none = {"id": 1, "name": "Alice", "optional": None}
+        data_missing_key = {"id": 2, "name": "Bob"}
+
+        result1 = tm.flatten(data_with_none, name="test")
+        result2 = tm.flatten(data_missing_key, name="test")
+
+        # Both should not have 'optional' field
+        assert "optional" not in result1.main[0]
+        assert "optional" not in result2.main[0]
+
+    def test_explicit_none_vs_missing_include_mode(self):
+        """Test that explicit None is included but missing key is not."""
+        data_with_none = {"id": 1, "name": "Alice", "optional": None}
+        data_missing_key = {"id": 2, "name": "Bob"}
+
+        config = TransmogConfig(include_nulls=True)
+        result1 = tm.flatten(data_with_none, name="test", config=config)
+        result2 = tm.flatten(data_missing_key, name="test", config=config)
+
+        # Explicit None should be included
+        assert "optional" in result1.main[0]
+        assert result1.main[0]["optional"] is None
+
+        # Missing key should not be present
+        assert "optional" not in result2.main[0]
+
+    def test_batch_with_mixed_none_and_missing(self):
+        """Test batch where some records have None, others missing key."""
+        data = [
+            {"id": 1, "name": "Alice", "score": 95},
+            {"id": 2, "name": "Bob", "score": None},
+            {"id": 3, "name": "Charlie"},  # Missing score
+        ]
+
+        # Skip mode
+        result_skip = tm.flatten(data, name="test")
+        assert "score" in result_skip.main[0]
+        assert "score" not in result_skip.main[1]
+        assert "score" not in result_skip.main[2]
+
+        # Include mode
+        config = TransmogConfig(include_nulls=True)
+        result_include = tm.flatten(data, name="test", config=config)
+        assert "score" in result_include.main[0]
+        assert "score" in result_include.main[1]  # Explicit None included
+        assert "score" not in result_include.main[2]  # Missing key still not present
+
+
+class TestNullInNestedStructures:
+    """Test null handling in various nested structure scenarios."""
+
+    def test_null_object_value_in_nested(self):
+        """Test None as entire nested object value."""
+        data = {"id": 1, "nested": None, "valid": "data"}
+
+        result = tm.flatten(data, name="test")
+
+        main = result.main[0]
+        assert "valid" in main
+        # None nested object should not create any nested_ fields
+        assert not any(key.startswith("nested") for key in main.keys())
+
+    def test_null_at_multiple_nesting_levels(self):
+        """Test nulls at different nesting levels."""
+        data = {
+            "id": 1,
+            "level1_null": None,
+            "level1": {
+                "level2_null": None,
+                "level2": {"level3_null": None, "level3_valid": "deep_value"},
+            },
+        }
+
+        result = tm.flatten(data, name="test")
+
+        main = result.main[0]
+        # Only the valid deep value should be present
+        assert any("level3_valid" in key for key in main.keys())
+        assert not any("null" in key for key in main.keys())
+
+    def test_null_sibling_to_valid_nested(self):
+        """Test null value as sibling to valid nested object."""
+        data = {
+            "id": 1,
+            "null_sibling": None,
+            "valid_sibling": {"key": "value"},
+        }
+
+        result = tm.flatten(data, name="test")
+
+        main = result.main[0]
+        assert "valid_sibling_key" in main
+        assert "null_sibling" not in main

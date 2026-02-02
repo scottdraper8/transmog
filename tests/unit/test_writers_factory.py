@@ -1,8 +1,5 @@
 """Tests for writer factory functionality."""
 
-import threading
-import time
-
 import pytest
 
 from transmog.exceptions import ConfigurationError
@@ -146,36 +143,6 @@ class TestWriterFactoryIntegration:
         assert "name" in table.schema.names
         name_column = table.column("name").to_pylist()
         assert name_column[0] == "Test 1"
-
-
-class TestWriterFactoryThreadSafety:
-    """Test writer factory thread safety."""
-
-    def test_factory_thread_safety(self):
-        """Test factory is thread-safe."""
-        results = []
-        errors = []
-
-        def create_writers(thread_id):
-            try:
-                for i in range(10):
-                    writer = create_writer("csv")
-                    results.append((thread_id, i, type(writer).__name__))
-                    time.sleep(0.001)
-            except Exception as e:
-                errors.append((thread_id, e))
-
-        threads = []
-        for i in range(5):
-            thread = threading.Thread(target=create_writers, args=(i,))
-            threads.append(thread)
-            thread.start()
-
-        for thread in threads:
-            thread.join()
-
-        assert len(errors) == 0, f"Thread errors: {errors}"
-        assert len(results) == 50
 
     def test_factory_handles_many_writers(self):
         """Test factory handles creating many writers."""

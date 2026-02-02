@@ -32,10 +32,24 @@ tm.flatten_stream(
     output_format="orc",
     compression="zstd"
 )
+
+# Stream to Avro
+tm.flatten_stream(
+    large_data,
+    output_path="output/",
+    name="dataset",
+    output_format="avro",
+    codec="snappy"
+)
 ```
 
 `flatten()` keeps results in memory and returns a `FlattenResult` object.
 `flatten_stream()` writes directly to disk and returns nothing.
+
+:::{warning}
+When using `flatten_stream()`, ensure the output directory has sufficient disk
+space for the processed data. Large datasets can generate substantial output files.
+:::
 
 ## Batch Size
 
@@ -97,6 +111,9 @@ tm.flatten_stream(data, "output/", output_format="parquet", row_group_size=50000
 tm.flatten_stream(data, "output/", output_format="orc")
 tm.flatten_stream(data, "output/", output_format="orc", compression="zstd")
 tm.flatten_stream(data, "output/", output_format="orc", compression="snappy", batch_size=50000)
+tm.flatten_stream(data, "output/", output_format="avro")
+tm.flatten_stream(data, "output/", output_format="avro", codec="snappy")
+tm.flatten_stream(data, "output/", output_format="avro", codec="deflate", sync_interval=32000)
 ```
 
 ## Examples
