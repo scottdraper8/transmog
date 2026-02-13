@@ -174,7 +174,7 @@ class TestParquetWriterErrorHandling:
         output_file = tmp_path / "invalid.parquet"
 
         writer = ParquetWriter()
-        with pytest.raises((OutputError, TypeError, ValueError)):
+        with pytest.raises((OutputError, TypeError, ValueError, AttributeError)):
             writer.write(invalid_data, str(output_file))
 
     def test_parquet_writer_complex_nested_data(self, tmp_path):

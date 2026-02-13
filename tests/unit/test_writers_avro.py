@@ -672,6 +672,28 @@ class TestAvroWriterErrorHandling:
             finally:
                 Path(f.name).unlink(missing_ok=True)
 
+    def test_avro_writer_memory_error_propagates(self):
+        """Test that MemoryError is not caught by the writer."""
+        from unittest.mock import patch
+
+        data = [{"id": "1", "name": "Alice"}]
+        writer = AvroWriter()
+
+        with patch("builtins.open", side_effect=MemoryError("out of memory")):
+            with pytest.raises(MemoryError):
+                writer.write(data, "/tmp/test.avro")
+
+    def test_avro_writer_oserror_wrapped_in_output_error(self):
+        """Test that OSError is wrapped in OutputError."""
+        from unittest.mock import patch
+
+        data = [{"id": "1", "name": "Alice"}]
+        writer = AvroWriter()
+
+        with patch("builtins.open", side_effect=OSError("disk full")):
+            with pytest.raises(OutputError, match="Failed to write Avro file"):
+                writer.write(data, "/tmp/test.avro")
+
 
 @pytest.mark.skipif(not AVRO_AVAILABLE, reason="fastavro not available")
 class TestAvroWriterIntegration:

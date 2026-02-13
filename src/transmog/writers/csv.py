@@ -188,9 +188,7 @@ class CsvWriter(DataWriter):
                 return destination
             else:
                 raise OutputError(f"Invalid destination type: {type(destination)}")
-        except Exception as exc:
-            if isinstance(exc, OutputError):
-                raise
+        except (OSError, csv.Error, ValueError) as exc:
             raise OutputError(f"Failed to write CSV file: {exc}") from exc
 
     def _write_csv_to_stream(

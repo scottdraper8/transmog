@@ -16,12 +16,21 @@ from transmog.writers.base import (
 try:
     import fastavro
     from fastavro import writer as avro_writer
+    from fastavro.schema import SchemaParseException as _AvroSchemaError
 
     AVRO_AVAILABLE = True
+    _AVRO_WRITE_ERRORS: tuple[type[Exception], ...] = (
+        OSError,
+        ValueError,
+        TypeError,
+        KeyError,
+        _AvroSchemaError,
+    )
 except ImportError:
     fastavro = None  # type: ignore[assignment]
     avro_writer = None  # type: ignore[assignment]
     AVRO_AVAILABLE = False
+    _AVRO_WRITE_ERRORS: tuple[type[Exception], ...] = (OSError,)  # type: ignore[no-redef]
 
 # Supported Avro compression codecs
 AVRO_CODECS = ("null", "deflate", "snappy", "zstandard", "lz4", "bzip2", "xz")
@@ -339,9 +348,7 @@ class AvroWriter(DataWriter):
             else:
                 raise OutputError(f"Invalid destination type: {type(destination)}")
 
-        except Exception as exc:
-            if isinstance(exc, OutputError):
-                raise
+        except _AVRO_WRITE_ERRORS as exc:
             raise OutputError(f"Failed to write Avro file: {exc}") from exc
 
 

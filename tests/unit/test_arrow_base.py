@@ -173,3 +173,52 @@ class TestConverterCaching:
         writer.close()
 
         assert writer.converters == {}
+
+
+class TestPyArrowWriterExceptionHandling:
+    """Test narrowed exception handling in PyArrowWriter.write()."""
+
+    def test_memory_error_propagates(self):
+        """Test that MemoryError is not caught by the writer."""
+        from unittest.mock import patch
+
+        from transmog.writers.parquet import ParquetWriter
+
+        data = [{"id": 1, "name": "Alice"}]
+        writer = ParquetWriter()
+
+        with patch("transmog.writers.arrow_base.pa.table", side_effect=MemoryError()):
+            with pytest.raises(MemoryError):
+                writer.write(data, "/tmp/test.parquet")
+
+    def test_oserror_wrapped_in_output_error(self, tmp_path):
+        """Test that OSError is wrapped in OutputError."""
+        from unittest.mock import patch
+
+        from transmog.exceptions import OutputError
+        from transmog.writers.parquet import ParquetWriter
+
+        data = [{"id": 1, "name": "Alice"}]
+        writer = ParquetWriter()
+
+        with patch(
+            "transmog.writers.parquet.pq.write_table",
+            side_effect=OSError("disk full"),
+        ):
+            with pytest.raises(OutputError, match="Failed to write Parquet file"):
+                writer.write(data, str(tmp_path / "test.parquet"))
+
+    def test_output_error_propagates_unwrapped(self):
+        """Test that OutputError from text-mode stream is not double-wrapped."""
+        import io
+
+        from transmog.exceptions import OutputError
+        from transmog.writers.parquet import ParquetWriter
+
+        data = [{"id": 1, "name": "Alice"}]
+        writer = ParquetWriter()
+        text_stream = io.StringIO()
+        text_stream.mode = "w"  # type: ignore[attr-defined]
+
+        with pytest.raises(OutputError, match="requires binary streams"):
+            writer.write(data, text_stream)

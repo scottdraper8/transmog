@@ -14,9 +14,11 @@ try:
     import pyarrow as pa
 
     PYARROW_AVAILABLE = True
+    _ARROW_WRITE_ERRORS: tuple[type[Exception], ...] = (OSError, pa.lib.ArrowException)
 except ImportError:
     pa = None
     PYARROW_AVAILABLE = False
+    _ARROW_WRITE_ERRORS: tuple[type[Exception], ...] = (OSError,)  # type: ignore[no-redef]
 
 
 def _is_valid_float_for_inference(value: Any) -> bool:
@@ -169,9 +171,7 @@ class PyArrowWriter(DataWriter):
                     )
                 self._write_table(table, destination, compression_val, **options)
                 return destination
-        except Exception as exc:
-            if isinstance(exc, (OutputError, MissingDependencyError)):
-                raise
+        except _ARROW_WRITE_ERRORS as exc:
             format_name = self._get_format_name()
             raise OutputError(f"Failed to write {format_name} file: {exc}") from exc
 

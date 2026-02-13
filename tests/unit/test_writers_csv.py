@@ -411,7 +411,7 @@ class TestCsvWriter:
         writer = CsvWriter()
         invalid_path = "/invalid/path/that/does/not/exist.csv"
 
-        with pytest.raises((OutputError, OSError, FileNotFoundError)):
+        with pytest.raises(OutputError):
             writer.write(sample_data, invalid_path)
 
     def test_csv_writer_file_like_object(self):
@@ -772,3 +772,33 @@ class TestCsvWriter:
 
         finally:
             Path(tmp_path).unlink(missing_ok=True)
+
+    def test_csv_writer_compression_raises_configuration_error(self):
+        """Test that compression option raises ConfigurationError, not OutputError."""
+        from transmog.exceptions import ConfigurationError
+
+        writer = CsvWriter()
+        data = [{"id": "1", "name": "Alice"}]
+
+        with pytest.raises(ConfigurationError):
+            writer.write(data, "output.csv", compression="gzip")
+
+    def test_csv_writer_memory_error_propagates(self, sample_data):
+        """Test that MemoryError is not caught by the writer."""
+        from unittest.mock import patch
+
+        writer = CsvWriter()
+
+        with patch("builtins.open", side_effect=MemoryError("out of memory")):
+            with pytest.raises(MemoryError):
+                writer.write(sample_data, "/tmp/test.csv")
+
+    def test_csv_writer_oserror_wrapped_in_output_error(self, sample_data):
+        """Test that OSError is wrapped in OutputError."""
+        from unittest.mock import patch
+
+        writer = CsvWriter()
+
+        with patch("builtins.open", side_effect=OSError("disk full")):
+            with pytest.raises(OutputError, match="Failed to write CSV file"):
+                writer.write(sample_data, "/tmp/test.csv")
