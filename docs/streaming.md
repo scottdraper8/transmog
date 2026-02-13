@@ -69,6 +69,47 @@ config = tm.TransmogConfig(batch_size=10000)
 result = tm.flatten(data, config=config)
 ```
 
+## Progress Tracking
+
+Track processing progress with a callback:
+
+```python
+def on_progress(records_processed, total_records):
+    if total_records:
+        pct = records_processed / total_records * 100
+        print(f"{records_processed}/{total_records} ({pct:.0f}%)")
+    else:
+        print(f"{records_processed} records processed")
+
+# Works with both flatten() and flatten_stream()
+result = tm.flatten(data, progress_callback=on_progress)
+
+tm.flatten_stream(
+    large_data,
+    output_path="output/",
+    progress_callback=on_progress
+)
+```
+
+`total_records` is the input length when known (`list` or `dict` input), otherwise
+`None` (file paths, byte strings, iterators). The callback fires once per batch, so
+frequency depends on `batch_size`.
+
+### Using with tqdm
+
+```python
+from tqdm import tqdm
+
+data = load_data()  # list of records
+bar = tqdm(total=len(data), unit="rec")
+
+def update_bar(processed, total):
+    bar.update(processed - bar.n)
+
+result = tm.flatten(data, progress_callback=update_bar)
+bar.close()
+```
+
 ## File Processing
 
 All file formats supported by `flatten()` are also supported by `flatten_stream()`:

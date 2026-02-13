@@ -16,7 +16,7 @@ from transmog.exceptions import (
 from transmog.flattening import get_current_timestamp, process_record_batch
 from transmog.iterators import get_data_iterator
 from transmog.streaming import stream_process
-from transmog.types import JsonDict, ProcessingContext
+from transmog.types import JsonDict, ProcessingContext, ProgressCallback
 from transmog.writers import create_writer
 from transmog.writers.base import _sanitize_filename
 
@@ -183,6 +183,7 @@ def flatten(
     data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes,
     name: str = "data",
     config: TransmogConfig | None = None,
+    progress_callback: ProgressCallback | None = None,
 ) -> FlattenResult:
     """Flatten nested data structures into tabular format.
 
@@ -193,6 +194,9 @@ def flatten(
         data: Input data - can be dict, list of dicts, file path, or JSON string
         name: Base name for the flattened tables
         config: Optional configuration (uses defaults if not provided)
+        progress_callback: Optional callable invoked after each batch flush with
+            (records_processed, total_records). total_records is None when input
+            length is unknown (file paths, byte strings).
 
     Returns:
         FlattenResult with flattened tables
@@ -216,6 +220,12 @@ def flatten(
     input_type = type(data).__name__
     logger.info("flatten started, name=%s, input_type=%s", name, input_type)
 
+    total_records: int | None = None
+    if isinstance(data, dict):
+        total_records = 1
+    elif isinstance(data, list):
+        total_records = len(data)
+
     result = FlattenResult(entity_name=name)
 
     if isinstance(data, dict):
@@ -229,6 +239,7 @@ def flatten(
     context = ProcessingContext(extract_time=timestamp)
     batch: list[JsonDict] = []
     batch_size = max(1, config.batch_size)
+    records_processed = 0
 
     def flush_batch() -> None:
         if not batch:
@@ -250,9 +261,18 @@ def flatten(
             )
         batch.append(record)
         if len(batch) >= batch_size:
+            records_processed += len(batch)
             flush_batch()
+            if progress_callback is not None:
+                progress_callback(records_processed, total_records)
 
-    flush_batch()
+    if batch:
+        records_processed += len(batch)
+        flush_batch()
+        if progress_callback is not None:
+            progress_callback(records_processed, total_records)
+    else:
+        flush_batch()
 
     logger.info(
         "flatten completed, name=%s, main_records=%d, child_tables=%d",
@@ -269,6 +289,7 @@ def flatten_stream(
     name: str = "data",
     output_format: str = "csv",
     config: TransmogConfig | None = None,
+    progress_callback: ProgressCallback | None = None,
     **format_options: Any,
 ) -> None:
     r"""Stream flatten data directly to files for memory-efficient processing.
@@ -282,6 +303,9 @@ def flatten_stream(
         name: Base name for the flattened tables
         output_format: Output format ("csv", "parquet", "orc", "avro")
         config: Optional configuration (optimized for memory if not provided)
+        progress_callback: Optional callable invoked after each batch flush with
+            (records_processed, total_records). total_records is None when input
+            length is unknown (file paths, byte strings).
         **format_options: Format-specific writer options:
 
             Parquet options:
@@ -328,6 +352,12 @@ def flatten_stream(
     output_path = Path(output_path)
     output_path.mkdir(parents=True, exist_ok=True)
 
+    total_records: int | None = None
+    if isinstance(data, dict):
+        total_records = 1
+    elif isinstance(data, list):
+        total_records = len(data)
+
     logger.info(
         "flatten_stream started, name=%s, format=%s, output=%s",
         name,
@@ -341,6 +371,8 @@ def flatten_stream(
         entity_name=name,
         output_format=output_format,
         output_destination=str(output_path),
+        progress_callback=progress_callback,
+        total_records=total_records,
         **format_options,
     )
 

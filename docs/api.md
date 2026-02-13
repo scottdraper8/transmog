@@ -11,6 +11,7 @@ flatten(
     data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes,
     name: str = "data",
     config: TransmogConfig | None = None,
+    progress_callback: Callable[[int, int | None], None] | None = None,
 ) -> FlattenResult
 ```
 
@@ -20,6 +21,10 @@ flatten(
   dictionary, list of dictionaries, JSON string, file path, or bytes.
 - **name** (*str*, default="data"): Base name for generated tables.
 - **config** (*TransmogConfig | None*, default=None): Configuration object. Uses defaults if not provided.
+- **progress_callback** (*Callable[[int, int | None], None] | None*, default=None): Optional
+  callable invoked after each batch flush. Receives `(records_processed, total_records)`.
+  `total_records` is the input length for `list` and `dict` inputs, or `None` when unknown
+  (file paths, byte strings). Invocation frequency depends on `batch_size`.
 
 **Returns:**
 
@@ -39,6 +44,13 @@ result = tm.flatten(data, config=config)
 
 # Custom configuration
 result = tm.flatten(data, config=tm.TransmogConfig(include_nulls=True))
+
+# Progress tracking
+def on_progress(processed, total):
+    if total:
+        print(f"{processed}/{total} records")
+
+result = tm.flatten(data, progress_callback=on_progress)
 
 # Process file directly
 result = tm.flatten("data.json")
@@ -74,6 +86,7 @@ flatten_stream(
     name: str = "data",
     output_format: str = "csv",
     config: TransmogConfig | None = None,
+    progress_callback: Callable[[int, int | None], None] | None = None,
     **format_options: Any,
 ) -> None
 ```
@@ -85,6 +98,8 @@ flatten_stream(
 - **name** (*str*, default="data"): Base name for output files.
 - **output_format** (*str*, default="csv"): Output format ("csv", "parquet", "orc", "avro").
 - **config** (*TransmogConfig | None*, default=None): Configuration object.
+- **progress_callback** (*Callable[[int, int | None], None] | None*, default=None): Optional
+  progress callback (same as `flatten()`).
 - **\*\*format_options**: Format-specific options.
 
 **Output Formats:**

@@ -1,10 +1,12 @@
 """Type definitions for Transmog package."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
 JsonDict = dict[str, Any]
+ProgressCallback = Callable[[int, int | None], None]
 
 
 class ArrayMode(Enum):
@@ -49,6 +51,7 @@ class ProcessingContext:
 
 __all__ = [
     "JsonDict",
+    "ProgressCallback",
     "ArrayMode",
     "ProcessingContext",
 ]

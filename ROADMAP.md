@@ -248,7 +248,7 @@ standard `logging.getLogger("transmog").setLevel(...)`.
 
 ### ENH-2: Progress callbacks
 
-`TODO` · Size: **S**
+`DONE` · Size: **S**
 
 No way to track progress on large jobs. Useful for UI
 integration and monitoring.
@@ -258,6 +258,12 @@ integration and monitoring.
 parameter to `flatten()` and `flatten_stream()`.
 `total_records` is `None` when unknown (streaming from
 iterator).
+
+- Progress: Added `progress_callback` parameter to
+  `flatten()`, `flatten_stream()`, and `stream_process()`.
+  Callback receives `(records_processed, total_records)`
+  after each batch flush. `total_records` is the input
+  length for list/dict inputs, `None` otherwise.
 
 ### ENH-3: Avro zstandard/lz4 codec documentation
 
