@@ -149,3 +149,66 @@ under 100 levels deep.
 Adjust only if processing unusually deep structures or to intentionally
 truncate output at a specific nesting level.
 :::
+
+## Logging
+
+Transmog uses Python's standard `logging` module. By default no output is
+produced (a `NullHandler` is attached to the root `transmog` logger). To
+enable diagnostic output, configure the logger in your application:
+
+```python
+import logging
+
+logging.basicConfig()
+logging.getLogger("transmog").setLevel(logging.INFO)
+```
+
+### Log Levels
+
+**INFO** — API entry/exit and streaming batch progress:
+
+```text
+INFO:transmog.api:flatten started, name=products, input_type=list
+INFO:transmog.api:flatten completed, name=products, main_records=150, child_tables=3
+INFO:transmog.streaming:stream started, entity=events, format=parquet
+INFO:transmog.streaming:stream batch 1 processed, records_in_batch=100, total_records=100
+INFO:transmog.streaming:stream completed, entity=events, total_batches=5, total_records=500
+```
+
+**DEBUG** — Format detection, schema inference, and batch processing internals:
+
+```text
+DEBUG:transmog.iterators:file input detected, path=data.json, extension=.json
+DEBUG:transmog.iterators:string format detected as jsonl
+DEBUG:transmog.flattening:processing batch, records=100, entity=products
+DEBUG:transmog.writers.arrow_base:arrow schema created, fields=12, types={'name': 'string', ...}
+DEBUG:transmog.writers.csv:csv schema created, table=main, fields=8
+```
+
+**WARNING** — Schema drift and data issues:
+
+```text
+WARNING:transmog.writers.csv:csv schema drift detected, table=main, unexpected_fields=['new_col']
+```
+
+### Per-Module Loggers
+
+Each module uses its own logger under the `transmog` namespace. Target
+specific modules to reduce noise:
+
+```python
+import logging
+
+# Only show streaming batch progress
+logging.basicConfig()
+logging.getLogger("transmog.streaming").setLevel(logging.INFO)
+
+# Only show format detection decisions
+logging.getLogger("transmog.iterators").setLevel(logging.DEBUG)
+```
+
+:::{tip}
+Enable `DEBUG` on `transmog.writers.csv` when troubleshooting schema drift
+errors. The warning log shows exactly which unexpected fields triggered the
+error before the exception is raised.
+:::

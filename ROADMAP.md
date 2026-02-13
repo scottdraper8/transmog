@@ -208,10 +208,14 @@ with unusual inputs.
 
 ### DOC-3: Logging and verbose mode undocumented
 
-`TODO` · Size: **S** · Depends on: ENH-1
+`DONE` · Size: **S** · Depends on: ENH-1
 
 No documentation for debugging or monitoring processing.
 Blocked until logging is implemented.
+
+- Progress: Added Logging section to configuration.md
+  covering log levels, example output, and per-module
+  logger targeting.
 
 ---
 
