@@ -5,6 +5,7 @@ Tests CSV output, formatting, and writer interface implementation.
 """
 
 import csv
+import logging
 import sys
 import tempfile
 from io import StringIO
@@ -14,7 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-from transmog.exceptions import OutputError
+from transmog.exceptions import ConfigurationError, OutputError
 from transmog.writers import CsvWriter, DataWriter
 from transmog.writers.csv import CsvStreamingWriter, _sanitize_csv_value
 
@@ -995,3 +996,113 @@ class TestCsvStreamingWriterExceptionCleanup:
         assert len(rows) >= 2
         assert rows[0]["name"] == "Alice"
         assert rows[1]["name"] == "Bob"
+
+
+class TestCsvSchemaDrift:
+    """Test schema_drift parameter behavior in CsvStreamingWriter."""
+
+    def test_strict_mode_raises_on_drift(self, tmp_path):
+        """Default strict mode raises OutputError on unexpected fields."""
+        csv_path = str(tmp_path / "test.csv")
+
+        with pytest.raises(OutputError, match="schema changed"):
+            with CsvStreamingWriter(
+                destination=csv_path, entity_name="test", schema_drift="strict"
+            ) as writer:
+                writer.write_main_records([{"id": "1", "name": "Alice"}])
+                writer.write_main_records(
+                    [{"id": "2", "name": "Bob", "extra": "field"}]
+                )
+
+    def test_strict_mode_is_default(self, tmp_path):
+        """Omitting schema_drift defaults to strict (raises on drift)."""
+        csv_path = str(tmp_path / "test.csv")
+
+        with pytest.raises(OutputError, match="schema changed"):
+            with CsvStreamingWriter(destination=csv_path, entity_name="test") as writer:
+                writer.write_main_records([{"id": "1", "name": "Alice"}])
+                writer.write_main_records(
+                    [{"id": "2", "name": "Bob", "surprise": "value"}]
+                )
+
+    def test_drop_mode_writes_known_fields(self, tmp_path):
+        """Drop mode removes unexpected fields and writes known fields."""
+        csv_path = str(tmp_path / "test.csv")
+
+        with CsvStreamingWriter(
+            destination=csv_path, entity_name="test", schema_drift="drop"
+        ) as writer:
+            writer.write_main_records([{"id": "1", "name": "Alice"}])
+            writer.write_main_records([{"id": "2", "name": "Bob", "extra": "dropped"}])
+
+        with open(csv_path, newline="") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        assert len(rows) == 2
+        assert rows[1]["id"] == "2"
+        assert rows[1]["name"] == "Bob"
+        assert "extra" not in reader.fieldnames
+
+    def test_drop_mode_logs_warning(self, tmp_path, caplog):
+        """Drop mode emits a WARNING log when drift is detected."""
+        csv_path = str(tmp_path / "test.csv")
+
+        with caplog.at_level(logging.WARNING, logger="transmog.writers.csv"):
+            with CsvStreamingWriter(
+                destination=csv_path, entity_name="test", schema_drift="drop"
+            ) as writer:
+                writer.write_main_records([{"id": "1", "name": "Alice"}])
+                writer.write_main_records(
+                    [{"id": "2", "name": "Bob", "new_col": "val"}]
+                )
+
+        assert any("schema drift detected" in msg for msg in caplog.messages)
+        assert any("new_col" in msg for msg in caplog.messages)
+
+    def test_drop_mode_preserves_schema(self, tmp_path):
+        """After drift, subsequent records are still checked against original schema."""
+        csv_path = str(tmp_path / "test.csv")
+
+        with CsvStreamingWriter(
+            destination=csv_path, entity_name="test", schema_drift="drop"
+        ) as writer:
+            writer.write_main_records([{"id": "1", "name": "Alice"}])
+            # Drift record — extra field dropped
+            writer.write_main_records([{"id": "2", "name": "Bob", "extra": "dropped"}])
+            # Normal record — still validates against original schema
+            writer.write_main_records([{"id": "3", "name": "Charlie"}])
+
+        with open(csv_path, newline="") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        assert len(rows) == 3
+        assert set(reader.fieldnames) == {"id", "name"}
+        assert rows[2]["name"] == "Charlie"
+
+    def test_drop_mode_multiple_batches(self, tmp_path):
+        """Drift in multiple batches is handled correctly in drop mode."""
+        csv_path = str(tmp_path / "test.csv")
+
+        with CsvStreamingWriter(
+            destination=csv_path, entity_name="test", schema_drift="drop"
+        ) as writer:
+            writer.write_main_records([{"id": "1", "name": "Alice"}])
+            writer.write_main_records([{"id": "2", "name": "Bob", "col_a": "x"}])
+            writer.write_main_records([{"id": "3", "name": "Charlie", "col_b": "y"}])
+
+        with open(csv_path, newline="") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        assert len(rows) == 3
+        assert set(reader.fieldnames) == {"id", "name"}
+        for row in rows:
+            assert "col_a" not in row
+            assert "col_b" not in row
+
+    def test_invalid_drift_mode_raises(self):
+        """Invalid schema_drift value raises ConfigurationError."""
+        with pytest.raises(ConfigurationError, match="Invalid schema_drift mode"):
+            CsvStreamingWriter(schema_drift="extend")

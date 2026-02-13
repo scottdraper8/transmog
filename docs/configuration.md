@@ -191,6 +191,10 @@ DEBUG:transmog.writers.csv:csv schema created, table=main, fields=8
 WARNING:transmog.writers.csv:csv schema drift detected, table=main, unexpected_fields=['new_col']
 ```
 
+By default, schema drift raises an `OutputError`. To drop unexpected fields
+instead, pass `schema_drift="drop"` to `flatten_stream()`. See
+[Schema Drift](outputs.md#schema-drift) for details.
+
 ### Per-Module Loggers
 
 Each module uses its own logger under the `transmog` namespace. Target

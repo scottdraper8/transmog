@@ -74,6 +74,33 @@ result.save(
 )
 ```
 
+### Schema Drift
+
+When using `flatten_stream()` with CSV output, the column schema is locked after
+the first batch of records. By default, any subsequent batch containing fields
+not present in the original schema raises an `OutputError`.
+
+The `schema_drift` parameter controls this behavior:
+
+| Mode       | Behavior                                                               |
+|------------|------------------------------------------------------------------------|
+| `"strict"` | Raise `OutputError` on unexpected fields (default)                     |
+| `"drop"`   | Log a warning and drop unexpected fields; write remaining known fields |
+
+```python
+import transmog as tm
+
+# Drop unexpected fields instead of raising
+for result in tm.flatten_stream(data, name="events", schema_drift="drop"):
+    pass
+```
+
+:::{note}
+An `"extend"` mode (rewriting headers to add new columns) is not supported.
+Streaming CSV headers are already emitted to the destination and cannot be
+rewritten for arbitrary outputs (stdout, binary streams, pipes).
+:::
+
 ## Parquet Output
 
 ```python

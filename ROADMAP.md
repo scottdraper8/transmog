@@ -109,16 +109,23 @@ explicitly and raise a clear error early.
 
 ### WRT-2: CSV schema drift has no recovery option
 
-`TODO` · Size: **M**
+`DONE` · Size: **M**
 
 `csv.py:378-386` — CSV streaming writer raises an error
 when new fields appear after the header is emitted. This
 is correct but inflexible.
 
 **Proposed fix:** Add configurable drift handling:
-`strict` (current, raise error), `warn` (log and skip
-new fields), `extend` (rewrite header). Default to
-`strict`.
+`strict` (current, raise error) and `drop` (log warning,
+discard unexpected fields). Default to `strict`. An
+`extend` mode (rewriting headers) was evaluated and
+omitted — headers are already emitted to the destination
+and cannot be rewritten for arbitrary outputs.
+
+- Progress: Added `schema_drift` parameter to
+  `CsvStreamingWriter` with `"strict"` (default) and
+  `"drop"` modes. Strict preserves existing behavior;
+  drop logs a WARNING and filters unexpected fields.
 
 ### WRT-3: Broad exception catching in writers
 

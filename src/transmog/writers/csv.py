@@ -245,6 +245,7 @@ class CsvStreamingWriter(StreamingWriter):
         include_header: bool = True,
         delimiter: str = ",",
         quotechar: str = '"',
+        schema_drift: str = "strict",
         **options: Any,
     ):
         """Initialize the CSV streaming writer.
@@ -255,11 +256,22 @@ class CsvStreamingWriter(StreamingWriter):
             include_header: Whether to include column headers
             delimiter: Column delimiter character
             quotechar: Character to use for quoting
+            schema_drift: How to handle schema drift after header emission.
+                "strict" raises OutputError (default), "drop" silently
+                removes unexpected fields.
             **options: Additional CSV writer options
         """
+        valid_drift_modes = ("strict", "drop")
+        if schema_drift not in valid_drift_modes:
+            raise ConfigurationError(
+                f"Invalid schema_drift mode: {schema_drift!r}. "
+                f"Must be one of {valid_drift_modes}"
+            )
+
         self.include_header = include_header
         self.delimiter = delimiter
         self.quotechar = quotechar
+        self.schema_drift = schema_drift
         self.file_objects: dict[str, TextIO] = {}
         self.writers: dict[str, csv.DictWriter] = {}
         self.fieldnames: dict[str, list[str]] = {}
@@ -388,11 +400,14 @@ class CsvStreamingWriter(StreamingWriter):
                     table_name,
                     sorted(unexpected_fields),
                 )
-                raise OutputError(
-                    "CSV schema changed after header emission; "
-                    f"unexpected fields {sorted(unexpected_fields)} detected "
-                    f"in table '{table_name}'."
-                )
+                if self.schema_drift == "strict":
+                    raise OutputError(
+                        "CSV schema changed after header emission; "
+                        f"unexpected fields {sorted(unexpected_fields)} detected "
+                        f"in table '{table_name}'."
+                    )
+                # "drop" mode: filter to known fields only
+                record = {k: v for k, v in record.items() if k in allowed_fields}
             writer.writerow(record)
 
     def write_main_records(self, records: list[dict[str, Any]]) -> None:
