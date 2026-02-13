@@ -175,6 +175,54 @@ class TestConverterCaching:
         assert writer.converters == {}
 
 
+class TestColumnBufferReuse:
+    """Test that column buffers and record buffers are reused across batches."""
+
+    def test_column_buffers_reused_across_batches(self, tmp_path):
+        """Test inner list objects are the same Python objects on second batch."""
+        from transmog.writers.parquet import ParquetStreamingWriter
+
+        with ParquetStreamingWriter(
+            destination=str(tmp_path), entity_name="test", row_group_size=2
+        ) as writer:
+            writer.write_main_records(
+                [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+            )
+            assert "main" in writer._column_buffers
+            first_lists = {k: v for k, v in writer._column_buffers["main"].items()}
+
+            writer.write_main_records(
+                [{"id": 3, "name": "Charlie"}, {"id": 4, "name": "Dave"}]
+            )
+            for key, first_list in first_lists.items():
+                assert writer._column_buffers["main"][key] is first_list
+
+    def test_column_buffers_cleared_on_close(self, tmp_path):
+        """Test close() clears the _column_buffers dict."""
+        from transmog.writers.parquet import ParquetStreamingWriter
+
+        writer = ParquetStreamingWriter(destination=str(tmp_path), entity_name="test")
+        writer.write_main_records([{"id": 1, "name": "Alice"}])
+        writer.close()
+
+        assert writer._column_buffers == {}
+
+    def test_record_buffer_reused_across_batches(self, tmp_path):
+        """Test same list object persists after flush (clear instead of reassign)."""
+        from transmog.writers.parquet import ParquetStreamingWriter
+
+        with ParquetStreamingWriter(
+            destination=str(tmp_path), entity_name="test", row_group_size=2
+        ) as writer:
+            writer.write_main_records([{"id": 1, "name": "Alice"}])
+            buffer_ref = writer.buffers["main"]
+
+            writer.write_main_records(
+                [{"id": 2, "name": "Bob"}, {"id": 3, "name": "Charlie"}]
+            )
+            assert writer.buffers["main"] is buffer_ref
+
+
 class TestPyArrowWriterExceptionHandling:
     """Test narrowed exception handling in PyArrowWriter.write()."""
 

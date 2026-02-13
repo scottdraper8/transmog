@@ -215,6 +215,7 @@ class PyArrowStreamingWriter(StreamingWriter):
         self.converters: dict[str, dict[str, Callable]] = {}
         self.buffers: dict[str, list[dict[str, Any]]] = {}
         self.base_dir: str | None = None
+        self._column_buffers: dict[str, dict[str, list[Any]]] = {}
         self.file_paths: dict[str, str] = {}
 
         if isinstance(destination, str):
@@ -361,7 +362,13 @@ class PyArrowStreamingWriter(StreamingWriter):
         schema = self.schemas[table_name]
         converters = self.converters[table_name]
 
-        columns: dict[str, list[Any]] = {field.name: [] for field in schema}
+        if table_name in self._column_buffers:
+            columns = self._column_buffers[table_name]
+            for col in columns.values():
+                col.clear()
+        else:
+            columns = {field.name: [] for field in schema}
+            self._column_buffers[table_name] = columns
 
         for record in records:
             for field in schema:
@@ -411,7 +418,7 @@ class PyArrowStreamingWriter(StreamingWriter):
         if writer:
             self._write_to_writer(writer, table)
 
-        self.buffers[table_name] = []
+        self.buffers[table_name].clear()
 
     def write_main_records(self, records: list[dict[str, Any]]) -> None:
         """Write a batch of main records.
@@ -469,6 +476,7 @@ class PyArrowStreamingWriter(StreamingWriter):
         self.schemas.clear()
         self.converters.clear()
         self.buffers.clear()
+        self._column_buffers.clear()
         self._closed = True
 
 
