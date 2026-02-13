@@ -222,7 +222,9 @@ save(
 - **path**: Output path (file or directory).
 - **output_format**: Output format ("csv", "parquet", "orc", "avro"). Auto-detected
   from extension if not specified. Defaults to "csv" when no extension is present.
-- **\*\*format_options**: Format-specific writer options (e.g., `delimiter`, `quoting` for CSV; `compression` for Parquet).
+- **\*\*format_options**: Format-specific writer options (e.g., `delimiter`, `quoting`
+  for CSV; `compression` for Parquet; `codec` for Avro). See {doc}`outputs` for codec
+  details and optional dependency requirements.
 
 **Returns:**
 

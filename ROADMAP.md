@@ -244,7 +244,7 @@ iterator).
 
 ### ENH-3: Avro zstandard/lz4 codec documentation
 
-`TODO` · Size: **S**
+`DONE` · Size: **S**
 
 `snappy`, `bzip2`, `xz` work via `cramjam`. `zstandard`
 and `lz4` require separate packages but this is not
@@ -253,3 +253,7 @@ documented.
 **Proposed fix:** Add a note in docs/outputs.md and
 api.md about installing `python-zstandard` or `lz4` for
 those codecs.
+
+- Progress: Install instructions and explanatory note
+  already present in outputs.md. Added cross-reference
+  from api.md format_options parameter.
