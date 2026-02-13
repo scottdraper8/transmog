@@ -219,7 +219,7 @@ Blocked until logging is implemented.
 
 ### ENH-1: Add logging support
 
-`TODO` · Size: **M**
+`DONE` · Size: **M**
 
 No logging or verbose mode. Users have no visibility into
 processing progress, type inference decisions, schema
@@ -228,6 +228,12 @@ drift events, or batch statistics.
 **Proposed fix:** Add `logging` module integration with a
 `transmog` logger. No output by default; users opt in via
 standard `logging.getLogger("transmog").setLevel(...)`.
+
+- Progress: Added structured logging across api, streaming,
+  iterators, flattening, arrow_base, and csv modules.
+  NullHandler on root logger. INFO for API entry/exit and
+  batch progress; DEBUG for format detection, schema
+  inference, and batch processing; WARNING for schema drift.
 
 ### ENH-2: Progress callbacks
 

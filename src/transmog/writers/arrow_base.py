@@ -1,5 +1,6 @@
 """Base classes for PyArrow-based writers (Parquet, ORC)."""
 
+import logging
 import math
 import os
 import pathlib
@@ -9,6 +10,8 @@ from typing import Any, BinaryIO, TextIO
 
 from transmog.exceptions import MissingDependencyError, OutputError
 from transmog.writers.base import DataWriter, StreamingWriter, _collect_field_names
+
+logger = logging.getLogger(__name__)
 
 try:
     import pyarrow as pa
@@ -292,6 +295,9 @@ class PyArrowStreamingWriter(StreamingWriter):
         if stringify_mode:
             fields = [pa.field(key, pa.string()) for key in field_names]
             converters = dict.fromkeys(field_names, _convert_str)
+            logger.debug(
+                "arrow schema created (stringify mode), fields=%d", len(fields)
+            )
             return pa.schema(fields), converters
 
         fields = []
@@ -337,6 +343,8 @@ class PyArrowStreamingWriter(StreamingWriter):
             fields.append(pa.field(key, pa_type))
             converters[key] = type_converters.get(pa_type, _convert_str)
 
+        types = {f.name: str(f.type) for f in fields}
+        logger.debug("arrow schema created, fields=%d, types=%s", len(fields), types)
         return pa.schema(fields), converters
 
     def _records_to_table(self, records: list[dict[str, Any]], table_name: str) -> Any:

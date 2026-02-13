@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
 from transmog.exceptions import ValidationError
+
+logger = logging.getLogger(__name__)
 
 try:
     import orjson as _orjson  # type: ignore[import-untyped]
@@ -75,6 +78,7 @@ def get_data_iterator(
 
     if isinstance(data, str) and os.path.exists(data):
         extension = os.path.splitext(data)[1].lower()
+        logger.debug("file input detected, path=%s, extension=%s", data, extension)
         if extension in (".jsonl", ".ndjson"):
             return get_jsonl_file_iterator(data)
         if extension == ".json5":
@@ -91,6 +95,7 @@ def get_data_iterator(
             raise ValidationError("No JSON content provided")
 
         normalised = _detect_string_format(text)
+        logger.debug("string format detected as %s", normalised)
 
         if normalised == "jsonl":
             return get_jsonl_data_iterator(data)
@@ -160,6 +165,8 @@ def get_json_file_iterator_streaming(file_path: str) -> Iterator[dict[str, Any]]
     Returns:
         Iterator over data records
     """
+    logger.debug("streaming JSON parse requested, path=%s", file_path)
+
     if _ijson is None:
         raise ValidationError(
             "ijson library is required for streaming JSON parsing. "

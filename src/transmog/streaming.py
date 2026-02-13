@@ -1,5 +1,6 @@
 """Streaming processing and result containers."""
 
+import logging
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, BinaryIO
@@ -8,6 +9,8 @@ from transmog.flattening import get_current_timestamp, process_record_batch
 from transmog.iterators import get_data_iterator
 from transmog.types import ProcessingContext
 from transmog.writers import create_streaming_writer
+
+logger = logging.getLogger(__name__)
 
 
 def stream_process(
@@ -51,6 +54,11 @@ def stream_process(
         **writer_options,
     )
 
+    logger.info("stream started, entity=%s, format=%s", entity_name, output_format)
+
+    batch_count = 0
+    total_records = 0
+
     try:
         data_iterator = get_data_iterator(data, streaming=True)
         actual_batch_size = batch_size or config.batch_size
@@ -74,6 +82,14 @@ def stream_process(
                 for table_name, table_records in child_tables.items():
                     writer.write_child_records(table_name, table_records)
 
+                batch_count += 1
+                total_records += len(record_buffer)
+                logger.info(
+                    "stream batch %d processed, records_in_batch=%d, total_records=%d",
+                    batch_count,
+                    len(record_buffer),
+                    total_records,
+                )
                 record_buffer = []
 
         if record_buffer:
@@ -88,8 +104,23 @@ def stream_process(
 
             for table_name, table_records in child_tables.items():
                 writer.write_child_records(table_name, table_records)
+
+            batch_count += 1
+            total_records += len(record_buffer)
+            logger.info(
+                "stream batch %d processed, records_in_batch=%d, total_records=%d",
+                batch_count,
+                len(record_buffer),
+                total_records,
+            )
     finally:
         writer.close()
+        logger.info(
+            "stream completed, entity=%s, total_batches=%d, total_records=%d",
+            entity_name,
+            batch_count,
+            total_records,
+        )
 
 
 __all__ = ["stream_process"]

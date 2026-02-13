@@ -2,6 +2,7 @@
 
 import csv
 import io
+import logging
 import os
 import pathlib
 import sys
@@ -15,6 +16,8 @@ from transmog.writers.base import (
     _normalize_special_floats,
     _sanitize_filename,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _sanitize_csv_value(value: Any) -> Any:
@@ -354,6 +357,10 @@ class CsvStreamingWriter(StreamingWriter):
         self.fieldnames[table_name] = fieldnames
         self.fieldname_sets[table_name] = set(fieldnames)
 
+        logger.debug(
+            "csv schema created, table=%s, fields=%d", table_name, len(fieldnames)
+        )
+
         if self.include_header and fieldnames:
             writer.writeheader()
 
@@ -376,6 +383,11 @@ class CsvStreamingWriter(StreamingWriter):
         for record in sanitized_records:
             unexpected_fields = set(record.keys()) - allowed_fields
             if unexpected_fields:
+                logger.warning(
+                    "csv schema drift detected, table=%s, unexpected_fields=%s",
+                    table_name,
+                    sorted(unexpected_fields),
+                )
                 raise OutputError(
                     "CSV schema changed after header emission; "
                     f"unexpected fields {sorted(unexpected_fields)} detected "

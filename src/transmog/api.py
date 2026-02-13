@@ -4,6 +4,7 @@ This module provides the primary user-facing functions for flattening
 nested data structures into tabular formats.
 """
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,8 @@ from transmog.streaming import stream_process
 from transmog.types import JsonDict, ProcessingContext
 from transmog.writers import create_writer
 from transmog.writers.base import _sanitize_filename
+
+logger = logging.getLogger(__name__)
 
 
 class FlattenResult:
@@ -106,14 +109,29 @@ class FlattenResult:
                 f"Unsupported format: {output_format}. Must be one of {valid_formats}"
             )
 
+        logger.info(
+            "save started, entity=%s, format=%s, path=%s",
+            self._entity_name,
+            output_format,
+            str(path),
+        )
+
+        result: list[str] | dict[str, str]
         if len(self.tables) > 0:
             if path.suffix:
                 path = path.parent / path.stem
-            return self._save_all_tables(path, output_format, **format_options)
+            result = self._save_all_tables(path, output_format, **format_options)
         else:
             if not path.suffix:
                 path = path.with_suffix(f".{output_format}")
-            return self._save_single_table(path, output_format, **format_options)
+            result = self._save_single_table(path, output_format, **format_options)
+
+        logger.info(
+            "save completed, entity=%s, tables_written=%d",
+            self._entity_name,
+            len(result),
+        )
+        return result
 
     def _save_all_tables(
         self,
@@ -195,6 +213,9 @@ def flatten(
     if config is None:
         config = TransmogConfig()
 
+    input_type = type(data).__name__
+    logger.info("flatten started, name=%s, input_type=%s", name, input_type)
+
     result = FlattenResult(entity_name=name)
 
     if isinstance(data, dict):
@@ -233,6 +254,12 @@ def flatten(
 
     flush_batch()
 
+    logger.info(
+        "flatten completed, name=%s, main_records=%d, child_tables=%d",
+        name,
+        len(result.main),
+        len(result.tables),
+    )
     return result
 
 
@@ -301,6 +328,13 @@ def flatten_stream(
     output_path = Path(output_path)
     output_path.mkdir(parents=True, exist_ok=True)
 
+    logger.info(
+        "flatten_stream started, name=%s, format=%s, output=%s",
+        name,
+        output_format,
+        str(output_path),
+    )
+
     stream_process(
         config=config,
         data=data,
@@ -309,6 +343,8 @@ def flatten_stream(
         output_destination=str(output_path),
         **format_options,
     )
+
+    logger.info("flatten_stream completed, name=%s", name)
 
 
 __all__ = [
