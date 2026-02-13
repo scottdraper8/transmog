@@ -1,5 +1,3 @@
-# eval-tests
-
 Evaluate test quality and coverage to identify weak, redundant, or ineffective tests.
 
 ## Task
@@ -60,5 +58,3 @@ Provide a report including:
 - Recommendations for test improvements or removal
 - Suggestions for additional tests to cover gaps in core functionality
 - Impact assessment of proposed test changes
-
-This command will be available in chat with /eval-tests

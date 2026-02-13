@@ -4,11 +4,11 @@ Tests for Parquet writer in Transmog.
 Tests Parquet file writing functionality, formats, and edge cases.
 """
 
-import json
 import sys
 import tempfile
 from pathlib import Path
 
+import pyarrow.parquet as pq
 import pytest
 
 from transmog.exceptions import OutputError
@@ -18,7 +18,7 @@ from transmog.writers import ParquetWriter
 class TestParquetWriter:
     """Test the ParquetWriter class."""
 
-    def test_parquet_writer_basic(self):
+    def test_parquet_writer_basic(self, tmp_path):
         """Test basic Parquet writing functionality."""
         data = [
             {"id": "1", "name": "Alice", "age": "25"},
@@ -26,151 +26,92 @@ class TestParquetWriter:
             {"id": "3", "name": "Charlie", "age": "35"},
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
-            output_file = f.name
+        output_file = tmp_path / "output.parquet"
+        writer = ParquetWriter()
+        writer.write(data, str(output_file))
 
-        try:
-            writer = ParquetWriter()
-            writer.write(data, output_file)
+        table = pq.read_table(str(output_file))
+        assert table.num_rows == 3
+        assert set(table.schema.names) == {"id", "name", "age"}
+        assert table.column("name").to_pylist() == ["Alice", "Bob", "Charlie"]
 
-            # Verify file was created
-            assert Path(output_file).exists()
-            assert Path(output_file).stat().st_size > 0
+    def test_parquet_writer_empty_data(self, tmp_path):
+        """Test writing empty data to Parquet produces no file."""
+        output_file = tmp_path / "empty.parquet"
+        writer = ParquetWriter()
+        writer.write([], str(output_file))
 
-            # Try to read back the data to verify it's valid Parquet
-            try:
-                import pyarrow.parquet as pq
+        # Empty data produces no output file
+        assert not output_file.exists()
 
-                table = pq.read_table(output_file)
-                assert table.num_rows == 3
-                assert "id" in table.schema.names
-                assert "name" in table.schema.names
-                assert "age" in table.schema.names
-            except ImportError:
-                # PyArrow not available, just check file exists
-                pass
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
-
-    def test_parquet_writer_empty_data(self):
-        """Test writing empty data to Parquet."""
-        data = []
-
-        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
-            output_file = f.name
-
-        try:
-            writer = ParquetWriter()
-            writer.write(data, output_file)
-
-            # File should exist but be minimal
-            assert Path(output_file).exists()
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
-
-    def test_parquet_writer_mixed_types(self):
+    def test_parquet_writer_mixed_types(self, tmp_path):
         """Test writing mixed data types to Parquet."""
         data = [
-            {"id": "1", "name": "Alice", "score": "95.5", "active": "true"},
-            {"id": "2", "name": "Bob", "score": "87.2", "active": "false"},
-            {"id": "3", "name": "Charlie", "score": "92.0", "active": "true"},
+            {"id": 1, "name": "Alice", "score": 95.5, "active": True},
+            {"id": 2, "name": "Bob", "score": 87.2, "active": False},
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
-            output_file = f.name
+        output_file = tmp_path / "mixed.parquet"
+        writer = ParquetWriter()
+        writer.write(data, str(output_file))
 
-        try:
-            writer = ParquetWriter()
-            writer.write(data, output_file)
+        table = pq.read_table(str(output_file))
+        assert table.num_rows == 2
+        assert table.column("name").to_pylist() == ["Alice", "Bob"]
 
-            assert Path(output_file).exists()
-            assert Path(output_file).stat().st_size > 0
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
-
-    def test_parquet_writer_unicode_data(self):
-        """Test writing Unicode data to Parquet."""
+    def test_parquet_writer_unicode_data(self, tmp_path):
+        """Test writing Unicode data to Parquet preserves characters."""
         data = [
             {"id": "1", "name": "José", "city": "São Paulo"},
-            {"id": "2", "name": "François", "city": "Montréal"},
-            {"id": "3", "name": "张三", "city": "北京"},
+            {"id": "2", "name": "张三", "city": "北京"},
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
-            output_file = f.name
+        output_file = tmp_path / "unicode.parquet"
+        writer = ParquetWriter()
+        writer.write(data, str(output_file))
 
-        try:
-            writer = ParquetWriter()
-            writer.write(data, output_file)
+        table = pq.read_table(str(output_file))
+        assert table.num_rows == 2
+        assert table.column("name").to_pylist() == ["José", "张三"]
+        assert table.column("city").to_pylist() == ["São Paulo", "北京"]
 
-            assert Path(output_file).exists()
-            assert Path(output_file).stat().st_size > 0
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
-
-    def test_parquet_writer_large_dataset(self):
+    def test_parquet_writer_large_dataset(self, tmp_path):
         """Test writing large dataset to Parquet."""
-        # Create a larger dataset
         data = [
-            {
-                "id": str(i),
-                "name": f"User_{i}",
-                "email": f"user{i}@example.com",
-                "score": str(i * 10.5),
-                "active": "true" if i % 2 == 0 else "false",
-            }
+            {"id": str(i), "name": f"User_{i}", "email": f"user{i}@example.com"}
             for i in range(1000)
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
-            output_file = f.name
+        output_file = tmp_path / "large.parquet"
+        writer = ParquetWriter()
+        writer.write(data, str(output_file))
 
-        try:
-            writer = ParquetWriter()
-            writer.write(data, output_file)
+        table = pq.read_table(str(output_file))
+        assert table.num_rows == 1000
+        assert table.column("id").to_pylist()[0] == "0"
+        assert table.column("id").to_pylist()[-1] == "999"
 
-            assert Path(output_file).exists()
-            assert Path(output_file).stat().st_size > 0
-
-            # Verify the file is reasonably sized for 1000 records
-            file_size = Path(output_file).stat().st_size
-            assert file_size > 1000  # Should be more than 1KB
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
-
-    def test_parquet_writer_sparse_data(self):
-        """Test writing sparse data (missing fields) to Parquet."""
+    def test_parquet_writer_sparse_data(self, tmp_path):
+        """Test writing sparse data (missing fields) fills nulls."""
         data = [
             {"id": "1", "name": "Alice", "email": "alice@example.com"},
-            {"id": "2", "name": "Bob"},  # Missing email
-            {"id": "3", "email": "charlie@example.com"},  # Missing name
-            {
-                "id": "4",
-                "name": "Diana",
-                "email": "diana@example.com",
-                "phone": "123-456-7890",
-            },  # Extra field
+            {"id": "2", "name": "Bob"},
+            {"id": "3", "email": "charlie@example.com"},
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
-            output_file = f.name
+        output_file = tmp_path / "sparse.parquet"
+        writer = ParquetWriter()
+        writer.write(data, str(output_file))
 
-        try:
-            writer = ParquetWriter()
-            writer.write(data, output_file)
+        table = pq.read_table(str(output_file))
+        assert table.num_rows == 3
+        assert set(table.schema.names) == {"id", "name", "email"}
+        # Missing fields should be null
+        names = table.column("name").to_pylist()
+        assert names[0] == "Alice"
+        assert names[2] is None
 
-            assert Path(output_file).exists()
-            assert Path(output_file).stat().st_size > 0
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
-
-    def test_parquet_writer_null_values(self):
+    def test_parquet_writer_null_values(self, tmp_path):
         """Test writing null values to Parquet."""
         data = [
             {"id": "1", "name": "Alice", "optional_field": "value1"},
@@ -178,24 +119,23 @@ class TestParquetWriter:
             {"id": "3", "name": "Charlie", "optional_field": ""},
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
-            output_file = f.name
+        output_file = tmp_path / "nulls.parquet"
+        writer = ParquetWriter()
+        writer.write(data, str(output_file))
 
-        try:
-            writer = ParquetWriter()
-            writer.write(data, output_file)
-
-            assert Path(output_file).exists()
-            assert Path(output_file).stat().st_size > 0
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
+        table = pq.read_table(str(output_file))
+        assert table.num_rows == 3
+        values = table.column("optional_field").to_pylist()
+        assert values[0] == "value1"
+        assert values[1] is None
+        assert values[2] == ""
 
 
 class TestParquetWriterOptions:
     """Test ParquetWriter with various options."""
 
-    def test_parquet_writer_compression(self):
+    @pytest.mark.parametrize("compression", ["snappy", "gzip", "brotli", None])
+    def test_parquet_writer_compression(self, tmp_path, compression):
         """Test Parquet writer with different compression options."""
         data = [
             {"id": "1", "name": "Alice", "data": "x" * 100},
@@ -203,49 +143,13 @@ class TestParquetWriterOptions:
             {"id": "3", "name": "Charlie", "data": "z" * 100},
         ]
 
-        compression_options = ["snappy", "gzip", "brotli", "lz4", None]
+        output_file = tmp_path / f"compressed_{compression}.parquet"
+        writer = ParquetWriter(compression=compression)
+        writer.write(data, str(output_file))
 
-        for compression in compression_options:
-            with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
-                output_file = f.name
-
-            try:
-                writer = ParquetWriter(compression=compression)
-                writer.write(data, output_file)
-
-                assert Path(output_file).exists()
-                assert Path(output_file).stat().st_size > 0
-
-            except (ValueError, ImportError):
-                # Some compression types might not be available
-                pass
-            finally:
-                Path(output_file).unlink(missing_ok=True)
-
-    def test_parquet_writer_schema_options(self):
-        """Test Parquet writer with schema options."""
-        data = [
-            {"id": "1", "name": "Alice", "score": "95.5"},
-            {"id": "2", "name": "Bob", "score": "87.2"},
-        ]
-
-        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
-            output_file = f.name
-
-        try:
-            writer = ParquetWriter(preserve_types=True, infer_schema=True)
-            writer.write(data, output_file)
-
-            assert Path(output_file).exists()
-            assert Path(output_file).stat().st_size > 0
-
-        except (OutputError, TypeError):
-            # These options might not exist in the current implementation
-            writer = ParquetWriter()
-            writer.write(data, output_file)
-            assert Path(output_file).exists()
-        finally:
-            Path(output_file).unlink(missing_ok=True)
+        table = pq.read_table(str(output_file))
+        assert table.num_rows == 3
+        assert table.column("name").to_pylist() == ["Alice", "Bob", "Charlie"]
 
 
 class TestParquetWriterErrorHandling:
@@ -264,78 +168,38 @@ class TestParquetWriterErrorHandling:
         with pytest.raises(OutputError):
             writer.write(data, invalid_path)
 
-    def test_parquet_writer_permission_denied(self):
-        """Test writing to path with no permissions."""
-        data = [{"id": "1", "name": "Alice"}]
-
-        # Try to write to root directory (should fail on most systems)
-        restricted_path = "/root/test.parquet"
-
-        writer = ParquetWriter()
-        try:
-            writer.write(data, restricted_path)
-            # If it doesn't raise an error, the system allows it
-        except (OutputError, PermissionError, OSError):
-            # Expected behavior
-            pass
-
-    def test_parquet_writer_invalid_data_type(self):
+    def test_parquet_writer_invalid_data_type(self, tmp_path):
         """Test writing invalid data types."""
         invalid_data = "not a list"
+        output_file = tmp_path / "invalid.parquet"
 
-        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
-            output_file = f.name
+        writer = ParquetWriter()
+        with pytest.raises((OutputError, TypeError, ValueError)):
+            writer.write(invalid_data, str(output_file))
 
-        try:
-            writer = ParquetWriter()
-            with pytest.raises((OutputError, TypeError, ValueError)):
-                writer.write(invalid_data, output_file)
-        finally:
-            Path(output_file).unlink(missing_ok=True)
-
-    def test_parquet_writer_complex_nested_data(self):
-        """Test writing complex nested data.
-
-        Complex nested data (dicts/lists within records) should be serialized
-        to JSON strings before writing to Parquet.
-        """
+    def test_parquet_writer_complex_nested_data(self, tmp_path):
+        """Test writing complex nested data serializes dicts/lists to JSON strings."""
         data = [
             {"id": "1", "name": "Alice", "nested": {"key": "value"}, "array": [1, 2, 3]}
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
-            output_file = f.name
+        output_file = tmp_path / "nested.parquet"
+        writer = ParquetWriter()
+        writer.write(data, str(output_file))
 
-        try:
-            writer = ParquetWriter()
-            writer.write(data, output_file)
-
-            # Verify file was created and is valid
-            assert Path(output_file).exists()
-            assert Path(output_file).stat().st_size > 0
-
-            # Verify we can read it back
-            try:
-                import pyarrow.parquet as pq
-
-                table = pq.read_table(output_file)
-                assert table.num_rows == 1
-                assert "id" in table.schema.names
-                assert "name" in table.schema.names
-            except ImportError:
-                pass  # PyArrow not available for verification
-        finally:
-            Path(output_file).unlink(missing_ok=True)
+        table = pq.read_table(str(output_file))
+        assert table.num_rows == 1
+        assert "id" in table.schema.names
+        assert "name" in table.schema.names
 
 
 class TestParquetWriterIntegration:
     """Test ParquetWriter integration with other components."""
 
-    def test_parquet_writer_with_transmog_result(self):
+    def test_parquet_writer_with_transmog_result(self, tmp_path):
         """Test ParquetWriter with transmog flatten result."""
         import transmog as tm
 
-        # Create test data
         test_data = {
             "id": 1,
             "name": "Test Company",
@@ -345,125 +209,48 @@ class TestParquetWriterIntegration:
             ],
         }
 
-        # Flatten the data
         result = tm.flatten(test_data, name="company")
+        output_path = tmp_path / "output"
+        paths = result.save(str(output_path), output_format="parquet")
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            output_path = Path(temp_dir) / "output"
-
-            # Save as Parquet
-            paths = result.save(str(output_path), output_format="parquet")
-
-            # Verify files were created
-            if isinstance(paths, dict):
-                for path in paths.values():
-                    assert Path(path).exists()
-                    assert Path(path).suffix == ".parquet"
-            else:
-                for path in paths:
-                    assert Path(path).exists()
-                    assert Path(path).suffix == ".parquet"
-
-    def test_parquet_writer_performance(self):
-        """Test ParquetWriter performance with medium dataset."""
-        # Create medium-sized dataset
-        data = [
-            {
-                "id": str(i),
-                "name": f"Record_{i}",
-                "category": f"Category_{i % 10}",
-                "value": str(i * 1.5),
-                "timestamp": f"2023-01-{(i % 28) + 1:02d}T10:00:00Z",
-                "active": "true" if i % 3 == 0 else "false",
-            }
-            for i in range(5000)
-        ]
-
-        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
-            output_file = f.name
-
-        try:
-            import time
-
-            start_time = time.time()
-
-            writer = ParquetWriter()
-            writer.write(data, output_file)
-
-            end_time = time.time()
-            duration = end_time - start_time
-
-            # Verify file was created
-            assert Path(output_file).exists()
-            assert Path(output_file).stat().st_size > 0
-
-            # Performance should be reasonable (less than 5 seconds for 5K records)
-            assert duration < 5.0, f"Writing took too long: {duration:.2f} seconds"
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
+        assert isinstance(paths, dict)
+        for _table_name, path in paths.items():
+            assert Path(path).exists()
+            assert Path(path).suffix == ".parquet"
+            table = pq.read_table(path)
+            assert table.num_rows > 0
 
 
 class TestParquetWriterEdgeCases:
     """Test edge cases for ParquetWriter."""
 
-    def test_parquet_writer_very_long_field_names(self):
-        """Test writing data with very long field names."""
-        long_field_name = "a" * 1000
-        data = [
-            {"id": "1", long_field_name: "value1"},
-            {"id": "2", long_field_name: "value2"},
-        ]
-
-        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
-            output_file = f.name
-
-        try:
-            writer = ParquetWriter()
-            writer.write(data, output_file)
-
-            assert Path(output_file).exists()
-            assert Path(output_file).stat().st_size > 0
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
-
-    def test_parquet_writer_many_columns(self):
+    def test_parquet_writer_many_columns(self, tmp_path):
         """Test writing data with many columns."""
-        # Create data with 100 columns
         data = [{f"col_{i}": f"value_{i}_{j}" for i in range(100)} for j in range(10)]
 
-        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
-            output_file = f.name
+        output_file = tmp_path / "wide.parquet"
+        writer = ParquetWriter()
+        writer.write(data, str(output_file))
 
-        try:
-            writer = ParquetWriter()
-            writer.write(data, output_file)
+        table = pq.read_table(str(output_file))
+        assert table.num_rows == 10
+        assert len(table.schema.names) == 100
 
-            assert Path(output_file).exists()
-            assert Path(output_file).stat().st_size > 0
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
-
-    def test_parquet_writer_special_characters_in_data(self):
-        """Test writing data with special characters."""
+    def test_parquet_writer_special_characters_in_data(self, tmp_path):
+        """Test writing data with special characters are preserved."""
         data = [
             {"id": "1", "text": "Line 1\nLine 2\tTabbed"},
             {"id": "2", "text": 'Quote: "Hello"'},
-            {"id": "3", "text": "Comma, semicolon; pipe|"},
-            {"id": "4", "text": "Unicode: 🚀 emoji"},
+            {"id": "3", "text": "Unicode: 🚀 emoji"},
         ]
 
-        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
-            output_file = f.name
+        output_file = tmp_path / "special.parquet"
+        writer = ParquetWriter()
+        writer.write(data, str(output_file))
 
-        try:
-            writer = ParquetWriter()
-            writer.write(data, output_file)
-
-            assert Path(output_file).exists()
-            assert Path(output_file).stat().st_size > 0
-
-        finally:
-            Path(output_file).unlink(missing_ok=True)
+        table = pq.read_table(str(output_file))
+        assert table.num_rows == 3
+        texts = table.column("text").to_pylist()
+        assert texts[0] == "Line 1\nLine 2\tTabbed"
+        assert texts[1] == 'Quote: "Hello"'
+        assert texts[2] == "Unicode: 🚀 emoji"

@@ -12,7 +12,10 @@ from pathlib import Path
 import pytest
 
 from transmog.exceptions import OutputError
-from transmog.writers import AvroStreamingWriter, AvroWriter
+from transmog.writers.avro import AVRO_AVAILABLE
+
+if AVRO_AVAILABLE:
+    from transmog.writers import AvroStreamingWriter, AvroWriter
 
 # ---- Helper Functions ----
 
@@ -72,6 +75,7 @@ def avro_temp_dir(tmp_path):
     return output_dir
 
 
+@pytest.mark.skipif(not AVRO_AVAILABLE, reason="fastavro not available")
 class TestAvroWriter:
     """Test the AvroWriter class."""
 
@@ -288,6 +292,7 @@ class TestAvroWriter:
         assert all(r["value"] is None for r in records)
 
 
+@pytest.mark.skipif(not AVRO_AVAILABLE, reason="fastavro not available")
 class TestAvroWriterOptions:
     """Test AvroWriter with various options."""
 
@@ -364,6 +369,7 @@ class TestAvroWriterOptions:
         assert option_size == large_interval_size  # Both use same sync_interval
 
 
+@pytest.mark.skipif(not AVRO_AVAILABLE, reason="fastavro not available")
 class TestAvroWriterSchemaInference:
     """Test Avro schema inference functionality."""
 
@@ -443,6 +449,7 @@ class TestAvroWriterSchemaInference:
         assert records[3]["value"] is None
 
 
+@pytest.mark.skipif(not AVRO_AVAILABLE, reason="fastavro not available")
 class TestAvroStreamingWriter:
     """Test the AvroStreamingWriter class."""
 
@@ -635,6 +642,7 @@ class TestAvroStreamingWriter:
         assert {r["id"] for r in child_records} == {"c1", "c2", "c3", "c4"}
 
 
+@pytest.mark.skipif(not AVRO_AVAILABLE, reason="fastavro not available")
 class TestAvroWriterErrorHandling:
     """Test AvroWriter error handling."""
 
@@ -665,6 +673,7 @@ class TestAvroWriterErrorHandling:
                 Path(f.name).unlink(missing_ok=True)
 
 
+@pytest.mark.skipif(not AVRO_AVAILABLE, reason="fastavro not available")
 class TestAvroWriterIntegration:
     """Test AvroWriter integration with other components."""
 
@@ -763,6 +772,7 @@ class TestAvroWriterIntegration:
             Path(output_file).unlink(missing_ok=True)
 
 
+@pytest.mark.skipif(not AVRO_AVAILABLE, reason="fastavro not available")
 class TestAvroWriterEdgeCases:
     """Test edge cases for AvroWriter."""
 

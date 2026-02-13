@@ -27,18 +27,40 @@ config = tm.TransmogConfig(
 result = tm.flatten(data, config=config)
 ```
 
-## Parameter Details
+## Core Parameters
+
+These are the parameters most users will configure.
+
+### array_mode
+
+**Type:** `ArrayMode`
+**Default:** `ArrayMode.SMART`
+
+Controls how arrays are processed. See [Array Handling](arrays.md) for detailed
+examples of each mode.
+
+Options: `SMART`, `SEPARATE`, `INLINE`, `SKIP`.
+
+### id_generation
+
+**Type:** `str | list[str]`
+**Default:** `"random"`
+
+Controls how record IDs are generated. See [ID Management](ids.md) for detailed
+examples of each strategy.
+
+Options: `"random"`, `"natural"`, `"hash"`, or a list of field names for composite keys.
 
 ### include_nulls
 
 **Type:** `bool`
 **Default:** `False`
 
-Include null and empty values in output:
+Include null and empty values in output. Enable this for CSV output where
+consistent columns across all rows are needed.
 
 ```python
-config = tm.TransmogConfig(include_nulls=False)  # Default
-config = tm.TransmogConfig(include_nulls=True)   # For CSV
+config = tm.TransmogConfig(include_nulls=True)
 ```
 
 ### stringify_values
@@ -46,17 +68,11 @@ config = tm.TransmogConfig(include_nulls=True)   # For CSV
 **Type:** `bool`
 **Default:** `False`
 
-Convert all leaf values to strings after flattening. Useful for ensuring
-consistent string types across all output formats and eliminating type
-conversion issues.
-
-When enabled:
+Convert all leaf values to strings after flattening:
 
 - Numbers become strings: `42` → `"42"`, `3.14` → `"3.14"`
 - Booleans become strings: `True` → `"True"`, `False` → `"False"`
-- Strings remain unchanged
 - Null values remain as None/null (not stringified)
-- Arrays respect `array_mode` setting, items are stringified individually
 
 ```python
 config = tm.TransmogConfig(stringify_values=True)
@@ -64,19 +80,8 @@ result = tm.flatten({"price": 19.99, "active": True}, config=config)
 # Result: {"price": "19.99", "active": "True"}
 ```
 
-Benefits:
-
-- Eliminates type inference overhead in Parquet/ORC writers
-- Consistent behavior across CSV, Parquet, and ORC formats
-- No type coercion errors
-- Simplified downstream processing
-
-### array_mode
-
-**Type:** `ArrayMode`
-**Default:** `ArrayMode.SMART`
-
-Options: `SMART`, `SEPARATE`, `INLINE`, `SKIP`. See [Array Handling](arrays.md).
+Useful when targeting CSV output or when downstream systems expect uniform string
+types. Eliminates type coercion errors in Parquet/ORC writers.
 
 ### batch_size
 
@@ -100,48 +105,47 @@ config = tm.TransmogConfig(batch_size=10000)  # Large batches
 
 :::
 
-### max_depth
+## Advanced Parameters
 
-**Type:** `int`
-**Default:** `100`
-
-Maximum recursion depth for nested structures. Fields nested deeper than this
-limit are silently omitted from the output. This prevents stack overflow on
-deeply nested or circular-like structures.
-
-```python
-config = tm.TransmogConfig(max_depth=10)  # Limit to 10 levels of nesting
-```
-
-:::{note}
-In practice, most JSON data is well under 100 levels deep. Adjust only if
-processing unusually deep structures or to intentionally truncate output.
-:::
-
-### id_generation
-
-**Type:** `str | list[str]`
-**Default:** `"random"`
-
-Options: `"random"`, `"natural"`, `"hash"`, or list of fields for composite keys. See [ID Management](ids.md).
+These parameters have sensible defaults and rarely need adjustment.
 
 ### id_field
 
 **Type:** `str`
 **Default:** `"_id"`
 
-Field name for record IDs.
+Field name for record IDs. Change only if `_id` conflicts with your data schema.
 
 ### parent_field
 
 **Type:** `str`
 **Default:** `"_parent_id"`
 
-Field name for parent references.
+Field name for parent references in child tables. Change only if `_parent_id`
+conflicts with your data schema.
 
 ### time_field
 
 **Type:** `str | None`
 **Default:** `"_timestamp"`
 
-Field name for timestamps. Set to `None` to disable.
+Field name for processing timestamps. Set to `None` to disable timestamp
+generation entirely.
+
+```python
+config = tm.TransmogConfig(time_field=None)  # Disable timestamps
+```
+
+### max_depth
+
+**Type:** `int`
+**Default:** `100`
+
+Maximum recursion depth for nested structures. Fields nested deeper than this
+limit are silently omitted. This is a safety guard — most JSON data is well
+under 100 levels deep.
+
+:::{note}
+Adjust only if processing unusually deep structures or to intentionally
+truncate output at a specific nesting level.
+:::

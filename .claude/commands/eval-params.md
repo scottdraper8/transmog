@@ -1,5 +1,3 @@
-# eval-params
-
 Evaluate parameterization within the project to identify over-parameterization and unnecessary configuration complexity.
 
 ## Task
@@ -37,5 +35,3 @@ Provide a report including:
 - Recommendations for consolidation or removal
 - Suggested refactoring to simplify configuration
 - Impact assessment of proposed changes (breaking changes, migration path, etc.)
-
-This command will be available in chat with /eval-params

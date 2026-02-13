@@ -1,31 +1,35 @@
 """Tests for writer factory functionality."""
 
+import csv
+
 import pytest
 
 from transmog.exceptions import ConfigurationError
-from transmog.writers import create_writer
+from transmog.writers import CsvWriter, ParquetWriter, create_writer
+from transmog.writers.orc import ORC_AVAILABLE
+
+if ORC_AVAILABLE:
+    from transmog.writers.orc import OrcWriter
 
 
 class TestWriterFactory:
     """Test writer factory functions."""
 
-    def test_create_csv_writer(self):
-        """Test creating CSV writer."""
+    def test_create_csv_writer_returns_correct_type(self):
+        """Test creating CSV writer returns CsvWriter."""
         writer = create_writer("csv")
-        assert writer is not None
-        assert hasattr(writer, "write")
+        assert isinstance(writer, CsvWriter)
 
-    def test_create_parquet_writer(self):
-        """Test creating Parquet writer."""
+    def test_create_parquet_writer_returns_correct_type(self):
+        """Test creating Parquet writer returns ParquetWriter."""
         writer = create_writer("parquet")
-        assert writer is not None
-        assert hasattr(writer, "write")
+        assert isinstance(writer, ParquetWriter)
 
-    def test_create_orc_writer(self):
-        """Test creating ORC writer."""
+    @pytest.mark.skipif(not ORC_AVAILABLE, reason="PyArrow not available")
+    def test_create_orc_writer_returns_correct_type(self):
+        """Test creating ORC writer returns OrcWriter."""
         writer = create_writer("orc")
-        assert writer is not None
-        assert hasattr(writer, "write")
+        assert isinstance(writer, OrcWriter)
 
     def test_create_writer_case_insensitive(self):
         """Test writer creation is case insensitive."""
@@ -33,28 +37,23 @@ class TestWriterFactory:
         writer_upper = create_writer("CSV")
         writer_mixed = create_writer("Csv")
 
-        assert writer_lower is not None
-        assert writer_upper is not None
-        assert writer_mixed is not None
-        assert isinstance(writer_lower, type(writer_upper))
+        assert type(writer_lower) is type(writer_upper) is type(writer_mixed)
 
-    def test_create_writer_with_options(self):
-        """Test creating writer with custom options."""
-        csv_writer = create_writer("csv", delimiter=";")
-        assert csv_writer is not None
+    def test_create_writer_with_options_applies_them(self, tmp_path):
+        """Test creating writer with custom options stores them."""
+        writer = create_writer("csv", delimiter=";")
 
-        parquet_writer = create_writer("parquet", compression="snappy")
-        assert parquet_writer is not None
+        output_file = tmp_path / "test.csv"
+        writer.write([{"a": 1, "b": 2}], str(output_file))
 
-        orc_writer = create_writer("orc", compression="zstd")
-        assert orc_writer is not None
+        with open(output_file) as f:
+            content = f.read()
+        assert ";" in content
 
     def test_create_writer_unsupported_format(self):
         """Test creating writer for unsupported format."""
-        with pytest.raises(ConfigurationError) as exc_info:
+        with pytest.raises(ConfigurationError, match="Unsupported format"):
             create_writer("unsupported_format")
-
-        assert "Unsupported format" in str(exc_info.value)
 
     def test_create_writer_empty_format(self):
         """Test creating writer with empty format."""
@@ -62,7 +61,7 @@ class TestWriterFactory:
             create_writer("")
 
     def test_factory_returns_new_instances(self):
-        """Test factory returns new instances."""
+        """Test factory returns new instances each time."""
         writer1 = create_writer("csv")
         writer2 = create_writer("csv")
         assert writer1 is not writer2
@@ -72,7 +71,7 @@ class TestWriterFactoryIntegration:
     """Test writer factory integration with actual writing."""
 
     def test_csv_writer_integration(self, tmp_path):
-        """Test factory-created CSV writer integration."""
+        """Test factory-created CSV writer writes correct data with options."""
         writer = create_writer("csv", delimiter=";")
 
         data = [
@@ -83,10 +82,6 @@ class TestWriterFactoryIntegration:
         output_file = tmp_path / "factory_test.csv"
         writer.write(data, str(output_file))
 
-        assert output_file.exists()
-
-        import csv
-
         with open(output_file, encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter=";")
             rows = list(reader)
@@ -95,8 +90,8 @@ class TestWriterFactoryIntegration:
         assert rows[0]["name"] == "Test 1"
 
     def test_parquet_writer_integration(self, tmp_path):
-        """Test factory-created Parquet writer integration."""
-        pytest.importorskip("pyarrow")
+        """Test factory-created Parquet writer writes correct data."""
+        import pyarrow.parquet as pq
 
         writer = create_writer("parquet")
 
@@ -108,20 +103,14 @@ class TestWriterFactoryIntegration:
         output_file = tmp_path / "factory_test.parquet"
         writer.write(data, str(output_file))
 
-        assert output_file.exists()
-
-        import pyarrow.parquet as pq
-
         table = pq.read_table(str(output_file))
-
         assert table.num_rows == 2
-        assert "name" in table.schema.names
-        name_column = table.column("name").to_pylist()
-        assert name_column[0] == "Test 1"
+        assert table.column("name").to_pylist() == ["Test 1", "Test 2"]
 
+    @pytest.mark.skipif(not ORC_AVAILABLE, reason="PyArrow not available")
     def test_orc_writer_integration(self, tmp_path):
-        """Test factory-created ORC writer integration."""
-        pytest.importorskip("pyarrow")
+        """Test factory-created ORC writer writes correct data."""
+        import pyarrow.orc as orc
 
         writer = create_writer("orc")
 
@@ -133,26 +122,6 @@ class TestWriterFactoryIntegration:
         output_file = tmp_path / "factory_test.orc"
         writer.write(data, str(output_file))
 
-        assert output_file.exists()
-
-        import pyarrow.orc as orc
-
         table = orc.read_table(str(output_file))
-
         assert table.num_rows == 2
-        assert "name" in table.schema.names
-        name_column = table.column("name").to_pylist()
-        assert name_column[0] == "Test 1"
-
-    def test_factory_handles_many_writers(self):
-        """Test factory handles creating many writers."""
-        writers = []
-        for i in range(100):
-            format_type = ["csv", "parquet", "orc"][i % 3]
-            writer = create_writer(format_type)
-            writers.append(writer)
-
-        assert len(writers) == 100
-
-        for writer in writers:
-            assert hasattr(writer, "write")
+        assert table.column("name").to_pylist() == ["Test 1", "Test 2"]

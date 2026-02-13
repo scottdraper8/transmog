@@ -81,25 +81,11 @@ class TestConfigValidation:
 class TestConfigArrayModes:
     """Test array mode configuration options."""
 
-    def test_smart_array_mode(self):
-        """Test SMART array mode configuration."""
-        config = TransmogConfig(array_mode=ArrayMode.SMART)
-        assert config.array_mode == ArrayMode.SMART
-
-    def test_separate_array_mode(self):
-        """Test SEPARATE array mode configuration."""
-        config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
-        assert config.array_mode == ArrayMode.SEPARATE
-
-    def test_inline_array_mode(self):
-        """Test INLINE array mode configuration."""
-        config = TransmogConfig(array_mode=ArrayMode.INLINE)
-        assert config.array_mode == ArrayMode.INLINE
-
-    def test_skip_array_mode(self):
-        """Test SKIP array mode configuration."""
-        config = TransmogConfig(array_mode=ArrayMode.SKIP)
-        assert config.array_mode == ArrayMode.SKIP
+    @pytest.mark.parametrize("mode", list(ArrayMode))
+    def test_array_mode_round_trips(self, mode):
+        """Test all ArrayMode values can be set and read back."""
+        config = TransmogConfig(array_mode=mode)
+        assert config.array_mode == mode
 
 
 class TestConfigConsistency:

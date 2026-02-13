@@ -2,10 +2,10 @@
 
 # Transmog - Flatten Nested JSON to Tabular Formats
 
-[![Transmog Version](https://img.shields.io/badge/transmog-2.0.1-ff79c6?logo=github&logoColor=white&labelColor=6272a4)](https://github.com/scottdraper8/transmog/releases)
+[![Transmog Version](https://img.shields.io/badge/transmog-2.0.2-ff79c6?logo=github&logoColor=white&labelColor=6272a4)](https://github.com/scottdraper8/transmog/releases)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-ffb86c?logo=python&logoColor=white&labelColor=6272a4)](https://www.python.org/downloads/)
 [![Poetry](https://img.shields.io/badge/Poetry-1.0+-f1fa8c?logo=poetry&logoColor=282a36&labelColor=6272a4)](https://python-poetry.org/)
-[![pre-commit](https://img.shields.io/badge/pre--commit-6.0.0-50fa7b?logo=pre-commit&logoColor=282a36&labelColor=6272a4)](https://github.com/pre-commit/pre-commit)
+[![pre-commit](https://img.shields.io/badge/pre--commit-4.5+-50fa7b?logo=pre-commit&logoColor=282a36&labelColor=6272a4)](https://github.com/pre-commit/pre-commit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-8be9fd?logo=opensourceinitiative&logoColor=white&labelColor=6272a4)](LICENSE)
 
 ---

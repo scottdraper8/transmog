@@ -71,50 +71,39 @@ result = tm.flatten(data, config=config)
 
 ## File Processing
 
-### JSON Files
+All file formats supported by `flatten()` are also supported by `flatten_stream()`:
+JSON (`.json`), JSON Lines (`.jsonl`, `.ndjson`), JSON5 (`.json5`), and HJSON (`.hjson`).
+See [Getting Started](getting_started.md#working-with-files) for format details and
+dependency requirements.
 
 ```python
 tm.flatten_stream("large_file.json", "output/", output_format="parquet")
-```
-
-### JSONL Files
-
-```python
 tm.flatten_stream("large_file.jsonl", "output/", output_format="csv")
-```
-
-JSONL files are processed line-by-line.
-
-### JSON5 Files
-
-```python
 tm.flatten_stream("config.json5", "output/", output_format="parquet")
-```
-
-JSON5 files support comments, trailing commas, unquoted keys, and single quotes.
-
-### HJSON Files
-
-```python
 tm.flatten_stream("data.hjson", "output/", output_format="csv")
 ```
 
-HJSON files support comments, unquoted strings, and multiline strings.
+JSONL files are processed line-by-line, making them ideal for streaming large datasets.
 
 ## Output Formats
 
+See [Output Formats](outputs.md) for full details on each format and its options.
+
 ```python
 tm.flatten_stream(data, "output/", output_format="csv")
-tm.flatten_stream(data, "output/", output_format="parquet")
 tm.flatten_stream(data, "output/", output_format="parquet", compression="snappy")
 tm.flatten_stream(data, "output/", output_format="parquet", row_group_size=50000)
-tm.flatten_stream(data, "output/", output_format="orc")
 tm.flatten_stream(data, "output/", output_format="orc", compression="zstd")
-tm.flatten_stream(data, "output/", output_format="orc", compression="snappy", batch_size=50000)
-tm.flatten_stream(data, "output/", output_format="avro")
 tm.flatten_stream(data, "output/", output_format="avro", codec="snappy")
 tm.flatten_stream(data, "output/", output_format="avro", codec="deflate", sync_interval=32000)
 ```
+
+:::{note}
+The ORC writer accepts a `batch_size` format option (e.g., `batch_size=50000`)
+that controls how many rows are written per ORC stripe. This is separate from
+`TransmogConfig.batch_size`, which controls how many records are processed per
+processing batch.
+:::
 
 ## Examples
 

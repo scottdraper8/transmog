@@ -140,7 +140,7 @@ The codebase is organized into focused modules:
 - **`src/transmog/flattening.py`** - Core flattening, metadata, and array extraction logic
 - **`src/transmog/iterators.py`** - Input normalization for JSON and JSONL sources
 - **`src/transmog/streaming.py`** - Streaming pipeline orchestration
-- **`src/transmog/writers.py`** - CSV and Parquet writers (batch and streaming)
+- **`src/transmog/writers/`** - CSV, Parquet, ORC, and Avro writers (batch and streaming)
 - **`src/transmog/exceptions.py`** - Exception hierarchy
 - **`src/transmog/types.py`** - Shared enums and processing context
 - **`tests/`** - Unit, integration, and performance test suites

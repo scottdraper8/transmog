@@ -188,14 +188,24 @@ result = tm.flatten(data, name="customers", config=config)
 result.save("import/")
 ```
 
-### Pandas
+### PyArrow
 
 ```python
 result = tm.flatten(data, name="sales")
 result.save("analysis.parquet")
 
-import pandas as pd
-df = pd.read_parquet("analysis.parquet")
+import pyarrow.parquet as pq
+table = pq.read_table("analysis.parquet")
+```
+
+### Polars
+
+```python
+result = tm.flatten(data, name="sales")
+result.save("analysis.parquet")
+
+import polars as pl
+df = pl.read_parquet("analysis.parquet")
 ```
 
 ### DuckDB

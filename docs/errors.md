@@ -29,13 +29,28 @@ except tm.ValidationError as e:
     print(f"Validation error: {e}")
 ```
 
+### MissingDependencyError
+
+Raised when an optional dependency is missing. Available as `tm.MissingDependencyError`.
+
+```python
+try:
+    result.save("output.parquet")
+except tm.MissingDependencyError as e:
+    print(f"Missing dependency: {e}")
+    print("Install with: pip install pyarrow")
+```
+
 ### ConfigurationError
 
-Raised when configuration is invalid. Not exported; handled during initialization.
+Raised when `TransmogConfig` receives invalid parameters (e.g., `batch_size < 1`,
+invalid `id_generation` value). Not exported in the public API — catch using
+`TransmogError` as the base class.
 
 ### OutputError
 
-Raised when writing output fails. Not exported.
+Raised when writing output files fails (e.g., permission errors, disk full).
+Not exported in the public API — catch using `TransmogError` as the base class.
 
 ## Custom Error Handling
 
@@ -73,4 +88,40 @@ try:
     result = tm.flatten("malformed.jsonl")
 except tm.TransmogError as e:
     print(f"Error processing file: {e}")
+```
+
+### Missing Optional Dependency
+
+```python
+try:
+    tm.flatten_stream(data, "output/", output_format="avro")
+except tm.MissingDependencyError as e:
+    print(f"Missing dependency: {e}")
+    print("Install with: pip install fastavro cramjam")
+```
+
+## Troubleshooting
+
+### Common Errors
+
+**"Missing dependency" when saving Parquet/ORC:**
+Install PyArrow: `pip install pyarrow`
+
+**"Missing dependency" when saving Avro:**
+Install fastavro and cramjam: `pip install fastavro cramjam`
+
+**Schema drift error during Avro streaming:**
+When using `flatten_stream()` with Avro output, the schema is locked after the
+first batch. If later batches contain fields not present in the first batch, a
+schema drift error is raised. Ensure input data has a consistent structure, or
+process a representative sample first to establish the schema.
+
+**ConfigurationError on invalid config:**
+Catch using `TransmogError` since `ConfigurationError` is not exported:
+
+```python
+try:
+    config = tm.TransmogConfig(batch_size=-1)
+except tm.TransmogError as e:
+    print(f"Invalid config: {e}")
 ```

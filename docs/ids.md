@@ -2,8 +2,6 @@
 
 ID generation strategies track records and maintain relationships between parent and child tables.
 
-## ID Strategies
-
 ## Random IDs (Default)
 
 The default strategy generates unique UUIDs for all records:

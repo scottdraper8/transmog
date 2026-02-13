@@ -3,7 +3,6 @@
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import mock_open, patch
 
 import pytest
 
@@ -199,16 +198,18 @@ class TestFlattenResultEdgeCases:
         assert len(result.all_tables) >= 1
         assert len(result.main) >= 1
 
-    def test_result_memory_behavior(self):
-        """Test memory behavior with large results."""
-        large_data = [{"id": i, "data": "x" * 100} for i in range(1000)]
+    def test_result_large_dataset_preserves_data(self):
+        """Test that large flattened datasets preserve all records."""
+        large_data = [{"id": i, "data": f"value_{i}"} for i in range(1000)]
         result = tm.flatten(large_data, name="large")
 
         assert len(result.main) == 1000
         assert len(result.all_tables) >= 1
-
-        count = sum(1 for _ in result.main[:10])
-        assert count == 10
+        # Verify first and last record data integrity
+        assert result.main[0]["id"] == 0
+        assert result.main[0]["data"] == "value_0"
+        assert result.main[-1]["id"] == 999
+        assert result.main[-1]["data"] == "value_999"
 
     def test_result_concurrent_access(self):
         """Test concurrent access to result data."""
@@ -320,41 +321,30 @@ class TestFlattenResultSaveErrors:
                 except (OSError, NotImplementedError):
                     pass
 
-    def test_result_save_disk_full_simulation(self):
-        """Test save operations when disk is full."""
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows file permissions work differently from Unix",
+    )
+    def test_result_save_to_invalid_directory(self):
+        """Test save operations when directory is not writable."""
         data = {"id": 1, "name": "Test"}
         result = tm.flatten(data, name="test")
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            output_path = Path(temp_dir) / "output.csv"
+        with pytest.raises((OutputError, ValidationError, OSError)):
+            result.save("/nonexistent/directory/that/does/not/exist/output.csv")
 
-            with patch("builtins.open", mock_open()) as mock_file:
-                mock_file.return_value.write.side_effect = OSError(
-                    "No space left on device"
-                )
-
-                with pytest.raises((OutputError, ValidationError, OSError)):
-                    result.save(str(output_path))
-
-    def test_result_serialization_edge_cases(self):
-        """Test serialization edge cases."""
+    def test_result_save_with_child_tables(self):
+        """Test saving result with child tables creates directory and all files."""
         data = {"company": {"name": "Test", "employees": [{"name": "Alice"}]}}
         result = tm.flatten(data, name="company")
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            output_path = Path(temp_dir) / "encoded.csv"
+            output_path = Path(temp_dir) / "output"
+            saved_paths = result.save(str(output_path), output_format="csv")
 
-            try:
-                saved_paths = result.save(str(output_path))
-
-                if isinstance(saved_paths, str):
-                    assert Path(saved_paths).exists()
-                elif isinstance(saved_paths, dict):
-                    for path in saved_paths.values():
-                        assert Path(path).exists()
-                elif isinstance(saved_paths, list):
-                    for path in saved_paths:
-                        assert Path(path).exists()
-
-            except (ValidationError, OutputError):
-                pass
+            assert isinstance(saved_paths, dict)
+            for table_name, path in saved_paths.items():
+                assert Path(path).exists(), (
+                    f"File for table '{table_name}' was not created"
+                )
+                assert Path(path).stat().st_size > 0

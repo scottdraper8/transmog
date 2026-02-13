@@ -45,6 +45,7 @@ Simple arrays contain only primitive values (strings, numbers, booleans,
 null). Complex arrays contain objects or nested structures.
 
 :::{tip} When to use SMART mode
+
 Default choice for most use cases. Balances data normalization
 with simplicity by keeping simple lists inline while properly normalizing
 complex nested data.
@@ -64,6 +65,7 @@ print(result.tables.keys())
 ```
 
 :::{tip} When to use SEPARATE mode
+
 Choose SEPARATE when:
 
 - Child records need to be queried independently
@@ -92,6 +94,7 @@ print(result.main)
 ```
 
 :::{tip} When to use INLINE mode
+
 Choose INLINE when:
 
 - Arrays are treated as opaque blobs
@@ -114,6 +117,7 @@ print(result.main)
 ```
 
 :::{tip} When to use SKIP mode
+
 Choose SKIP when:
 
 - Arrays are not relevant to the analysis

@@ -30,7 +30,7 @@ print(result.tables)  # Employee data in separate table
 - **[Configuration](configuration.md)** - Configuration parameters
 - **[Array Handling](arrays.md)** - Array processing modes
 - **[ID Management](ids.md)** - ID generation strategies
-- **[Error Handling](errors.md)** - Error recovery modes
+- **[Error Handling](errors.md)** - Exception types and error handling
 - **[Output Formats](outputs.md)** - CSV, Parquet, ORC, and Avro output
 - **[Streaming](streaming.md)** - Large dataset processing
 - **[API Reference](api.md)** - Function and class documentation

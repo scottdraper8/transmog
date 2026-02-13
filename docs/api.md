@@ -83,7 +83,7 @@ flatten_stream(
 - **data** (*dict[str, Any] | list[dict[str, Any]] | str | Path | bytes*): Input data (same as `flatten()`).
 - **output_path** (*str | Path*): Directory path for output files.
 - **name** (*str*, default="data"): Base name for output files.
-- **output_format** (*str*, default="csv"): Output format ("csv", "parquet", "orc").
+- **output_format** (*str*, default="csv"): Output format ("csv", "parquet", "orc", "avro").
 - **config** (*TransmogConfig | None*, default=None): Configuration object.
 - **\*\*format_options**: Format-specific options.
 
@@ -112,6 +112,11 @@ config = tm.TransmogConfig(batch_size=5000)
 tm.flatten_stream(data, "output/", output_format="orc", config=config)
 ```
 
+:::{note}
+When `config` is not provided, `flatten_stream()` uses `batch_size=100` (instead
+of the default 1000) for memory efficiency. Pass an explicit config to override.
+:::
+
 :::{seealso}
 For large datasets that don't fit in memory, use `flatten_stream()` instead of
 `flatten()`. It writes directly to disk without keeping all data in memory.
@@ -127,6 +132,7 @@ Configuration class for all processing parameters.
 TransmogConfig(
     array_mode: ArrayMode = ArrayMode.SMART,
     include_nulls: bool = False,
+    stringify_values: bool = False,
     max_depth: int = 100,
     id_generation: str | list[str] = "random",
     id_field: str = "_id",
@@ -142,6 +148,8 @@ TransmogConfig(
 
 - `array_mode` (ArrayMode, default=ArrayMode.SMART): How to handle arrays
 - `include_nulls` (bool, default=False): Include null and empty values in output
+- `stringify_values` (bool, default=False): Convert all leaf values to strings after
+  flattening. Numbers become `"42"`, booleans become `"True"`, nulls remain as None.
 - `max_depth` (int, default=100): Maximum recursion depth
 
 **ID and Metadata:**
@@ -212,7 +220,8 @@ save(
 **Parameters:**
 
 - **path**: Output path (file or directory).
-- **output_format**: Output format ("csv", "parquet", "orc"). Auto-detected from extension if not specified.
+- **output_format**: Output format ("csv", "parquet", "orc", "avro"). Auto-detected
+  from extension if not specified. Defaults to "csv" when no extension is present.
 - **\*\*format_options**: Format-specific writer options (e.g., `delimiter`, `quoting` for CSV; `compression` for Parquet).
 
 **Returns:**
@@ -221,16 +230,25 @@ save(
   single table output or a dictionary mapping table names to file paths for
   multiple tables.
 
+**Behavior:**
+
+- **With child tables:** Saves all tables to a directory. If a file path with an
+  extension is given (e.g., `"output/data.csv"`), the extension is stripped and a
+  directory is created instead. Returns `dict[str, str]` mapping table names to paths.
+- **Without child tables:** Saves the main table to a single file. If no extension
+  is present, the output format extension is appended automatically. Returns `list[str]`.
+
 **Examples:**
 
 ```python
-# Save to directory
+# Save to directory (when child tables exist)
 paths = result.save("output/")
+# Creates: output/products.csv, output/products_reviews.csv
 
 # Save with explicit format
-paths = result.save("output/", output_format="csv")
+paths = result.save("output/", output_format="parquet")
 
-# Save single table
+# Save single table (when no child tables)
 paths = result.save("data.csv")
 ```
 

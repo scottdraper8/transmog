@@ -1,5 +1,3 @@
-# eval-docs
-
 Evaluate documentation quality and alignment with the codebase to ensure comprehensive, accurate, and user-focused guidance.
 
 ## Task
@@ -98,5 +96,3 @@ Provide a report including:
 - Accessibility issues (broken links, orphaned pages)
 - Recommendations for improving clarity and user focus
 - Impact assessment of proposed changes (breaking changes to docs structure, migration path, etc.)
-
-This command will be available in chat with /eval-docs

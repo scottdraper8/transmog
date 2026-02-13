@@ -44,15 +44,43 @@ ol li {
     margin-bottom: 0.5em;
 }
 
-/* Improve note and warning boxes */
+/* Improve admonition boxes */
+.admonition {
+    padding: 0.8rem 1rem;
+    margin: 1.5rem 0;
+    border-radius: 4px;
+}
+
 .admonition.note {
     background-color: var(--color-background-secondary);
     border-left-color: var(--color-brand-primary);
 }
 
-.admonition.warning {
+.admonition.tip,
+.admonition.hint {
+    background-color: var(--color-background-secondary);
+    border-left-color: #50fa7b;
+}
+
+.admonition.important {
+    background-color: var(--color-background-secondary);
+    border-left-color: #ff79c6;
+}
+
+.admonition.seealso {
+    background-color: var(--color-background-secondary);
+    border-left-color: #8be9fd;
+}
+
+.admonition.warning,
+.admonition.caution {
     background-color: var(--color-background-secondary);
     border-left-color: #f0b37e;
+}
+
+.admonition > .admonition-title {
+    font-weight: 700;
+    margin-bottom: 0.4rem;
 }
 
 /* API documentation parameter styling */

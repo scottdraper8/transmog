@@ -46,8 +46,8 @@ docs/_autosummary/
 !.git*
 !.pre-commit-config.yaml
 
-# Tracking Cursor rules and commands
-!.cursor/
-.cursor/*
-!.cursor/rules/
-!.cursor/commands/
+# Tracking Claude Code rules and commands
+!.claude/
+.claude/*
+!.claude/rules/
+!.claude/commands/
