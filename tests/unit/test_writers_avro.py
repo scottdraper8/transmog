@@ -8,6 +8,7 @@ import math
 import sys
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -912,3 +913,113 @@ class TestAvroWriterEdgeCases:
 
         finally:
             Path(output_file).unlink(missing_ok=True)
+
+
+@pytest.mark.skipif(not AVRO_AVAILABLE, reason="fastavro not available")
+class TestAvroStreamingWriterExceptionCleanup:
+    """Test resource cleanup behavior of AvroStreamingWriter on exceptions."""
+
+    def test_context_manager_cleans_up_on_write_exception(self, tmp_path):
+        """Context manager clears metadata when fastavro.writer raises."""
+        avro_dir = tmp_path / "avro_out"
+        avro_dir.mkdir()
+
+        def always_fail(*_args, **_kwargs):
+            raise OSError("simulated avro write failure")
+
+        with pytest.raises(OSError, match="simulated avro write failure"):
+            with AvroStreamingWriter(
+                destination=str(avro_dir), entity_name="test"
+            ) as writer:
+                writer.write_main_records(
+                    [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
+                )
+                with patch("transmog.writers.avro.avro_writer", always_fail):
+                    writer.write_main_records(
+                        [
+                            {"id": "3", "name": "Charlie"},
+                            {"id": "4", "name": "Dave"},
+                        ]
+                    )
+
+        assert writer._closed is True
+        assert writer.schemas == {}
+        assert writer.file_paths == {}
+        assert writer.initialized_tables == set()
+
+    def test_no_context_manager_retains_metadata_on_exception(self, tmp_path):
+        """Without context manager, metadata is retained after exception."""
+        avro_dir = tmp_path / "avro_out"
+        avro_dir.mkdir()
+
+        def always_fail(*_args, **_kwargs):
+            raise OSError("simulated avro write failure")
+
+        writer = AvroStreamingWriter(destination=str(avro_dir), entity_name="test")
+        writer.write_main_records(
+            [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
+        )
+
+        with patch("transmog.writers.avro.avro_writer", always_fail):
+            with pytest.raises(OSError, match="simulated avro write failure"):
+                writer.write_main_records(
+                    [
+                        {"id": "3", "name": "Charlie"},
+                        {"id": "4", "name": "Dave"},
+                    ]
+                )
+
+        assert not getattr(writer, "_closed", False)
+        assert writer.schemas != {}
+        assert writer.file_paths != {}
+        assert writer.initialized_tables != set()
+
+        writer.close()
+
+    def test_schema_drift_cleanup_with_context_manager(self, tmp_path):
+        """Context manager cleans up after schema drift raises OutputError."""
+        avro_dir = tmp_path / "avro_out"
+        avro_dir.mkdir()
+
+        with pytest.raises(OutputError, match="schema changed"):
+            with AvroStreamingWriter(
+                destination=str(avro_dir), entity_name="test"
+            ) as writer:
+                writer.write_main_records([{"id": "1", "name": "Alice"}])
+                writer.write_main_records(
+                    [{"id": "2", "name": "Bob", "new_field": "surprise"}]
+                )
+
+        assert writer._closed is True
+        assert writer.schemas == {}
+
+    def test_first_batch_file_survives_second_batch_failure(self, tmp_path):
+        """First batch's .avro file persists on disk after second batch fails."""
+        avro_dir = tmp_path / "avro_out"
+        avro_dir.mkdir()
+
+        def always_fail(*_args, **_kwargs):
+            raise OSError("simulated avro write failure")
+
+        with pytest.raises(OSError, match="simulated avro write failure"):
+            with AvroStreamingWriter(
+                destination=str(avro_dir), entity_name="test"
+            ) as writer:
+                writer.write_main_records(
+                    [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
+                )
+                with patch("transmog.writers.avro.avro_writer", always_fail):
+                    writer.write_main_records(
+                        [
+                            {"id": "3", "name": "Charlie"},
+                            {"id": "4", "name": "Dave"},
+                        ]
+                    )
+
+        avro_file = avro_dir / "test.avro"
+        assert avro_file.exists()
+
+        records = read_avro_records(str(avro_file))
+        assert len(records) == 2
+        assert records[0]["name"] == "Alice"
+        assert records[1]["name"] == "Bob"

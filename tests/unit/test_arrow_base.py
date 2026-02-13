@@ -1,5 +1,7 @@
 """Tests for PyArrow base writer converter functions and caching."""
 
+from unittest.mock import patch
+
 import pytest
 
 from transmog.writers.arrow_base import PYARROW_AVAILABLE
@@ -270,3 +272,133 @@ class TestPyArrowWriterExceptionHandling:
 
         with pytest.raises(OutputError, match="requires binary streams"):
             writer.write(data, text_stream)
+
+
+class TestArrowStreamingWriterExceptionCleanup:
+    """Test resource cleanup behavior of PyArrowStreamingWriter on exceptions."""
+
+    def test_context_manager_closes_writers_on_write_exception(self, tmp_path):
+        """Context manager clears writers/buffers when _write_to_writer raises."""
+        from transmog.writers.parquet import ParquetStreamingWriter
+
+        def always_fail(self, _writer_obj, _table):
+            raise OSError("simulated write failure")
+
+        with pytest.raises(OSError, match="simulated write failure"):
+            with ParquetStreamingWriter(
+                destination=str(tmp_path), entity_name="test", row_group_size=2
+            ) as writer:
+                writer.write_main_records(
+                    [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+                )
+                with patch.object(
+                    ParquetStreamingWriter, "_write_to_writer", always_fail
+                ):
+                    writer.write_main_records(
+                        [{"id": 3, "name": "Charlie"}, {"id": 4, "name": "Dave"}]
+                    )
+
+        assert writer._closed is True
+        assert writer.writers == {}
+        assert writer.schemas == {}
+        assert writer.converters == {}
+
+    def test_no_context_manager_leaves_writers_open_on_exception(self, tmp_path):
+        """Without context manager, writers/buffers remain populated after error."""
+        from transmog.writers.parquet import ParquetStreamingWriter
+
+        def always_fail(self, _writer_obj, _table):
+            raise OSError("simulated write failure")
+
+        writer = ParquetStreamingWriter(
+            destination=str(tmp_path), entity_name="test", row_group_size=2
+        )
+        writer.write_main_records(
+            [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+        )
+
+        with patch.object(ParquetStreamingWriter, "_write_to_writer", always_fail):
+            with pytest.raises(OSError, match="simulated write failure"):
+                writer.write_main_records(
+                    [{"id": 3, "name": "Charlie"}, {"id": 4, "name": "Dave"}]
+                )
+
+        assert not getattr(writer, "_closed", False)
+        assert writer.writers != {}
+
+        writer.close()
+
+    def test_buffer_retained_on_write_failure(self, tmp_path):
+        """Buffers retain records when _write_to_writer raises before clear()."""
+        from transmog.writers.parquet import ParquetStreamingWriter
+
+        def always_fail(self, _writer_obj, _table):
+            raise OSError("write failure")
+
+        writer = ParquetStreamingWriter(
+            destination=str(tmp_path), entity_name="test", row_group_size=2
+        )
+        # Add one record (below batch_size, no flush yet)
+        writer.write_main_records([{"id": 1, "name": "Alice"}])
+        assert len(writer.buffers["main"]) == 1
+
+        # Adding a second record triggers flush (row_group_size=2), which fails
+        with patch.object(ParquetStreamingWriter, "_write_to_writer", always_fail):
+            with pytest.raises(OSError, match="write failure"):
+                writer.write_main_records([{"id": 2, "name": "Bob"}])
+
+        # Buffer was NOT cleared because the exception happened before clear()
+        assert len(writer.buffers["main"]) == 2
+
+        writer.close()
+
+    def test_close_flush_failure_prevents_cleanup(self, tmp_path):
+        """close() does not complete cleanup if flush raises (no try/finally)."""
+        from transmog.writers.parquet import ParquetStreamingWriter
+
+        def always_fail(self, _writer_obj, _table):
+            raise OSError("flush failure during close")
+
+        writer = ParquetStreamingWriter(
+            destination=str(tmp_path), entity_name="test", row_group_size=100
+        )
+        # Records stay buffered (below batch_size)
+        writer.write_main_records(
+            [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+        )
+        assert len(writer.buffers["main"]) == 2
+
+        with patch.object(ParquetStreamingWriter, "_write_to_writer", always_fail):
+            with pytest.raises(OSError, match="flush failure during close"):
+                writer.close()
+
+        # close() did not finish — cleanup never reached
+        assert not getattr(writer, "_closed", False)
+        assert writer.writers != {} or writer.schemas != {}
+
+    def test_partial_file_on_disk_after_exception(self, tmp_path):
+        """First batch's file survives on disk after second batch fails."""
+        from pathlib import Path
+
+        from transmog.writers.parquet import ParquetStreamingWriter
+
+        def always_fail(self, _writer_obj, _table):
+            raise OSError("simulated write failure")
+
+        with pytest.raises(OSError, match="simulated write failure"):
+            with ParquetStreamingWriter(
+                destination=str(tmp_path), entity_name="test", row_group_size=2
+            ) as writer:
+                writer.write_main_records(
+                    [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+                )
+                with patch.object(
+                    ParquetStreamingWriter, "_write_to_writer", always_fail
+                ):
+                    writer.write_main_records(
+                        [{"id": 3, "name": "Charlie"}, {"id": 4, "name": "Dave"}]
+                    )
+
+        parquet_file = Path(tmp_path) / "test.parquet"
+        assert parquet_file.exists()
+        assert parquet_file.stat().st_size > 0

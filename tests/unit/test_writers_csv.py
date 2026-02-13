@@ -10,12 +10,13 @@ import tempfile
 from io import StringIO
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 
 from transmog.exceptions import OutputError
 from transmog.writers import CsvWriter, DataWriter
-from transmog.writers.csv import _sanitize_csv_value
+from transmog.writers.csv import CsvStreamingWriter, _sanitize_csv_value
 
 
 class TestCsvWriter:
@@ -881,3 +882,116 @@ class TestCsvWriter:
         with patch("builtins.open", side_effect=OSError("disk full")):
             with pytest.raises(OutputError, match="Failed to write CSV file"):
                 writer.write(sample_data, "/tmp/test.csv")
+
+
+class TestCsvStreamingWriterExceptionCleanup:
+    """Test resource cleanup behavior of CsvStreamingWriter on exceptions."""
+
+    def test_context_manager_closes_files_on_write_exception(self, tmp_path):
+        """Context manager closes file handles when writerow raises mid-batch."""
+        csv_path = str(tmp_path / "test.csv")
+
+        call_count = 0
+        original_writerow = csv.DictWriter.writerow
+
+        def failing_writerow(self_writer, rowdict):
+            nonlocal call_count
+            call_count += 1
+            if call_count > 3:
+                raise OSError("simulated disk failure")
+            return original_writerow(self_writer, rowdict)
+
+        with patch.object(csv.DictWriter, "writerow", failing_writerow):
+            with pytest.raises(OSError, match="simulated disk failure"):
+                with CsvStreamingWriter(
+                    destination=csv_path, entity_name="test"
+                ) as writer:
+                    writer.write_main_records(
+                        [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
+                    )
+                    writer.write_main_records(
+                        [{"id": "3", "name": "Charlie"}, {"id": "4", "name": "Dave"}]
+                    )
+
+        assert writer._closed is True
+        assert writer.file_objects == {}
+
+    def test_no_context_manager_leaks_files_on_write_exception(self, tmp_path):
+        """Without context manager, file handles are not closed on exception."""
+        csv_path = str(tmp_path / "test.csv")
+
+        def always_fail(self_writer, rowdict):
+            raise OSError("simulated disk failure")
+
+        writer = CsvStreamingWriter(destination=csv_path, entity_name="test")
+        writer.write_main_records(
+            [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
+        )
+
+        with patch.object(csv.DictWriter, "writerow", always_fail):
+            with pytest.raises(OSError, match="simulated disk failure"):
+                writer.write_main_records([{"id": "3", "name": "Charlie"}])
+
+        assert not getattr(writer, "_closed", False)
+        assert writer.file_objects != {}
+        assert not writer.file_objects["main"].closed
+
+        writer.close()
+
+    def test_context_manager_closes_files_on_schema_drift(self, tmp_path):
+        """Context manager cleans up when schema drift raises OutputError."""
+        csv_path = str(tmp_path / "test.csv")
+
+        with pytest.raises(OutputError, match="schema changed"):
+            with CsvStreamingWriter(destination=csv_path, entity_name="test") as writer:
+                writer.write_main_records([{"id": "1", "name": "Alice"}])
+                writer.write_main_records(
+                    [{"id": "2", "name": "Bob", "new_field": "surprise"}]
+                )
+
+        assert writer._closed is True
+        assert writer.file_objects == {}
+        assert writer.writers == {}
+
+    def test_close_after_exception_is_safe(self, tmp_path):
+        """Explicit close() after exception works and is idempotent."""
+        csv_path = str(tmp_path / "test.csv")
+
+        writer = CsvStreamingWriter(destination=csv_path, entity_name="test")
+        writer.write_main_records([{"id": "1", "name": "Alice"}])
+
+        with pytest.raises(OutputError, match="schema changed"):
+            writer.write_main_records([{"id": "2", "name": "Bob", "extra": "field"}])
+
+        assert not getattr(writer, "_closed", False)
+
+        writer.close()
+        assert writer._closed is True
+        assert writer.file_objects == {}
+
+        # Idempotent: second close() is a no-op
+        writer.close()
+        assert writer._closed is True
+
+    def test_partial_file_exists_after_write_exception(self, tmp_path):
+        """After mid-batch failure + cleanup, output file contains batch 1 data."""
+        csv_path = str(tmp_path / "test.csv")
+
+        def always_fail(self_writer, rowdict):
+            raise OSError("simulated disk failure")
+
+        with pytest.raises(OSError, match="simulated disk failure"):
+            with CsvStreamingWriter(destination=csv_path, entity_name="test") as writer:
+                writer.write_main_records(
+                    [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
+                )
+                with patch.object(csv.DictWriter, "writerow", always_fail):
+                    writer.write_main_records([{"id": "3", "name": "Charlie"}])
+
+        assert Path(csv_path).exists()
+        with open(csv_path, newline="") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        assert len(rows) >= 2
+        assert rows[0]["name"] == "Alice"
+        assert rows[1]["name"] == "Bob"

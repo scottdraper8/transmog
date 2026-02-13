@@ -150,7 +150,7 @@ injection patterns including edge cases.
 
 ### TEST-2: Streaming writer exception cleanup
 
-`TODO` · Size: **M**
+`DONE` · Size: **M**
 
 Limited testing for file handle cleanup when streaming
 writers encounter exceptions mid-batch. Could leak file
@@ -159,6 +159,12 @@ handles or leave partial files.
 **Proposed fix:** Add tests that inject failures during
 write and verify resources are cleaned up and partial
 files are handled.
+
+- Progress: Added 14 tests across CSV, Arrow, and Avro
+  streaming writers covering context manager cleanup,
+  no-context-manager leak behavior, schema drift, close
+  idempotency, buffer retention, and partial file
+  survival.
 
 ### TEST-3: Iterator format detection edge cases
 
