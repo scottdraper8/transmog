@@ -15,6 +15,7 @@ import pytest
 
 from transmog.exceptions import OutputError
 from transmog.writers import CsvWriter, DataWriter
+from transmog.writers.csv import _sanitize_csv_value
 
 
 class TestCsvWriter:
@@ -772,6 +773,84 @@ class TestCsvWriter:
 
         finally:
             Path(tmp_path).unlink(missing_ok=True)
+
+    @pytest.mark.parametrize(
+        "char",
+        ["=", "+", "-", "@", "|", "\t", "\r"],
+        ids=["equals", "plus", "minus", "at", "pipe", "tab", "cr"],
+    )
+    def test_sanitize_csv_value_dangerous_chars_parametrized(self, char: str):
+        """Each dangerous leading character triggers single-quote prefix."""
+        payload = f"{char}payload"
+        result = _sanitize_csv_value(payload)
+        assert result == f"'{char}payload"
+
+    @pytest.mark.parametrize(
+        ("label", "value"),
+        [
+            ("fullwidth_equals", "\uff1d1+1"),
+            ("fullwidth_plus", "\uff0b1"),
+            ("unicode_minus", "\u2212value"),
+            ("zwsp_prefix_equals", "\u200b=1+1"),
+            ("bom_prefix_equals", "\ufeff=1+1"),
+        ],
+        ids=lambda v: v if isinstance(v, str) and len(v) < 30 else None,
+    )
+    def test_sanitize_csv_value_unicode_bypass_not_caught(self, label: str, value: str):
+        """Fullwidth and zero-width Unicode bypasses are not currently sanitized."""
+        result = _sanitize_csv_value(value)
+        assert result == value, f"{label}: expected value to pass through unsanitized"
+
+    @pytest.mark.parametrize(
+        ("label", "value"),
+        [
+            ("nbsp_equals", "\u00a0=cmd"),
+            ("em_space_plus", "\u2003+attack"),
+            ("ideographic_space_at", "\u3000@SUM(A1)"),
+            ("newline_minus", "\n-formula"),
+        ],
+        ids=lambda v: v if isinstance(v, str) and len(v) < 30 else None,
+    )
+    def test_sanitize_csv_value_unicode_whitespace_caught(self, label: str, value: str):
+        """Unicode whitespace recognized by str.lstrip() is caught."""
+        result = _sanitize_csv_value(value)
+        assert result.startswith("'"), (
+            f"{label}: expected sanitization for whitespace-prefixed dangerous char"
+        )
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "hello=world",
+            "user@domain.com",
+            "a|b",
+            "mid-word",
+            "col\there",
+            "line\rhere",
+        ],
+        ids=[
+            "embedded_equals",
+            "embedded_at",
+            "embedded_pipe",
+            "embedded_minus",
+            "embedded_tab",
+            "embedded_cr",
+        ],
+    )
+    def test_sanitize_csv_value_embedded_dangerous_chars_safe(self, value: str):
+        """Dangerous characters in non-leading positions must not trigger sanitization."""
+        result = _sanitize_csv_value(value)
+        assert result == value
+
+    @pytest.mark.parametrize(
+        "value",
+        [42, 3.14, True, None, [1, 2], {"a": 1}],
+        ids=["int", "float", "bool", "none", "list", "dict"],
+    )
+    def test_sanitize_csv_value_non_string_passthrough(self, value: Any):
+        """Non-string types pass through unchanged via identity check."""
+        result = _sanitize_csv_value(value)
+        assert result is value
 
     def test_csv_writer_compression_raises_configuration_error(self):
         """Test that compression option raises ConfigurationError, not OutputError."""

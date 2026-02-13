@@ -60,7 +60,7 @@ and type converters outside the main loop.
 
 ### PERF-2: Arrow column buffer allocation per batch
 
-`TODO` · Size: **S**
+`DONE` · Size: **S**
 
 `_records_to_table()` at line 309 creates a new dict
 comprehension `{field.name: [] for field in schema}` for
@@ -69,6 +69,8 @@ streaming mode.
 
 **Proposed fix:** Allocate column buffers once and clear
 between batches instead of reallocating.
+
+- Progress: Column buffers are now allocated once and cleared between batches in streaming Arrow writers.
 
 ### PERF-3: JSON files fully parsed into memory
 
@@ -114,7 +116,7 @@ new fields), `extend` (rewrite header). Default to
 
 ### WRT-3: Broad exception catching in writers
 
-`TODO` · Size: **S**
+`DONE` · Size: **S**
 
 Multiple writer files (`csv.py:191`, `avro.py:342`,
 `arrow_base.py:124`) use `except Exception` blocks that
@@ -125,13 +127,15 @@ could mask system exceptions like `MemoryError` or
 exceptions instead of bare `Exception`. Let system
 exceptions propagate.
 
+- Progress: Narrowed to specific types in all three writers; fixed latent ConfigurationError bug in CsvWriter.
+
 ---
 
 ## Testing
 
 ### TEST-1: CSV injection prevention coverage
 
-`TODO` · Size: **S**
+`DONE` · Size: **S**
 
 `_sanitize_csv_value()` in `csv.py:20-53` exists but test
 coverage for bypass attempts (leading whitespace, Unicode
@@ -139,6 +143,10 @@ formula characters) is minimal.
 
 **Proposed fix:** Add parameterized tests for known CSV
 injection patterns including edge cases.
+
+- Progress: Added 5 parametrized direct unit tests covering
+  dangerous chars, Unicode bypasses, whitespace, embedded
+  chars, and non-string passthrough.
 
 ### TEST-2: Streaming writer exception cleanup
 
