@@ -4,9 +4,11 @@ Tests for Avro writer in Transmog.
 Tests Avro file writing functionality, schema inference, and edge cases.
 """
 
+import io
 import math
 import sys
 import tempfile
+import warnings
 from pathlib import Path
 from unittest.mock import patch
 
@@ -641,6 +643,68 @@ class TestAvroStreamingWriter:
         child_records = read_avro_records(str(child_file))
         assert len(child_records) == 4
         assert {r["id"] for r in child_records} == {"c1", "c2", "c3", "c4"}
+
+    def test_file_object_warns_on_construction(self):
+        """Passing a BytesIO emits a UserWarning about single-batch limitation."""
+        buf = io.BytesIO()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            writer = AvroStreamingWriter(destination=buf, entity_name="test")
+
+        assert len(caught) == 1
+        assert issubclass(caught[0].category, UserWarning)
+        assert "single batch" in str(caught[0].message).lower()
+        assert "fastavro" in str(caught[0].message).lower()
+        writer.close()
+
+    def test_file_object_single_batch_works(self):
+        """A single write_main_records call to BytesIO succeeds."""
+        import fastavro
+
+        buf = io.BytesIO()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            writer = AvroStreamingWriter(destination=buf, entity_name="test")
+
+        records = [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
+        writer.write_main_records(records)
+        writer.close()
+
+        buf.seek(0)
+        reader = fastavro.reader(buf)
+        read_back = list(reader)
+        assert len(read_back) == 2
+        assert read_back[0]["name"] == "Alice"
+        assert read_back[1]["name"] == "Bob"
+
+    def test_file_object_second_batch_raises(self):
+        """Second write_main_records to BytesIO raises OutputError."""
+        buf = io.BytesIO()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            writer = AvroStreamingWriter(destination=buf, entity_name="test")
+
+        writer.write_main_records([{"id": "1", "name": "Alice"}])
+
+        with pytest.raises(OutputError) as exc_info:
+            writer.write_main_records([{"id": "2", "name": "Bob"}])
+
+        assert "fastavro" in str(exc_info.value).lower()
+        assert "file-like object" in str(exc_info.value).lower()
+        writer.close()
+
+    def test_file_object_child_table_raises(self):
+        """Writing child records to a BytesIO raises OutputError."""
+        buf = io.BytesIO()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            writer = AvroStreamingWriter(destination=buf, entity_name="test")
+
+        with pytest.raises(OutputError) as exc_info:
+            writer.write_child_records("children", [{"id": "c1", "parent_id": "1"}])
+
+        assert "file-like object" in str(exc_info.value).lower()
+        writer.close()
 
 
 @pytest.mark.skipif(not AVRO_AVAILABLE, reason="fastavro not available")

@@ -96,7 +96,7 @@ JSON could use incremental parsing (e.g., `ijson`).
 
 ### WRT-1: Avro streaming to file-like objects unsupported
 
-`TODO` · Size: **M**
+`DONE` · Size: **M**
 
 `avro.py:526-544` — multiple batch writes to file-like
 object destinations fail because append mode (`a+b`)
@@ -106,6 +106,12 @@ file path destinations work.
 **Proposed fix:** Buffer records internally and flush to
 the file-like object on close, or document the limitation
 explicitly and raise a clear error early.
+
+- Progress: Emit `UserWarning` at construction when
+  file-like object destination is used. Improved error
+  message on second batch write attributing limitation to
+  fastavro's append mode requirement. Single-batch writes
+  to file-like objects continue to work.
 
 ### WRT-2: CSV schema drift has no recovery option
 
