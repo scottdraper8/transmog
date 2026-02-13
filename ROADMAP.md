@@ -44,18 +44,19 @@ generation strategies.
 
 ### PERF-1: Arrow schema inference is two-pass
 
-`TODO` · Size: **M**
+`DONE` · Size: **M**
 
-`_create_schema()` in `arrow_base.py:245-287` scans all
-records to determine field types. Then
-`_records_to_table()` at line 311-329 scans again with
-nested loops (records x fields) doing type checks on
-every iteration. O(n\*m) even when types are already
-known.
+`_create_schema()` in `arrow_base.py` scans all records
+to determine field types. Then `_records_to_table()`
+scans again with nested loops (records x fields) doing
+type checks on every iteration. O(n\*m) even when types
+are already known.
 
 **Proposed fix:** Combine schema inference and type
 conversion into a single pass. Pre-compute field indices
 and type converters outside the main loop.
+
+- Progress: Pre-computed converter functions replace per-cell type comparisons in streaming Arrow writer.
 
 ### PERF-2: Arrow column buffer allocation per batch
 
