@@ -74,7 +74,7 @@ between batches instead of reallocating.
 
 ### PERF-3: JSON files fully parsed into memory
 
-`TODO` · Size: **M**
+`DONE` · Size: **M**
 
 `iterators.py:129,254,260` — all JSON files are fully
 loaded before iteration. Works for reasonable sizes but
@@ -83,6 +83,12 @@ problematic for multi-GB files.
 **Proposed fix:** Add streaming JSON parser option for
 large files. JSONL already streams line-by-line; standard
 JSON could use incremental parsing (e.g., `ijson`).
+
+- Progress: Added `get_json_file_iterator_streaming()`
+  using ijson for constant-memory parsing of JSON arrays.
+  Available via `streaming=True` on `get_data_iterator()`
+  and auto-enabled in `stream_process()`. ijson is an
+  optional dependency (`pip install transmog[streaming]`).
 
 ---
 

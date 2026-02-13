@@ -52,7 +52,7 @@ def stream_process(
     )
 
     try:
-        data_iterator = get_data_iterator(data)
+        data_iterator = get_data_iterator(data, streaming=True)
         actual_batch_size = batch_size or config.batch_size
         timestamp = extract_time if extract_time else get_current_timestamp()
         context = ProcessingContext(extract_time=timestamp)

@@ -52,6 +52,7 @@ optional-dependencies.dev = [
   "bandit>=1.9",
   # Documentation dependencies
   "furo>=2024.8",
+  "ijson>=3.4",
   "interrogate>=1.7",
   "linkify-it-py>=2",
   "memory-profiler>=0.60",
@@ -89,6 +90,8 @@ optional-dependencies.minimal = [
   "orjson>=3.11",
   "typing-extensions>=4",
 ]
+
+optional-dependencies.streaming = [ "ijson>=3.4" ]
 
 urls."Bug Tracker" = "https://github.com/scottdraper8/transmog/issues"
 urls."Documentation" = "https://scottdraper8.github.io/transmog/"

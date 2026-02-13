@@ -12,11 +12,13 @@ import pytest
 
 from transmog.exceptions import ValidationError
 from transmog.iterators import (
+    IJSON_AVAILABLE,
     _detect_string_format,
     get_data_iterator,
     get_hjson_file_iterator,
     get_json5_file_iterator,
     get_json_data_iterator,
+    get_json_file_iterator_streaming,
     get_jsonl_data_iterator,
     get_jsonl_file_iterator,
 )
@@ -727,3 +729,154 @@ class TestCrossFormatCompatibility:
         path = temp_file(hjson_data, ".json5")
         with pytest.raises(ValidationError):
             list(get_data_iterator(path))
+
+
+# ============================================================================
+# Streaming JSON Tests
+# ============================================================================
+
+
+@pytest.mark.skipif(not IJSON_AVAILABLE, reason="ijson not available")
+class TestJsonFileIteratorStreaming:
+    """Test streaming JSON file parsing via ijson."""
+
+    def test_stream_array_of_objects(self, temp_file):
+        """Basic array streaming yields all records."""
+        content = json.dumps([{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}])
+        path = temp_file(content, ".json")
+        records = list(get_json_file_iterator_streaming(path))
+        assert len(records) == 2
+        assert records[0] == {"id": 1, "name": "Alice"}
+        assert records[1] == {"id": 2, "name": "Bob"}
+
+    def test_stream_single_object_fallback(self, temp_file):
+        """Single object file falls back to standard loading."""
+        content = json.dumps({"id": 1, "name": "Alice"})
+        path = temp_file(content, ".json")
+        records = list(get_json_file_iterator_streaming(path))
+        assert len(records) == 1
+        assert records[0] == {"id": 1, "name": "Alice"}
+
+    def test_stream_empty_array(self, temp_file):
+        """Empty array yields zero records."""
+        path = temp_file("[]", ".json")
+        records = list(get_json_file_iterator_streaming(path))
+        assert len(records) == 0
+
+    def test_stream_non_dict_items_raises(self, temp_file):
+        """Array of non-objects raises ValidationError at index 0."""
+        path = temp_file("[1, 2, 3]", ".json")
+        with pytest.raises(ValidationError, match="index 0"):
+            list(get_json_file_iterator_streaming(path))
+
+    def test_stream_mixed_items_raises_at_index(self, temp_file):
+        """Error message includes the correct index for mixed arrays."""
+        content = json.dumps([{"id": 1}, "not_a_dict", {"id": 3}])
+        path = temp_file(content, ".json")
+        with pytest.raises(ValidationError, match="index 1"):
+            list(get_json_file_iterator_streaming(path))
+
+    def test_stream_invalid_json_raises(self, temp_file):
+        """Malformed JSON raises ValidationError."""
+        path = temp_file("[{invalid json", ".json")
+        with pytest.raises(ValidationError):
+            list(get_json_file_iterator_streaming(path))
+
+    def test_stream_nonexistent_file_raises(self):
+        """Missing file raises ValidationError."""
+        with pytest.raises(ValidationError, match="File not found"):
+            list(get_json_file_iterator_streaming("/path/that/does/not/exist.json"))
+
+    def test_stream_empty_file_raises(self, temp_file):
+        """Empty file raises ValidationError."""
+        path = temp_file("", ".json")
+        with pytest.raises(ValidationError, match="empty"):
+            list(get_json_file_iterator_streaming(path))
+
+    def test_stream_whitespace_before_array(self, temp_file):
+        """Leading whitespace before array is handled."""
+        content = "  \n  " + json.dumps([{"id": 1}])
+        path = temp_file(content, ".json")
+        records = list(get_json_file_iterator_streaming(path))
+        assert len(records) == 1
+        assert records[0] == {"id": 1}
+
+    def test_stream_large_array(self, temp_file):
+        """1000-item array streams correctly."""
+        data = [{"id": i, "value": f"item_{i}"} for i in range(1000)]
+        content = json.dumps(data)
+        path = temp_file(content, ".json")
+        records = list(get_json_file_iterator_streaming(path))
+        assert len(records) == 1000
+        assert records[0] == {"id": 0, "value": "item_0"}
+        assert records[999] == {"id": 999, "value": "item_999"}
+
+    def test_stream_nested_objects(self, temp_file):
+        """Nested dicts and lists are preserved."""
+        data = [
+            {
+                "id": 1,
+                "meta": {"tags": ["a", "b"], "info": {"level": 3}},
+                "items": [1, 2, 3],
+            }
+        ]
+        content = json.dumps(data)
+        path = temp_file(content, ".json")
+        records = list(get_json_file_iterator_streaming(path))
+        assert len(records) == 1
+        assert records[0]["meta"]["tags"] == ["a", "b"]
+        assert records[0]["meta"]["info"]["level"] == 3
+        assert records[0]["items"] == [1, 2, 3]
+
+
+@pytest.mark.skipif(not IJSON_AVAILABLE, reason="ijson not available")
+class TestGetDataIteratorStreaming:
+    """Test streaming flag in get_data_iterator."""
+
+    def test_streaming_json_file(self, temp_file):
+        """streaming=True routes JSON files to streaming iterator."""
+        content = json.dumps([{"id": 1}, {"id": 2}])
+        path = temp_file(content, ".json")
+        records = list(get_data_iterator(path, streaming=True))
+        assert len(records) == 2
+        assert records[0] == {"id": 1}
+        assert records[1] == {"id": 2}
+
+    def test_streaming_non_json_unaffected(self, temp_file):
+        """JSONL routing is unchanged with streaming=True."""
+        content = '{"id": 1}\n{"id": 2}\n'
+        path = temp_file(content, ".jsonl")
+        records = list(get_data_iterator(path, streaming=True))
+        assert len(records) == 2
+        assert records[0] == {"id": 1}
+        assert records[1] == {"id": 2}
+
+    def test_streaming_false_standard_path(self, temp_file):
+        """streaming=False uses standard JSON loading."""
+        content = json.dumps([{"id": 1}])
+        path = temp_file(content, ".json")
+        records = list(get_data_iterator(path, streaming=False))
+        assert len(records) == 1
+        assert records[0] == {"id": 1}
+
+    def test_streaming_in_memory_unaffected(self):
+        """Streaming flag has no effect on list/dict input."""
+        data = [{"id": 1}, {"id": 2}]
+        records = list(get_data_iterator(data, streaming=True))
+        assert len(records) == 2
+        assert records[0] == {"id": 1}
+
+
+class TestStreamingWithoutIjson:
+    """Test streaming behavior when ijson is not available."""
+
+    def test_get_data_iterator_falls_back(self, temp_file, monkeypatch):
+        """streaming=True silently falls back without ijson."""
+        import transmog.iterators as mod
+
+        monkeypatch.setattr(mod, "IJSON_AVAILABLE", False)
+        content = json.dumps([{"id": 1}])
+        path = temp_file(content, ".json")
+        records = list(get_data_iterator(path, streaming=True))
+        assert len(records) == 1
+        assert records[0] == {"id": 1}
