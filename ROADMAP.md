@@ -168,7 +168,7 @@ files are handled.
 
 ### TEST-3: Iterator format detection edge cases
 
-`TODO` · Size: **S**
+`DONE` · Size: **S**
 
 `_detect_string_format()` in `iterators.py:314-336` uses
 heuristics (checks 5 lines, counts hits). Could be fooled
@@ -177,6 +177,11 @@ content.
 
 **Proposed fix:** Add edge case tests for format detection
 with unusual inputs.
+
+- Progress: Added 12 edge case tests covering empty/whitespace
+  input, boundary hit counts, pretty-printed JSON, blank line
+  interleaving, leading whitespace, non-object lines, bytes
+  input, and the checked-limit threshold.
 
 ---
 

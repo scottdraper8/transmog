@@ -12,6 +12,7 @@ import pytest
 
 from transmog.exceptions import ValidationError
 from transmog.iterators import (
+    _detect_string_format,
     get_data_iterator,
     get_hjson_file_iterator,
     get_json5_file_iterator,
@@ -338,6 +339,66 @@ class TestDataIteratorEdgeCases:
         assert len(records) == 2
         assert records[0]["name"] == "Alice"
         assert records[1]["name"] == "Bob"
+
+
+class TestDetectStringFormat:
+    """Test _detect_string_format edge cases for JSON vs JSONL detection."""
+
+    def test_single_object_no_newline(self):
+        """No newline in input triggers early return as JSON."""
+        assert _detect_string_format('{"id": 1}') == "json"
+
+    def test_empty_string(self):
+        """Empty input triggers early return as JSON."""
+        assert _detect_string_format("") == "json"
+
+    def test_whitespace_only(self):
+        """Whitespace-only input strips to empty, returns JSON."""
+        assert _detect_string_format("  \n\n  ") == "json"
+
+    def test_two_valid_objects(self):
+        """Two valid JSON objects on separate lines detected as JSONL."""
+        assert _detect_string_format('{"a":1}\n{"b":2}') == "jsonl"
+
+    def test_many_empty_lines_before_objects(self):
+        """Empty lines are skipped and do not prevent JSONL detection."""
+        text = "\n" * 20 + '{"a":1}\n{"b":2}'
+        assert _detect_string_format(text) == "jsonl"
+
+    def test_pretty_printed_json_not_jsonl(self):
+        """Pretty-printed JSON has inner '{' lines that fail parse."""
+        text = json.dumps({"a": {"b": 1}}, indent=2)
+        assert _detect_string_format(text) == "json"
+
+    def test_one_valid_one_invalid(self):
+        """One parseable hit is below the threshold of 2."""
+        assert _detect_string_format('{"a":1}\n{bad}') == "json"
+
+    def test_five_checked_one_valid(self):
+        """Check limit reached with only 1 valid hit returns JSON."""
+        lines = ['{"a":1}'] + ["{invalid" for _ in range(4)]
+        assert _detect_string_format("\n".join(lines)) == "json"
+
+    def test_non_object_lines_skipped(self):
+        """Lines not starting with '{' are skipped entirely."""
+        assert _detect_string_format('[1,2]\n"str"\n42') == "json"
+
+    def test_three_valid_among_blanks(self):
+        """Blank lines interspersed with valid objects still detected."""
+        text = '\n{"a":1}\n\n{"b":2}\n\n{"c":3}\n'
+        assert _detect_string_format(text) == "jsonl"
+
+    def test_bytes_input_detected_as_jsonl(self):
+        """Bytes input routed through get_data_iterator yields JSONL records."""
+        data = b'{"a":1}\n{"b":2}\n'
+        records = list(get_data_iterator(data))
+        assert len(records) == 2
+        assert records[0]["a"] == 1
+        assert records[1]["b"] == 2
+
+    def test_leading_whitespace_on_object_lines(self):
+        """Lines with leading whitespace are stripped before startswith check."""
+        assert _detect_string_format('  {"a":1}\n  {"b":2}') == "jsonl"
 
 
 @pytest.mark.skipif(not JSON5_AVAILABLE, reason="json5 not available")
