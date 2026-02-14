@@ -95,7 +95,8 @@ config = tm.TransmogConfig(batch_size=100)    # Small batches
 config = tm.TransmogConfig(batch_size=10000)  # Large batches
 ```
 
-:::{tip} Choosing batch_size
+:::{tip}
+**Choosing batch_size**
 
 - **Small batches (100-500):** Use for memory-constrained environments or very
   large records. `flatten_stream()` defaults to 100 for memory efficiency.
