@@ -114,6 +114,8 @@ Default configuration:
 - Extracts complex arrays (objects) into separate tables
 - Links parent and child records with generated IDs
 
+(working-with-files)=
+
 ### Working with Files
 
 Process files directly:

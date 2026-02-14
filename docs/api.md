@@ -62,7 +62,7 @@ result = tm.flatten("data.hjson")
 
 **Supported File Formats:** JSON (`.json`), JSON Lines (`.jsonl`, `.ndjson`),
 JSON5 (`.json5`, requires `pip install json5`), HJSON (`.hjson`, requires
-`pip install hjson`). See [Working with Files](getting_started.md#working-with-files) for details.
+`pip install hjson`). See [Working with Files](working-with-files) for details.
 
 ### flatten_stream()
 
