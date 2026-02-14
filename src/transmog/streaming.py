@@ -101,14 +101,15 @@ def stream_process(
 
         if record_buffer:
             flush_batch(record_buffer)
-    finally:
-        writer.close()
+
         logger.info(
             "stream completed, entity=%s, total_batches=%d, total_records=%d",
             entity_name,
             batch_count,
             total_records_processed,
         )
+    finally:
+        writer.close()
 
 
 __all__ = ["stream_process"]
