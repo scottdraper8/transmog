@@ -68,7 +68,9 @@ class TestFlattenJson:
 
         result, _ = flatten_json(data, config)
 
-        assert isinstance(result, dict)
+        # Empty strings are skipped by default (include_nulls=False)
+        assert "name" not in result
+        assert "nested_empty" not in result
 
     def test_flatten_mixed_types(self):
         """Test flattening with mixed data types."""
@@ -95,11 +97,10 @@ class TestFlattenJson:
 
         result, _ = flatten_json(data, config)
 
-        # Should handle special characters in keys
-        assert isinstance(result, dict)
-        # Verify the values are preserved
+        # Values must be preserved regardless of key transformation
         assert "value1" in result.values()
         assert "value2" in result.values()
+        assert len(result) == 2
 
     def test_flatten_preserves_original(self):
         """Test that flattening preserves original data."""
@@ -178,8 +179,10 @@ class TestFlattenJsonEdgeCases:
 
         result, _ = flatten_json(data, config)
 
-        assert isinstance(result, dict)
-        assert len(result) >= 3
+        assert "coffee" in result.values()
+        assert "CV" in result.values()
+        assert "rocket" in result.values()
+        assert len(result) == 3
 
     def test_flatten_numeric_keys(self):
         """Test flattening with numeric-like keys."""
@@ -189,8 +192,9 @@ class TestFlattenJsonEdgeCases:
 
         result, _ = flatten_json(data, config)
 
-        assert isinstance(result, dict)
-        assert len(result) >= 2
+        assert "numeric_key" in result.values()
+        assert "nested_numeric" in result.values()
+        assert len(result) == 2
 
     def test_flatten_large_object(self):
         """Test flattening large objects."""
@@ -204,8 +208,10 @@ class TestFlattenJsonEdgeCases:
 
         result, _ = flatten_json(data, config)
 
-        assert isinstance(result, dict)
-        assert len(result) >= 50
+        # Each of 100 fields has 2 leaf values (value + nested_deep) = 200 fields
+        assert len(result) == 200
+        assert result["root_field_0_value"] == 0
+        assert result["root_field_99_nested_deep"] == "value_99"
 
     def test_flatten_with_list_values(self):
         """Test flattening with list values in SMART mode."""
@@ -234,8 +240,9 @@ class TestFlattenJsonEdgeCases:
 
         result, _ = flatten_json(data, config)
 
-        assert isinstance(result, dict)
-        if "true_val" in result:
-            assert result["true_val"]
-        if "false_val" in result:
-            assert not result["false_val"]
+        assert result["true_val"] is True
+        assert result["false_val"] is False
+        assert result["nested_bool"] is True
+        # None values are skipped by default
+        assert "none_val" not in result
+        assert "nested_null" not in result

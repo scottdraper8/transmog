@@ -669,3 +669,44 @@ class TestStreamingEdgeCases:
             reader = csv.DictReader(f)
             result = list(reader)
         assert len(result) == 2
+
+
+class TestStreamProcessingAvro:
+    """Test streaming processing with Avro format."""
+
+    @pytest.mark.skipif(
+        not pytest.importorskip("fastavro", reason="fastavro not available"),
+        reason="fastavro required",
+    )
+    def test_stream_to_avro(self, tmp_path):
+        """Test streaming output to Avro format."""
+        data = [
+            {"id": 1, "name": "Alice", "score": 95},
+            {"id": 2, "name": "Bob", "score": 87},
+            {"id": 3, "name": "Charlie", "score": 92},
+        ]
+
+        config = TransmogConfig(batch_size=2)
+        output_dir = tmp_path / "avro_output"
+        output_dir.mkdir()
+
+        stream_process(
+            config=config,
+            data=data,
+            entity_name="users",
+            output_format="avro",
+            output_destination=str(output_dir),
+        )
+
+        avro_file = output_dir / "users.avro"
+        assert avro_file.exists()
+
+        import fastavro
+
+        with open(avro_file, "rb") as f:
+            reader = fastavro.reader(f)
+            records = list(reader)
+
+        assert len(records) == 3
+        names = {r["name"] for r in records}
+        assert names == {"Alice", "Bob", "Charlie"}

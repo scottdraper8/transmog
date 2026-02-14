@@ -107,6 +107,42 @@ class TestConfigConsistency:
             assert config.id_generation
 
 
+class TestMaxDepthBehavior:
+    """Test that max_depth actually truncates output."""
+
+    def test_max_depth_truncates_deep_nesting(self):
+        """Test that max_depth limits flattening depth."""
+        import transmog as tm
+
+        data = {"a": {"b": {"c": {"d": {"e": "deep_value"}}}}}
+
+        config_shallow = TransmogConfig(max_depth=2)
+        result_shallow = tm.flatten(data, name="test", config=config_shallow)
+        shallow_keys = {k for k in result_shallow.main[0] if not k.startswith("_")}
+
+        config_deep = TransmogConfig(max_depth=100)
+        result_deep = tm.flatten(data, name="test", config=config_deep)
+        deep_keys = {k for k in result_deep.main[0] if not k.startswith("_")}
+
+        # Shallow config should produce fewer fields than deep config
+        assert len(shallow_keys) < len(deep_keys)
+
+    def test_max_depth_1_only_top_level(self):
+        """Test that max_depth=1 only includes top-level scalar fields."""
+        import transmog as tm
+
+        data = {"top": "value", "nested": {"inner": "hidden"}}
+
+        config = TransmogConfig(max_depth=1)
+        result = tm.flatten(data, name="test", config=config)
+
+        main = result.main[0]
+        non_meta = {k: v for k, v in main.items() if not k.startswith("_")}
+        assert "top" in non_meta
+        # Nested fields should not appear at depth 1
+        assert not any("inner" in k for k in non_meta)
+
+
 class TestArrayModeHandling:
     """Test array mode validation and error handling."""
 

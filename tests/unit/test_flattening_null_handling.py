@@ -37,35 +37,7 @@ class TestNullHandlingSkip:
         assert "nested_value" not in main_record
         assert "nested_also_null" not in main_record
 
-    def test_skip_empty_strings(self):
-        """Test that empty strings are skipped."""
-        data = {"id": 1, "empty": "", "valid": "data"}
-
-        result = tm.flatten(data, name="test")
-
-        main_record = result.main[0]
-        assert "valid" in main_record
-        assert "empty" not in main_record
-
-    def test_skip_empty_dicts(self):
-        """Test that empty dicts are skipped."""
-        data = {"id": 1, "empty_dict": {}, "nested": {"value": "test"}}
-
-        result = tm.flatten(data, name="test")
-
-        main_record = result.main[0]
-        assert "nested_value" in main_record
-        # Empty dict should not create any fields
-
-    def test_skip_empty_lists(self):
-        """Test that empty lists are skipped."""
-        data = {"id": 1, "empty_list": [], "items": [1, 2, 3]}
-
-        result = tm.flatten(data, name="test")
-
-        main_record = result.main[0]
-        assert "id" in main_record
-        # Empty list should not create child tables
+    # Empty string, dict, and list skip tests are in test_edge_cases_empty_values.py
 
 
 class TestNullHandlingInclude:
@@ -127,36 +99,7 @@ class TestNullHandlingInclude:
 class TestNullHandlingEdgeCases:
     """Test edge cases for null handling."""
 
-    def test_all_null_record_skip(self):
-        """Test record with all null values in SKIP mode."""
-        data = {"field1": None, "field2": None, "field3": None}
-
-        result = tm.flatten(data, name="test")
-
-        # Record should exist with only metadata fields (no data fields)
-        assert len(result.main) == 1
-        main_record = result.main[0]
-        # Should only have metadata fields, no data fields
-        data_fields = [k for k in main_record.keys() if not k.startswith("_")]
-        assert len(data_fields) == 0
-
-    def test_all_null_record_include(self):
-        """Test record with all null values in INCLUDE mode."""
-        data = {"field1": None, "field2": None, "field3": None}
-
-        config = TransmogConfig(include_nulls=True)
-        result = tm.flatten(data, name="test", config=config)
-
-        # Record should exist with null fields included
-        assert len(result.main) == 1
-        main_record = result.main[0]
-        # Should have the null fields
-        assert "field1" in main_record
-        assert "field2" in main_record
-        assert "field3" in main_record
-        assert main_record["field1"] is None
-        assert main_record["field2"] is None
-        assert main_record["field3"] is None
+    # All-null record tests are in test_edge_cases_empty_values.py::TestAllEmptyRecord
 
     def test_mixed_null_and_valid_data(self):
         """Test mix of null and valid data."""
@@ -313,57 +256,7 @@ class TestNullHandlingWithArrayModes:
         assert "name" in main
 
 
-class TestNullVsMissingKey:
-    """Test distinction between explicit None and missing keys."""
-
-    def test_explicit_none_vs_missing_skip_mode(self):
-        """Test that explicit None and missing key behave same in skip mode."""
-        data_with_none = {"id": 1, "name": "Alice", "optional": None}
-        data_missing_key = {"id": 2, "name": "Bob"}
-
-        result1 = tm.flatten(data_with_none, name="test")
-        result2 = tm.flatten(data_missing_key, name="test")
-
-        # Both should not have 'optional' field
-        assert "optional" not in result1.main[0]
-        assert "optional" not in result2.main[0]
-
-    def test_explicit_none_vs_missing_include_mode(self):
-        """Test that explicit None is included but missing key is not."""
-        data_with_none = {"id": 1, "name": "Alice", "optional": None}
-        data_missing_key = {"id": 2, "name": "Bob"}
-
-        config = TransmogConfig(include_nulls=True)
-        result1 = tm.flatten(data_with_none, name="test", config=config)
-        result2 = tm.flatten(data_missing_key, name="test", config=config)
-
-        # Explicit None should be included
-        assert "optional" in result1.main[0]
-        assert result1.main[0]["optional"] is None
-
-        # Missing key should not be present
-        assert "optional" not in result2.main[0]
-
-    def test_batch_with_mixed_none_and_missing(self):
-        """Test batch where some records have None, others missing key."""
-        data = [
-            {"id": 1, "name": "Alice", "score": 95},
-            {"id": 2, "name": "Bob", "score": None},
-            {"id": 3, "name": "Charlie"},  # Missing score
-        ]
-
-        # Skip mode
-        result_skip = tm.flatten(data, name="test")
-        assert "score" in result_skip.main[0]
-        assert "score" not in result_skip.main[1]
-        assert "score" not in result_skip.main[2]
-
-        # Include mode
-        config = TransmogConfig(include_nulls=True)
-        result_include = tm.flatten(data, name="test", config=config)
-        assert "score" in result_include.main[0]
-        assert "score" in result_include.main[1]  # Explicit None included
-        assert "score" not in result_include.main[2]  # Missing key still not present
+# Null vs missing key tests are in test_edge_cases_empty_values.py::TestMissingKeyVsNone
 
 
 class TestNullInNestedStructures:

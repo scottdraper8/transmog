@@ -452,3 +452,10 @@ class TestBoundaryConditions:
         assert len(result.main) == 1
         record = result.main[0]
         assert len(record) > 1000
+
+    def test_invalid_utf8_bytes(self):
+        """Test that invalid UTF-8 bytes raise an appropriate error."""
+        invalid_bytes = b"\x80\x81\x82"
+
+        with pytest.raises((ValidationError, UnicodeDecodeError, json.JSONDecodeError)):
+            tm.flatten(invalid_bytes, name="test")

@@ -71,8 +71,9 @@ class TestFieldNaming:
         result = tm.flatten(data, name="test")
 
         main_record = result.main[0]
-        # Should handle special characters (may sanitize or preserve)
-        assert len(main_record) >= 5  # All fields should be processed
+        # All 5 values must be preserved in the output
+        values = {v for v in main_record.values() if not str(v).startswith("_")}
+        assert {"value1", "value2", "value3", "value4", "value5"}.issubset(values)
 
     def test_numeric_field_names(self):
         """Test handling numeric field names."""
@@ -85,8 +86,10 @@ class TestFieldNaming:
         result = tm.flatten(data, name="test")
 
         main_record = result.main[0]
-        # Should handle numeric keys
-        assert len(main_record) >= 3
+        values = set(main_record.values())
+        assert "numeric_key" in values
+        assert "mixed_key" in values
+        assert "field_with_number" in values
 
     def test_unicode_field_names(self):
         """Test handling Unicode field names."""
@@ -101,8 +104,8 @@ class TestFieldNaming:
         result = tm.flatten(data, name="test")
 
         main_record = result.main[0]
-        # Should handle Unicode keys
-        assert len(main_record) >= 5
+        values = set(main_record.values())
+        assert {"coffee", "cv", "innocent", "rocket", "test"}.issubset(values)
 
     def test_empty_field_names(self):
         """Test handling empty or whitespace field names."""
@@ -115,14 +118,20 @@ class TestFieldNaming:
         assert isinstance(main_record, dict)
 
     def test_duplicate_field_names_after_flattening(self):
-        """Test handling potential duplicate field names after flattening."""
+        """Test handling potential duplicate field names after flattening.
+
+        When a top-level key collides with a flattened nested key (e.g.,
+        'user_name' and 'user.name' both become 'user_name'), the nested
+        value overwrites the top-level one.
+        """
         data = {"user_name": "direct_field", "user": {"name": "nested_field"}}
 
         result = tm.flatten(data, name="test")
 
         main_record = result.main[0]
-        # Should handle potential conflicts
-        assert len(main_record) >= 2
+        assert "user_name" in main_record
+        # Nested field overwrites the direct field on collision
+        assert main_record["user_name"] == "nested_field"
 
     def test_case_sensitivity(self):
         """Test case sensitivity in field names."""
@@ -252,8 +261,13 @@ class TestNamingEdgeCases:
         result = tm.flatten(data, name="test")
 
         main_record = result.main[0]
-        # Should handle reserved keywords
-        assert len(main_record) >= 4
+        values = set(main_record.values())
+        assert {
+            "python_keyword",
+            "another_keyword",
+            "yet_another",
+            "function_keyword",
+        }.issubset(values)
 
     def test_sql_reserved_words(self):
         """Test handling SQL reserved words as field names."""
@@ -268,8 +282,15 @@ class TestNamingEdgeCases:
         result = tm.flatten(data, name="test")
 
         main_record = result.main[0]
-        # Should handle SQL reserved words
-        assert len(main_record) >= 5
+        values = set(main_record.values())
+        expected = {
+            "sql_keyword",
+            "another_sql",
+            "condition_keyword",
+            "sorting_keyword",
+            "grouping_keyword",
+        }
+        assert expected.issubset(values)
 
     def test_very_long_field_names(self):
         """Test handling very long field names."""

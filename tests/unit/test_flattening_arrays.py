@@ -189,7 +189,7 @@ class TestArrayExtractionIntegration:
         assert len(result.main) == 1
 
         # Should have child tables from arrays
-        assert len(result.tables) >= 0
+        assert len(result.tables) > 0
 
     def test_array_parent_child_relationships(self, array_data):
         """Test parent-child relationships in extracted arrays."""

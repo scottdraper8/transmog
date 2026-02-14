@@ -177,3 +177,26 @@ class TestConfigValidation:
         """Config rejects invalid id_strategy type."""
         with pytest.raises(Exception):
             TransmogConfig(id_generation=123)
+
+
+class TestNaturalIdEdgeCases:
+    """Test edge cases for natural ID strategy."""
+
+    def test_natural_id_field_name_conflict(self):
+        """Test natural strategy when record has both _id and id fields."""
+        import transmog as tm
+
+        data = {"_id": "natural-id-value", "id": "other-id", "name": "test"}
+        config = TransmogConfig(id_generation="natural")
+
+        result = tm.flatten(data, name="test", config=config)
+
+        # Natural strategy should use the _id field value
+        assert result.main[0]["_id"] == "natural-id-value"
+
+    def test_natural_id_missing_field(self):
+        """Test natural strategy when the ID field is missing from the record."""
+        record = {"name": "no_id_field", "value": 42}
+
+        with pytest.raises(ValidationError):
+            generate_transmog_id(record, "natural", "_id")
