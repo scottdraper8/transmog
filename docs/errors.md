@@ -49,8 +49,20 @@ invalid `id_generation` value). Not exported in the public API — catch using
 
 ### OutputError
 
-Raised when writing output files fails (e.g., permission errors, disk full).
-Not exported in the public API — catch using `TransmogError` as the base class.
+Raised when writing output files fails. Not exported in the public API — catch
+using `TransmogError` as the base class. Common triggers:
+
+- Schema drift in strict mode (CSV streaming encounters unexpected fields)
+- File permission errors or disk full during writes
+- Avro schema mismatch between batches
+
+```python
+try:
+    tm.flatten_stream(data, "output/", output_format="csv")
+except tm.TransmogError as e:
+    # OutputError is caught via the base class
+    print(f"Write failed: {e}")
+```
 
 ## Custom Error Handling
 

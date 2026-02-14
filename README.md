@@ -2,7 +2,7 @@
 
 # Transmog - Flatten Nested JSON to Tabular Formats
 
-[![Transmog Version](https://img.shields.io/badge/transmog-2.0.2-ff79c6?logo=github&logoColor=white&labelColor=6272a4)](https://github.com/scottdraper8/transmog/releases)
+[![Transmog Version](https://img.shields.io/badge/transmog-2.0.3-ff79c6?logo=github&logoColor=white&labelColor=6272a4)](https://github.com/scottdraper8/transmog/releases)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-ffb86c?logo=python&logoColor=white&labelColor=6272a4)](https://www.python.org/downloads/)
 [![Poetry](https://img.shields.io/badge/Poetry-1.0+-f1fa8c?logo=poetry&logoColor=282a36&labelColor=6272a4)](https://python-poetry.org/)
 [![pre-commit](https://img.shields.io/badge/pre--commit-4.5+-50fa7b?logo=pre-commit&logoColor=282a36&labelColor=6272a4)](https://github.com/pre-commit/pre-commit)
@@ -105,6 +105,11 @@ Full documentation: [scottdraper8.github.io/transmog](https://scottdraper8.githu
 
 - [Getting Started](https://scottdraper8.github.io/transmog/getting_started.html)
 - [Configuration](https://scottdraper8.github.io/transmog/configuration.html)
+- [Array Handling](https://scottdraper8.github.io/transmog/arrays.html)
+- [ID Management](https://scottdraper8.github.io/transmog/ids.html)
+- [Error Handling](https://scottdraper8.github.io/transmog/errors.html)
+- [Output Formats](https://scottdraper8.github.io/transmog/outputs.html)
+- [Streaming](https://scottdraper8.github.io/transmog/streaming.html)
 - [API Reference](https://scottdraper8.github.io/transmog/api.html)
 - [Contributing](https://scottdraper8.github.io/transmog/contributing.html)
 

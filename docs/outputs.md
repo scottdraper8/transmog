@@ -74,6 +74,19 @@ result.save(
 )
 ```
 
+Streaming CSV supports the same options plus `schema_drift`:
+
+```python
+tm.flatten_stream(
+    data, "output/",
+    output_format="csv",
+    delimiter="|",
+    quotechar="'",
+    include_header=True,       # Include column headers (default: True)
+    schema_drift="drop",       # Handle schema drift (default: "strict")
+)
+```
+
 ### Schema Drift
 
 When using `flatten_stream()` with CSV output, the column schema is locked after
@@ -91,8 +104,7 @@ The `schema_drift` parameter controls this behavior:
 import transmog as tm
 
 # Drop unexpected fields instead of raising
-for result in tm.flatten_stream(data, name="events", schema_drift="drop"):
-    pass
+tm.flatten_stream(data, "output/", name="events", output_format="csv", schema_drift="drop")
 ```
 
 :::{note}
@@ -202,7 +214,7 @@ print(result.main[0])
 config = tm.TransmogConfig(include_nulls=True)
 result = tm.flatten(data, config=config)
 print(result.main[0])
-# {'name': 'Product', 'description': '', 'notes': ''}
+# {'name': 'Product', 'description': None, 'notes': None}
 ```
 
 ## Integration Examples

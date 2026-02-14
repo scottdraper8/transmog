@@ -112,19 +112,14 @@ bar.close()
 
 ## File Processing
 
-All file formats supported by `flatten()` are also supported by `flatten_stream()`:
-JSON (`.json`), JSON Lines (`.jsonl`, `.ndjson`), JSON5 (`.json5`), and HJSON (`.hjson`).
-See [Getting Started](getting_started.md#working-with-files) for format details and
-dependency requirements.
+All file formats supported by `flatten()` work with `flatten_stream()`. JSONL
+files are processed line-by-line, making them ideal for streaming large datasets.
+See [Getting Started](getting_started.md#working-with-files) for supported formats
+and dependency requirements.
 
 ```python
-tm.flatten_stream("large_file.json", "output/", output_format="parquet")
-tm.flatten_stream("large_file.jsonl", "output/", output_format="csv")
-tm.flatten_stream("config.json5", "output/", output_format="parquet")
-tm.flatten_stream("data.hjson", "output/", output_format="csv")
+tm.flatten_stream("large_file.jsonl", "output/", output_format="parquet")
 ```
-
-JSONL files are processed line-by-line, making them ideal for streaming large datasets.
 
 ## Output Formats
 

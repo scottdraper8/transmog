@@ -8,7 +8,7 @@ Transform nested data structures into flat tables.
 
 ```python
 flatten(
-    data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes,
+    data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes | Iterator[dict[str, Any]],
     name: str = "data",
     config: TransmogConfig | None = None,
     progress_callback: Callable[[int, int | None], None] | None = None,
@@ -17,8 +17,9 @@ flatten(
 
 **Parameters:**
 
-- **data** (*dict[str, Any] | list[dict[str, Any]] | str | Path | bytes*): Input data. Can be
-  dictionary, list of dictionaries, JSON string, file path, or bytes.
+- **data** (*dict | list[dict] | str | Path | bytes | Iterator[dict]*): Input data. Can be
+  dictionary, list of dictionaries, JSON string, file path, bytes, or an iterator/generator
+  yielding dictionaries.
 - **name** (*str*, default="data"): Base name for generated tables.
 - **config** (*TransmogConfig | None*, default=None): Configuration object. Uses defaults if not provided.
 - **progress_callback** (*Callable[[int, int | None], None] | None*, default=None): Optional
@@ -59,21 +60,9 @@ result = tm.flatten("data.json5")
 result = tm.flatten("data.hjson")
 ```
 
-**Supported File Formats:**
-
-- JSON (.json)
-- JSON Lines (.jsonl, .ndjson)
-- JSON5 (.json5) - Supports comments, trailing commas, unquoted keys, single quotes
-
-:::{important}
-JSON5 support requires: `pip install json5`
-:::
-
-- HJSON (.hjson) - Human JSON with comments, unquoted strings, multiline strings
-
-:::{important}
-HJSON support requires: `pip install hjson`
-:::
+**Supported File Formats:** JSON (`.json`), JSON Lines (`.jsonl`, `.ndjson`),
+JSON5 (`.json5`, requires `pip install json5`), HJSON (`.hjson`, requires
+`pip install hjson`). See [Working with Files](getting_started.md#working-with-files) for details.
 
 ### flatten_stream()
 
@@ -81,7 +70,7 @@ Stream data directly to files.
 
 ```python
 flatten_stream(
-    data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes,
+    data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes | Iterator[dict[str, Any]],
     output_path: str | Path,
     name: str = "data",
     output_format: str = "csv",
@@ -93,7 +82,7 @@ flatten_stream(
 
 **Parameters:**
 
-- **data** (*dict[str, Any] | list[dict[str, Any]] | str | Path | bytes*): Input data (same as `flatten()`).
+- **data** (*dict | list[dict] | str | Path | bytes | Iterator[dict]*): Input data (same as `flatten()`).
 - **output_path** (*str | Path*): Directory path for output files.
 - **name** (*str*, default="data"): Base name for output files.
 - **output_format** (*str*, default="csv"): Output format ("csv", "parquet", "orc", "avro").
@@ -157,33 +146,8 @@ TransmogConfig(
 )
 ```
 
-**Parameters:**
-
-**Data Transformation:**
-
-- `array_mode` (ArrayMode, default=ArrayMode.SMART): How to handle arrays
-- `include_nulls` (bool, default=False): Include null and empty values in output
-- `stringify_values` (bool, default=False): Convert all leaf values to strings after
-  flattening. Numbers become `"42"`, booleans become `"True"`, nulls remain as None.
-- `max_depth` (int, default=100): Maximum recursion depth
-
-**ID and Metadata:**
-
-- `id_generation` (str | list[str], default="random"): ID generation strategy
-  - String options:
-    - `"random"` (default): Always generate random UUID
-    - `"natural"`: Use existing `id_field` field (error if missing)
-    - `"hash"`: Deterministic hash of entire record
-  - List options:
-    - `["field1", "field2"]`: Deterministic hash of these specific fields (composite key)
-
-- `id_field` (str, default="_id"): Field name for record IDs (generated or existing)
-- `parent_field` (str, default="_parent_id"): Field name for parent record references
-- `time_field` (str | None, default="_timestamp"): Field name for timestamps. Set to None to disable timestamp tracking
-
-**Processing Control:**
-
-- `batch_size` (int, default=1000): Records to process at once
+See {doc}`configuration` for detailed parameter descriptions, usage guidance, and
+batch size recommendations.
 
 ### FlattenResult
 
@@ -285,71 +249,18 @@ for record in result.main:
 
 ## Error Classes
 
-### TransmogError
+All exceptions inherit from `TransmogError`. Three are exported in the public API:
 
-Base exception class for all Transmog errors.
+| Exception | Available as | Description |
+| --------- | ----------- | ----------- |
+| `TransmogError` | `tm.TransmogError` | Base exception for all Transmog errors |
+| `ValidationError` | `tm.ValidationError` | Input data validation failures |
+| `MissingDependencyError` | `tm.MissingDependencyError` | Missing optional dependency (pyarrow, fastavro) |
 
-```python
-class TransmogError(Exception):
-    """Base exception for all Transmog operations."""
-```
+`ConfigurationError` and `OutputError` exist internally but are not exported.
+Catch them via `TransmogError`.
 
-**Available as:** `tm.TransmogError`
-
-### ValidationError
-
-Raised for data validation failures.
-
-```python
-class ValidationError(TransmogError):
-    """Raised when input data fails validation checks."""
-```
-
-**Available as:** `tm.ValidationError`
-
-**Examples:**
-
-```python
-try:
-    result = tm.flatten(invalid_data)
-except tm.ValidationError as e:
-    print(f"Data validation error: {e}")
-```
-
-### MissingDependencyError
-
-Raised when an optional dependency is missing.
-
-```python
-class MissingDependencyError(TransmogError):
-    """Raised when an optional dependency is missing."""
-```
-
-**Available as:** `tm.MissingDependencyError`
-
-**Examples:**
-
-```python
-# Parquet dependency error
-try:
-    tm.flatten_stream(data, "output/", output_format="parquet")
-except tm.MissingDependencyError as e:
-    print(f"Missing dependency: {e}")
-    print(f"Install with: pip install pyarrow")
-
-# Avro dependency error
-try:
-    tm.flatten_stream(data, "output/", output_format="avro")
-except tm.MissingDependencyError as e:
-    print(f"Missing dependency: {e}")
-    print(f"Install with: pip install fastavro cramjam")
-```
-
-:::{note}
-Other exception types (`ConfigurationError`, `OutputError`) exist
-internally but are not exported in the public API. Catch them using generic
-exception handling or `TransmogError` as the base class.
-:::
+See {doc}`errors` for usage examples, troubleshooting, and error handling patterns.
 
 ## Type Definitions
 

@@ -5,7 +5,7 @@ requires = [ "poetry>=1" ]
 
 [project]
 name = "transmog"
-version = "2.0.2"
+version = "2.0.3"
 description = "A data transformation library for flattening complex nested structures into tabular formats while preserving hierarchical relationships"
 readme = "README.md"
 keywords = [

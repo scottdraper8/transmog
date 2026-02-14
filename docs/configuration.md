@@ -129,7 +129,8 @@ conflicts with your data schema.
 **Type:** `str | None`
 **Default:** `"_timestamp"`
 
-Field name for processing timestamps. Set to `None` to disable timestamp
+Field name for processing timestamps. Timestamps are UTC in
+`YYYY-MM-DD HH:MM:SS.ssssss` format. Set to `None` to disable timestamp
 generation entirely.
 
 ```python
@@ -141,9 +142,10 @@ config = tm.TransmogConfig(time_field=None)  # Disable timestamps
 **Type:** `int`
 **Default:** `100`
 
-Maximum recursion depth for nested structures. Fields nested deeper than this
-limit are silently omitted. This is a safety guard — most JSON data is well
-under 100 levels deep.
+Maximum recursion depth for nested structures. The entire subtree below this
+depth is silently omitted — not just the field at that level, but all of its
+descendants. This is a safety guard; most JSON data is well under 100 levels
+deep.
 
 :::{note}
 Adjust only if processing unusually deep structures or to intentionally

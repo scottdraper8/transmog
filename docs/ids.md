@@ -44,15 +44,11 @@ print(result.tables["products_reviews"][0])
 
 :::{important}
 Strategy `"natural"` requires the specified field to exist in all records.
-If the field is missing, a `TransmogError` is raised.
+A missing, empty, or null ID field raises `TransmogError`.
 :::
 
-**Error conditions:**
-
-- Missing ID field in a record raises `TransmogError`
-- Empty or null ID values raise `TransmogError`
-- Child records use their own natural ID if present, otherwise fall back to
-  generated IDs
+Child records use their own natural ID if the field is present; otherwise
+they fall back to generated IDs.
 
 ## Hash-Based IDs
 
