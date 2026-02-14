@@ -271,8 +271,6 @@ def flatten(
         flush_batch()
         if progress_callback is not None:
             progress_callback(records_processed, total_records)
-    else:
-        flush_batch()
 
     logger.info(
         "flatten completed, name=%s, main_records=%d, child_tables=%d",
