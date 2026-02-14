@@ -87,6 +87,8 @@ tm.flatten_stream(
 )
 ```
 
+(schema-drift)=
+
 ### Schema Drift
 
 When using `flatten_stream()` with CSV output, the column schema is locked after

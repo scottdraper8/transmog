@@ -1,11 +1,14 @@
 """Tests for logging support across transmog modules."""
 
 import logging
+from collections.abc import Iterator
 
+import pytest
 import transmog as tm
 from transmog.config import TransmogConfig
 from transmog.flattening import process_record_batch
 from transmog.iterators import get_data_iterator
+from transmog.streaming import stream_process
 from transmog.types import ProcessingContext
 
 
@@ -141,6 +144,31 @@ class TestStreamBatchLogging:
         ]
         assert len(messages) == 1
         assert "total_records=7" in messages[0]
+
+    def test_stream_completed_not_logged_on_exception(self, caplog, tmp_path):
+        """Verify 'stream completed' is not emitted when processing raises."""
+
+        def failing_iterator() -> Iterator[dict]:
+            yield {"a": 1}
+            raise RuntimeError("simulated mid-stream failure")
+
+        config = TransmogConfig()
+        with caplog.at_level(logging.DEBUG, logger="transmog"):
+            with pytest.raises(RuntimeError, match="simulated mid-stream failure"):
+                stream_process(
+                    config=config,
+                    data=failing_iterator(),
+                    entity_name="test",
+                    output_format="csv",
+                    output_destination=str(tmp_path / "out"),
+                )
+
+        stream_completed = [
+            r.message
+            for r in caplog.records
+            if r.name == "transmog.streaming" and "stream completed" in r.message
+        ]
+        assert len(stream_completed) == 0
 
 
 class TestDebugLevelLogging:

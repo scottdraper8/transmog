@@ -114,7 +114,7 @@ bar.close()
 
 All file formats supported by `flatten()` work with `flatten_stream()`. JSONL
 files are processed line-by-line, making them ideal for streaming large datasets.
-See [Getting Started](getting_started.md#working-with-files) for supported formats
+See [Working with Files](working-with-files) for supported formats
 and dependency requirements.
 
 ```python

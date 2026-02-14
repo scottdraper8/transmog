@@ -196,7 +196,7 @@ WARNING:transmog.writers.csv:csv schema drift detected, table=main, unexpected_f
 
 By default, schema drift raises an `OutputError`. To drop unexpected fields
 instead, pass `schema_drift="drop"` to `flatten_stream()`. See
-[Schema Drift](outputs.md#schema-drift) for details.
+[Schema Drift](schema-drift) for details.
 
 ### Per-Module Loggers
 
