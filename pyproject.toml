@@ -42,6 +42,7 @@ dependencies = [
   "cramjam>=2.7",
   "fastavro>=1.9",
   "hjson>=3.1",
+  "ijson>=3.4",
   "json5>=0.13",
   "orjson>=3.11",
   "pyarrow>=23",
@@ -90,8 +91,6 @@ optional-dependencies.minimal = [
   "orjson>=3.11",
   "typing-extensions>=4",
 ]
-
-optional-dependencies.streaming = [ "ijson>=3.4" ]
 
 urls."Bug Tracker" = "https://github.com/scottdraper8/transmog/issues"
 urls."Documentation" = "https://scottdraper8.github.io/transmog/"

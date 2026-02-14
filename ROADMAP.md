@@ -87,8 +87,8 @@ JSON could use incremental parsing (e.g., `ijson`).
 - Progress: Added `get_json_file_iterator_streaming()`
   using ijson for constant-memory parsing of JSON arrays.
   Available via `streaming=True` on `get_data_iterator()`
-  and auto-enabled in `stream_process()`. ijson is an
-  optional dependency (`pip install transmog[streaming]`).
+  and auto-enabled in `stream_process()`. ijson is a
+  core dependency as of v2.0.3.
 
 ---
 
