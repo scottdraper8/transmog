@@ -69,58 +69,38 @@ def stream_process(
         timestamp = extract_time if extract_time else get_current_timestamp()
         context = ProcessingContext(extract_time=timestamp)
 
+        def flush_batch(buffer: list[dict[str, Any]]) -> None:
+            nonlocal batch_count, total_records_processed
+            main_records, child_tables = process_record_batch(
+                records=buffer,
+                entity_name=entity_name,
+                config=config,
+                _context=context,
+            )
+            writer.write_main_records(main_records)
+            for table_name, table_records in child_tables.items():
+                writer.write_child_records(table_name, table_records)
+            batch_count += 1
+            total_records_processed += len(buffer)
+            logger.info(
+                "stream batch %d processed, records_in_batch=%d, total_records=%d",
+                batch_count,
+                len(buffer),
+                total_records_processed,
+            )
+            if progress_callback is not None:
+                progress_callback(total_records_processed, total_records)
+
         record_buffer = []
         for record in data_iterator:
             record_buffer.append(record)
 
             if len(record_buffer) >= actual_batch_size:
-                main_records, child_tables = process_record_batch(
-                    records=record_buffer,
-                    entity_name=entity_name,
-                    config=config,
-                    _context=context,
-                )
-
-                writer.write_main_records(main_records)
-
-                for table_name, table_records in child_tables.items():
-                    writer.write_child_records(table_name, table_records)
-
-                batch_count += 1
-                total_records_processed += len(record_buffer)
-                logger.info(
-                    "stream batch %d processed, records_in_batch=%d, total_records=%d",
-                    batch_count,
-                    len(record_buffer),
-                    total_records_processed,
-                )
-                if progress_callback is not None:
-                    progress_callback(total_records_processed, total_records)
+                flush_batch(record_buffer)
                 record_buffer = []
 
         if record_buffer:
-            main_records, child_tables = process_record_batch(
-                records=record_buffer,
-                entity_name=entity_name,
-                config=config,
-                _context=context,
-            )
-
-            writer.write_main_records(main_records)
-
-            for table_name, table_records in child_tables.items():
-                writer.write_child_records(table_name, table_records)
-
-            batch_count += 1
-            total_records_processed += len(record_buffer)
-            logger.info(
-                "stream batch %d processed, records_in_batch=%d, total_records=%d",
-                batch_count,
-                len(record_buffer),
-                total_records_processed,
-            )
-            if progress_callback is not None:
-                progress_callback(total_records_processed, total_records)
+            flush_batch(record_buffer)
     finally:
         writer.close()
         logger.info(
