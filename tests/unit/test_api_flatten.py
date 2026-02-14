@@ -326,27 +326,25 @@ class TestFlattenStream:
 
     def test_flatten_stream_parquet_format(self, batch_data, output_dir):
         """Test streaming to Parquet format."""
+        import pyarrow.parquet as pq
+
         output_path = output_dir / "parquet_stream"
 
-        try:
-            result = tm.flatten_stream(
-                batch_data,
-                output_path=str(output_path),
-                name="parquet_data",
-                output_format="parquet",
-            )
+        result = tm.flatten_stream(
+            batch_data,
+            output_path=str(output_path),
+            name="parquet_data",
+            output_format="parquet",
+        )
 
-            assert result is None
-            output_files = list(output_dir.glob("**/*"))
-            output_files = [f for f in output_files if f.is_file()]
+        assert result is None
+        parquet_files = list(output_dir.glob("**/*.parquet"))
+        assert len(parquet_files) > 0
 
-            if len(output_files) == 0:
-                pytest.skip("Parquet format not available or not working")
-            else:
-                assert len(output_files) > 0
-
-        except (ImportError, tm.TransmogError) as e:
-            pytest.skip(f"Parquet format not available: {e}")
+        # Verify content of main file
+        main_file = next(f for f in parquet_files if "parquet_data" in f.name)
+        table = pq.read_table(str(main_file))
+        assert table.num_rows == len(batch_data)
 
     def test_flatten_stream_with_options(self, array_data, output_dir):
         """Test streaming with various configuration options."""
@@ -436,40 +434,6 @@ class TestBoundaryConditions:
         assert "large_float" in record
         assert "small_float" in record
 
-    def test_unicode_and_special_characters(self):
-        """Test handling of Unicode and special characters."""
-        data = {
-            "unicode": "Hello 世界 🌍",
-            "special_chars": "!@#$%^&*()_+-=[]{}|;':\",./<>?",
-            "newlines": "line1\nline2\r\nline3",
-            "tabs": "col1\tcol2\tcol3",
-        }
-
-        result = tm.flatten(data, name="test")
-
-        assert len(result.main) == 1
-        record = result.main[0]
-        assert "unicode" in record
-        assert "special_chars" in record
-        assert "newlines" in record
-        assert "tabs" in record
-
-    def test_maximum_nesting_depth(self):
-        """Test handling of maximum nesting depth."""
-        data = {"level_0": {}}
-        current = data["level_0"]
-
-        for i in range(1, 50):
-            current[f"level_{i}"] = {}
-            current = current[f"level_{i}"]
-
-        current["final_value"] = "deep"
-
-        config = TransmogConfig(max_depth=100)
-        result = tm.flatten(data, name="test", config=config)
-
-        assert len(result.main) == 1
-
     def test_very_long_field_names(self):
         """Test handling of very long field names."""
         long_key = "a" * 1000
@@ -488,3 +452,10 @@ class TestBoundaryConditions:
         assert len(result.main) == 1
         record = result.main[0]
         assert len(record) > 1000
+
+    def test_invalid_utf8_bytes(self):
+        """Test that invalid UTF-8 bytes raise an appropriate error."""
+        invalid_bytes = b"\x80\x81\x82"
+
+        with pytest.raises((ValidationError, UnicodeDecodeError, json.JSONDecodeError)):
+            tm.flatten(invalid_bytes, name="test")

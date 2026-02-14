@@ -504,39 +504,36 @@ class TestStreamingWithComplexData:
 class TestStreamingOutputFormats:
     """Test streaming processing with different output formats."""
 
-    def test_streaming_to_multiple_formats(self, tmp_path):
-        """Test streaming to different output formats."""
+    def test_streaming_csv_output_content(self, tmp_path):
+        """Test that streaming CSV output contains correct data."""
         data = [
             {"id": 1, "name": "Alice", "score": 95.5},
             {"id": 2, "name": "Bob", "score": 87.2},
         ]
 
         config = TransmogConfig()
+        output_dir = tmp_path / "csv_output"
 
-        # Test JSON output
-        json_file = tmp_path / "scores.json"
         stream_process(
             config=config,
             data=data,
             entity_name="scores",
             output_format="csv",
-            output_destination=str(json_file),
+            output_destination=str(output_dir),
         )
-        assert json_file.exists()
 
-        # Test CSV output
-        csv_file = tmp_path / "scores.csv"
-        stream_process(
-            config=config,
-            data=data,
-            entity_name="scores",
-            output_format="csv",
-            output_destination=str(csv_file),
-        )
-        assert csv_file.exists()
+        main_file = output_dir / "scores.csv"
+        assert main_file.exists()
 
-    def test_streaming_with_format_options(self, tmp_path):
-        """Test streaming with format-specific options."""
+        with open(main_file) as f:
+            reader = csv.DictReader(f)
+            result = list(reader)
+        assert len(result) == 2
+        assert result[0]["name"] == "Alice"
+        assert result[1]["name"] == "Bob"
+
+    def test_streaming_with_csv_delimiter_option(self, tmp_path):
+        """Test streaming with CSV delimiter format option."""
         data = [
             {"id": 1, "name": "Alice"},
             {"id": 2, "name": "Bob"},
@@ -551,15 +548,18 @@ class TestStreamingOutputFormats:
             entity_name="users",
             output_format="csv",
             output_destination=str(output_dir),
+            delimiter="\t",
         )
 
         main_file = output_dir / "users.csv"
         assert main_file.exists()
 
         with open(main_file) as f:
-            reader = csv.DictReader(f)
-            result = list(reader)
-        assert len(result) == 2
+            content = f.read()
+        # Should use tab delimiter, not commas
+        assert "\t" in content
+        lines = content.strip().split("\n")
+        assert len(lines) == 3  # header + 2 data rows
 
     def test_streaming_to_parquet_format(self, tmp_path):
         """Test streaming to Parquet format with finalization.
@@ -669,3 +669,44 @@ class TestStreamingEdgeCases:
             reader = csv.DictReader(f)
             result = list(reader)
         assert len(result) == 2
+
+
+class TestStreamProcessingAvro:
+    """Test streaming processing with Avro format."""
+
+    @pytest.mark.skipif(
+        not pytest.importorskip("fastavro", reason="fastavro not available"),
+        reason="fastavro required",
+    )
+    def test_stream_to_avro(self, tmp_path):
+        """Test streaming output to Avro format."""
+        data = [
+            {"id": 1, "name": "Alice", "score": 95},
+            {"id": 2, "name": "Bob", "score": 87},
+            {"id": 3, "name": "Charlie", "score": 92},
+        ]
+
+        config = TransmogConfig(batch_size=2)
+        output_dir = tmp_path / "avro_output"
+        output_dir.mkdir()
+
+        stream_process(
+            config=config,
+            data=data,
+            entity_name="users",
+            output_format="avro",
+            output_destination=str(output_dir),
+        )
+
+        avro_file = output_dir / "users.avro"
+        assert avro_file.exists()
+
+        import fastavro
+
+        with open(avro_file, "rb") as f:
+            reader = fastavro.reader(f)
+            records = list(reader)
+
+        assert len(records) == 3
+        names = {r["name"] for r in records}
+        assert names == {"Alice", "Bob", "Charlie"}

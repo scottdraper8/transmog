@@ -1,13 +1,11 @@
 """Tests for metadata annotation, timestamp generation, and processing context."""
 
-import uuid
 from datetime import datetime
 
 import pytest
 
 from transmog.config import TransmogConfig
 from transmog.flattening import (
-    TRANSMOG_NAMESPACE,
     annotate_with_metadata,
     get_current_timestamp,
 )
@@ -29,10 +27,14 @@ class TestTimestampGeneration:
         except ValueError:
             pytest.fail("Timestamp is not in valid ISO format")
 
-    def test_timestamp_uniqueness(self):
-        """Test that timestamps are reasonably unique."""
+    def test_timestamp_format_is_iso(self):
+        """Test that timestamps follow ISO format consistently."""
         timestamps = [get_current_timestamp() for _ in range(5)]
-        assert len(set(timestamps)) >= 1
+        for ts in timestamps:
+            assert isinstance(ts, str)
+            assert len(ts) > 10
+            # Should be parseable as ISO datetime
+            datetime.fromisoformat(ts.replace("Z", "+00:00"))
 
     def test_timestamp_format(self):
         """Test timestamp format consistency."""
@@ -123,19 +125,6 @@ class TestMetadataAnnotation:
 
         assert isinstance(annotated, dict)
         assert "name" in annotated
-
-
-class TestTransmogNamespace:
-    """Test transmog namespace constant."""
-
-    def test_transmog_namespace_exists(self):
-        """Test that transmog namespace is defined."""
-        assert isinstance(TRANSMOG_NAMESPACE, uuid.UUID)
-
-    def test_transmog_namespace_format(self):
-        """Test transmog namespace format."""
-        assert str(TRANSMOG_NAMESPACE)
-        assert len(str(TRANSMOG_NAMESPACE)) == 36
 
 
 class TestProcessingContext:

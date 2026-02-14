@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 import transmog as tm
+from transmog.writers.avro import AVRO_AVAILABLE
 
 from ...conftest import assert_files_created, count_files_in_dir
 
@@ -18,6 +19,7 @@ from ...conftest import assert_files_created, count_files_in_dir
 class TestEndToEndWorkflows:
     """Test complete end-to-end workflows."""
 
+    @pytest.mark.skipif(not AVRO_AVAILABLE, reason="fastavro not available")
     def test_json_to_multiple_formats(self, complex_nested_data, output_dir):
         """Test processing JSON and outputting to multiple formats."""
         # Step 1: Flatten the data

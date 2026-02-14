@@ -2,6 +2,7 @@
 
 import csv
 import io
+import logging
 import os
 import pathlib
 import sys
@@ -15,6 +16,8 @@ from transmog.writers.base import (
     _normalize_special_floats,
     _sanitize_filename,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _sanitize_csv_value(value: Any) -> Any:
@@ -188,9 +191,7 @@ class CsvWriter(DataWriter):
                 return destination
             else:
                 raise OutputError(f"Invalid destination type: {type(destination)}")
-        except Exception as exc:
-            if isinstance(exc, OutputError):
-                raise
+        except (OSError, csv.Error, ValueError) as exc:
             raise OutputError(f"Failed to write CSV file: {exc}") from exc
 
     def _write_csv_to_stream(
@@ -244,6 +245,7 @@ class CsvStreamingWriter(StreamingWriter):
         include_header: bool = True,
         delimiter: str = ",",
         quotechar: str = '"',
+        schema_drift: str = "strict",
         **options: Any,
     ):
         """Initialize the CSV streaming writer.
@@ -254,11 +256,22 @@ class CsvStreamingWriter(StreamingWriter):
             include_header: Whether to include column headers
             delimiter: Column delimiter character
             quotechar: Character to use for quoting
+            schema_drift: How to handle schema drift after header emission.
+                "strict" raises OutputError (default), "drop" silently
+                removes unexpected fields.
             **options: Additional CSV writer options
         """
+        valid_drift_modes = ("strict", "drop")
+        if schema_drift not in valid_drift_modes:
+            raise ConfigurationError(
+                f"Invalid schema_drift mode: {schema_drift!r}. "
+                f"Must be one of {valid_drift_modes}"
+            )
+
         self.include_header = include_header
         self.delimiter = delimiter
         self.quotechar = quotechar
+        self.schema_drift = schema_drift
         self.file_objects: dict[str, TextIO] = {}
         self.writers: dict[str, csv.DictWriter] = {}
         self.fieldnames: dict[str, list[str]] = {}
@@ -356,6 +369,10 @@ class CsvStreamingWriter(StreamingWriter):
         self.fieldnames[table_name] = fieldnames
         self.fieldname_sets[table_name] = set(fieldnames)
 
+        logger.debug(
+            "csv schema created, table=%s, fields=%d", table_name, len(fieldnames)
+        )
+
         if self.include_header and fieldnames:
             writer.writeheader()
 
@@ -378,11 +395,19 @@ class CsvStreamingWriter(StreamingWriter):
         for record in sanitized_records:
             unexpected_fields = set(record.keys()) - allowed_fields
             if unexpected_fields:
-                raise OutputError(
-                    "CSV schema changed after header emission; "
-                    f"unexpected fields {sorted(unexpected_fields)} detected "
-                    f"in table '{table_name}'."
+                logger.warning(
+                    "csv schema drift detected, table=%s, unexpected_fields=%s",
+                    table_name,
+                    sorted(unexpected_fields),
                 )
+                if self.schema_drift == "strict":
+                    raise OutputError(
+                        "CSV schema changed after header emission; "
+                        f"unexpected fields {sorted(unexpected_fields)} detected "
+                        f"in table '{table_name}'."
+                    )
+                # "drop" mode: filter to known fields only
+                record = {k: v for k, v in record.items() if k in allowed_fields}
             writer.writerow(record)
 
     def write_main_records(self, records: list[dict[str, Any]]) -> None:

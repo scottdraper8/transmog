@@ -8,18 +8,24 @@ Transform nested data structures into flat tables.
 
 ```python
 flatten(
-    data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes,
+    data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes | Iterator[dict[str, Any]],
     name: str = "data",
     config: TransmogConfig | None = None,
+    progress_callback: Callable[[int, int | None], None] | None = None,
 ) -> FlattenResult
 ```
 
 **Parameters:**
 
-- **data** (*dict[str, Any] | list[dict[str, Any]] | str | Path | bytes*): Input data. Can be
-  dictionary, list of dictionaries, JSON string, file path, or bytes.
+- **data** (*dict | list[dict] | str | Path | bytes | Iterator[dict]*): Input data. Can be
+  dictionary, list of dictionaries, JSON string, file path, bytes, or an iterator/generator
+  yielding dictionaries.
 - **name** (*str*, default="data"): Base name for generated tables.
 - **config** (*TransmogConfig | None*, default=None): Configuration object. Uses defaults if not provided.
+- **progress_callback** (*Callable[[int, int | None], None] | None*, default=None): Optional
+  callable invoked after each batch flush. Receives `(records_processed, total_records)`.
+  `total_records` is the input length for `list` and `dict` inputs, or `None` when unknown
+  (file paths, byte strings). Invocation frequency depends on `batch_size`.
 
 **Returns:**
 
@@ -40,6 +46,13 @@ result = tm.flatten(data, config=config)
 # Custom configuration
 result = tm.flatten(data, config=tm.TransmogConfig(include_nulls=True))
 
+# Progress tracking
+def on_progress(processed, total):
+    if total:
+        print(f"{processed}/{total} records")
+
+result = tm.flatten(data, progress_callback=on_progress)
+
 # Process file directly
 result = tm.flatten("data.json")
 result = tm.flatten("data.jsonl")
@@ -47,21 +60,9 @@ result = tm.flatten("data.json5")
 result = tm.flatten("data.hjson")
 ```
 
-**Supported File Formats:**
-
-- JSON (.json)
-- JSON Lines (.jsonl, .ndjson)
-- JSON5 (.json5) - Supports comments, trailing commas, unquoted keys, single quotes
-
-:::{important}
-JSON5 support requires: `pip install json5`
-:::
-
-- HJSON (.hjson) - Human JSON with comments, unquoted strings, multiline strings
-
-:::{important}
-HJSON support requires: `pip install hjson`
-:::
+**Supported File Formats:** JSON (`.json`), JSON Lines (`.jsonl`, `.ndjson`),
+JSON5 (`.json5`, requires `pip install json5`), HJSON (`.hjson`, requires
+`pip install hjson`). See [Working with Files](getting_started.md#working-with-files) for details.
 
 ### flatten_stream()
 
@@ -69,22 +70,25 @@ Stream data directly to files.
 
 ```python
 flatten_stream(
-    data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes,
+    data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes | Iterator[dict[str, Any]],
     output_path: str | Path,
     name: str = "data",
     output_format: str = "csv",
     config: TransmogConfig | None = None,
+    progress_callback: Callable[[int, int | None], None] | None = None,
     **format_options: Any,
 ) -> None
 ```
 
 **Parameters:**
 
-- **data** (*dict[str, Any] | list[dict[str, Any]] | str | Path | bytes*): Input data (same as `flatten()`).
+- **data** (*dict | list[dict] | str | Path | bytes | Iterator[dict]*): Input data (same as `flatten()`).
 - **output_path** (*str | Path*): Directory path for output files.
 - **name** (*str*, default="data"): Base name for output files.
-- **output_format** (*str*, default="csv"): Output format ("csv", "parquet", "orc").
+- **output_format** (*str*, default="csv"): Output format ("csv", "parquet", "orc", "avro").
 - **config** (*TransmogConfig | None*, default=None): Configuration object.
+- **progress_callback** (*Callable[[int, int | None], None] | None*, default=None): Optional
+  progress callback (same as `flatten()`).
 - **\*\*format_options**: Format-specific options.
 
 **Output Formats:**
@@ -112,6 +116,11 @@ config = tm.TransmogConfig(batch_size=5000)
 tm.flatten_stream(data, "output/", output_format="orc", config=config)
 ```
 
+:::{note}
+When `config` is not provided, `flatten_stream()` uses `batch_size=100` (instead
+of the default 1000) for memory efficiency. Pass an explicit config to override.
+:::
+
 :::{seealso}
 For large datasets that don't fit in memory, use `flatten_stream()` instead of
 `flatten()`. It writes directly to disk without keeping all data in memory.
@@ -127,6 +136,7 @@ Configuration class for all processing parameters.
 TransmogConfig(
     array_mode: ArrayMode = ArrayMode.SMART,
     include_nulls: bool = False,
+    stringify_values: bool = False,
     max_depth: int = 100,
     id_generation: str | list[str] = "random",
     id_field: str = "_id",
@@ -136,31 +146,8 @@ TransmogConfig(
 )
 ```
 
-**Parameters:**
-
-**Data Transformation:**
-
-- `array_mode` (ArrayMode, default=ArrayMode.SMART): How to handle arrays
-- `include_nulls` (bool, default=False): Include null and empty values in output
-- `max_depth` (int, default=100): Maximum recursion depth
-
-**ID and Metadata:**
-
-- `id_generation` (str | list[str], default="random"): ID generation strategy
-  - String options:
-    - `"random"` (default): Always generate random UUID
-    - `"natural"`: Use existing `id_field` field (error if missing)
-    - `"hash"`: Deterministic hash of entire record
-  - List options:
-    - `["field1", "field2"]`: Deterministic hash of these specific fields (composite key)
-
-- `id_field` (str, default="_id"): Field name for record IDs (generated or existing)
-- `parent_field` (str, default="_parent_id"): Field name for parent record references
-- `time_field` (str | None, default="_timestamp"): Field name for timestamps. Set to None to disable timestamp tracking
-
-**Processing Control:**
-
-- `batch_size` (int, default=1000): Records to process at once
+See {doc}`configuration` for detailed parameter descriptions, usage guidance, and
+batch size recommendations.
 
 ### FlattenResult
 
@@ -212,8 +199,11 @@ save(
 **Parameters:**
 
 - **path**: Output path (file or directory).
-- **output_format**: Output format ("csv", "parquet", "orc"). Auto-detected from extension if not specified.
-- **\*\*format_options**: Format-specific writer options (e.g., `delimiter`, `quoting` for CSV; `compression` for Parquet).
+- **output_format**: Output format ("csv", "parquet", "orc", "avro"). Auto-detected
+  from extension if not specified. Defaults to "csv" when no extension is present.
+- **\*\*format_options**: Format-specific writer options (e.g., `delimiter`, `quoting`
+  for CSV; `compression` for Parquet; `codec` for Avro). See {doc}`outputs` for codec
+  details and optional dependency requirements.
 
 **Returns:**
 
@@ -221,16 +211,25 @@ save(
   single table output or a dictionary mapping table names to file paths for
   multiple tables.
 
+**Behavior:**
+
+- **With child tables:** Saves all tables to a directory. If a file path with an
+  extension is given (e.g., `"output/data.csv"`), the extension is stripped and a
+  directory is created instead. Returns `dict[str, str]` mapping table names to paths.
+- **Without child tables:** Saves the main table to a single file. If no extension
+  is present, the output format extension is appended automatically. Returns `list[str]`.
+
 **Examples:**
 
 ```python
-# Save to directory
+# Save to directory (when child tables exist)
 paths = result.save("output/")
+# Creates: output/products.csv, output/products_reviews.csv
 
 # Save with explicit format
-paths = result.save("output/", output_format="csv")
+paths = result.save("output/", output_format="parquet")
 
-# Save single table
+# Save single table (when no child tables)
 paths = result.save("data.csv")
 ```
 
@@ -250,71 +249,18 @@ for record in result.main:
 
 ## Error Classes
 
-### TransmogError
+All exceptions inherit from `TransmogError`. Three are exported in the public API:
 
-Base exception class for all Transmog errors.
+| Exception | Available as | Description |
+| --------- | ----------- | ----------- |
+| `TransmogError` | `tm.TransmogError` | Base exception for all Transmog errors |
+| `ValidationError` | `tm.ValidationError` | Input data validation failures |
+| `MissingDependencyError` | `tm.MissingDependencyError` | Missing optional dependency (pyarrow, fastavro) |
 
-```python
-class TransmogError(Exception):
-    """Base exception for all Transmog operations."""
-```
+`ConfigurationError` and `OutputError` exist internally but are not exported.
+Catch them via `TransmogError`.
 
-**Available as:** `tm.TransmogError`
-
-### ValidationError
-
-Raised for data validation failures.
-
-```python
-class ValidationError(TransmogError):
-    """Raised when input data fails validation checks."""
-```
-
-**Available as:** `tm.ValidationError`
-
-**Examples:**
-
-```python
-try:
-    result = tm.flatten(invalid_data)
-except tm.ValidationError as e:
-    print(f"Data validation error: {e}")
-```
-
-### MissingDependencyError
-
-Raised when an optional dependency is missing.
-
-```python
-class MissingDependencyError(TransmogError):
-    """Raised when an optional dependency is missing."""
-```
-
-**Available as:** `tm.MissingDependencyError`
-
-**Examples:**
-
-```python
-# Parquet dependency error
-try:
-    tm.flatten_stream(data, "output/", output_format="parquet")
-except tm.MissingDependencyError as e:
-    print(f"Missing dependency: {e}")
-    print(f"Install with: pip install pyarrow")
-
-# Avro dependency error
-try:
-    tm.flatten_stream(data, "output/", output_format="avro")
-except tm.MissingDependencyError as e:
-    print(f"Missing dependency: {e}")
-    print(f"Install with: pip install fastavro cramjam")
-```
-
-:::{note}
-Other exception types (`ConfigurationError`, `OutputError`) exist
-internally but are not exported in the public API. Catch them using generic
-exception handling or `TransmogError` as the base class.
-:::
+See {doc}`errors` for usage examples, troubleshooting, and error handling patterns.
 
 ## Type Definitions
 

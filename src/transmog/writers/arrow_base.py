@@ -1,21 +1,27 @@
 """Base classes for PyArrow-based writers (Parquet, ORC)."""
 
+import logging
 import math
 import os
 import pathlib
 from abc import abstractmethod
+from collections.abc import Callable
 from typing import Any, BinaryIO, TextIO
 
 from transmog.exceptions import MissingDependencyError, OutputError
 from transmog.writers.base import DataWriter, StreamingWriter, _collect_field_names
 
+logger = logging.getLogger(__name__)
+
 try:
     import pyarrow as pa
 
     PYARROW_AVAILABLE = True
+    _ARROW_WRITE_ERRORS: tuple[type[Exception], ...] = (OSError, pa.lib.ArrowException)
 except ImportError:
     pa = None
     PYARROW_AVAILABLE = False
+    _ARROW_WRITE_ERRORS: tuple[type[Exception], ...] = (OSError,)  # type: ignore[no-redef]
 
 
 def _is_valid_float_for_inference(value: Any) -> bool:
@@ -33,6 +39,53 @@ def _is_valid_float_for_inference(value: Any) -> bool:
     if not isinstance(value, float):
         return False
     return not (math.isnan(value) or math.isinf(value))
+
+
+def _convert_bool(value: Any) -> bool | None:
+    """Convert a value to bool for Arrow column."""
+    try:
+        return bool(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def _convert_int(value: Any) -> int | None:
+    """Convert a value to int for Arrow column."""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def _convert_float(value: Any) -> float | None:
+    """Convert a value to float for Arrow column."""
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def _convert_str(value: Any) -> str | None:
+    """Convert a value to str for Arrow column."""
+    try:
+        return str(value)
+    except (ValueError, TypeError):
+        return None
+
+
+_TYPE_CONVERTERS: dict[Any, Callable] = {}
+
+
+def _get_type_converters() -> dict[Any, Callable]:
+    """Get the mapping of PyArrow types to converter functions.
+
+    Lazily initialized to avoid import-time dependency on PyArrow.
+    """
+    if not _TYPE_CONVERTERS and pa is not None:
+        _TYPE_CONVERTERS[pa.bool_()] = _convert_bool
+        _TYPE_CONVERTERS[pa.int64()] = _convert_int
+        _TYPE_CONVERTERS[pa.float64()] = _convert_float
+    return _TYPE_CONVERTERS
 
 
 class PyArrowWriter(DataWriter):
@@ -121,9 +174,7 @@ class PyArrowWriter(DataWriter):
                     )
                 self._write_table(table, destination, compression_val, **options)
                 return destination
-        except Exception as exc:
-            if isinstance(exc, (OutputError, MissingDependencyError)):
-                raise
+        except _ARROW_WRITE_ERRORS as exc:
             format_name = self._get_format_name()
             raise OutputError(f"Failed to write {format_name} file: {exc}") from exc
 
@@ -164,8 +215,10 @@ class PyArrowStreamingWriter(StreamingWriter):
         self.stringify_mode = stringify_mode
         self.writers: dict[str, Any] = {}
         self.schemas: dict[str, Any] = {}
+        self.converters: dict[str, dict[str, Callable]] = {}
         self.buffers: dict[str, list[dict[str, Any]]] = {}
         self.base_dir: str | None = None
+        self._column_buffers: dict[str, dict[str, list[Any]]] = {}
         self.file_paths: dict[str, str] = {}
 
         if isinstance(destination, str):
@@ -219,8 +272,8 @@ class PyArrowStreamingWriter(StreamingWriter):
 
     def _create_schema(
         self, records: list[dict[str, Any]], stringify_mode: bool = False
-    ) -> Any:
-        """Create PyArrow schema from records.
+    ) -> tuple[Any, dict[str, Callable]]:
+        """Create PyArrow schema and field converters from records.
 
         Handles special float values (NaN, Inf) by skipping them during type
         inference, as they don't represent typical data patterns.
@@ -230,19 +283,25 @@ class PyArrowStreamingWriter(StreamingWriter):
             stringify_mode: If True, all fields are strings (skip type inference)
 
         Returns:
-            PyArrow schema
+            Tuple of (PyArrow schema, dict mapping field names to converters)
         """
         if not records:
-            return pa.schema([])
+            return pa.schema([]), {}
 
         field_names = _collect_field_names(records)
+        type_converters = _get_type_converters()
 
         # If stringify mode, all fields are strings - skip type inference
         if stringify_mode:
             fields = [pa.field(key, pa.string()) for key in field_names]
-            return pa.schema(fields)
+            converters = dict.fromkeys(field_names, _convert_str)
+            logger.debug(
+                "arrow schema created (stringify mode), fields=%d", len(fields)
+            )
+            return pa.schema(fields), converters
 
         fields = []
+        converters = {}
 
         for key in field_names:
             value = None
@@ -269,7 +328,6 @@ class PyArrowStreamingWriter(StreamingWriter):
 
             # Determine type based on found value or float flag
             if value is None and found_float:
-                # All float values were NaN/Inf, but field is still float type
                 pa_type = pa.float64()
             elif value is None:
                 pa_type = pa.string()
@@ -283,8 +341,11 @@ class PyArrowStreamingWriter(StreamingWriter):
                 pa_type = pa.string()
 
             fields.append(pa.field(key, pa_type))
+            converters[key] = type_converters.get(pa_type, _convert_str)
 
-        return pa.schema(fields)
+        types = {f.name: str(f.type) for f in fields}
+        logger.debug("arrow schema created, fields=%d, types=%s", len(fields), types)
+        return pa.schema(fields), converters
 
     def _records_to_table(self, records: list[dict[str, Any]], table_name: str) -> Any:
         """Convert records to PyArrow table.
@@ -300,13 +361,22 @@ class PyArrowStreamingWriter(StreamingWriter):
             return pa.table({})
 
         if table_name not in self.schemas:
-            self.schemas[table_name] = self._create_schema(
+            schema, converters = self._create_schema(
                 records, stringify_mode=self.stringify_mode
             )
+            self.schemas[table_name] = schema
+            self.converters[table_name] = converters
 
         schema = self.schemas[table_name]
+        converters = self.converters[table_name]
 
-        columns: dict[str, list[Any]] = {field.name: [] for field in schema}
+        if table_name in self._column_buffers:
+            columns = self._column_buffers[table_name]
+            for col in columns.values():
+                col.clear()
+        else:
+            columns = {field.name: [] for field in schema}
+            self._column_buffers[table_name] = columns
 
         for record in records:
             for field in schema:
@@ -316,17 +386,7 @@ class PyArrowStreamingWriter(StreamingWriter):
                 if value is None:
                     columns[field_name].append(None)
                 else:
-                    try:
-                        if field.type == pa.bool_():
-                            columns[field_name].append(bool(value))
-                        elif field.type == pa.int64():
-                            columns[field_name].append(int(value))
-                        elif field.type == pa.float64():
-                            columns[field_name].append(float(value))
-                        else:
-                            columns[field_name].append(str(value))
-                    except (ValueError, TypeError):
-                        columns[field_name].append(None)
+                    columns[field_name].append(converters[field_name](value))
 
         arrays = [pa.array(columns[field.name], type=field.type) for field in schema]
         return pa.table(arrays, schema=schema)
@@ -366,7 +426,7 @@ class PyArrowStreamingWriter(StreamingWriter):
         if writer:
             self._write_to_writer(writer, table)
 
-        self.buffers[table_name] = []
+        self.buffers[table_name].clear()
 
     def write_main_records(self, records: list[dict[str, Any]]) -> None:
         """Write a batch of main records.
@@ -422,7 +482,9 @@ class PyArrowStreamingWriter(StreamingWriter):
 
         self.writers.clear()
         self.schemas.clear()
+        self.converters.clear()
         self.buffers.clear()
+        self._column_buffers.clear()
         self._closed = True
 
 

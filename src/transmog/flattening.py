@@ -6,6 +6,7 @@ hierarchical relationship preservation.
 """
 
 import json
+import logging
 import math
 import uuid
 from datetime import datetime, timezone
@@ -14,6 +15,8 @@ from typing import Any
 from transmog.config import TransmogConfig
 from transmog.exceptions import ValidationError
 from transmog.types import ArrayMode, JsonDict, ProcessingContext
+
+logger = logging.getLogger(__name__)
 
 # Namespace UUID for deterministic ID generation
 TRANSMOG_NAMESPACE = uuid.UUID("a9b8c7d6-e5f4-1234-abcd-0123456789ab")
@@ -549,6 +552,8 @@ def process_record_batch(
     Returns:
         Tuple of (flattened_records, child_arrays)
     """
+    logger.debug("processing batch, records=%d, entity=%s", len(records), entity_name)
+
     flattened_records = []
     all_child_arrays: dict[str, list[dict[str, Any]]] = {}
 

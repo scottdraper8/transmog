@@ -171,31 +171,15 @@ class TestBatchProcessingIntegration:
         assert len(saved_files) > 0
         assert all(path.endswith(".csv") for path in saved_files)
 
-    def test_batch_processing_performance_comparison(self, large_dataset):
-        """Test batch processing performance with different configurations."""
-        import time
-
-        # Small batch size
+    def test_batch_size_does_not_affect_output(self, large_dataset):
+        """Test that different batch sizes produce identical output."""
         config_small = TransmogConfig(batch_size=10)
-
-        start_time = time.time()
         result_small = tm.flatten(large_dataset, name="users", config=config_small)
-        small_batch_time = time.time() - start_time
 
-        # Large batch size
         config_large = TransmogConfig(batch_size=50)
-
-        start_time = time.time()
         result_large = tm.flatten(large_dataset, name="users", config=config_large)
-        large_batch_time = time.time() - start_time
 
-        # Both should produce same results
         assert len(result_small.main) == len(result_large.main)
-
-        # Performance comparison (large batches might be faster)
-        # Just ensure both complete in reasonable time
-        assert small_batch_time < 10.0  # seconds
-        assert large_batch_time < 10.0  # seconds
 
 
 class TestBatchProcessingEdgeCases:

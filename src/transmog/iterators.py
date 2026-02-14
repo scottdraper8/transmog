@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
 from transmog.exceptions import ValidationError
+
+logger = logging.getLogger(__name__)
 
 try:
     import orjson as _orjson  # type: ignore[import-untyped]
@@ -24,6 +27,13 @@ try:
     import hjson as _hjson  # type: ignore[import-untyped]
 except ImportError:
     _hjson = None  # type: ignore[assignment]
+
+try:
+    import ijson as _ijson  # type: ignore[import-untyped]
+except ImportError:
+    _ijson = None  # type: ignore[assignment]
+
+IJSON_AVAILABLE: bool = _ijson is not None
 
 if _orjson is not None:
     JSON_DECODE_ERRORS: tuple[type[Exception], ...] = (
@@ -43,11 +53,15 @@ def get_data_iterator(
         | bytes
         | Iterator[dict[str, Any]]
     ),
+    *,
+    streaming: bool = False,
 ) -> Iterator[dict[str, Any]]:
     """Return an iterator over input records.
 
     Args:
         data: Input data in various formats
+        streaming: When True and ijson is available, use streaming JSON
+            parsing for .json files to reduce memory usage.
 
     Returns:
         Iterator over data records
@@ -64,12 +78,15 @@ def get_data_iterator(
 
     if isinstance(data, str) and os.path.exists(data):
         extension = os.path.splitext(data)[1].lower()
+        logger.debug("file input detected, path=%s, extension=%s", data, extension)
         if extension in (".jsonl", ".ndjson"):
             return get_jsonl_file_iterator(data)
         if extension == ".json5":
             return get_json5_file_iterator(data)
         if extension == ".hjson":
             return get_hjson_file_iterator(data)
+        if streaming and IJSON_AVAILABLE:
+            return get_json_file_iterator_streaming(data)
         return get_json_file_iterator(data)
 
     if isinstance(data, (str, bytes)):
@@ -78,6 +95,7 @@ def get_data_iterator(
             raise ValidationError("No JSON content provided")
 
         normalised = _detect_string_format(text)
+        logger.debug("string format detected as %s", normalised)
 
         if normalised == "jsonl":
             return get_jsonl_data_iterator(data)
@@ -133,6 +151,77 @@ def get_json_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
         raise ValidationError(f"Error reading file {file_path}: {exc}") from exc
 
     yield from _iter_parsed_json(parsed)
+
+
+def get_json_file_iterator_streaming(file_path: str) -> Iterator[dict[str, Any]]:
+    """Iterate over records in a JSON file using streaming parsing.
+
+    Uses ijson for constant-memory parsing of large JSON arrays.
+    Single-object files fall back to standard loading.
+
+    Args:
+        file_path: Path to the JSON file
+
+    Returns:
+        Iterator over data records
+    """
+    logger.debug("streaming JSON parse requested, path=%s", file_path)
+
+    if _ijson is None:
+        raise ValidationError(
+            "ijson library is required for streaming JSON parsing. "
+            "Install with: pip install ijson"
+        )
+
+    if not os.path.exists(file_path):
+        raise ValidationError(f"File not found: {file_path}")
+
+    first_byte = _peek_first_byte(file_path)
+
+    if first_byte == ord("{"):
+        yield from get_json_file_iterator(file_path)
+        return
+
+    if first_byte != ord("["):
+        raise ValidationError(
+            f"Expected JSON object or array in {file_path}, "
+            f"got unexpected character: {chr(first_byte)!r}"
+        )
+
+    try:
+        with open(file_path, "rb") as handle:
+            for index, item in enumerate(_ijson.items(handle, "item")):
+                if not isinstance(item, dict):
+                    raise ValidationError(
+                        f"Expected JSON object at index {index} in "
+                        f"{file_path}, got {type(item).__name__}"
+                    )
+                yield item
+    except _ijson.common.IncompleteJSONError as exc:
+        raise ValidationError(f"Invalid JSON in file {file_path}: {exc}") from exc
+    except OSError as exc:
+        raise ValidationError(f"Error reading file {file_path}: {exc}") from exc
+
+
+def _peek_first_byte(file_path: str) -> int:
+    """Read the first non-whitespace byte from a file.
+
+    Args:
+        file_path: Path to the file
+
+    Returns:
+        The first non-whitespace byte as an int.
+
+    Raises:
+        ValidationError: If the file is empty or whitespace-only.
+    """
+    with open(file_path, "rb") as handle:
+        while True:
+            byte = handle.read(1)
+            if not byte:
+                raise ValidationError(f"File is empty: {file_path}")
+            if not byte.isspace():
+                return byte[0]
 
 
 def get_jsonl_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
@@ -337,9 +426,11 @@ def _detect_string_format(value: str) -> str:
 
 
 __all__ = [
+    "IJSON_AVAILABLE",
     "get_data_iterator",
     "get_json_data_iterator",
     "get_json_file_iterator",
+    "get_json_file_iterator_streaming",
     "get_jsonl_file_iterator",
     "get_jsonl_data_iterator",
     "get_json5_file_iterator",

@@ -1,6 +1,0 @@
----
-description: "Avoid using pandas. Use alternative packages like pyarrow, csv, or polars instead."
-alwaysApply: false
----
-
-Avoid using pandas at all costs. Alternative packages to use include and are not limited to pyarrow, csv, and polars

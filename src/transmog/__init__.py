@@ -15,12 +15,16 @@ Advanced Usage:
     >>> tm.flatten_stream(large_data, "output/", output_format="parquet")
 """
 
-__version__ = "2.0.2"
+import logging
 
 from transmog.api import FlattenResult, flatten, flatten_stream
 from transmog.config import TransmogConfig
 from transmog.exceptions import MissingDependencyError, TransmogError, ValidationError
 from transmog.types import ArrayMode
+
+logging.getLogger(__name__).addHandler(logging.NullHandler())
+
+__version__ = "2.0.3"
 
 __all__ = [
     "flatten",

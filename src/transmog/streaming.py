@@ -1,13 +1,16 @@
 """Streaming processing and result containers."""
 
+import logging
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, BinaryIO
 
 from transmog.flattening import get_current_timestamp, process_record_batch
 from transmog.iterators import get_data_iterator
-from transmog.types import ProcessingContext
+from transmog.types import ProcessingContext, ProgressCallback
 from transmog.writers import create_streaming_writer
+
+logger = logging.getLogger(__name__)
 
 
 def stream_process(
@@ -25,6 +28,8 @@ def stream_process(
     output_destination: str | BinaryIO | None = None,
     extract_time: str | None = None,
     batch_size: int | None = None,
+    progress_callback: ProgressCallback | None = None,
+    total_records: int | None = None,
     **format_options: Any,
 ) -> None:
     """Stream process data and write directly to output.
@@ -37,6 +42,8 @@ def stream_process(
         output_destination: File path or file-like object to write to
         extract_time: Optional extraction timestamp
         batch_size: Size of batches to process
+        progress_callback: Optional callable invoked after each batch flush
+        total_records: Total input record count (None when unknown)
         **format_options: Format-specific options for the writer
     """
     # Pass stringify_mode to writer for optimization (skip type inference)
@@ -51,43 +58,56 @@ def stream_process(
         **writer_options,
     )
 
+    logger.info("stream started, entity=%s, format=%s", entity_name, output_format)
+
+    batch_count = 0
+    total_records_processed = 0
+
     try:
-        data_iterator = get_data_iterator(data)
+        data_iterator = get_data_iterator(data, streaming=True)
         actual_batch_size = batch_size or config.batch_size
         timestamp = extract_time if extract_time else get_current_timestamp()
         context = ProcessingContext(extract_time=timestamp)
+
+        def flush_batch(buffer: list[dict[str, Any]]) -> None:
+            nonlocal batch_count, total_records_processed
+            main_records, child_tables = process_record_batch(
+                records=buffer,
+                entity_name=entity_name,
+                config=config,
+                _context=context,
+            )
+            writer.write_main_records(main_records)
+            for table_name, table_records in child_tables.items():
+                writer.write_child_records(table_name, table_records)
+            batch_count += 1
+            total_records_processed += len(buffer)
+            logger.info(
+                "stream batch %d processed, records_in_batch=%d, total_records=%d",
+                batch_count,
+                len(buffer),
+                total_records_processed,
+            )
+            if progress_callback is not None:
+                progress_callback(total_records_processed, total_records)
 
         record_buffer = []
         for record in data_iterator:
             record_buffer.append(record)
 
             if len(record_buffer) >= actual_batch_size:
-                main_records, child_tables = process_record_batch(
-                    records=record_buffer,
-                    entity_name=entity_name,
-                    config=config,
-                    _context=context,
-                )
-
-                writer.write_main_records(main_records)
-
-                for table_name, table_records in child_tables.items():
-                    writer.write_child_records(table_name, table_records)
-
+                flush_batch(record_buffer)
                 record_buffer = []
 
         if record_buffer:
-            main_records, child_tables = process_record_batch(
-                records=record_buffer,
-                entity_name=entity_name,
-                config=config,
-                _context=context,
-            )
+            flush_batch(record_buffer)
 
-            writer.write_main_records(main_records)
-
-            for table_name, table_records in child_tables.items():
-                writer.write_child_records(table_name, table_records)
+        logger.info(
+            "stream completed, entity=%s, total_batches=%d, total_records=%d",
+            entity_name,
+            batch_count,
+            total_records_processed,
+        )
     finally:
         writer.close()
 

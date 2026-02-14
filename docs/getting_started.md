@@ -129,15 +129,16 @@ result = tm.flatten("data.ndjson", name="logs")
 
 :::{important}
 JSON5 and HJSON formats require additional packages:
+
+- JSON5: `pip install json5`
+- HJSON: `pip install hjson`
 :::
 
 ```python
 # Process JSON5 (with comments, trailing commas, etc.)
-# Requires: pip install json5
 result = tm.flatten("config.json5", name="settings")
 
 # Process HJSON (human-friendly JSON)
-# Requires: pip install hjson
 result = tm.flatten("data.hjson", name="records")
 
 # Save results as CSV

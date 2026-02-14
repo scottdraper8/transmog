@@ -27,18 +27,40 @@ config = tm.TransmogConfig(
 result = tm.flatten(data, config=config)
 ```
 
-## Parameter Details
+## Core Parameters
+
+These are the parameters most users will configure.
+
+### array_mode
+
+**Type:** `ArrayMode`
+**Default:** `ArrayMode.SMART`
+
+Controls how arrays are processed. See [Array Handling](arrays.md) for detailed
+examples of each mode.
+
+Options: `SMART`, `SEPARATE`, `INLINE`, `SKIP`.
+
+### id_generation
+
+**Type:** `str | list[str]`
+**Default:** `"random"`
+
+Controls how record IDs are generated. See [ID Management](ids.md) for detailed
+examples of each strategy.
+
+Options: `"random"`, `"natural"`, `"hash"`, or a list of field names for composite keys.
 
 ### include_nulls
 
 **Type:** `bool`
 **Default:** `False`
 
-Include null and empty values in output:
+Include null and empty values in output. Enable this for CSV output where
+consistent columns across all rows are needed.
 
 ```python
-config = tm.TransmogConfig(include_nulls=False)  # Default
-config = tm.TransmogConfig(include_nulls=True)   # For CSV
+config = tm.TransmogConfig(include_nulls=True)
 ```
 
 ### stringify_values
@@ -46,17 +68,11 @@ config = tm.TransmogConfig(include_nulls=True)   # For CSV
 **Type:** `bool`
 **Default:** `False`
 
-Convert all leaf values to strings after flattening. Useful for ensuring
-consistent string types across all output formats and eliminating type
-conversion issues.
-
-When enabled:
+Convert all leaf values to strings after flattening:
 
 - Numbers become strings: `42` → `"42"`, `3.14` → `"3.14"`
 - Booleans become strings: `True` → `"True"`, `False` → `"False"`
-- Strings remain unchanged
 - Null values remain as None/null (not stringified)
-- Arrays respect `array_mode` setting, items are stringified individually
 
 ```python
 config = tm.TransmogConfig(stringify_values=True)
@@ -64,19 +80,8 @@ result = tm.flatten({"price": 19.99, "active": True}, config=config)
 # Result: {"price": "19.99", "active": "True"}
 ```
 
-Benefits:
-
-- Eliminates type inference overhead in Parquet/ORC writers
-- Consistent behavior across CSV, Parquet, and ORC formats
-- No type coercion errors
-- Simplified downstream processing
-
-### array_mode
-
-**Type:** `ArrayMode`
-**Default:** `ArrayMode.SMART`
-
-Options: `SMART`, `SEPARATE`, `INLINE`, `SKIP`. See [Array Handling](arrays.md).
+Useful when targeting CSV output or when downstream systems expect uniform string
+types. Eliminates type coercion errors in Parquet/ORC writers.
 
 ### batch_size
 
@@ -90,7 +95,8 @@ config = tm.TransmogConfig(batch_size=100)    # Small batches
 config = tm.TransmogConfig(batch_size=10000)  # Large batches
 ```
 
-:::{tip} Choosing batch_size
+:::{tip}
+**Choosing batch_size**
 
 - **Small batches (100-500):** Use for memory-constrained environments or very
   large records. `flatten_stream()` defaults to 100 for memory efficiency.
@@ -100,48 +106,116 @@ config = tm.TransmogConfig(batch_size=10000)  # Large batches
 
 :::
 
-### max_depth
+## Advanced Parameters
 
-**Type:** `int`
-**Default:** `100`
-
-Maximum recursion depth for nested structures. Fields nested deeper than this
-limit are silently omitted from the output. This prevents stack overflow on
-deeply nested or circular-like structures.
-
-```python
-config = tm.TransmogConfig(max_depth=10)  # Limit to 10 levels of nesting
-```
-
-:::{note}
-In practice, most JSON data is well under 100 levels deep. Adjust only if
-processing unusually deep structures or to intentionally truncate output.
-:::
-
-### id_generation
-
-**Type:** `str | list[str]`
-**Default:** `"random"`
-
-Options: `"random"`, `"natural"`, `"hash"`, or list of fields for composite keys. See [ID Management](ids.md).
+These parameters have sensible defaults and rarely need adjustment.
 
 ### id_field
 
 **Type:** `str`
 **Default:** `"_id"`
 
-Field name for record IDs.
+Field name for record IDs. Change only if `_id` conflicts with your data schema.
 
 ### parent_field
 
 **Type:** `str`
 **Default:** `"_parent_id"`
 
-Field name for parent references.
+Field name for parent references in child tables. Change only if `_parent_id`
+conflicts with your data schema.
 
 ### time_field
 
 **Type:** `str | None`
 **Default:** `"_timestamp"`
 
-Field name for timestamps. Set to `None` to disable.
+Field name for processing timestamps. Timestamps are UTC in
+`YYYY-MM-DD HH:MM:SS.ssssss` format. Set to `None` to disable timestamp
+generation entirely.
+
+```python
+config = tm.TransmogConfig(time_field=None)  # Disable timestamps
+```
+
+### max_depth
+
+**Type:** `int`
+**Default:** `100`
+
+Maximum recursion depth for nested structures. The entire subtree below this
+depth is silently omitted — not just the field at that level, but all of its
+descendants. This is a safety guard; most JSON data is well under 100 levels
+deep.
+
+:::{note}
+Adjust only if processing unusually deep structures or to intentionally
+truncate output at a specific nesting level.
+:::
+
+## Logging
+
+Transmog uses Python's standard `logging` module. By default no output is
+produced (a `NullHandler` is attached to the root `transmog` logger). To
+enable diagnostic output, configure the logger in your application:
+
+```python
+import logging
+
+logging.basicConfig()
+logging.getLogger("transmog").setLevel(logging.INFO)
+```
+
+### Log Levels
+
+**INFO** — API entry/exit and streaming batch progress:
+
+```text
+INFO:transmog.api:flatten started, name=products, input_type=list
+INFO:transmog.api:flatten completed, name=products, main_records=150, child_tables=3
+INFO:transmog.streaming:stream started, entity=events, format=parquet
+INFO:transmog.streaming:stream batch 1 processed, records_in_batch=100, total_records=100
+INFO:transmog.streaming:stream completed, entity=events, total_batches=5, total_records=500
+```
+
+**DEBUG** — Format detection, schema inference, and batch processing internals:
+
+```text
+DEBUG:transmog.iterators:file input detected, path=data.json, extension=.json
+DEBUG:transmog.iterators:string format detected as jsonl
+DEBUG:transmog.flattening:processing batch, records=100, entity=products
+DEBUG:transmog.writers.arrow_base:arrow schema created, fields=12, types={'name': 'string', ...}
+DEBUG:transmog.writers.csv:csv schema created, table=main, fields=8
+```
+
+**WARNING** — Schema drift and data issues:
+
+```text
+WARNING:transmog.writers.csv:csv schema drift detected, table=main, unexpected_fields=['new_col']
+```
+
+By default, schema drift raises an `OutputError`. To drop unexpected fields
+instead, pass `schema_drift="drop"` to `flatten_stream()`. See
+[Schema Drift](outputs.md#schema-drift) for details.
+
+### Per-Module Loggers
+
+Each module uses its own logger under the `transmog` namespace. Target
+specific modules to reduce noise:
+
+```python
+import logging
+
+# Only show streaming batch progress
+logging.basicConfig()
+logging.getLogger("transmog.streaming").setLevel(logging.INFO)
+
+# Only show format detection decisions
+logging.getLogger("transmog.iterators").setLevel(logging.DEBUG)
+```
+
+:::{tip}
+Enable `DEBUG` on `transmog.writers.csv` when troubleshooting schema drift
+errors. The warning log shows exactly which unexpected fields triggered the
+error before the exception is raised.
+:::

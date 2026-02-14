@@ -2,6 +2,7 @@
 
 import os
 import pathlib
+import warnings
 from typing import Any, BinaryIO, TextIO
 
 from transmog.exceptions import OutputError
@@ -16,12 +17,21 @@ from transmog.writers.base import (
 try:
     import fastavro
     from fastavro import writer as avro_writer
+    from fastavro.schema import SchemaParseException as _AvroSchemaError
 
     AVRO_AVAILABLE = True
+    _AVRO_WRITE_ERRORS: tuple[type[Exception], ...] = (
+        OSError,
+        ValueError,
+        TypeError,
+        KeyError,
+        _AvroSchemaError,
+    )
 except ImportError:
     fastavro = None  # type: ignore[assignment]
     avro_writer = None  # type: ignore[assignment]
     AVRO_AVAILABLE = False
+    _AVRO_WRITE_ERRORS: tuple[type[Exception], ...] = (OSError,)  # type: ignore[no-redef]
 
 # Supported Avro compression codecs
 AVRO_CODECS = ("null", "deflate", "snappy", "zstandard", "lz4", "bzip2", "xz")
@@ -339,9 +349,7 @@ class AvroWriter(DataWriter):
             else:
                 raise OutputError(f"Invalid destination type: {type(destination)}")
 
-        except Exception as exc:
-            if isinstance(exc, OutputError):
-                raise
+        except _AVRO_WRITE_ERRORS as exc:
             raise OutputError(f"Failed to write Avro file: {exc}") from exc
 
 
@@ -350,6 +358,10 @@ class AvroStreamingWriter(StreamingWriter):
 
     Uses fastavro's append mode (a+b) to write records incrementally,
     avoiding memory accumulation of all records until close().
+
+    File-like object destinations only support a single batch write
+    due to fastavro requiring file reopening for appends. Use file
+    path destinations for full multi-batch streaming support.
     """
 
     def __init__(
@@ -409,6 +421,14 @@ class AvroStreamingWriter(StreamingWriter):
                     "Avro format requires binary streams, text streams not supported"
                 )
             self.file_object_dest = destination  # type: ignore[assignment]
+            warnings.warn(
+                "Avro streaming to file-like objects only supports "
+                "a single batch write. fastavro requires file "
+                "reopening (a+b mode) to append records, which is "
+                "not possible with file-like objects. Use a file "
+                "path destination for multi-batch streaming.",
+                stacklevel=2,
+            )
 
     def _get_file_path_for_table(self, table_name: str) -> str | None:
         """Get the file path for a table.
@@ -537,10 +557,12 @@ class AvroStreamingWriter(StreamingWriter):
                 )
                 self.initialized_tables.add(table_name)
             else:
-                # Subsequent writes to file-like objects not supported for append
                 raise OutputError(
-                    "Multiple batch writes to file-like object destinations "
-                    "are not supported. Use a file path destination instead."
+                    "Cannot append to file-like object: fastavro "
+                    "requires file reopening (a+b mode) to append "
+                    "records, which is not possible with file-like "
+                    "objects. Use a file path destination for "
+                    "multi-batch streaming."
                 )
             return
 

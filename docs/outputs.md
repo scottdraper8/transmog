@@ -74,6 +74,45 @@ result.save(
 )
 ```
 
+Streaming CSV supports the same options plus `schema_drift`:
+
+```python
+tm.flatten_stream(
+    data, "output/",
+    output_format="csv",
+    delimiter="|",
+    quotechar="'",
+    include_header=True,       # Include column headers (default: True)
+    schema_drift="drop",       # Handle schema drift (default: "strict")
+)
+```
+
+### Schema Drift
+
+When using `flatten_stream()` with CSV output, the column schema is locked after
+the first batch of records. By default, any subsequent batch containing fields
+not present in the original schema raises an `OutputError`.
+
+The `schema_drift` parameter controls this behavior:
+
+| Mode       | Behavior                                                               |
+|------------|------------------------------------------------------------------------|
+| `"strict"` | Raise `OutputError` on unexpected fields (default)                     |
+| `"drop"`   | Log a warning and drop unexpected fields; write remaining known fields |
+
+```python
+import transmog as tm
+
+# Drop unexpected fields instead of raising
+tm.flatten_stream(data, "output/", name="events", output_format="csv", schema_drift="drop")
+```
+
+:::{note}
+An `"extend"` mode (rewriting headers to add new columns) is not supported.
+Streaming CSV headers are already emitted to the destination and cannot be
+rewritten for arbitrary outputs (stdout, binary streams, pipes).
+:::
+
 ## Parquet Output
 
 ```python
@@ -175,7 +214,7 @@ print(result.main[0])
 config = tm.TransmogConfig(include_nulls=True)
 result = tm.flatten(data, config=config)
 print(result.main[0])
-# {'name': 'Product', 'description': '', 'notes': ''}
+# {'name': 'Product', 'description': None, 'notes': None}
 ```
 
 ## Integration Examples
@@ -188,14 +227,24 @@ result = tm.flatten(data, name="customers", config=config)
 result.save("import/")
 ```
 
-### Pandas
+### PyArrow
 
 ```python
 result = tm.flatten(data, name="sales")
 result.save("analysis.parquet")
 
-import pandas as pd
-df = pd.read_parquet("analysis.parquet")
+import pyarrow.parquet as pq
+table = pq.read_table("analysis.parquet")
+```
+
+### Polars
+
+```python
+result = tm.flatten(data, name="sales")
+result.save("analysis.parquet")
+
+import polars as pl
+df = pl.read_parquet("analysis.parquet")
 ```
 
 ### DuckDB
