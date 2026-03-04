@@ -7,16 +7,17 @@ Stream large datasets directly to files without keeping all data in memory.
 ```python
 import transmog as tm
 
-# Stream to CSV files
-tm.flatten_stream(
+# Stream to CSV files — returns list of written paths
+files = tm.flatten_stream(
     large_data,
     output_path="output/",
     name="dataset",
     output_format="csv"
 )
+# files: [PosixPath('output/dataset.csv'), ...]
 
 # Stream to compressed Parquet
-tm.flatten_stream(
+files = tm.flatten_stream(
     large_data,
     output_path="output/",
     name="dataset",
@@ -25,7 +26,7 @@ tm.flatten_stream(
 )
 
 # Stream to compressed ORC
-tm.flatten_stream(
+files = tm.flatten_stream(
     large_data,
     output_path="output/",
     name="dataset",
@@ -34,7 +35,7 @@ tm.flatten_stream(
 )
 
 # Stream to Avro
-tm.flatten_stream(
+files = tm.flatten_stream(
     large_data,
     output_path="output/",
     name="dataset",
@@ -44,7 +45,7 @@ tm.flatten_stream(
 ```
 
 `flatten()` keeps results in memory and returns a `FlattenResult` object.
-`flatten_stream()` writes directly to disk and returns nothing.
+`flatten_stream()` writes directly to disk and returns a `list[Path]` of written file paths.
 
 :::{warning}
 When using `flatten_stream()`, ensure the output directory has sufficient disk

@@ -77,7 +77,7 @@ flatten_stream(
     config: TransmogConfig | None = None,
     progress_callback: Callable[[int, int | None], None] | None = None,
     **format_options: Any,
-) -> None
+) -> list[Path]
 ```
 
 **Parameters:**
@@ -100,20 +100,21 @@ flatten_stream(
 
 **Returns:**
 
-- **None**: Data is written directly to files.
+- **list[Path]**: List of `Path` objects for each file written.
 
 **Examples:**
 
 ```python
 # Stream to CSV
-tm.flatten_stream(large_data, "output/", output_format="csv")
+files = tm.flatten_stream(large_data, "output/", output_format="csv")
+# files: [PosixPath('output/data.csv'), ...]
 
 # Stream to Parquet
-tm.flatten_stream(data, "output/", output_format="parquet")
+files = tm.flatten_stream(data, "output/", output_format="parquet")
 
 # Stream to ORC with configuration
 config = tm.TransmogConfig(batch_size=5000)
-tm.flatten_stream(data, "output/", output_format="orc", config=config)
+files = tm.flatten_stream(data, "output/", output_format="orc", config=config)
 ```
 
 :::{note}
