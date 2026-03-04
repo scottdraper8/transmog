@@ -31,7 +31,7 @@ def stream_process(
     progress_callback: ProgressCallback | None = None,
     total_records: int | None = None,
     **format_options: Any,
-) -> None:
+) -> list[Path]:
     """Stream process data and write directly to output.
 
     Args:
@@ -45,6 +45,9 @@ def stream_process(
         progress_callback: Optional callable invoked after each batch flush
         total_records: Total input record count (None when unknown)
         **format_options: Format-specific options for the writer
+
+    Returns:
+        List of file paths written by the writer.
     """
     # Pass stringify_mode to writer for optimization (skip type inference)
     writer_options = dict(format_options)
@@ -62,6 +65,7 @@ def stream_process(
 
     batch_count = 0
     total_records_processed = 0
+    files_written: list[Path] = []
 
     try:
         data_iterator = get_data_iterator(data, streaming=True)
@@ -109,7 +113,8 @@ def stream_process(
             total_records_processed,
         )
     finally:
-        writer.close()
+        files_written = writer.close()
+    return files_written
 
 
 __all__ = ["stream_process"]

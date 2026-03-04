@@ -289,7 +289,7 @@ def flatten_stream(
     config: TransmogConfig | None = None,
     progress_callback: ProgressCallback | None = None,
     **format_options: Any,
-) -> None:
+) -> list[Path]:
     r"""Stream flatten data directly to files for memory-efficient processing.
 
     This function processes data and writes directly to output files without
@@ -324,13 +324,17 @@ def flatten_stream(
                 - sync_interval: int - Approximate sync block size in bytes
                   (default: 16000)
 
+    Returns:
+        List of Path objects for each file written.
+
     Examples:
         >>> # Stream large dataset to CSV files
-        >>> flatten_stream(large_data, "output/", output_format="csv")
+        >>> files = flatten_stream(large_data, "output/", output_format="csv")
+        >>> # files: [PosixPath('output/data.csv'), ...]
 
         >>> # Stream with custom config
         >>> config = TransmogConfig(batch_size=100)
-        >>> flatten_stream(data, "output/", config=config)
+        >>> files = flatten_stream(data, "output/", config=config)
 
         >>> # Stream to compressed Parquet with specific row group size
         >>> flatten_stream(data, "output/", output_format="parquet",
@@ -363,7 +367,7 @@ def flatten_stream(
         str(output_path),
     )
 
-    stream_process(
+    files_written = stream_process(
         config=config,
         data=data,
         entity_name=name,
@@ -375,6 +379,7 @@ def flatten_stream(
     )
 
     logger.info("flatten_stream completed, name=%s", name)
+    return files_written
 
 
 __all__ = [
