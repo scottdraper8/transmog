@@ -3,6 +3,7 @@
 import os
 import pathlib
 import warnings
+from pathlib import Path
 from typing import Any, BinaryIO, TextIO
 
 from transmog.exceptions import OutputError
@@ -619,19 +620,24 @@ class AvroStreamingWriter(StreamingWriter):
         """
         self._write_records(table_name, records)
 
-    def close(self) -> None:
+    def close(self) -> list[Path]:
         """Finalize output and clean up resources.
 
         Since records are written incrementally using append mode,
         there is no buffered data to flush at close time.
+
+        Returns:
+            List of file paths written, or empty list if writing to a stream.
         """
         if getattr(self, "_closed", False):
-            return
+            return []
 
         # Flush file-like object destination if present
         if self.file_object_dest is not None:
             if hasattr(self.file_object_dest, "flush"):
                 self.file_object_dest.flush()
+
+        paths = [Path(p) for p in self.file_paths.values()]
 
         # Clear metadata
         self.file_paths.clear()
@@ -639,6 +645,7 @@ class AvroStreamingWriter(StreamingWriter):
         self.schema_field_sets.clear()
         self.initialized_tables.clear()
         self._closed = True
+        return paths
 
 
 __all__ = ["AvroWriter", "AvroStreamingWriter", "AVRO_AVAILABLE"]

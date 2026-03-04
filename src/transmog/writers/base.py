@@ -3,6 +3,7 @@
 import math
 import re
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, BinaryIO, Literal, TextIO
 
 
@@ -123,8 +124,12 @@ class StreamingWriter(ABC):
         pass
 
     @abstractmethod
-    def close(self) -> None:
-        """Finalize output, flush buffered data, and clean up resources."""
+    def close(self) -> list[Path]:
+        """Finalize output, flush buffered data, and clean up resources.
+
+        Returns:
+            List of file paths written, or empty list if writing to a stream.
+        """
         pass
 
     def __enter__(self) -> "StreamingWriter":
