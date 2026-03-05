@@ -6,6 +6,7 @@ import logging
 import os
 import pathlib
 import sys
+from pathlib import Path
 from typing import Any, BinaryIO, TextIO, cast
 
 from transmog.exceptions import ConfigurationError, OutputError
@@ -276,6 +277,7 @@ class CsvStreamingWriter(StreamingWriter):
         self.writers: dict[str, csv.DictWriter] = {}
         self.fieldnames: dict[str, list[str]] = {}
         self.fieldname_sets: dict[str, set[str]] = {}
+        self.file_paths: dict[str, str] = {}
         self.should_close_files: bool = False
         self.base_dir: str | None = None
 
@@ -296,6 +298,7 @@ class CsvStreamingWriter(StreamingWriter):
                 file_obj = open(destination, "w", encoding="utf-8", newline="")
 
                 self.file_objects["main"] = file_obj
+                self.file_paths["main"] = destination
                 self.should_close_files = True
             else:
                 self.base_dir = destination
@@ -333,6 +336,7 @@ class CsvStreamingWriter(StreamingWriter):
                 filename = _sanitize_filename(table_name)
 
             file_path = os.path.join(self.base_dir, f"{filename}.csv")
+            self.file_paths[table_name] = file_path
             file_obj = open(file_path, "w", encoding="utf-8", newline="")
 
             self.file_objects[table_name] = file_obj
@@ -429,10 +433,16 @@ class CsvStreamingWriter(StreamingWriter):
         """
         self._write_records(table_name, records)
 
-    def close(self) -> None:
-        """Finalize output, flush buffered data, and clean up resources."""
+    def close(self) -> list[Path]:
+        """Finalize output, flush buffered data, and clean up resources.
+
+        Returns:
+            List of file paths written, or empty list if writing to a stream.
+        """
         if getattr(self, "_closed", False):
-            return
+            return []
+
+        paths = [Path(p) for p in self.file_paths.values()]
 
         for file_obj in self.file_objects.values():
             if hasattr(file_obj, "flush"):
@@ -448,6 +458,7 @@ class CsvStreamingWriter(StreamingWriter):
         self.fieldnames.clear()
         self.fieldname_sets.clear()
         self._closed = True
+        return paths
 
 
 __all__ = ["CsvWriter", "CsvStreamingWriter"]

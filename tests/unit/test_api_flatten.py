@@ -288,9 +288,9 @@ class TestFlattenStream:
             output_format="csv",
         )
 
-        assert result is None
-        csv_files = list(output_dir.glob("**/*.csv"))
-        assert len(csv_files) > 0
+        assert isinstance(result, list)
+        assert len(result) > 0
+        assert all(Path(p).exists() for p in result)
 
     def test_flatten_stream_large_data(self, large_json_file, output_dir):
         """Test streaming with large dataset."""
@@ -305,9 +305,9 @@ class TestFlattenStream:
             config=config,
         )
 
-        assert result is None
-        csv_files = list(output_dir.glob("**/*.csv"))
-        assert len(csv_files) > 0
+        assert isinstance(result, list)
+        assert len(result) > 0
+        assert all(Path(p).exists() for p in result)
 
     def test_flatten_stream_csv_format(self, batch_data, output_dir):
         """Test streaming to CSV format."""
@@ -320,9 +320,10 @@ class TestFlattenStream:
             output_format="csv",
         )
 
-        assert result is None
-        csv_files = list(output_dir.glob("**/*.csv"))
-        assert len(csv_files) > 0
+        assert isinstance(result, list)
+        assert len(result) > 0
+        assert all(Path(p).exists() for p in result)
+        assert all(str(p).endswith(".csv") for p in result)
 
     def test_flatten_stream_parquet_format(self, batch_data, output_dir):
         """Test streaming to Parquet format."""
@@ -337,12 +338,12 @@ class TestFlattenStream:
             output_format="parquet",
         )
 
-        assert result is None
-        parquet_files = list(output_dir.glob("**/*.parquet"))
-        assert len(parquet_files) > 0
+        assert isinstance(result, list)
+        assert len(result) > 0
+        assert all(Path(p).exists() for p in result)
 
         # Verify content of main file
-        main_file = next(f for f in parquet_files if "parquet_data" in f.name)
+        main_file = next(p for p in result if "parquet_data" in str(p))
         table = pq.read_table(str(main_file))
         assert table.num_rows == len(batch_data)
 
@@ -363,9 +364,9 @@ class TestFlattenStream:
             config=config,
         )
 
-        assert result is None
-        csv_files = list(output_dir.glob("**/*.csv"))
-        assert len(csv_files) > 0
+        assert isinstance(result, list)
+        assert len(result) > 0
+        assert all(Path(p).exists() for p in result)
 
     def test_flatten_stream_invalid_format(self, simple_data, output_dir):
         """Test streaming with invalid output format."""

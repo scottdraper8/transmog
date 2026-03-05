@@ -98,7 +98,8 @@ class TestEndToEndWorkflows:
             config=config,
         )
 
-        assert result is None  # Streaming returns None
+        assert isinstance(result, list)
+        assert len(result) > 0
 
         # Verify files were created and contain data
         csv_files = list((output_dir / "streaming_csv").glob("**/*.csv"))

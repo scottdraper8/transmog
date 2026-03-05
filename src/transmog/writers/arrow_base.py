@@ -6,6 +6,7 @@ import os
 import pathlib
 from abc import abstractmethod
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, BinaryIO, TextIO
 
 from transmog.exceptions import MissingDependencyError, OutputError
@@ -467,14 +468,20 @@ class PyArrowStreamingWriter(StreamingWriter):
         if len(self.buffers[table_name]) >= self.batch_size:
             self._write_buffer(table_name)
 
-    def close(self) -> None:
-        """Finalize output, flush buffered data, and clean up resources."""
+    def close(self) -> list[Path]:
+        """Finalize output, flush buffered data, and clean up resources.
+
+        Returns:
+            List of file paths written, or empty list if writing to a stream.
+        """
         if getattr(self, "_closed", False):
-            return
+            return []
 
         for table_name in list(self.buffers.keys()):
             if self.buffers[table_name]:
                 self._write_buffer(table_name)
+
+        paths = [Path(p) for p in self.file_paths.values()]
 
         for writer in self.writers.values():
             if hasattr(writer, "close"):
@@ -486,6 +493,7 @@ class PyArrowStreamingWriter(StreamingWriter):
         self.buffers.clear()
         self._column_buffers.clear()
         self._closed = True
+        return paths
 
 
 __all__ = ["PyArrowWriter", "PyArrowStreamingWriter", "PYARROW_AVAILABLE"]
