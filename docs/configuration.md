@@ -115,15 +115,34 @@ These parameters have sensible defaults and rarely need adjustment.
 **Type:** `str`
 **Default:** `"_id"`
 
-Field name for record IDs. Change only if `_id` conflicts with your data schema.
+Controls two things depending on `id_generation`:
+
+- **Output field name** — the name of the ID field written to every output record,
+  regardless of strategy.
+- **Source field name** — when `id_generation="natural"`, the field transmog reads
+  from each source record to use as that record's ID.
+
+For all other strategies (`"random"`, `"hash"`, composite list), the value is only
+used as the output field name — no source field is read.
+
+Change this only if `_id` conflicts with your data schema.
 
 ### parent_field
 
 **Type:** `str`
 **Default:** `"_parent_id"`
 
-Field name for parent references in child tables. Change only if `_parent_id`
-conflicts with your data schema.
+Controls the **output field name** written on child records to reference their
+parent's ID. This is purely an output concern — it does not read from or target
+any field in the source data. The parent-child link is established automatically
+from the nesting structure.
+
+Change this only if `_parent_id` conflicts with your data schema.
+
+:::{note}
+`id_field`, `parent_field`, and `time_field` must all be distinct. Supplying the
+same name for any two raises a `ConfigurationError`.
+:::
 
 ### time_field
 

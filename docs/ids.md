@@ -85,7 +85,12 @@ assert result1.main[0]["_id"] == result2.main[0]["_id"]
 
 ## Metadata Field Names
 
-Customize the names of metadata fields:
+`id_field`, `parent_field`, and `time_field` control the **names of metadata
+columns in the output**. They do not affect how source data is read, with one
+exception: `id_field` doubles as the source field name when
+`id_generation="natural"` (see [Natural IDs](#natural-ids) above).
+
+Customize these names when the defaults conflict with your data schema:
 
 ```python
 config = tm.TransmogConfig(
@@ -100,6 +105,9 @@ print(result.main[0])
 # {'name': 'Product', 'record_id': '...', '_created_at': '...'}
 ```
 
+All three names must be distinct. Supplying the same value for any two raises a
+`ConfigurationError`.
+
 Disable timestamp tracking:
 
 ```python
@@ -109,7 +117,9 @@ result = tm.flatten(data, config=config)
 
 ## Parent-Child Relationships
 
-Child records reference their parents through the parent ID field:
+Child records reference their parents through the `parent_field` output column.
+This link is built automatically from the nesting structure — no configuration
+beyond the field name is required.
 
 ```python
 result = tm.flatten(data, name="products")
