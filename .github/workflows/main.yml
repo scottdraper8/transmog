@@ -3,6 +3,11 @@ name: CI & Testing
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'pyproject.toml'
   pull_request:
     branches: [ main ]
     paths:
