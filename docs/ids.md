@@ -88,7 +88,7 @@ assert result1.main[0]["_id"] == result2.main[0]["_id"]
 `id_field`, `parent_field`, and `time_field` control the **names of metadata
 columns in the output**. They do not affect how source data is read, with one
 exception: `id_field` doubles as the source field name when
-`id_generation="natural"` (see [Natural IDs](#natural-ids) above).
+`id_generation="natural"` (see Natural IDs above).
 
 Customize these names when the defaults conflict with your data schema:
 
