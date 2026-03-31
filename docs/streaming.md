@@ -7,14 +7,14 @@ Stream large datasets directly to files without keeping all data in memory.
 ```python
 import transmog as tm
 
-# Stream to CSV files — returns list of written paths
+# Stream to CSV part files — returns list of written paths
 files = tm.flatten_stream(
     large_data,
     output_path="output/",
     name="dataset",
     output_format="csv"
 )
-# files: [PosixPath('output/dataset.csv'), ...]
+# files: [PosixPath('output/dataset_part_0000.csv'), ...]
 
 # Stream to compressed Parquet
 files = tm.flatten_stream(
@@ -40,12 +40,21 @@ files = tm.flatten_stream(
     output_path="output/",
     name="dataset",
     output_format="avro",
-    codec="snappy"
+    compression="snappy"
 )
 ```
 
 `flatten()` keeps results in memory and returns a `FlattenResult` object.
-`flatten_stream()` writes directly to disk and returns a `list[Path]` of written file paths.
+`flatten_stream()` writes directly to disk as numbered part files and returns a
+`list[Path]` of written file paths.
+
+Each batch flush produces a separate part file (e.g., `dataset_part_0000.csv`,
+`dataset_part_0001.csv`). Each part file has its own independently inferred
+schema, so fields that only appear in certain batches are preserved in their
+respective part files.
+
+A `_schema_log.json` file is written alongside the part files, tracking the base
+schema and any deviations (structural or type) across parts.
 
 :::{warning}
 When using `flatten_stream()`, ensure the output directory has sufficient disk
@@ -129,17 +138,14 @@ See [Output Formats](outputs.md) for full details on each format and its options
 ```python
 tm.flatten_stream(data, "output/", output_format="csv")
 tm.flatten_stream(data, "output/", output_format="parquet", compression="snappy")
-tm.flatten_stream(data, "output/", output_format="parquet", row_group_size=50000)
 tm.flatten_stream(data, "output/", output_format="orc", compression="zstd")
-tm.flatten_stream(data, "output/", output_format="avro", codec="snappy")
-tm.flatten_stream(data, "output/", output_format="avro", codec="deflate", sync_interval=32000)
+tm.flatten_stream(data, "output/", output_format="avro", compression="snappy")
+tm.flatten_stream(data, "output/", output_format="avro", compression="deflate", sync_interval=32000)
 ```
 
 :::{note}
-The ORC writer accepts a `batch_size` format option (e.g., `batch_size=50000`)
-that controls how many rows are written per ORC stripe. This is separate from
-`TransmogConfig.batch_size`, which controls how many records are processed per
-processing batch.
+`TransmogConfig.batch_size` controls both the record processing batch size and
+the number of records per part file.
 :::
 
 ## Examples

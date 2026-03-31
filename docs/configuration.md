@@ -22,6 +22,7 @@ config = tm.TransmogConfig(
 
     # Processing Control
     batch_size=1000,                     # Records to process at once
+    coerce_schema=False,                 # Unify part file schemas at close
 )
 
 result = tm.flatten(data, config=config)
@@ -105,6 +106,22 @@ config = tm.TransmogConfig(batch_size=10000)  # Large batches
   critical. Reduces per-batch overhead.
 
 :::
+
+### coerce_schema
+
+**Type:** `bool`
+**Default:** `False`
+
+When enabled, the streaming writer analyzes schema deviations across all part
+files at close time and rewrites minority part files to match a unified schema.
+Files missing fields get null-filled columns; type differences are widened.
+
+This incurs additional I/O proportional to the number of deviating part files.
+
+```python
+config = tm.TransmogConfig(coerce_schema=True)
+tm.flatten_stream(data, "output/", config=config, output_format="parquet")
+```
 
 ## Advanced Parameters
 
@@ -207,15 +224,11 @@ DEBUG:transmog.writers.arrow_base:arrow schema created, fields=12, types={'name'
 DEBUG:transmog.writers.csv:csv schema created, table=main, fields=8
 ```
 
-**WARNING** — Schema drift and data issues:
+**WARNING** — Schema deviations and data issues:
 
-```text
-WARNING:transmog.writers.csv:csv schema drift detected, table=main, unexpected_fields=['new_col']
-```
-
-By default, schema drift raises an `OutputError`. To drop unexpected fields
-instead, pass `schema_drift="drop"` to `flatten_stream()`. See
-[Schema Drift](schema-drift) for details.
+Schema deviations across part files are emitted as `UserWarning` at close time,
+distinguishing structural changes (added/removed fields) from type changes.
+Details are also written to `_schema_log.json` in the output directory.
 
 ### Per-Module Loggers
 
@@ -234,7 +247,6 @@ logging.getLogger("transmog.iterators").setLevel(logging.DEBUG)
 ```
 
 :::{tip}
-Enable `DEBUG` on `transmog.writers.csv` when troubleshooting schema drift
-errors. The warning log shows exactly which unexpected fields triggered the
-error before the exception is raised.
+Enable `DEBUG` on `transmog.writers` when troubleshooting schema issues.
+Debug logs show schema inference details for each part file.
 :::

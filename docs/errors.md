@@ -52,9 +52,8 @@ invalid `id_generation` value). Not exported in the public API — catch using
 Raised when writing output files fails. Not exported in the public API — catch
 using `TransmogError` as the base class. Common triggers:
 
-- Schema drift in strict mode (CSV streaming encounters unexpected fields)
 - File permission errors or disk full during writes
-- Avro schema mismatch between batches
+- Invalid codec or compression option
 
 ```python
 try:
@@ -122,11 +121,12 @@ Install PyArrow: `pip install pyarrow`
 **"Missing dependency" when saving Avro:**
 Install fastavro and cramjam: `pip install fastavro cramjam`
 
-**Schema drift error during Avro streaming:**
-When using `flatten_stream()` with Avro output, the schema is locked after the
-first batch. If later batches contain fields not present in the first batch, a
-schema drift error is raised. Ensure input data has a consistent structure, or
-process a representative sample first to establish the schema.
+**Schema deviation warnings during streaming:**
+When using `flatten_stream()`, each batch produces its own part file with
+independently inferred schema. If schemas differ across parts, a `UserWarning`
+is emitted and details are written to `_schema_log.json`. Enable
+`coerce_schema=True` in `TransmogConfig` to automatically unify schemas across
+part files at close time.
 
 **ConfigurationError on invalid config:**
 Catch using `TransmogError` since `ConfigurationError` is not exported:

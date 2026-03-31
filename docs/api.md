@@ -100,16 +100,18 @@ flatten_stream(
 
 **Returns:**
 
-- **list[Path]**: List of `Path` objects for each file written.
+- **list[Path]**: List of `Path` objects for each part file written. Streaming
+  writers produce numbered part files (e.g., `data_part_0000.csv`,
+  `data_part_0001.csv`).
 
 **Examples:**
 
 ```python
-# Stream to CSV
+# Stream to CSV part files
 files = tm.flatten_stream(large_data, "output/", output_format="csv")
-# files: [PosixPath('output/data.csv'), ...]
+# files: [PosixPath('output/data_part_0000.csv'), ...]
 
-# Stream to Parquet
+# Stream to Parquet part files
 files = tm.flatten_stream(data, "output/", output_format="parquet")
 
 # Stream to ORC with configuration
@@ -144,6 +146,7 @@ TransmogConfig(
     parent_field: str = "_parent_id",
     time_field: str | None = "_timestamp",
     batch_size: int = 1000,
+    coerce_schema: bool = False,
 )
 ```
 

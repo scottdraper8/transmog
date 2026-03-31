@@ -2,7 +2,7 @@
 
 # Transmog - Flatten Nested JSON to Tabular Formats
 
-[![Transmog Version](https://img.shields.io/badge/transmog-2.0.3-ff79c6?logo=github&logoColor=white&labelColor=6272a4)](https://github.com/scottdraper8/transmog/releases)
+[![Transmog Version](https://img.shields.io/badge/transmog-2.0.4-ff79c6?logo=github&logoColor=white&labelColor=6272a4)](https://github.com/scottdraper8/transmog/releases)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-ffb86c?logo=python&logoColor=white&labelColor=6272a4)](https://www.python.org/downloads/)
 [![Poetry](https://img.shields.io/badge/Poetry-1.0+-f1fa8c?logo=poetry&logoColor=282a36&labelColor=6272a4)](https://python-poetry.org/)
 [![pre-commit](https://img.shields.io/badge/pre--commit-4.5+-50fa7b?logo=pre-commit&logoColor=282a36&labelColor=6272a4)](https://github.com/pre-commit/pre-commit)
@@ -75,7 +75,8 @@ config = tm.TransmogConfig(
 
     # Processing controls
     max_depth=100,                   # Maximum recursion depth
-    batch_size=1000                  # Records per batch for streaming
+    batch_size=1000,                 # Records per batch for streaming
+    coerce_schema=False,             # Unify part file schemas at close
 )
 
 result = tm.flatten(data, config=config)
