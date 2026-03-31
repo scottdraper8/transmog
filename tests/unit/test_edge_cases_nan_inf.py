@@ -62,36 +62,24 @@ class TestIsNullLikeHelper:
 class TestNanFlatteningSkipMode:
     """Test NaN handling with include_nulls=False (default)."""
 
-    def test_nan_value_skipped_at_top_level(self):
-        """Test that NaN values are skipped at top level."""
-        data = {"id": 1, "valid": 3.14, "nan_value": float("nan")}
+    @pytest.mark.parametrize(
+        "field_name,special_value",
+        [
+            ("nan_value", float("nan")),
+            ("inf_value", float("inf")),
+            ("neg_inf", float("-inf")),
+        ],
+        ids=["nan", "pos_inf", "neg_inf"],
+    )
+    def test_special_float_skipped_at_top_level(self, field_name, special_value):
+        """Test that NaN/Inf values are skipped at top level."""
+        data = {"id": 1, "valid": 3.14, field_name: special_value}
 
         result = tm.flatten(data, name="test")
 
         main = result.main[0]
         assert "valid" in main
-        assert main["valid"] == 3.14
-        assert "nan_value" not in main
-
-    def test_positive_inf_skipped_at_top_level(self):
-        """Test that positive infinity is skipped at top level."""
-        data = {"id": 1, "valid": 42, "inf_value": float("inf")}
-
-        result = tm.flatten(data, name="test")
-
-        main = result.main[0]
-        assert "valid" in main
-        assert "inf_value" not in main
-
-    def test_negative_inf_skipped_at_top_level(self):
-        """Test that negative infinity is skipped at top level."""
-        data = {"id": 1, "valid": 42, "neg_inf": float("-inf")}
-
-        result = tm.flatten(data, name="test")
-
-        main = result.main[0]
-        assert "valid" in main
-        assert "neg_inf" not in main
+        assert field_name not in main
 
     def test_nan_in_nested_structure_skipped(self):
         """Test that NaN in nested structures is skipped."""
@@ -151,30 +139,26 @@ class TestNanFlatteningSkipMode:
 class TestNanFlatteningIncludeMode:
     """Test NaN handling with include_nulls=True."""
 
-    def test_nan_value_included_as_none(self):
-        """Test that NaN values are included as None when include_nulls=True."""
-        data = {"id": 1, "valid": 3.14, "nan_value": float("nan")}
+    @pytest.mark.parametrize(
+        "field_name,special_value",
+        [
+            ("nan_value", float("nan")),
+            ("pos_inf", float("inf")),
+            ("neg_inf", float("-inf")),
+        ],
+        ids=["nan", "pos_inf", "neg_inf"],
+    )
+    def test_special_float_included_as_none(self, field_name, special_value):
+        """Test that NaN/Inf values are included as None when include_nulls=True."""
+        data = {"id": 1, "valid": 3.14, field_name: special_value}
 
         config = TransmogConfig(include_nulls=True)
         result = tm.flatten(data, name="test", config=config)
 
         main = result.main[0]
         assert "valid" in main
-        assert "nan_value" in main
-        assert main["nan_value"] is None
-
-    def test_inf_values_included_as_none(self):
-        """Test that Inf values are included as None when include_nulls=True."""
-        data = {"id": 1, "pos_inf": float("inf"), "neg_inf": float("-inf")}
-
-        config = TransmogConfig(include_nulls=True)
-        result = tm.flatten(data, name="test", config=config)
-
-        main = result.main[0]
-        assert "pos_inf" in main
-        assert main["pos_inf"] is None
-        assert "neg_inf" in main
-        assert main["neg_inf"] is None
+        assert field_name in main
+        assert main[field_name] is None
 
     def test_nan_in_nested_included(self):
         """Test that NaN in nested structures is included as None."""

@@ -4,44 +4,44 @@ import math
 
 import pytest
 
-from transmog.writers.base import _normalize_special_floats, _sanitize_filename
+from transmog.writers.base import _normalize_special_floats, sanitize_filename
 
 
 class TestSanitizeFilename:
-    """Test _sanitize_filename function."""
+    """Test sanitize_filename function."""
 
     def test_alphanumeric_unchanged(self):
         """Test that alphanumeric strings pass through unchanged."""
-        assert _sanitize_filename("simple_name") == "simple_name"
+        assert sanitize_filename("simple_name") == "simple_name"
 
     def test_special_characters_replaced(self):
         """Test that special characters are replaced with underscores."""
-        assert _sanitize_filename("my file!@#") == "my_file"
+        assert sanitize_filename("my file!@#") == "my_file"
 
     def test_consecutive_underscores_collapsed(self):
         """Test that consecutive underscores are collapsed."""
-        assert _sanitize_filename("a___b") == "a_b"
+        assert sanitize_filename("a___b") == "a_b"
 
     def test_leading_trailing_underscores_stripped(self):
         """Test that leading/trailing underscores are stripped."""
-        result = _sanitize_filename("__test__")
+        result = sanitize_filename("__test__")
         assert not result.startswith("_")
         assert not result.endswith("_")
         assert result == "test"
 
     def test_dots_and_hyphens_preserved(self):
         """Test that dots and hyphens are preserved."""
-        assert _sanitize_filename("file-name.csv") == "file-name.csv"
+        assert sanitize_filename("file-name.csv") == "file-name.csv"
 
     def test_spaces_replaced(self):
         """Test that spaces are replaced."""
-        result = _sanitize_filename("my table name")
+        result = sanitize_filename("my table name")
         assert " " not in result
         assert result == "my_table_name"
 
     def test_slash_replaced(self):
         """Test that path separators are replaced."""
-        result = _sanitize_filename("path/to/file")
+        result = sanitize_filename("path/to/file")
         assert "/" not in result
 
 

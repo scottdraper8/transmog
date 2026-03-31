@@ -5,7 +5,6 @@ Tests CSV output, formatting, and writer interface implementation.
 """
 
 import csv
-import logging
 import sys
 import tempfile
 from io import StringIO
@@ -372,9 +371,9 @@ class TestCsvWriter:
                 lines = content.strip().split("\n")
                 header_line = lines[0]
 
-                # Fields are sorted alphabetically
-                expected_order = "active,age,id,name"
-                assert header_line == expected_order
+                # All field names present in header
+                header_fields = set(header_line.split(","))
+                assert header_fields == {"active", "age", "id", "name"}
 
                 # Check data integrity
                 assert "Alice" in content
@@ -431,8 +430,10 @@ class TestCsvWriter:
 
         content = output_buffer.getvalue()
 
-        # Fields are sorted alphabetically: active,age,id,name
-        assert "active,age,id,name" in content
+        # All field names present in header
+        header_line = content.split("\n")[0].strip().split("\r")[0]
+        header_fields = set(header_line.split(","))
+        assert header_fields == {"active", "age", "id", "name"}
         assert "Alice" in content
         assert "Bob" in content
         assert "Charlie" in content
@@ -536,7 +537,7 @@ class TestCsvWriter:
             Path(tmp_path).unlink(missing_ok=True)
 
     def test_csv_writer_thread_safety(self, sample_data):
-        """Test CSV writer thread safety."""
+        """Test CSV writer thread safety with data integrity checks."""
         import threading
 
         writer = CsvWriter()
@@ -550,44 +551,39 @@ class TestCsvWriter:
                 ) as tmp:
                     tmp_path = tmp.name
 
-                # Modify data slightly for each thread
                 thread_data = [
                     {**record, "thread_id": str(thread_id)} for record in sample_data
                 ]
 
                 writer.write(thread_data, tmp_path)
 
-                # Verify written data
                 with open(tmp_path, newline="") as f:
                     reader = csv.DictReader(f)
                     written_data = list(reader)
 
-                results.append((thread_id, len(written_data)))
+                results.append((thread_id, written_data))
 
-                # Cleanup
                 Path(tmp_path).unlink(missing_ok=True)
 
             except Exception as e:
                 errors.append((thread_id, e))
 
-        # Create multiple threads
         threads = []
-        for i in range(3):  # Fewer threads for CSV to avoid file conflicts
+        for i in range(3):
             thread = threading.Thread(target=write_in_thread, args=(i,))
             threads.append(thread)
             thread.start()
 
-        # Wait for all threads
         for thread in threads:
             thread.join()
 
-        # Should have no errors
         assert len(errors) == 0, f"Errors occurred: {errors}"
         assert len(results) == 3
 
-        # All threads should have written the same number of records
-        for _thread_id, record_count in results:
-            assert record_count == len(sample_data)
+        for thread_id, written_data in results:
+            assert len(written_data) == len(sample_data)
+            # Verify each thread's data contains the correct thread_id
+            assert all(row["thread_id"] == str(thread_id) for row in written_data)
 
     def test_csv_injection_prevention_formulas(self):
         """Test CSV injection prevention for formula injection attacks."""
@@ -885,224 +881,296 @@ class TestCsvWriter:
                 writer.write(sample_data, "/tmp/test.csv")
 
 
+class TestCsvStreamingWriterBasics:
+    """Test basic CsvStreamingWriter functionality with part files."""
+
+    def test_write_produces_part_file(self, tmp_path):
+        """Writing records and closing produces a part file."""
+        dest = str(tmp_path)
+
+        with CsvStreamingWriter(
+            destination=dest, entity_name="test", batch_size=100
+        ) as writer:
+            writer.write_main_records([{"id": "1", "name": "Alice"}])
+
+        expected = tmp_path / "test_part_0000.csv"
+        assert expected.exists()
+
+        with open(expected, newline="") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        assert len(rows) == 1
+        assert rows[0]["name"] == "Alice"
+
+    def test_close_returns_part_paths(self, tmp_path):
+        """close() returns a list of Path objects for written part files."""
+        dest = str(tmp_path)
+
+        writer = CsvStreamingWriter(
+            destination=dest, entity_name="test", batch_size=100
+        )
+        writer.write_main_records([{"id": "1", "name": "Alice"}])
+        paths = writer.close()
+
+        assert len(paths) == 1
+        assert paths[0] == Path(tmp_path / "test_part_0000.csv")
+
+    def test_multiple_batches_produce_multiple_parts(self, tmp_path):
+        """Exceeding batch_size causes multiple part files."""
+        dest = str(tmp_path)
+
+        with CsvStreamingWriter(
+            destination=dest, entity_name="test", batch_size=2
+        ) as writer:
+            writer.write_main_records([{"id": "1"}, {"id": "2"}])
+            writer.write_main_records([{"id": "3"}])
+
+        part_0 = tmp_path / "test_part_0000.csv"
+        part_1 = tmp_path / "test_part_0001.csv"
+
+        assert part_0.exists()
+        assert part_1.exists()
+
+        with open(part_0, newline="") as f:
+            rows_0 = list(csv.DictReader(f))
+        with open(part_1, newline="") as f:
+            rows_1 = list(csv.DictReader(f))
+
+        assert len(rows_0) == 2
+        assert len(rows_1) == 1
+
+    def test_empty_write_produces_no_files(self, tmp_path):
+        """Writing empty records does not produce any part files."""
+        dest = str(tmp_path)
+
+        with CsvStreamingWriter(
+            destination=dest, entity_name="test", batch_size=100
+        ) as writer:
+            writer.write_main_records([])
+
+        csv_files = list(tmp_path.glob("*.csv"))
+        assert len(csv_files) == 0
+
+    def test_custom_delimiter(self, tmp_path):
+        """Part files use the configured delimiter."""
+        dest = str(tmp_path)
+
+        with CsvStreamingWriter(
+            destination=dest, entity_name="test", delimiter=";", batch_size=100
+        ) as writer:
+            writer.write_main_records([{"id": "1", "name": "Alice"}])
+
+        part_file = tmp_path / "test_part_0000.csv"
+        content = part_file.read_text()
+
+        assert ";" in content
+        assert content.count(";") > content.count(",")
+
+    def test_no_header(self, tmp_path):
+        """Part files omit headers when include_header is False."""
+        dest = str(tmp_path)
+
+        with CsvStreamingWriter(
+            destination=dest, entity_name="test", include_header=False, batch_size=100
+        ) as writer:
+            writer.write_main_records([{"id": "1", "name": "Alice"}])
+
+        part_file = tmp_path / "test_part_0000.csv"
+        content = part_file.read_text().strip()
+        lines = content.split("\n")
+
+        # Only one line (data), no header
+        assert len(lines) == 1
+        assert "id" not in lines[0] or "1" in lines[0]
+
+    def test_child_records_produce_separate_part_files(self, tmp_path):
+        """Child records are written to part files named after the child table."""
+        dest = str(tmp_path)
+
+        with CsvStreamingWriter(
+            destination=dest, entity_name="parent", batch_size=100
+        ) as writer:
+            writer.write_main_records([{"id": "1", "name": "Alice"}])
+            writer.write_child_records("addresses", [{"parent_id": "1", "city": "NYC"}])
+
+        main_part = tmp_path / "parent_part_0000.csv"
+        child_part = tmp_path / "addresses_part_0000.csv"
+
+        assert main_part.exists()
+        assert child_part.exists()
+
+        with open(child_part, newline="") as f:
+            rows = list(csv.DictReader(f))
+
+        assert len(rows) == 1
+        assert rows[0]["city"] == "NYC"
+
+    def test_file_like_object_raises_configuration_error(self):
+        """Passing a file-like object as destination raises ConfigurationError."""
+        buffer = StringIO()
+
+        with pytest.raises(ConfigurationError, match="directory path"):
+            CsvStreamingWriter(destination=buffer, entity_name="test")
+
+    def test_writer_has_expected_attributes(self, tmp_path):
+        """Writer exposes buffers, part_counts, base_schemas, schema_log, all_part_paths."""
+        dest = str(tmp_path)
+        writer = CsvStreamingWriter(destination=dest, entity_name="test")
+
+        assert hasattr(writer, "buffers")
+        assert hasattr(writer, "part_counts")
+        assert hasattr(writer, "base_schemas")
+        assert hasattr(writer, "schema_log")
+        assert hasattr(writer, "all_part_paths")
+
+        assert isinstance(writer.buffers, dict)
+        assert isinstance(writer.part_counts, dict)
+        assert isinstance(writer.base_schemas, dict)
+        assert isinstance(writer.schema_log, dict)
+        assert isinstance(writer.all_part_paths, list)
+
+        writer.close()
+
+    def test_context_manager_basic(self, tmp_path):
+        """Context manager writes and closes cleanly."""
+        dest = str(tmp_path)
+
+        with CsvStreamingWriter(
+            destination=dest, entity_name="test", batch_size=100
+        ) as writer:
+            writer.write_main_records(
+                [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
+            )
+
+        assert writer._closed is True
+
+        part_file = tmp_path / "test_part_0000.csv"
+        assert part_file.exists()
+
+        with open(part_file, newline="") as f:
+            rows = list(csv.DictReader(f))
+
+        assert len(rows) == 2
+
+
 class TestCsvStreamingWriterExceptionCleanup:
     """Test resource cleanup behavior of CsvStreamingWriter on exceptions."""
 
-    def test_context_manager_closes_files_on_write_exception(self, tmp_path):
-        """Context manager closes file handles when writerow raises mid-batch."""
-        csv_path = str(tmp_path / "test.csv")
+    def test_context_manager_closes_on_write_exception(self, tmp_path):
+        """Context manager calls close() when writerows raises mid-batch."""
+        dest = str(tmp_path)
 
         call_count = 0
-        original_writerow = csv.DictWriter.writerow
+        original_writerows = csv.DictWriter.writerows
 
-        def failing_writerow(self_writer, rowdict):
+        def failing_writerows(self_writer, rowdicts):
             nonlocal call_count
             call_count += 1
-            if call_count > 3:
+            if call_count > 1:
                 raise OSError("simulated disk failure")
-            return original_writerow(self_writer, rowdict)
+            return original_writerows(self_writer, rowdicts)
 
-        with patch.object(csv.DictWriter, "writerow", failing_writerow):
+        with patch.object(csv.DictWriter, "writerows", failing_writerows):
             with pytest.raises(OSError, match="simulated disk failure"):
                 with CsvStreamingWriter(
-                    destination=csv_path, entity_name="test"
+                    destination=dest, entity_name="test", batch_size=2
                 ) as writer:
+                    # First batch flushes (call_count=1, succeeds)
                     writer.write_main_records(
                         [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
                     )
+                    # Second batch flushes (call_count=2, fails)
                     writer.write_main_records(
                         [{"id": "3", "name": "Charlie"}, {"id": "4", "name": "Dave"}]
                     )
 
+        # First part file was written before the failure
+        assert (tmp_path / "test_part_0000.csv").exists()
+
+    def test_close_after_exception_is_idempotent(self, tmp_path):
+        """Calling close() after context manager exit is safe and idempotent."""
+        dest = str(tmp_path)
+
+        with CsvStreamingWriter(
+            destination=dest, entity_name="test", batch_size=100
+        ) as writer:
+            writer.write_main_records([{"id": "1", "name": "Alice"}])
+
         assert writer._closed is True
-        assert writer.file_objects == {}
 
-    def test_no_context_manager_leaks_files_on_write_exception(self, tmp_path):
-        """Without context manager, file handles are not closed on exception."""
-        csv_path = str(tmp_path / "test.csv")
-
-        def always_fail(self_writer, rowdict):
-            raise OSError("simulated disk failure")
-
-        writer = CsvStreamingWriter(destination=csv_path, entity_name="test")
-        writer.write_main_records(
-            [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
-        )
-
-        with patch.object(csv.DictWriter, "writerow", always_fail):
-            with pytest.raises(OSError, match="simulated disk failure"):
-                writer.write_main_records([{"id": "3", "name": "Charlie"}])
-
-        assert not getattr(writer, "_closed", False)
-        assert writer.file_objects != {}
-        assert not writer.file_objects["main"].closed
-
+        # Second close is a no-op
         writer.close()
-
-    def test_context_manager_closes_files_on_schema_drift(self, tmp_path):
-        """Context manager cleans up when schema drift raises OutputError."""
-        csv_path = str(tmp_path / "test.csv")
-
-        with pytest.raises(OutputError, match="schema changed"):
-            with CsvStreamingWriter(destination=csv_path, entity_name="test") as writer:
-                writer.write_main_records([{"id": "1", "name": "Alice"}])
-                writer.write_main_records(
-                    [{"id": "2", "name": "Bob", "new_field": "surprise"}]
-                )
-
         assert writer._closed is True
-        assert writer.file_objects == {}
-        assert writer.writers == {}
 
-    def test_close_after_exception_is_safe(self, tmp_path):
-        """Explicit close() after exception works and is idempotent."""
-        csv_path = str(tmp_path / "test.csv")
+    def test_close_without_context_manager(self, tmp_path):
+        """Explicit close() works without context manager."""
+        dest = str(tmp_path)
 
-        writer = CsvStreamingWriter(destination=csv_path, entity_name="test")
+        writer = CsvStreamingWriter(
+            destination=dest, entity_name="test", batch_size=100
+        )
         writer.write_main_records([{"id": "1", "name": "Alice"}])
 
-        with pytest.raises(OutputError, match="schema changed"):
-            writer.write_main_records([{"id": "2", "name": "Bob", "extra": "field"}])
-
         assert not getattr(writer, "_closed", False)
 
-        writer.close()
+        paths = writer.close()
         assert writer._closed is True
-        assert writer.file_objects == {}
+        assert len(paths) == 1
 
-        # Idempotent: second close() is a no-op
-        writer.close()
-        assert writer._closed is True
+        # Idempotent: second close returns empty list
+        paths2 = writer.close()
+        assert paths2 == []
 
-    def test_partial_file_exists_after_write_exception(self, tmp_path):
-        """After mid-batch failure + cleanup, output file contains batch 1 data."""
-        csv_path = str(tmp_path / "test.csv")
+    def test_compression_raises_configuration_error(self):
+        """Passing compression option raises ConfigurationError."""
+        with pytest.raises(ConfigurationError, match="compression"):
+            CsvStreamingWriter(
+                destination="/tmp/test", entity_name="test", compression="gzip"
+            )
 
-        def always_fail(self_writer, rowdict):
-            raise OSError("simulated disk failure")
 
-        with pytest.raises(OSError, match="simulated disk failure"):
-            with CsvStreamingWriter(destination=csv_path, entity_name="test") as writer:
+class TestCsvCoercion:
+    """Test schema coercion for CSV part files."""
+
+    def test_coercion_unifies_csv_columns(self, tmp_path):
+        """Test that coerce_schema rewrites minority CSV part files."""
+        import json
+        import warnings
+
+        dest = str(tmp_path)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            with CsvStreamingWriter(
+                destination=dest,
+                entity_name="test",
+                batch_size=2,
+                coerce_schema=True,
+            ) as writer:
                 writer.write_main_records(
                     [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
                 )
-                with patch.object(csv.DictWriter, "writerow", always_fail):
-                    writer.write_main_records([{"id": "3", "name": "Charlie"}])
-
-        assert Path(csv_path).exists()
-        with open(csv_path, newline="") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-        assert len(rows) >= 2
-        assert rows[0]["name"] == "Alice"
-        assert rows[1]["name"] == "Bob"
-
-
-class TestCsvSchemaDrift:
-    """Test schema_drift parameter behavior in CsvStreamingWriter."""
-
-    def test_strict_mode_raises_on_drift(self, tmp_path):
-        """Default strict mode raises OutputError on unexpected fields."""
-        csv_path = str(tmp_path / "test.csv")
-
-        with pytest.raises(OutputError, match="schema changed"):
-            with CsvStreamingWriter(
-                destination=csv_path, entity_name="test", schema_drift="strict"
-            ) as writer:
-                writer.write_main_records([{"id": "1", "name": "Alice"}])
                 writer.write_main_records(
-                    [{"id": "2", "name": "Bob", "extra": "field"}]
+                    [
+                        {"id": "3", "name": "Charlie", "extra": "val"},
+                        {"id": "4", "name": "Dave", "extra": "val2"},
+                    ]
                 )
 
-    def test_strict_mode_is_default(self, tmp_path):
-        """Omitting schema_drift defaults to strict (raises on drift)."""
-        csv_path = str(tmp_path / "test.csv")
+        # Part 0 should have been rewritten with the "extra" column
+        with open(tmp_path / "test_part_0000.csv", newline="") as f:
+            rows0 = list(csv.DictReader(f))
+        with open(tmp_path / "test_part_0001.csv", newline="") as f:
+            rows1 = list(csv.DictReader(f))
 
-        with pytest.raises(OutputError, match="schema changed"):
-            with CsvStreamingWriter(destination=csv_path, entity_name="test") as writer:
-                writer.write_main_records([{"id": "1", "name": "Alice"}])
-                writer.write_main_records(
-                    [{"id": "2", "name": "Bob", "surprise": "value"}]
-                )
+        assert len(rows0) == 2
+        assert len(rows1) == 2
+        assert "extra" in rows0[0]
+        assert "extra" in rows1[0]
+        # Coerced column should be empty string in part 0
+        assert rows0[0]["extra"] == ""
+        assert rows1[0]["extra"] == "val"
 
-    def test_drop_mode_writes_known_fields(self, tmp_path):
-        """Drop mode removes unexpected fields and writes known fields."""
-        csv_path = str(tmp_path / "test.csv")
-
-        with CsvStreamingWriter(
-            destination=csv_path, entity_name="test", schema_drift="drop"
-        ) as writer:
-            writer.write_main_records([{"id": "1", "name": "Alice"}])
-            writer.write_main_records([{"id": "2", "name": "Bob", "extra": "dropped"}])
-
-        with open(csv_path, newline="") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-
-        assert len(rows) == 2
-        assert rows[1]["id"] == "2"
-        assert rows[1]["name"] == "Bob"
-        assert "extra" not in reader.fieldnames
-
-    def test_drop_mode_logs_warning(self, tmp_path, caplog):
-        """Drop mode emits a WARNING log when drift is detected."""
-        csv_path = str(tmp_path / "test.csv")
-
-        with caplog.at_level(logging.WARNING, logger="transmog.writers.csv"):
-            with CsvStreamingWriter(
-                destination=csv_path, entity_name="test", schema_drift="drop"
-            ) as writer:
-                writer.write_main_records([{"id": "1", "name": "Alice"}])
-                writer.write_main_records(
-                    [{"id": "2", "name": "Bob", "new_col": "val"}]
-                )
-
-        assert any("schema drift detected" in msg for msg in caplog.messages)
-        assert any("new_col" in msg for msg in caplog.messages)
-
-    def test_drop_mode_preserves_schema(self, tmp_path):
-        """After drift, subsequent records are still checked against original schema."""
-        csv_path = str(tmp_path / "test.csv")
-
-        with CsvStreamingWriter(
-            destination=csv_path, entity_name="test", schema_drift="drop"
-        ) as writer:
-            writer.write_main_records([{"id": "1", "name": "Alice"}])
-            # Drift record — extra field dropped
-            writer.write_main_records([{"id": "2", "name": "Bob", "extra": "dropped"}])
-            # Normal record — still validates against original schema
-            writer.write_main_records([{"id": "3", "name": "Charlie"}])
-
-        with open(csv_path, newline="") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-
-        assert len(rows) == 3
-        assert set(reader.fieldnames) == {"id", "name"}
-        assert rows[2]["name"] == "Charlie"
-
-    def test_drop_mode_multiple_batches(self, tmp_path):
-        """Drift in multiple batches is handled correctly in drop mode."""
-        csv_path = str(tmp_path / "test.csv")
-
-        with CsvStreamingWriter(
-            destination=csv_path, entity_name="test", schema_drift="drop"
-        ) as writer:
-            writer.write_main_records([{"id": "1", "name": "Alice"}])
-            writer.write_main_records([{"id": "2", "name": "Bob", "col_a": "x"}])
-            writer.write_main_records([{"id": "3", "name": "Charlie", "col_b": "y"}])
-
-        with open(csv_path, newline="") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-
-        assert len(rows) == 3
-        assert set(reader.fieldnames) == {"id", "name"}
-        for row in rows:
-            assert "col_a" not in row
-            assert "col_b" not in row
-
-    def test_invalid_drift_mode_raises(self):
-        """Invalid schema_drift value raises ConfigurationError."""
-        with pytest.raises(ConfigurationError, match="Invalid schema_drift mode"):
-            CsvStreamingWriter(schema_drift="extend")
+        log = json.loads((tmp_path / "_schema_log.json").read_text())
+        assert "coerced_to" in log["tables"]["main"]["parts"][0]

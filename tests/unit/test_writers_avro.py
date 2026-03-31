@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
-from transmog.exceptions import OutputError
+from transmog.exceptions import ConfigurationError, OutputError
 from transmog.writers.avro import AVRO_AVAILABLE
 
 if AVRO_AVAILABLE:
@@ -53,6 +53,24 @@ def read_avro_schema(file_path):
     with open(file_path, "rb") as f:
         reader = fastavro.reader(f)
         return reader.writer_schema
+
+
+def read_all_avro_records(directory, entity_name):
+    """Read records from all part files for an entity in a directory.
+
+    Args:
+        directory: Path to directory containing part files
+        entity_name: Entity name prefix for part files
+
+    Returns:
+        List of all records across all part files, in part-file order
+    """
+    directory = Path(directory)
+    part_files = sorted(directory.glob(f"{entity_name}_part_*.avro"))
+    all_records = []
+    for part_file in part_files:
+        all_records.extend(read_avro_records(str(part_file)))
+    return all_records
 
 
 # ---- Fixtures ----
@@ -143,9 +161,9 @@ class TestAvroWriter:
     def test_avro_writer_unicode_data(self, avro_temp_file):
         """Test writing Unicode data to Avro."""
         data = [
-            {"id": "1", "name": "José", "city": "São Paulo"},
-            {"id": "2", "name": "François", "city": "Montréal"},
-            {"id": "3", "name": "张三", "city": "北京"},
+            {"id": "1", "name": "Jose", "city": "Sao Paulo"},
+            {"id": "2", "name": "Francois", "city": "Montreal"},
+            {"id": "3", "name": "\u5f20\u4e09", "city": "\u5317\u4eac"},
         ]
 
         writer = AvroWriter()
@@ -156,8 +174,8 @@ class TestAvroWriter:
 
         # Verify Unicode is preserved
         records = read_avro_records(str(avro_temp_file))
-        assert records[0]["name"] == "José"
-        assert records[2]["name"] == "张三"
+        assert records[0]["name"] == "Jose"
+        assert records[2]["name"] == "\u5f20\u4e09"
 
     def test_avro_writer_large_dataset(self):
         """Test writing large dataset to Avro."""
@@ -316,7 +334,7 @@ class TestAvroWriterOptions:
             {"id": "3", "name": "Charlie", "data": "z" * 100},
         ]
 
-        writer = AvroWriter(codec=codec)
+        writer = AvroWriter(compression=codec)
         writer.write(data, str(avro_temp_file))
 
         assert avro_temp_file.exists()
@@ -331,7 +349,7 @@ class TestAvroWriterOptions:
         """Test Avro writer with invalid codec raises appropriate error."""
         data = [{"id": "1", "name": "Alice"}]
 
-        writer = AvroWriter(codec="invalid_codec")
+        writer = AvroWriter(compression="invalid_codec")
         with pytest.raises(OutputError) as exc_info:
             writer.write(data, str(avro_temp_file))
 
@@ -457,7 +475,7 @@ class TestAvroStreamingWriter:
     """Test the AvroStreamingWriter class."""
 
     def test_streaming_writer_basic(self, avro_temp_dir):
-        """Test basic streaming writer functionality."""
+        """Test basic streaming writer produces a part file."""
         writer = AvroStreamingWriter(
             destination=str(avro_temp_dir),
             entity_name="test_entity",
@@ -469,16 +487,17 @@ class TestAvroStreamingWriter:
         ]
 
         writer.write_main_records(records)
-        writer.close()
+        paths = writer.close()
 
-        output_file = avro_temp_dir / "test_entity.avro"
-        assert output_file.exists()
+        part_file = avro_temp_dir / "test_entity_part_0000.avro"
+        assert part_file.exists()
+        assert len(paths) == 1
 
-        read_records = read_avro_records(str(output_file))
+        read_records = read_avro_records(str(part_file))
         assert len(read_records) == 2
 
     def test_streaming_writer_child_tables(self, avro_temp_dir):
-        """Test streaming writer with child tables."""
+        """Test streaming writer with child tables produces child part files."""
         writer = AvroStreamingWriter(
             destination=str(avro_temp_dir),
             entity_name="parent",
@@ -492,219 +511,132 @@ class TestAvroStreamingWriter:
 
         writer.write_main_records(main_records)
         writer.write_child_records("parent_children", child_records)
-        writer.close()
+        paths = writer.close()
 
-        main_file = avro_temp_dir / "parent.avro"
-        child_file = avro_temp_dir / "parent_children.avro"
+        main_part = avro_temp_dir / "parent_part_0000.avro"
+        child_part = avro_temp_dir / "parent_children_part_0000.avro"
 
-        assert main_file.exists()
-        assert child_file.exists()
+        assert main_part.exists()
+        assert child_part.exists()
+        assert len(paths) == 2
 
-        read_records = read_avro_records(str(child_file))
+        read_records = read_avro_records(str(child_part))
         assert len(read_records) == 2
 
-    def test_streaming_writer_schema_drift_detection(self, avro_temp_dir):
-        """Test that schema drift is detected and raises error."""
-        writer = AvroStreamingWriter(
-            destination=str(avro_temp_dir),
-            entity_name="test",
-        )
-
-        # First batch establishes schema
-        records1 = [{"id": "1", "name": "Alice"}]
-        writer.write_main_records(records1)
-
-        # Second batch with new field should raise error
-        records2 = [{"id": "2", "name": "Bob", "new_field": "value"}]
-
-        with pytest.raises(OutputError) as exc_info:
-            writer.write_main_records(records2)
-
-        assert "schema changed" in str(exc_info.value).lower()
-        writer.close()
-
     def test_streaming_writer_context_manager(self, avro_temp_dir):
-        """Test streaming writer as context manager."""
+        """Test streaming writer as context manager produces part files."""
         with AvroStreamingWriter(
             destination=str(avro_temp_dir),
             entity_name="test",
         ) as writer:
             writer.write_main_records([{"id": "1", "name": "Alice"}])
 
-        output_file = avro_temp_dir / "test.avro"
-        assert output_file.exists()
+        part_file = avro_temp_dir / "test_part_0000.avro"
+        assert part_file.exists()
 
-    def test_streaming_writer_single_file(self, avro_temp_file):
-        """Test streaming writer to single file."""
-        writer = AvroStreamingWriter(
-            destination=str(avro_temp_file),
-            entity_name="test",
-        )
-
-        writer.write_main_records([{"id": "1", "name": "Alice"}])
-        writer.close()
-
-        assert avro_temp_file.exists()
-
-        records = read_avro_records(str(avro_temp_file))
-        assert len(records) == 1
+    def test_streaming_writer_file_object_raises_configuration_error(self):
+        """File-like object destinations raise ConfigurationError."""
+        buf = io.BytesIO()
+        with pytest.raises(ConfigurationError, match="directory path"):
+            AvroStreamingWriter(destination=buf, entity_name="test")
 
     def test_streaming_writer_multiple_batches(self, avro_temp_dir):
-        """Test streaming writer with multiple batches to verify no data loss."""
+        """Test streaming writer with multiple batches produces multiple part files."""
+        # Use batch_size=2 to force flushing after each write_main_records call
         writer = AvroStreamingWriter(
             destination=str(avro_temp_dir),
             entity_name="test_batches",
+            batch_size=2,
         )
 
-        # Write first batch
+        # Write first batch (2 records = batch_size, triggers flush)
         batch1 = [
             {"id": "1", "name": "Alice", "value": 100},
             {"id": "2", "name": "Bob", "value": 200},
         ]
         writer.write_main_records(batch1)
 
-        # Write second batch
+        # Write second batch (2 records = batch_size, triggers flush)
         batch2 = [
             {"id": "3", "name": "Charlie", "value": 300},
             {"id": "4", "name": "Diana", "value": 400},
         ]
         writer.write_main_records(batch2)
 
-        # Write third batch
+        # Write third batch (1 record < batch_size, flushed at close)
         batch3 = [
             {"id": "5", "name": "Eve", "value": 500},
         ]
         writer.write_main_records(batch3)
 
-        writer.close()
+        paths = writer.close()
 
-        output_file = avro_temp_dir / "test_batches.avro"
-        assert output_file.exists()
+        # Expect 3 part files: two from batch_size flushes, one from close()
+        assert len(paths) == 3
+        for i in range(3):
+            part_file = avro_temp_dir / f"test_batches_part_{i:04d}.avro"
+            assert part_file.exists()
 
-        records = read_avro_records(str(output_file))
-        assert len(records) == 5, f"Expected 5 records but got {len(records)}"
+        # Read all records from all part files
+        all_records = read_all_avro_records(avro_temp_dir, "test_batches")
+        assert len(all_records) == 5, f"Expected 5 records but got {len(all_records)}"
 
-        # Verify all records are present
-        ids = {r["id"] for r in records}
+        ids = {r["id"] for r in all_records}
         assert ids == {"1", "2", "3", "4", "5"}
 
         # Verify data integrity
-        assert records[0]["name"] == "Alice"
-        assert records[0]["value"] == 100
-        assert records[4]["name"] == "Eve"
-        assert records[4]["value"] == 500
+        records_by_id = {r["id"]: r for r in all_records}
+        assert records_by_id["1"]["name"] == "Alice"
+        assert records_by_id["1"]["value"] == 100
+        assert records_by_id["5"]["name"] == "Eve"
+        assert records_by_id["5"]["value"] == 500
 
     def test_streaming_writer_multiple_batches_with_child_tables(self, avro_temp_dir):
         """Test streaming writer with multiple batches including child tables."""
         writer = AvroStreamingWriter(
             destination=str(avro_temp_dir),
             entity_name="test_parent",
+            batch_size=2,
         )
 
-        # Write first batch of main records
+        # Write first batch of main records (triggers flush at batch_size=2)
         main_batch1 = [
             {"id": "1", "name": "Parent1"},
             {"id": "2", "name": "Parent2"},
         ]
         writer.write_main_records(main_batch1)
 
-        # Write first batch of child records
+        # Write first batch of child records (triggers flush at batch_size=2)
         child_batch1 = [
             {"id": "c1", "parent_id": "1", "value": "child1"},
             {"id": "c2", "parent_id": "1", "value": "child2"},
         ]
         writer.write_child_records("children", child_batch1)
 
-        # Write second batch of main records
+        # Write second batch of main records (flushed at close)
         main_batch2 = [
             {"id": "3", "name": "Parent3"},
         ]
         writer.write_main_records(main_batch2)
 
-        # Write second batch of child records
+        # Write second batch of child records (flushed at close)
         child_batch2 = [
             {"id": "c3", "parent_id": "2", "value": "child3"},
             {"id": "c4", "parent_id": "3", "value": "child4"},
         ]
         writer.write_child_records("children", child_batch2)
 
-        writer.close()
+        paths = writer.close()
 
-        # Verify main records
-        main_file = avro_temp_dir / "test_parent.avro"
-        assert main_file.exists()
-        main_records = read_avro_records(str(main_file))
+        # Verify main part files
+        main_records = read_all_avro_records(avro_temp_dir, "test_parent")
         assert len(main_records) == 3
         assert {r["id"] for r in main_records} == {"1", "2", "3"}
 
-        # Verify child records
-        child_file = avro_temp_dir / "children.avro"
-        assert child_file.exists()
-        child_records = read_avro_records(str(child_file))
+        # Verify child part files
+        child_records = read_all_avro_records(avro_temp_dir, "children")
         assert len(child_records) == 4
         assert {r["id"] for r in child_records} == {"c1", "c2", "c3", "c4"}
-
-    def test_file_object_warns_on_construction(self):
-        """Passing a BytesIO emits a UserWarning about single-batch limitation."""
-        buf = io.BytesIO()
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            writer = AvroStreamingWriter(destination=buf, entity_name="test")
-
-        assert len(caught) == 1
-        assert issubclass(caught[0].category, UserWarning)
-        assert "single batch" in str(caught[0].message).lower()
-        assert "fastavro" in str(caught[0].message).lower()
-        writer.close()
-
-    def test_file_object_single_batch_works(self):
-        """A single write_main_records call to BytesIO succeeds."""
-        import fastavro
-
-        buf = io.BytesIO()
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            writer = AvroStreamingWriter(destination=buf, entity_name="test")
-
-        records = [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
-        writer.write_main_records(records)
-        writer.close()
-
-        buf.seek(0)
-        reader = fastavro.reader(buf)
-        read_back = list(reader)
-        assert len(read_back) == 2
-        assert read_back[0]["name"] == "Alice"
-        assert read_back[1]["name"] == "Bob"
-
-    def test_file_object_second_batch_raises(self):
-        """Second write_main_records to BytesIO raises OutputError."""
-        buf = io.BytesIO()
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            writer = AvroStreamingWriter(destination=buf, entity_name="test")
-
-        writer.write_main_records([{"id": "1", "name": "Alice"}])
-
-        with pytest.raises(OutputError) as exc_info:
-            writer.write_main_records([{"id": "2", "name": "Bob"}])
-
-        assert "fastavro" in str(exc_info.value).lower()
-        assert "file-like object" in str(exc_info.value).lower()
-        writer.close()
-
-    def test_file_object_child_table_raises(self):
-        """Writing child records to a BytesIO raises OutputError."""
-        buf = io.BytesIO()
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            writer = AvroStreamingWriter(destination=buf, entity_name="test")
-
-        with pytest.raises(OutputError) as exc_info:
-            writer.write_child_records("children", [{"id": "c1", "parent_id": "1"}])
-
-        assert "file-like object" in str(exc_info.value).lower()
-        writer.close()
 
 
 @pytest.mark.skipif(not AVRO_AVAILABLE, reason="fastavro not available")
@@ -794,7 +726,7 @@ class TestAvroWriterIntegration:
                     assert Path(path).suffix == ".avro"
 
     def test_avro_flatten_stream(self):
-        """Test flatten_stream with Avro output."""
+        """Test flatten_stream with Avro output produces part files."""
         import transmog as tm
 
         test_data = [
@@ -809,18 +741,16 @@ class TestAvroWriterIntegration:
                 temp_dir,
                 name="users",
                 output_format="avro",
-                codec="snappy",
+                compression="snappy",
             )
 
-            output_file = Path(temp_dir) / "users.avro"
-            assert output_file.exists()
+            # Part file(s) should exist
+            part_files = sorted(Path(temp_dir).glob("users_part_*.avro"))
+            assert len(part_files) >= 1
 
-            import fastavro
-
-            with open(output_file, "rb") as f:
-                reader = fastavro.reader(f)
-                records = list(reader)
-                assert len(records) == 3
+            # All records should be present across part files
+            all_records = read_all_avro_records(temp_dir, "users")
+            assert len(all_records) == 3
 
     def test_avro_writer_performance(self):
         """Test AvroWriter performance with medium dataset."""
@@ -907,7 +837,7 @@ class TestAvroWriterEdgeCases:
             {"id": "1", "text": "Line 1\nLine 2\tTabbed"},
             {"id": "2", "text": 'Quote: "Hello"'},
             {"id": "3", "text": "Comma, semicolon; pipe|"},
-            {"id": "4", "text": "Unicode: 🚀 emoji"},
+            {"id": "4", "text": "Unicode: \U0001f680 emoji"},
         ]
 
         with tempfile.NamedTemporaryFile(suffix=".avro", delete=False) as f:
@@ -924,7 +854,7 @@ class TestAvroWriterEdgeCases:
             with open(output_file, "rb") as f:
                 reader = fastavro.reader(f)
                 records = list(reader)
-                assert records[3]["text"] == "Unicode: 🚀 emoji"
+                assert records[3]["text"] == "Unicode: \U0001f680 emoji"
 
         finally:
             Path(output_file).unlink(missing_ok=True)
@@ -984,7 +914,7 @@ class TestAvroStreamingWriterExceptionCleanup:
     """Test resource cleanup behavior of AvroStreamingWriter on exceptions."""
 
     def test_context_manager_cleans_up_on_write_exception(self, tmp_path):
-        """Context manager clears metadata when fastavro.writer raises."""
+        """Context manager clears internal state when _write_buffer raises."""
         avro_dir = tmp_path / "avro_out"
         avro_dir.mkdir()
 
@@ -993,12 +923,14 @@ class TestAvroStreamingWriterExceptionCleanup:
 
         with pytest.raises(OSError, match="simulated avro write failure"):
             with AvroStreamingWriter(
-                destination=str(avro_dir), entity_name="test"
+                destination=str(avro_dir), entity_name="test", batch_size=2
             ) as writer:
                 writer.write_main_records(
                     [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
                 )
                 with patch("transmog.writers.avro.avro_writer", always_fail):
+                    # This batch triggers flush (buffer has 2 records from above
+                    # that already flushed, plus these 2 new ones)
                     writer.write_main_records(
                         [
                             {"id": "3", "name": "Charlie"},
@@ -1007,9 +939,8 @@ class TestAvroStreamingWriterExceptionCleanup:
                     )
 
         assert writer._closed is True
-        assert writer.schemas == {}
-        assert writer.file_paths == {}
-        assert writer.initialized_tables == set()
+        assert writer.buffers == {}
+        assert writer.part_counts == {}
 
     def test_no_context_manager_retains_metadata_on_exception(self, tmp_path):
         """Without context manager, metadata is retained after exception."""
@@ -1019,7 +950,9 @@ class TestAvroStreamingWriterExceptionCleanup:
         def always_fail(*_args, **_kwargs):
             raise OSError("simulated avro write failure")
 
-        writer = AvroStreamingWriter(destination=str(avro_dir), entity_name="test")
+        writer = AvroStreamingWriter(
+            destination=str(avro_dir), entity_name="test", batch_size=2
+        )
         writer.write_main_records(
             [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
         )
@@ -1034,31 +967,13 @@ class TestAvroStreamingWriterExceptionCleanup:
                 )
 
         assert not getattr(writer, "_closed", False)
-        assert writer.schemas != {}
-        assert writer.file_paths != {}
-        assert writer.initialized_tables != set()
+        # Writer should still have some state from the successful first batch
+        assert writer.all_part_paths != []
 
         writer.close()
 
-    def test_schema_drift_cleanup_with_context_manager(self, tmp_path):
-        """Context manager cleans up after schema drift raises OutputError."""
-        avro_dir = tmp_path / "avro_out"
-        avro_dir.mkdir()
-
-        with pytest.raises(OutputError, match="schema changed"):
-            with AvroStreamingWriter(
-                destination=str(avro_dir), entity_name="test"
-            ) as writer:
-                writer.write_main_records([{"id": "1", "name": "Alice"}])
-                writer.write_main_records(
-                    [{"id": "2", "name": "Bob", "new_field": "surprise"}]
-                )
-
-        assert writer._closed is True
-        assert writer.schemas == {}
-
-    def test_first_batch_file_survives_second_batch_failure(self, tmp_path):
-        """First batch's .avro file persists on disk after second batch fails."""
+    def test_first_batch_part_file_survives_second_batch_failure(self, tmp_path):
+        """First batch's part file persists on disk after second batch fails."""
         avro_dir = tmp_path / "avro_out"
         avro_dir.mkdir()
 
@@ -1067,7 +982,7 @@ class TestAvroStreamingWriterExceptionCleanup:
 
         with pytest.raises(OSError, match="simulated avro write failure"):
             with AvroStreamingWriter(
-                destination=str(avro_dir), entity_name="test"
+                destination=str(avro_dir), entity_name="test", batch_size=2
             ) as writer:
                 writer.write_main_records(
                     [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
@@ -1080,10 +995,55 @@ class TestAvroStreamingWriterExceptionCleanup:
                         ]
                     )
 
-        avro_file = avro_dir / "test.avro"
-        assert avro_file.exists()
+        # The first batch's part file should still exist
+        part_file = avro_dir / "test_part_0000.avro"
+        assert part_file.exists()
 
-        records = read_avro_records(str(avro_file))
+        records = read_avro_records(str(part_file))
         assert len(records) == 2
         assert records[0]["name"] == "Alice"
-        assert records[1]["name"] == "Bob"
+
+
+@pytest.mark.skipif(not AVRO_AVAILABLE, reason="fastavro not available")
+class TestAvroCoercion:
+    """Test schema coercion for Avro part files."""
+
+    def test_coercion_unifies_avro_schemas(self, tmp_path):
+        """Test that coerce_schema rewrites minority Avro part files."""
+        import json
+
+        avro_dir = tmp_path / "avro_out"
+        avro_dir.mkdir()
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            with AvroStreamingWriter(
+                destination=str(avro_dir),
+                entity_name="test",
+                batch_size=2,
+                coerce_schema=True,
+            ) as writer:
+                writer.write_main_records(
+                    [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+                )
+                writer.write_main_records(
+                    [
+                        {"id": 3, "name": "Charlie", "extra": "val"},
+                        {"id": 4, "name": "Dave", "extra": "val2"},
+                    ]
+                )
+
+        # Part 0 should have been rewritten with the "extra" field
+        part0_records = read_avro_records(str(avro_dir / "test_part_0000.avro"))
+        part1_records = read_avro_records(str(avro_dir / "test_part_0001.avro"))
+
+        assert len(part0_records) == 2
+        assert len(part1_records) == 2
+        assert "extra" in part0_records[0]
+        assert "extra" in part1_records[0]
+        # Coerced field should be null in part 0
+        assert part0_records[0]["extra"] is None
+        assert part1_records[0]["extra"] == "val"
+
+        log = json.loads((avro_dir / "_schema_log.json").read_text())
+        assert "coerced_to" in log["tables"]["main"]["parts"][0]

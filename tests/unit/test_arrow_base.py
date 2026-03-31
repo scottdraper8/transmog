@@ -1,5 +1,6 @@
 """Tests for PyArrow base writer converter functions and caching."""
 
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -139,82 +140,32 @@ class TestCreateSchemaConverters:
         assert all(converters[k] is _convert_str for k in converters)
 
 
-class TestConverterCaching:
-    """Test that converters are cached across batches and cleared on close."""
+class TestPartFileOutput:
+    """Test that streaming writers produce part files."""
 
-    def test_converters_cached_across_batches(self, tmp_path):
-        """Test second batch reuses the same converters dict object."""
+    def test_produces_part_files(self, tmp_path):
+        """Test that multiple batches produce numbered part files."""
         from transmog.writers.parquet import ParquetStreamingWriter
 
         with ParquetStreamingWriter(
-            destination=str(tmp_path), entity_name="test", row_group_size=2
-        ) as writer:
-            writer.write_main_records(
-                [
-                    {"id": 1, "name": "Alice"},
-                    {"id": 2, "name": "Bob"},
-                ]
-            )
-            assert "main" in writer.converters
-            first_converters = writer.converters["main"]
-
-            writer.write_main_records(
-                [
-                    {"id": 3, "name": "Charlie"},
-                    {"id": 4, "name": "Dave"},
-                ]
-            )
-            assert writer.converters["main"] is first_converters
-
-    def test_converters_cleared_on_close(self, tmp_path):
-        """Test close() clears the converters dict."""
-        from transmog.writers.parquet import ParquetStreamingWriter
-
-        writer = ParquetStreamingWriter(destination=str(tmp_path), entity_name="test")
-        writer.write_main_records([{"id": 1, "name": "Alice"}])
-        writer.close()
-
-        assert writer.converters == {}
-
-
-class TestColumnBufferReuse:
-    """Test that column buffers and record buffers are reused across batches."""
-
-    def test_column_buffers_reused_across_batches(self, tmp_path):
-        """Test inner list objects are the same Python objects on second batch."""
-        from transmog.writers.parquet import ParquetStreamingWriter
-
-        with ParquetStreamingWriter(
-            destination=str(tmp_path), entity_name="test", row_group_size=2
+            destination=str(tmp_path), entity_name="test", batch_size=2
         ) as writer:
             writer.write_main_records(
                 [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
             )
-            assert "main" in writer._column_buffers
-            first_lists = {k: v for k, v in writer._column_buffers["main"].items()}
-
             writer.write_main_records(
                 [{"id": 3, "name": "Charlie"}, {"id": 4, "name": "Dave"}]
             )
-            for key, first_list in first_lists.items():
-                assert writer._column_buffers["main"][key] is first_list
 
-    def test_column_buffers_cleared_on_close(self, tmp_path):
-        """Test close() clears the _column_buffers dict."""
-        from transmog.writers.parquet import ParquetStreamingWriter
-
-        writer = ParquetStreamingWriter(destination=str(tmp_path), entity_name="test")
-        writer.write_main_records([{"id": 1, "name": "Alice"}])
-        writer.close()
-
-        assert writer._column_buffers == {}
+        assert (tmp_path / "test_part_0000.parquet").exists()
+        assert (tmp_path / "test_part_0001.parquet").exists()
 
     def test_record_buffer_reused_across_batches(self, tmp_path):
         """Test same list object persists after flush (clear instead of reassign)."""
         from transmog.writers.parquet import ParquetStreamingWriter
 
         with ParquetStreamingWriter(
-            destination=str(tmp_path), entity_name="test", row_group_size=2
+            destination=str(tmp_path), entity_name="test", batch_size=2
         ) as writer:
             writer.write_main_records([{"id": 1, "name": "Alice"}])
             buffer_ref = writer.buffers["main"]
@@ -230,8 +181,6 @@ class TestPyArrowWriterExceptionHandling:
 
     def test_memory_error_propagates(self):
         """Test that MemoryError is not caught by the writer."""
-        from unittest.mock import patch
-
         from transmog.writers.parquet import ParquetWriter
 
         data = [{"id": 1, "name": "Alice"}]
@@ -243,8 +192,6 @@ class TestPyArrowWriterExceptionHandling:
 
     def test_oserror_wrapped_in_output_error(self, tmp_path):
         """Test that OSError is wrapped in OutputError."""
-        from unittest.mock import patch
-
         from transmog.exceptions import OutputError
         from transmog.writers.parquet import ParquetWriter
 
@@ -277,128 +224,192 @@ class TestPyArrowWriterExceptionHandling:
 class TestArrowStreamingWriterExceptionCleanup:
     """Test resource cleanup behavior of PyArrowStreamingWriter on exceptions."""
 
-    def test_context_manager_closes_writers_on_write_exception(self, tmp_path):
-        """Context manager clears writers/buffers when _write_to_writer raises."""
+    def test_context_manager_closes_on_write_exception(self, tmp_path):
+        """Context manager marks writer as closed when _write_to_format_writer raises."""
         from transmog.writers.parquet import ParquetStreamingWriter
 
-        def always_fail(self, _writer_obj, _table):
+        def always_fail(_self, _writer_obj, _table):
             raise OSError("simulated write failure")
 
         with pytest.raises(OSError, match="simulated write failure"):
             with ParquetStreamingWriter(
-                destination=str(tmp_path), entity_name="test", row_group_size=2
+                destination=str(tmp_path), entity_name="test", batch_size=2
             ) as writer:
                 writer.write_main_records(
                     [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
                 )
                 with patch.object(
-                    ParquetStreamingWriter, "_write_to_writer", always_fail
+                    ParquetStreamingWriter, "_write_to_format_writer", always_fail
                 ):
                     writer.write_main_records(
                         [{"id": 3, "name": "Charlie"}, {"id": 4, "name": "Dave"}]
                     )
 
         assert writer._closed is True
-        assert writer.writers == {}
-        assert writer.schemas == {}
-        assert writer.converters == {}
-
-    def test_no_context_manager_leaves_writers_open_on_exception(self, tmp_path):
-        """Without context manager, writers/buffers remain populated after error."""
-        from transmog.writers.parquet import ParquetStreamingWriter
-
-        def always_fail(self, _writer_obj, _table):
-            raise OSError("simulated write failure")
-
-        writer = ParquetStreamingWriter(
-            destination=str(tmp_path), entity_name="test", row_group_size=2
-        )
-        writer.write_main_records(
-            [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
-        )
-
-        with patch.object(ParquetStreamingWriter, "_write_to_writer", always_fail):
-            with pytest.raises(OSError, match="simulated write failure"):
-                writer.write_main_records(
-                    [{"id": 3, "name": "Charlie"}, {"id": 4, "name": "Dave"}]
-                )
-
-        assert not getattr(writer, "_closed", False)
-        assert writer.writers != {}
-
-        writer.close()
 
     def test_buffer_retained_on_write_failure(self, tmp_path):
-        """Buffers retain records when _write_to_writer raises before clear()."""
+        """Buffers retain records when _write_to_format_writer raises before clear()."""
         from transmog.writers.parquet import ParquetStreamingWriter
 
-        def always_fail(self, _writer_obj, _table):
+        def always_fail(_self, _writer_obj, _table):
             raise OSError("write failure")
 
         writer = ParquetStreamingWriter(
-            destination=str(tmp_path), entity_name="test", row_group_size=2
+            destination=str(tmp_path), entity_name="test", batch_size=2
         )
-        # Add one record (below batch_size, no flush yet)
         writer.write_main_records([{"id": 1, "name": "Alice"}])
         assert len(writer.buffers["main"]) == 1
 
-        # Adding a second record triggers flush (row_group_size=2), which fails
-        with patch.object(ParquetStreamingWriter, "_write_to_writer", always_fail):
+        with patch.object(
+            ParquetStreamingWriter, "_write_to_format_writer", always_fail
+        ):
             with pytest.raises(OSError, match="write failure"):
                 writer.write_main_records([{"id": 2, "name": "Bob"}])
 
-        # Buffer was NOT cleared because the exception happened before clear()
         assert len(writer.buffers["main"]) == 2
 
         writer.close()
 
     def test_close_flush_failure_prevents_cleanup(self, tmp_path):
-        """close() does not complete cleanup if flush raises (no try/finally)."""
+        """close() does not complete cleanup if flush raises."""
         from transmog.writers.parquet import ParquetStreamingWriter
 
-        def always_fail(self, _writer_obj, _table):
+        def always_fail(_self, _writer_obj, _table):
             raise OSError("flush failure during close")
 
         writer = ParquetStreamingWriter(
-            destination=str(tmp_path), entity_name="test", row_group_size=100
+            destination=str(tmp_path), entity_name="test", batch_size=100
         )
-        # Records stay buffered (below batch_size)
         writer.write_main_records(
             [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
         )
         assert len(writer.buffers["main"]) == 2
 
-        with patch.object(ParquetStreamingWriter, "_write_to_writer", always_fail):
+        with patch.object(
+            ParquetStreamingWriter, "_write_to_format_writer", always_fail
+        ):
             with pytest.raises(OSError, match="flush failure during close"):
                 writer.close()
 
-        # close() did not finish — cleanup never reached
         assert not getattr(writer, "_closed", False)
-        assert writer.writers != {} or writer.schemas != {}
 
     def test_partial_file_on_disk_after_exception(self, tmp_path):
-        """First batch's file survives on disk after second batch fails."""
-        from pathlib import Path
-
+        """First batch's part file survives on disk after second batch fails."""
         from transmog.writers.parquet import ParquetStreamingWriter
 
-        def always_fail(self, _writer_obj, _table):
+        def always_fail(_self, _writer_obj, _table):
             raise OSError("simulated write failure")
 
         with pytest.raises(OSError, match="simulated write failure"):
             with ParquetStreamingWriter(
-                destination=str(tmp_path), entity_name="test", row_group_size=2
+                destination=str(tmp_path), entity_name="test", batch_size=2
             ) as writer:
                 writer.write_main_records(
                     [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
                 )
                 with patch.object(
-                    ParquetStreamingWriter, "_write_to_writer", always_fail
+                    ParquetStreamingWriter, "_write_to_format_writer", always_fail
                 ):
                     writer.write_main_records(
                         [{"id": 3, "name": "Charlie"}, {"id": 4, "name": "Dave"}]
                     )
 
-        parquet_file = Path(tmp_path) / "test.parquet"
-        assert parquet_file.exists()
-        assert parquet_file.stat().st_size > 0
+        part_file = Path(tmp_path) / "test_part_0000.parquet"
+        assert part_file.exists()
+        assert part_file.stat().st_size > 0
+
+
+class TestSchemaLog:
+    """Test schema log generation for part files."""
+
+    def test_schema_log_written(self, tmp_path):
+        """Test that _schema_log.json is written at close time."""
+        import json
+
+        from transmog.writers.parquet import ParquetStreamingWriter
+
+        with ParquetStreamingWriter(
+            destination=str(tmp_path), entity_name="test", batch_size=2
+        ) as writer:
+            writer.write_main_records(
+                [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+            )
+
+        log_path = tmp_path / "_schema_log.json"
+        assert log_path.exists()
+        log = json.loads(log_path.read_text())
+        assert "tables" in log
+        assert "main" in log["tables"]
+        assert len(log["tables"]["main"]["parts"]) == 1
+        assert log["tables"]["main"]["parts"][0]["deviations"] is None
+
+    def test_schema_deviations_tracked(self, tmp_path):
+        """Test that schema deviations are recorded in the log."""
+        import json
+        import warnings
+
+        from transmog.writers.parquet import ParquetStreamingWriter
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            with ParquetStreamingWriter(
+                destination=str(tmp_path), entity_name="test", batch_size=2
+            ) as writer:
+                writer.write_main_records(
+                    [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+                )
+                writer.write_main_records(
+                    [
+                        {"id": 3, "name": "Charlie", "extra": "val"},
+                        {"id": 4, "name": "Dave", "extra": "val2"},
+                    ]
+                )
+
+        log_path = tmp_path / "_schema_log.json"
+        log = json.loads(log_path.read_text())
+        parts = log["tables"]["main"]["parts"]
+        assert len(parts) == 2
+        assert parts[0]["deviations"] is None
+        assert parts[1]["deviations"] is not None
+        assert "extra" in parts[1]["deviations"]["structural"]["added"]
+
+    def test_coercion_unifies_parquet_schemas(self, tmp_path):
+        """Test that coerce_schema rewrites minority part files."""
+        import json
+        import warnings
+
+        import pyarrow.parquet as pq
+
+        from transmog.writers.parquet import ParquetStreamingWriter
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            with ParquetStreamingWriter(
+                destination=str(tmp_path),
+                entity_name="test",
+                batch_size=2,
+                coerce_schema=True,
+            ) as writer:
+                writer.write_main_records(
+                    [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+                )
+                writer.write_main_records(
+                    [
+                        {"id": 3, "name": "Charlie", "extra": "val"},
+                        {"id": 4, "name": "Dave", "extra": "val2"},
+                    ]
+                )
+
+        # Both part files should have the unified schema after coercion
+        part0 = pq.read_table(str(tmp_path / "test_part_0000.parquet"))
+        part1 = pq.read_table(str(tmp_path / "test_part_0001.parquet"))
+
+        assert "extra" in part0.column_names
+        assert "extra" in part1.column_names
+        assert part0.num_rows == 2
+        assert part1.num_rows == 2
+        # Coerced column should be null-filled in part 0
+        assert part0.column("extra").null_count == 2
+
+        log = json.loads((tmp_path / "_schema_log.json").read_text())
+        assert "coerced_to" in log["tables"]["main"]["parts"][0]
