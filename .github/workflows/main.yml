@@ -26,32 +26,27 @@ jobs:
         python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+    - name: Set up UV
+      uses: astral-sh/setup-uv@v5
       with:
         python-version: ${{ matrix.python-version }}
-        cache: 'pip'
+        cache: true
 
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install -e ".[dev]"
+      run: uv sync --extra dev
 
     - name: Run tests
-      run: |
-        pytest tests/ --cov=transmog
+      run: uv run pytest tests/ --cov=transmog
 
     - name: Test output format methods
-      run: python scripts/test_output_formats.py
+      run: uv run python scripts/test_output_formats.py
 
     # Only build docs on Python 3.10 to verify they build correctly during CI
     - name: Build docs
       if: matrix.python-version == '3.10'
-      run: |
-        python -m pip install -e ".[docs]"
-        cd docs && make html
+      run: uv run make -C docs html
 
     - name: Upload docs
       uses: actions/upload-artifact@v4
