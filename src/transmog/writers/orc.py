@@ -5,10 +5,12 @@ from typing import Any, BinaryIO, TextIO
 from transmog.writers.arrow_base import PyArrowStreamingWriter, PyArrowWriter
 
 try:
+    import pyarrow as pa
     import pyarrow.orc as orc
 
     ORC_AVAILABLE = True
 except ImportError:
+    pa = None
     orc = None
     ORC_AVAILABLE = False
 
@@ -45,22 +47,25 @@ class OrcStreamingWriter(PyArrowStreamingWriter):
 
     def __init__(
         self,
-        destination: str | BinaryIO | None = None,
+        destination: str | None = None,
         entity_name: str = "entity",
         compression: str = "zstd",
-        batch_size: int = 10000,
         **options: Any,
     ) -> None:
         """Initialize the ORC streaming writer.
 
         Args:
-            destination: Path or file-like object to write to
+            destination: Directory path to write part files to
             entity_name: Name of the entity for output files
             compression: Compression algorithm ("zstd", "snappy", "lz4", etc.)
-            batch_size: Number of records per batch
             **options: Additional options for PyArrow
         """
-        super().__init__(destination, entity_name, compression, batch_size, **options)
+        super().__init__(
+            destination=destination,
+            entity_name=entity_name,
+            compression=compression,
+            **options,
+        )
 
     def _get_format_name(self) -> str:
         """Get the format name."""
@@ -70,13 +75,27 @@ class OrcStreamingWriter(PyArrowStreamingWriter):
         """Get the file extension."""
         return ".orc"
 
-    def _create_writer(self, file_path: str, schema: Any) -> Any:
+    def _create_format_writer(self, file_path: str, schema: Any) -> Any:
         """Create the ORC writer instance."""
         return orc.ORCWriter(file_path, compression=self.compression, **self.options)
 
-    def _write_to_writer(self, writer: Any, table: Any) -> None:
+    def _write_to_format_writer(self, writer: Any, table: Any) -> None:
         """Write table using the ORC writer."""
         writer.write(table)
+
+    def _rewrite_part_with_schema(self, file_path: str, target_schema: Any) -> None:
+        """Rewrite an ORC part file with a new target schema."""
+        table = orc.read_table(file_path)
+
+        for field in target_schema:
+            if field.name not in table.column_names:
+                null_array = pa.nulls(len(table), type=field.type)
+                table = table.append_column(field, null_array)
+
+        table = table.select([f.name for f in target_schema])
+        table = table.cast(target_schema)
+
+        orc.write_table(table, file_path, compression=self.compression)
 
 
 __all__ = ["OrcWriter", "OrcStreamingWriter", "ORC_AVAILABLE"]

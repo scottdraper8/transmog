@@ -5,6 +5,7 @@ nested data structures into tabular formats.
 """
 
 import logging
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +19,7 @@ from transmog.iterators import get_data_iterator
 from transmog.streaming import stream_process
 from transmog.types import JsonDict, ProcessingContext, ProgressCallback
 from transmog.writers import create_writer
-from transmog.writers.base import _sanitize_filename
+from transmog.writers.base import sanitize_filename
 
 logger = logging.getLogger(__name__)
 
@@ -150,12 +151,12 @@ class FlattenResult:
             if not records:
                 continue
 
-            safe_name = _sanitize_filename(table_name)
+            safe_name = sanitize_filename(table_name)
             destination = base_path / f"{safe_name or 'table'}{extension}"
 
             try:
                 written_path = writer.write(records, str(destination))
-            except Exception as exc:
+            except (OSError, OutputError) as exc:
                 raise OutputError(
                     f"Failed to write {output_format.upper()} for table '{table_name}' "
                     f"to '{destination}': {exc}"
@@ -180,7 +181,14 @@ class FlattenResult:
 
 
 def flatten(
-    data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes,
+    data: (
+        dict[str, Any]
+        | list[dict[str, Any]]
+        | str
+        | Path
+        | bytes
+        | Iterator[dict[str, Any]]
+    ),
     name: str = "data",
     config: TransmogConfig | None = None,
     progress_callback: ProgressCallback | None = None,
@@ -282,7 +290,14 @@ def flatten(
 
 
 def flatten_stream(
-    data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes,
+    data: (
+        dict[str, Any]
+        | list[dict[str, Any]]
+        | str
+        | Path
+        | bytes
+        | Iterator[dict[str, Any]]
+    ),
     output_path: str | Path,
     name: str = "data",
     output_format: str = "csv",
@@ -309,15 +324,13 @@ def flatten_stream(
             Parquet options:
                 - compression: str - Compression codec
                   ("snappy", "gzip", "brotli", None)
-                - row_group_size: int - Rows per row group (default: 10000)
 
             ORC options:
                 - compression: str - Compression codec
                   ("zstd", "snappy", "lz4", "zlib", None)
-                - batch_size: int - Rows per batch (default: 10000)
 
             Avro options:
-                - codec: str - Compression codec
+                - compression: str - Compression codec
                   ("null", "deflate", "snappy", "bzip2", "xz")
                   Note: snappy/bzip2/xz provided via cramjam (included by default)
                         zstandard/lz4 require separate packages (fastavro limitation)
@@ -325,28 +338,27 @@ def flatten_stream(
                   (default: 16000)
 
     Returns:
-        List of Path objects for each file written.
+        List of Path objects for each part file written.
 
     Examples:
-        >>> # Stream large dataset to CSV files
+        >>> # Stream large dataset to CSV part files
         >>> files = flatten_stream(large_data, "output/", output_format="csv")
-        >>> # files: [PosixPath('output/data.csv'), ...]
 
-        >>> # Stream with custom config
+        >>> # Stream with custom config (batch_size controls part file size)
         >>> config = TransmogConfig(batch_size=100)
         >>> files = flatten_stream(data, "output/", config=config)
 
-        >>> # Stream to compressed Parquet with specific row group size
+        >>> # Stream to compressed Parquet
         >>> flatten_stream(data, "output/", output_format="parquet",
-        ...                compression="snappy", row_group_size=50000)
+        ...                compression="snappy")
 
-        >>> # Stream to compressed ORC with specific batch size
+        >>> # Stream to compressed ORC
         >>> flatten_stream(data, "output/", output_format="orc",
-        ...                compression="zstd", batch_size=50000)
+        ...                compression="zstd")
 
         >>> # Stream to Avro with snappy compression
         >>> flatten_stream(data, "output/", output_format="avro",
-        ...                codec="snappy")
+        ...                compression="snappy")
     """
     if config is None:
         config = TransmogConfig(batch_size=100)

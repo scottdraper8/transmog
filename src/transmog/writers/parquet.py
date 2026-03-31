@@ -9,10 +9,15 @@ try:
     import pyarrow.parquet as pq
 
     PARQUET_AVAILABLE = True
+    _PARQUET_READ_ERRORS: tuple[type[Exception], ...] = (
+        OSError,
+        pa.lib.ArrowException,
+    )
 except ImportError:
     pa = None
     pq = None
     PARQUET_AVAILABLE = False
+    _PARQUET_READ_ERRORS: tuple[type[Exception], ...] = (OSError,)  # type: ignore[no-redef]
 
 
 class ParquetWriter(PyArrowWriter):
@@ -47,23 +52,24 @@ class ParquetStreamingWriter(PyArrowStreamingWriter):
 
     def __init__(
         self,
-        destination: str | BinaryIO | None = None,
+        destination: str | None = None,
         entity_name: str = "entity",
         compression: str = "snappy",
-        row_group_size: int = 10000,
         **options: Any,
     ) -> None:
         """Initialize the Parquet streaming writer.
 
         Args:
-            destination: Path or file-like object to write to
+            destination: Directory path to write part files to
             entity_name: Name of the entity for output files
             compression: Compression algorithm ("snappy", "gzip", etc.)
-            row_group_size: Number of records per row group
             **options: Additional options for PyArrow
         """
         super().__init__(
-            destination, entity_name, compression, row_group_size, **options
+            destination=destination,
+            entity_name=entity_name,
+            compression=compression,
+            **options,
         )
 
     def _get_format_name(self) -> str:
@@ -74,15 +80,31 @@ class ParquetStreamingWriter(PyArrowStreamingWriter):
         """Get the file extension."""
         return ".parquet"
 
-    def _create_writer(self, file_path: str, schema: Any) -> Any:
+    def _create_format_writer(self, file_path: str, schema: Any) -> Any:
         """Create the Parquet writer instance."""
         return pq.ParquetWriter(
             file_path, schema, compression=self.compression, **self.options
         )
 
-    def _write_to_writer(self, writer: Any, table: Any) -> None:
+    def _write_to_format_writer(self, writer: Any, table: Any) -> None:
         """Write table using the Parquet writer."""
         writer.write_table(table)
+
+    def _rewrite_part_with_schema(self, file_path: str, target_schema: Any) -> None:
+        """Rewrite a Parquet part file with a new target schema."""
+        table = pq.read_table(file_path)
+
+        # Add missing columns as null arrays
+        for field in target_schema:
+            if field.name not in table.column_names:
+                null_array = pa.nulls(len(table), type=field.type)
+                table = table.append_column(field, null_array)
+
+        # Reorder columns to match target schema, then cast types
+        table = table.select([f.name for f in target_schema])
+        table = table.cast(target_schema)
+
+        pq.write_table(table, file_path, compression=self.compression)
 
 
 __all__ = ["ParquetWriter", "ParquetStreamingWriter", "PARQUET_AVAILABLE"]

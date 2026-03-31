@@ -3,7 +3,7 @@
 import logging
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import Any
 
 from transmog.flattening import get_current_timestamp, process_record_batch
 from transmog.iterators import get_data_iterator
@@ -25,9 +25,8 @@ def stream_process(
     ),
     entity_name: str,
     output_format: str,
-    output_destination: str | BinaryIO | None = None,
+    output_destination: str | None = None,
     extract_time: str | None = None,
-    batch_size: int | None = None,
     progress_callback: ProgressCallback | None = None,
     total_records: int | None = None,
     **format_options: Any,
@@ -38,10 +37,9 @@ def stream_process(
         config: TransmogConfig instance
         data: Input data (dict, list, string, Path, bytes, or iterator)
         entity_name: Name of the entity being processed
-        output_format: Output format ("json", "csv", "parquet", "orc", etc)
-        output_destination: File path or file-like object to write to
+        output_format: Output format ("csv", "parquet", "orc", "avro")
+        output_destination: Directory path to write to
         extract_time: Optional extraction timestamp
-        batch_size: Size of batches to process
         progress_callback: Optional callable invoked after each batch flush
         total_records: Total input record count (None when unknown)
         **format_options: Format-specific options for the writer
@@ -49,15 +47,16 @@ def stream_process(
     Returns:
         List of file paths written by the writer.
     """
-    # Pass stringify_mode to writer for optimization (skip type inference)
     writer_options = dict(format_options)
-    if hasattr(config, "stringify_values") and config.stringify_values:
-        writer_options["stringify_mode"] = True
+    if config.stringify_values:
+        writer_options["stringify_values"] = True
 
     writer = create_streaming_writer(
         format_name=output_format,
         destination=output_destination,
         entity_name=entity_name,
+        batch_size=config.batch_size,
+        coerce_schema=config.coerce_schema,
         **writer_options,
     )
 
@@ -69,7 +68,7 @@ def stream_process(
 
     try:
         data_iterator = get_data_iterator(data, streaming=True)
-        actual_batch_size = batch_size or config.batch_size
+        actual_batch_size = config.batch_size
         timestamp = extract_time if extract_time else get_current_timestamp()
         context = ProcessingContext(extract_time=timestamp)
 
@@ -95,13 +94,13 @@ def stream_process(
             if progress_callback is not None:
                 progress_callback(total_records_processed, total_records)
 
-        record_buffer = []
+        record_buffer: list[dict[str, Any]] = []
         for record in data_iterator:
             record_buffer.append(record)
 
             if len(record_buffer) >= actual_batch_size:
                 flush_batch(record_buffer)
-                record_buffer = []
+                record_buffer.clear()
 
         if record_buffer:
             flush_batch(record_buffer)

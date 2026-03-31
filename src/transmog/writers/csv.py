@@ -2,11 +2,7 @@
 
 import csv
 import io
-import logging
-import os
 import pathlib
-import sys
-from pathlib import Path
 from typing import Any, BinaryIO, TextIO, cast
 
 from transmog.exceptions import ConfigurationError, OutputError
@@ -15,10 +11,9 @@ from transmog.writers.base import (
     StreamingWriter,
     _collect_field_names,
     _normalize_special_floats,
-    _sanitize_filename,
 )
 
-logger = logging.getLogger(__name__)
+_DANGEROUS_CHARS = frozenset("=+-@|\t\r")
 
 
 def _sanitize_csv_value(value: Any) -> Any:
@@ -34,24 +29,22 @@ def _sanitize_csv_value(value: Any) -> Any:
     Returns:
         Sanitized value safe for CSV output
     """
-    if not isinstance(value, str):
-        return value
-
-    if not value:
-        return value
-
-    # Check first character and first non-whitespace character
-    # to prevent bypass with leading spaces
-    stripped = value.lstrip()
-    if not stripped:
+    if not isinstance(value, str) or not value:
         return value
 
     first_char = value[0]
-    first_nonwhitespace = stripped[0]
 
-    dangerous_chars = ("=", "+", "-", "@", "|", "\t", "\r")
+    # Fast path: first char is not dangerous and not whitespace
+    if first_char not in _DANGEROUS_CHARS and not first_char.isspace():
+        return value
 
-    if first_char in dangerous_chars or first_nonwhitespace in dangerous_chars:
+    # First char is dangerous
+    if first_char in _DANGEROUS_CHARS:
+        return f"'{value}"
+
+    # First char is whitespace — check first non-whitespace char
+    stripped = value.lstrip()
+    if stripped and stripped[0] in _DANGEROUS_CHARS:
         return f"'{value}"
 
     return value
@@ -61,12 +54,6 @@ def _sanitize_record(record: dict[str, Any]) -> dict[str, Any]:
     """Sanitize all values in a record for CSV output.
 
     Normalizes special float values (NaN, Inf) and prevents CSV injection.
-
-    Args:
-        record: Dictionary record to sanitize
-
-    Returns:
-        New dictionary with sanitized values
     """
     return {
         key: _sanitize_csv_value(_normalize_special_floats(value, null_replacement=""))
@@ -106,19 +93,7 @@ class CsvWriter(DataWriter):
         destination: str | BinaryIO | TextIO,
         **options: Any,
     ) -> str | BinaryIO | TextIO:
-        """Write data to a CSV file.
-
-        Args:
-            data: The data to write
-            destination: Path or file-like object to write to
-            **options: Format-specific options (include_header, delimiter, etc.)
-
-        Returns:
-            Path to the written file or file-like object
-
-        Raises:
-            OutputError: If writing fails
-        """
+        """Write data to a CSV file."""
         try:
             if "compression" in options:
                 raise ConfigurationError(
@@ -206,18 +181,7 @@ class CsvWriter(DataWriter):
         quoting: int,
         escapechar: str | None,
     ) -> None:
-        """Write CSV data directly to a stream.
-
-        Args:
-            stream: Text stream to write to
-            table_data: The table data
-            field_names: List of field names
-            include_header: Whether to include headers
-            delimiter: Column delimiter
-            quotechar: Quote character
-            quoting: Quoting mode
-            escapechar: Escape character
-        """
+        """Write CSV data directly to a stream."""
         writer_params: dict[str, Any] = {
             "fieldnames": field_names,
             "delimiter": delimiter,
@@ -237,228 +201,125 @@ class CsvWriter(DataWriter):
 
 
 class CsvStreamingWriter(StreamingWriter):
-    """Streaming writer for CSV format."""
+    """Streaming writer for CSV format.
+
+    Writes each batch flush as a separate part file, enabling per-batch
+    column discovery. A schema log tracks structural deviations (column
+    presence) across parts.
+    """
 
     def __init__(
         self,
-        destination: str | BinaryIO | TextIO | None = None,
+        destination: str | None = None,
         entity_name: str = "entity",
         include_header: bool = True,
         delimiter: str = ",",
         quotechar: str = '"',
-        schema_drift: str = "strict",
         **options: Any,
     ):
         """Initialize the CSV streaming writer.
 
         Args:
-            destination: Output file path or file-like object
+            destination: Output directory path
             entity_name: Name of the entity
             include_header: Whether to include column headers
             delimiter: Column delimiter character
             quotechar: Character to use for quoting
-            schema_drift: How to handle schema drift after header emission.
-                "strict" raises OutputError (default), "drop" silently
-                removes unexpected fields.
             **options: Additional CSV writer options
         """
-        valid_drift_modes = ("strict", "drop")
-        if schema_drift not in valid_drift_modes:
-            raise ConfigurationError(
-                f"Invalid schema_drift mode: {schema_drift!r}. "
-                f"Must be one of {valid_drift_modes}"
-            )
-
-        self.include_header = include_header
-        self.delimiter = delimiter
-        self.quotechar = quotechar
-        self.schema_drift = schema_drift
-        self.file_objects: dict[str, TextIO] = {}
-        self.writers: dict[str, csv.DictWriter] = {}
-        self.fieldnames: dict[str, list[str]] = {}
-        self.fieldname_sets: dict[str, set[str]] = {}
-        self.file_paths: dict[str, str] = {}
-        self.should_close_files: bool = False
-        self.base_dir: str | None = None
-
         if "compression" in options:
             raise ConfigurationError(
                 "CSV streaming writer does not support compression"
             )
 
+        self.include_header = include_header
+        self.delimiter = delimiter
+        self.quotechar = quotechar
+
         super().__init__(destination, entity_name, **options)
 
-        if destination is None:
-            self.file_objects["main"] = cast(TextIO, sys.stdout)
-            self.should_close_files = False
-        elif isinstance(destination, str):
-            if destination.endswith(".csv"):
-                os.makedirs(os.path.dirname(destination) or ".", exist_ok=True)
+    # --- StreamingWriter abstract method implementations ---
 
-                file_obj = open(destination, "w", encoding="utf-8", newline="")
+    def _get_file_extension(self) -> str:
+        return ".csv"
 
-                self.file_objects["main"] = file_obj
-                self.file_paths["main"] = destination
-                self.should_close_files = True
-            else:
-                self.base_dir = destination
-                os.makedirs(self.base_dir, exist_ok=True)
-                self.should_close_files = True
-        else:
-            mode = getattr(destination, "mode", "")
-            is_binary = "b" in mode if mode else hasattr(destination, "readinto")
-
-            if is_binary:
-                text_dest = io.TextIOWrapper(
-                    cast(BinaryIO, destination), encoding="utf-8"
-                )
-                self.file_objects["main"] = text_dest
-            else:
-                self.file_objects["main"] = cast(TextIO, destination)
-            self.should_close_files = False
-
-    def _get_file_for_table(self, table_name: str) -> TextIO:
-        """Get or create a text file object for the given table.
-
-        Args:
-            table_name: Name of the table
-
-        Returns:
-            Text file object for writing
-        """
-        if table_name in self.file_objects:
-            return self.file_objects[table_name]
-
-        if self.base_dir:
-            if table_name == "main":
-                filename = self.entity_name
-            else:
-                filename = _sanitize_filename(table_name)
-
-            file_path = os.path.join(self.base_dir, f"{filename}.csv")
-            self.file_paths[table_name] = file_path
-            file_obj = open(file_path, "w", encoding="utf-8", newline="")
-
-            self.file_objects[table_name] = file_obj
-            return file_obj
-        else:
-            raise OutputError(f"Cannot create file for table {table_name}")
-
-    def _ensure_writer(
-        self, table_name: str, records: list[dict[str, Any]]
-    ) -> csv.DictWriter:
-        """Ensure writer and schema are initialized for a table.
-
-        Args:
-            table_name: Name of the table
-            records: Records that will be written
-
-        Returns:
-            CSV writer for the table
-        """
-        if table_name in self.writers:
-            return self.writers[table_name]
-
-        fieldnames = _collect_field_names(records)
-        file_obj = self._get_file_for_table(table_name)
-
-        writer = csv.DictWriter(
-            file_obj,
-            fieldnames=fieldnames,
-            delimiter=self.delimiter,
-            quotechar=self.quotechar,
-        )
-
-        self.writers[table_name] = writer
-        self.fieldnames[table_name] = fieldnames
-        self.fieldname_sets[table_name] = set(fieldnames)
-
-        logger.debug(
-            "csv schema created, table=%s, fields=%d", table_name, len(fieldnames)
-        )
-
-        if self.include_header and fieldnames:
-            writer.writeheader()
-
-        return writer
-
-    def _write_records(self, table_name: str, records: list[dict[str, Any]]) -> None:
-        """Write records to the specified table in a single pass.
-
-        Args:
-            table_name: Name of the table
-            records: Records to write
-        """
-        if not records:
-            return
-
+    def _write_part(self, file_path: str, records: list[dict[str, Any]]) -> Any:
+        """Write records to a CSV part file and return the field names."""
         sanitized_records = [_sanitize_record(record) for record in records]
-        writer = self._ensure_writer(table_name, sanitized_records)
-        allowed_fields = self.fieldname_sets.get(table_name, set())
+        field_names = _collect_field_names(sanitized_records)
 
-        for record in sanitized_records:
-            unexpected_fields = set(record.keys()) - allowed_fields
-            if unexpected_fields:
-                logger.warning(
-                    "csv schema drift detected, table=%s, unexpected_fields=%s",
-                    table_name,
-                    sorted(unexpected_fields),
-                )
-                if self.schema_drift == "strict":
-                    raise OutputError(
-                        "CSV schema changed after header emission; "
-                        f"unexpected fields {sorted(unexpected_fields)} detected "
-                        f"in table '{table_name}'."
-                    )
-                # "drop" mode: filter to known fields only
-                record = {k: v for k, v in record.items() if k in allowed_fields}
-            writer.writerow(record)
+        with open(file_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=field_names,
+                delimiter=self.delimiter,
+                quotechar=self.quotechar,
+            )
+            if self.include_header and field_names:
+                writer.writeheader()
+            writer.writerows(sanitized_records)
 
-    def write_main_records(self, records: list[dict[str, Any]]) -> None:
-        """Write a batch of main records.
+        return field_names
 
-        Args:
-            records: List of main table records to write
-        """
-        self._write_records("main", records)
+    @staticmethod
+    def _schema_to_dict(schema: Any) -> dict:
+        """Serialize a CSV schema (field name list) to a JSON-friendly dict."""
+        return {"fields": schema}
 
-    def write_child_records(
-        self, table_name: str, records: list[dict[str, Any]]
-    ) -> None:
-        """Write a batch of child records.
+    @staticmethod
+    def _compute_deviations(base_schema: Any, part_schema: Any) -> dict | None:
+        """Compute structural deviations between field name lists."""
+        base_set = set(base_schema)
+        part_set = set(part_schema)
 
-        Args:
-            table_name: Name of the child table
-            records: List of child records to write
-        """
-        self._write_records(table_name, records)
+        added = sorted(part_set - base_set)
+        removed = sorted(base_set - part_set)
 
-    def close(self) -> list[Path]:
-        """Finalize output, flush buffered data, and clean up resources.
+        if not added and not removed:
+            return None
 
-        Returns:
-            List of file paths written, or empty list if writing to a stream.
-        """
-        if getattr(self, "_closed", False):
-            return []
+        return {"structural": {"added": added, "removed": removed}}
 
-        paths = [Path(p) for p in self.file_paths.values()]
+    def _schema_fingerprint(self, schema: Any) -> tuple:
+        """Create a hashable fingerprint from a field name list."""
+        return tuple(schema)
 
-        for file_obj in self.file_objects.values():
-            if hasattr(file_obj, "flush"):
-                file_obj.flush()
+    def _build_unified_schema(self, schemas: list[Any]) -> Any:
+        """Build a unified field name list from all part schemas."""
+        unified: list[str] = []
+        seen: set[str] = set()
+        for fields in schemas:
+            for f in fields:
+                if f not in seen:
+                    unified.append(f)
+                    seen.add(f)
+        return unified
 
-        if self.should_close_files:
-            for file_obj in self.file_objects.values():
-                if hasattr(file_obj, "close"):
-                    file_obj.close()
+    def _rewrite_part(self, file_path: str, target_schema: Any) -> None:
+        """Rewrite a CSV part file with a unified column set."""
+        unified_fields: list[str] = target_schema
 
-        self.file_objects.clear()
-        self.writers.clear()
-        self.fieldnames.clear()
-        self.fieldname_sets.clear()
-        self._closed = True
-        return paths
+        with open(file_path, encoding="utf-8", newline="") as f:
+            reader = csv.DictReader(
+                f, delimiter=self.delimiter, quotechar=self.quotechar
+            )
+            rows = list(reader)
+
+        for row in rows:
+            for field in unified_fields:
+                if field not in row:
+                    row[field] = ""
+
+        with open(file_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=unified_fields,
+                delimiter=self.delimiter,
+                quotechar=self.quotechar,
+            )
+            if self.include_header:
+                writer.writeheader()
+            writer.writerows(rows)
 
 
 __all__ = ["CsvWriter", "CsvStreamingWriter"]

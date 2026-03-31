@@ -2,7 +2,6 @@
 
 import logging
 import math
-import os
 import pathlib
 from abc import abstractmethod
 from collections.abc import Callable
@@ -30,12 +29,6 @@ def _is_valid_float_for_inference(value: Any) -> bool:
 
     NaN and Infinity values should not be used for type inference as they
     don't represent typical float data patterns.
-
-    Args:
-        value: Value to check
-
-    Returns:
-        True if value is a valid float for inference purposes
     """
     if not isinstance(value, float):
         return False
@@ -181,25 +174,23 @@ class PyArrowWriter(DataWriter):
 
 
 class PyArrowStreamingWriter(StreamingWriter):
-    """Base streaming writer for PyArrow-based formats."""
+    """Base streaming writer for PyArrow-based formats (Parquet, ORC)."""
 
     def __init__(
         self,
-        destination: str | BinaryIO | TextIO | None = None,
+        destination: str | None = None,
         entity_name: str = "entity",
         compression: str = "snappy",
-        batch_size: int = 10000,
-        stringify_mode: bool = False,
+        stringify_values: bool = False,
         **options: Any,
     ) -> None:
         """Initialize the PyArrow streaming writer.
 
         Args:
-            destination: Path or file-like object to write to
+            destination: Directory path to write part files to
             entity_name: Name of the entity for output files
             compression: Compression algorithm
-            batch_size: Number of records per batch
-            stringify_mode: If True, all fields are strings (skip type inference)
+            stringify_values: If True, all fields are strings (skip type inference)
             **options: Additional options for PyArrow
         """
         super().__init__(destination, entity_name, **options)
@@ -212,19 +203,8 @@ class PyArrowStreamingWriter(StreamingWriter):
             )
 
         self.compression = compression
-        self.batch_size = batch_size
-        self.stringify_mode = stringify_mode
-        self.writers: dict[str, Any] = {}
-        self.schemas: dict[str, Any] = {}
-        self.converters: dict[str, dict[str, Callable]] = {}
-        self.buffers: dict[str, list[dict[str, Any]]] = {}
-        self.base_dir: str | None = None
+        self.stringify_values = stringify_values
         self._column_buffers: dict[str, dict[str, list[Any]]] = {}
-        self.file_paths: dict[str, str] = {}
-
-        if isinstance(destination, str):
-            self.base_dir = destination
-            os.makedirs(self.base_dir, exist_ok=True)
 
     @abstractmethod
     def _get_format_name(self) -> str:
@@ -237,39 +217,16 @@ class PyArrowStreamingWriter(StreamingWriter):
         pass
 
     @abstractmethod
-    def _create_writer(self, file_path: str, schema: Any) -> Any:
+    def _create_format_writer(self, file_path: str, schema: Any) -> Any:
         """Create the format-specific writer instance."""
         pass
 
     @abstractmethod
-    def _write_to_writer(self, writer: Any, table: Any) -> None:
+    def _write_to_format_writer(self, writer: Any, table: Any) -> None:
         """Write table using the format-specific writer."""
         pass
 
-    def _get_table_path(self, table_name: str) -> str | None:
-        """Get the file path for a table.
-
-        Args:
-            table_name: Name of the table
-
-        Returns:
-            File path or None if using file-like object
-        """
-        if self.base_dir is None:
-            return None
-
-        if table_name in self.file_paths:
-            return self.file_paths[table_name]
-
-        extension = self._get_file_extension()
-        if table_name == "main":
-            file_path = os.path.join(self.base_dir, f"{self.entity_name}{extension}")
-        else:
-            safe_name = table_name.replace(".", "_").replace("/", "_")
-            file_path = os.path.join(self.base_dir, f"{safe_name}{extension}")
-
-        self.file_paths[table_name] = file_path
-        return file_path
+    # --- Schema inference (PyArrow-specific) ---
 
     def _create_schema(
         self, records: list[dict[str, Any]], stringify_mode: bool = False
@@ -292,7 +249,6 @@ class PyArrowStreamingWriter(StreamingWriter):
         field_names = _collect_field_names(records)
         type_converters = _get_type_converters()
 
-        # If stringify mode, all fields are strings - skip type inference
         if stringify_mode:
             fields = [pa.field(key, pa.string()) for key in field_names]
             converters = dict.fromkeys(field_names, _convert_str)
@@ -316,8 +272,6 @@ class PyArrowStreamingWriter(StreamingWriter):
                 if val is None:
                     continue
 
-                # For floats, skip NaN/Inf for type inference but note that
-                # the field contains float data
                 if isinstance(val, float):
                     found_float = True
                     if _is_valid_float_for_inference(val):
@@ -327,7 +281,6 @@ class PyArrowStreamingWriter(StreamingWriter):
                     value = val
                     break
 
-            # Determine type based on found value or float flag
             if value is None and found_float:
                 pa_type = pa.float64()
             elif value is None:
@@ -344,40 +297,24 @@ class PyArrowStreamingWriter(StreamingWriter):
             fields.append(pa.field(key, pa_type))
             converters[key] = type_converters.get(pa_type, _convert_str)
 
-        types = {f.name: str(f.type) for f in fields}
-        logger.debug("arrow schema created, fields=%d, types=%s", len(fields), types)
+        if logger.isEnabledFor(logging.DEBUG):
+            types = {f.name: str(f.type) for f in fields}
+            logger.debug(
+                "arrow schema created, fields=%d, types=%s", len(fields), types
+            )
         return pa.schema(fields), converters
 
-    def _records_to_table(self, records: list[dict[str, Any]], table_name: str) -> Any:
-        """Convert records to PyArrow table.
-
-        Args:
-            records: Records to convert
-            table_name: Name of the table
-
-        Returns:
-            PyArrow table
-        """
+    def _records_to_table(
+        self,
+        records: list[dict[str, Any]],
+        schema: Any,
+        converters: dict[str, Callable],
+    ) -> Any:
+        """Convert records to PyArrow table using a provided schema."""
         if not records:
             return pa.table({})
 
-        if table_name not in self.schemas:
-            schema, converters = self._create_schema(
-                records, stringify_mode=self.stringify_mode
-            )
-            self.schemas[table_name] = schema
-            self.converters[table_name] = converters
-
-        schema = self.schemas[table_name]
-        converters = self.converters[table_name]
-
-        if table_name in self._column_buffers:
-            columns = self._column_buffers[table_name]
-            for col in columns.values():
-                col.clear()
-        else:
-            columns = {field.name: [] for field in schema}
-            self._column_buffers[table_name] = columns
+        columns: dict[str, list[Any]] = {field.name: [] for field in schema}
 
         for record in records:
             for field in schema:
@@ -392,107 +329,75 @@ class PyArrowStreamingWriter(StreamingWriter):
         arrays = [pa.array(columns[field.name], type=field.type) for field in schema]
         return pa.table(arrays, schema=schema)
 
-    def _initialize_writer(self, table_name: str, schema: Any) -> None:
-        """Initialize a writer for a table.
+    # --- StreamingWriter abstract method implementations ---
 
-        Args:
-            table_name: Name of the table
-            schema: PyArrow schema
+    def _write_part(self, file_path: str, records: list[dict[str, Any]]) -> Any:
+        """Write records to a PyArrow part file and return the schema."""
+        schema, converters = self._create_schema(
+            records, stringify_mode=self.stringify_values
+        )
+        table = self._records_to_table(records, schema, converters)
+
+        writer = self._create_format_writer(file_path, schema)
+        self._write_to_format_writer(writer, table)
+        if hasattr(writer, "close"):
+            writer.close()
+
+        return schema
+
+    @staticmethod
+    def _schema_to_dict(schema: Any) -> dict:
+        """Serialize a PyArrow schema to a JSON-friendly dict."""
+        return {"fields": [{"name": f.name, "type": str(f.type)} for f in schema]}
+
+    @staticmethod
+    def _compute_deviations(base_schema: Any, part_schema: Any) -> dict | None:
+        """Compute schema deviations between a base and part schema."""
+        base_fields = {f.name: str(f.type) for f in base_schema}
+        part_fields = {f.name: str(f.type) for f in part_schema}
+
+        added = sorted(name for name in part_fields if name not in base_fields)
+        removed = sorted(name for name in base_fields if name not in part_fields)
+        type_changes = {
+            name: {"base": base_fields[name], "part": part_fields[name]}
+            for name in base_fields
+            if name in part_fields and base_fields[name] != part_fields[name]
+        }
+
+        if not added and not removed and not type_changes:
+            return None
+
+        result: dict[str, Any] = {}
+        if added or removed:
+            result["structural"] = {"added": added, "removed": removed}
+        if type_changes:
+            result["type"] = type_changes
+        return result
+
+    def _schema_fingerprint(self, schema: Any) -> tuple:
+        """Create a hashable fingerprint from a PyArrow schema."""
+        return tuple((f.name, str(f.type)) for f in schema)
+
+    def _build_unified_schema(self, schemas: list[Any]) -> Any:
+        """Build a unified PyArrow schema from all part schemas."""
+        return pa.unify_schemas(schemas)
+
+    def _rewrite_part(self, file_path: str, target_schema: Any) -> None:
+        """Rewrite a part file with a new target schema.
+
+        Delegates to subclass-specific read/rewrite methods.
         """
-        file_path = self._get_table_path(table_name)
+        self._rewrite_part_with_schema(file_path, target_schema)
 
-        if file_path is None:
-            return
-
-        writer = self._create_writer(file_path, schema)
-        self.writers[table_name] = writer
-        self.schemas[table_name] = schema
-
-    def _write_buffer(self, table_name: str) -> None:
-        """Write buffered records to file.
-
-        Args:
-            table_name: Name of the table
-        """
-        if table_name not in self.buffers or not self.buffers[table_name]:
-            return
-
-        records = self.buffers[table_name]
-        table = self._records_to_table(records, table_name)
-
-        if table_name not in self.writers:
-            self._initialize_writer(table_name, table.schema)
-
-        writer = self.writers.get(table_name)
-        if writer:
-            self._write_to_writer(writer, table)
-
-        self.buffers[table_name].clear()
-
-    def write_main_records(self, records: list[dict[str, Any]]) -> None:
-        """Write a batch of main records.
-
-        Args:
-            records: List of main table records to write
-        """
-        if not records:
-            return
-
-        table_name = "main"
-
-        if table_name not in self.buffers:
-            self.buffers[table_name] = []
-
-        self.buffers[table_name].extend(records)
-
-        if len(self.buffers[table_name]) >= self.batch_size:
-            self._write_buffer(table_name)
-
-    def write_child_records(
-        self, table_name: str, records: list[dict[str, Any]]
-    ) -> None:
-        """Write a batch of child records.
-
-        Args:
-            table_name: Name of the child table
-            records: List of child records to write
-        """
-        if not records:
-            return
-
-        if table_name not in self.buffers:
-            self.buffers[table_name] = []
-
-        self.buffers[table_name].extend(records)
-
-        if len(self.buffers[table_name]) >= self.batch_size:
-            self._write_buffer(table_name)
+    @abstractmethod
+    def _rewrite_part_with_schema(self, file_path: str, target_schema: Any) -> None:
+        """Rewrite a part file with a target schema (format-specific)."""
+        ...
 
     def close(self) -> list[Path]:
-        """Finalize output, flush buffered data, and clean up resources.
-
-        Returns:
-            List of file paths written, or empty list if writing to a stream.
-        """
-        if getattr(self, "_closed", False):
-            return []
-
-        for table_name in list(self.buffers.keys()):
-            if self.buffers[table_name]:
-                self._write_buffer(table_name)
-
-        paths = [Path(p) for p in self.file_paths.values()]
-
-        for writer in self.writers.values():
-            if hasattr(writer, "close"):
-                writer.close()
-
-        self.writers.clear()
-        self.schemas.clear()
-        self.converters.clear()
-        self.buffers.clear()
+        """Finalize output, flush buffered data, and clear PyArrow caches."""
+        paths = super().close()
         self._column_buffers.clear()
-        self._closed = True
         return paths
 
 

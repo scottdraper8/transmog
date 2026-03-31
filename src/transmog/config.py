@@ -59,6 +59,15 @@ class TransmogConfig:
     batch_size: int = 1000
     """Number of records to process at once for memory efficiency."""
 
+    coerce_schema: bool = False
+    """Coerce part files to a unified schema at close time.
+
+    When enabled, the streaming writer analyzes schema deviations across all
+    part files at close time and rewrites minority part files to match the
+    majority schema. This incurs additional I/O proportional to the number
+    of deviating part files.
+    """
+
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
         if self.batch_size < 1:
@@ -77,6 +86,12 @@ class TransmogConfig:
             raise ConfigurationError(
                 f"stringify_values must be a boolean, "
                 f"got {type(self.stringify_values).__name__}"
+            )
+
+        if not isinstance(self.coerce_schema, bool):
+            raise ConfigurationError(
+                f"coerce_schema must be a boolean, "
+                f"got {type(self.coerce_schema).__name__}"
             )
 
         if isinstance(self.id_generation, str):
