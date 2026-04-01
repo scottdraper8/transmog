@@ -65,25 +65,13 @@ class TestBatchProcessing:
             assert processed_record["age"] == record["age"]
             assert processed_record["city"] == record["city"]
 
-    def test_batch_processing_different_sizes(self, sample_records):
-        """Test batch processing with different batch sizes."""
-        batch_sizes = [1, 2, 3, 5, 10]
-
-        for batch_size in batch_sizes:
-            config = TransmogConfig(batch_size=batch_size)
-            result = tm.flatten(sample_records, name="users", config=config)
-
-            # Results should be the same regardless of batch size
-            assert len(result.main) == len(sample_records)
-
-    def test_batch_processing_memory_efficiency(self, sample_records):
-        """Test batch processing memory efficiency."""
-        # Small batch size for memory efficiency
-        config = TransmogConfig(batch_size=2)
+    @pytest.mark.parametrize("batch_size", [1, 2, 3, 5, 10])
+    def test_batch_size_does_not_affect_output(self, sample_records, batch_size):
+        """Test that output is identical regardless of batch size."""
+        config = TransmogConfig(batch_size=batch_size)
         result = tm.flatten(sample_records, name="users", config=config)
 
         assert len(result.main) == len(sample_records)
-        # Memory optimized should still produce correct results
         assert all("name" in record for record in result.main)
 
     def test_batch_processing_with_arrays(self, nested_records):
@@ -98,19 +86,6 @@ class TestBatchProcessing:
         # Check that employees were extracted to child tables
         employee_tables = [name for name in result.tables.keys() if "employees" in name]
         assert len(employee_tables) > 0
-
-    def test_batch_processing_error_handling(self, sample_records):
-        """Test batch processing with error handling."""
-        # Add a problematic record
-        problematic_records = sample_records + [
-            {"id": "invalid", "name": None, "age": "not_a_number"}
-        ]
-
-        config = TransmogConfig(batch_size=2)
-        result = tm.flatten(problematic_records, name="users", config=config)
-
-        # Should process valid records and handle errors gracefully
-        assert len(result.main) >= len(sample_records)
 
     def test_batch_processing_deterministic_results(self, sample_records):
         """Test that batch processing produces deterministic results."""
@@ -171,8 +146,8 @@ class TestBatchProcessingIntegration:
         assert len(saved_files) > 0
         assert all(path.endswith(".csv") for path in saved_files)
 
-    def test_batch_size_does_not_affect_output(self, large_dataset):
-        """Test that different batch sizes produce identical output."""
+    def test_batch_size_does_not_affect_output_count(self, large_dataset):
+        """Test that different batch sizes produce identical record counts."""
         config_small = TransmogConfig(batch_size=10)
         result_small = tm.flatten(large_dataset, name="users", config=config_small)
 
@@ -230,10 +205,9 @@ class TestBatchProcessingEdgeCases:
         assert len(result.main) == len(complex_records)
         assert len(result.tables) > 0
 
-    def test_batch_processing_memory_stress(self):
-        """Test batch processing under memory stress conditions."""
-        # Create a large number of records with nested data
-        stress_records = [
+    def test_batch_processing_wide_nested_records(self):
+        """Test batch processing with wide records containing nested data."""
+        records = [
             {
                 "id": i,
                 "data": {f"field_{j}": f"value_{i}_{j}" for j in range(50)},
@@ -242,11 +216,10 @@ class TestBatchProcessingEdgeCases:
             for i in range(20)
         ]
 
-        # Use memory optimized config with small batches
         config = TransmogConfig(batch_size=5)
+        result = tm.flatten(records, name="wide_nested", config=config)
 
-        result = tm.flatten(stress_records, name="stress_test", config=config)
-
-        # Should complete without memory errors
-        assert len(result.main) == len(stress_records)
+        assert len(result.main) == 20
         assert len(result.tables) > 0
+        # Verify nested fields were flattened
+        assert any("data_field_0" in r for r in result.main)

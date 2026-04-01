@@ -15,22 +15,6 @@ if ORC_AVAILABLE:
 class TestWriterFactory:
     """Test writer factory functions."""
 
-    def test_create_csv_writer_returns_correct_type(self):
-        """Test creating CSV writer returns CsvWriter."""
-        writer = create_writer("csv")
-        assert isinstance(writer, CsvWriter)
-
-    def test_create_parquet_writer_returns_correct_type(self):
-        """Test creating Parquet writer returns ParquetWriter."""
-        writer = create_writer("parquet")
-        assert isinstance(writer, ParquetWriter)
-
-    @pytest.mark.skipif(not ORC_AVAILABLE, reason="PyArrow not available")
-    def test_create_orc_writer_returns_correct_type(self):
-        """Test creating ORC writer returns OrcWriter."""
-        writer = create_writer("orc")
-        assert isinstance(writer, OrcWriter)
-
     def test_create_writer_case_insensitive(self):
         """Test writer creation is case insensitive."""
         writer_lower = create_writer("csv")

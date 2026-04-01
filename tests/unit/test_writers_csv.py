@@ -320,12 +320,10 @@ class TestCsvWriter:
         finally:
             Path(tmp_path).unlink(missing_ok=True)
 
-    def test_csv_writer_large_data(self):
-        """Test CSV writer with large dataset."""
-        # Create large dataset
-        large_data = [
-            {"id": str(i), "value": f"item_{i}", "data": "x" * 50} for i in range(10000)
-        ]
+    @pytest.mark.parametrize("size", [5000, 10000], ids=["5k", "10k"])
+    def test_csv_writer_large_dataset_integrity(self, size):
+        """Test CSV writer preserves data integrity with large datasets."""
+        data = [{"id": str(i), "value": f"item_{i}"} for i in range(size)]
 
         writer = CsvWriter()
 
@@ -333,21 +331,15 @@ class TestCsvWriter:
             tmp_path = tmp.name
 
         try:
-            writer.write(large_data, tmp_path)
+            writer.write(data, tmp_path)
 
-            # Verify file was created and has correct size
-            assert Path(tmp_path).exists()
-            file_size = Path(tmp_path).stat().st_size
-            assert file_size > 500000  # Should be substantial
-
-            # Verify first and last records
             with open(tmp_path, newline="") as f:
                 reader = csv.DictReader(f)
                 written_data = list(reader)
 
-            assert len(written_data) == 10000
+            assert len(written_data) == size
             assert written_data[0]["id"] == "0"
-            assert written_data[-1]["id"] == "9999"
+            assert written_data[-1]["id"] == str(size - 1)
 
         finally:
             Path(tmp_path).unlink(missing_ok=True)
@@ -509,29 +501,6 @@ class TestCsvWriter:
 
             assert len(written_data) == 2
             assert written_data[0]["name"] == "Alice"
-
-        finally:
-            Path(tmp_path).unlink(missing_ok=True)
-
-    def test_csv_writer_large_dataset_integrity(self):
-        """Test CSV writer preserves data integrity with large dataset."""
-        data = [{"id": str(i), "data": f"item_{i}"} for i in range(5000)]
-
-        writer = CsvWriter()
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
-            tmp_path = tmp.name
-
-        try:
-            writer.write(data, tmp_path)
-
-            with open(tmp_path, newline="") as f:
-                reader = csv.DictReader(f)
-                written_data = list(reader)
-
-            assert len(written_data) == 5000
-            assert written_data[0]["id"] == "0"
-            assert written_data[-1]["id"] == "4999"
 
         finally:
             Path(tmp_path).unlink(missing_ok=True)
@@ -884,8 +853,8 @@ class TestCsvWriter:
 class TestCsvStreamingWriterBasics:
     """Test basic CsvStreamingWriter functionality with part files."""
 
-    def test_write_produces_part_file(self, tmp_path):
-        """Writing records and closing produces a part file."""
+    def test_write_produces_file(self, tmp_path):
+        """Writing records and closing produces a consolidated file."""
         dest = str(tmp_path)
 
         with CsvStreamingWriter(
@@ -893,7 +862,7 @@ class TestCsvStreamingWriterBasics:
         ) as writer:
             writer.write_main_records([{"id": "1", "name": "Alice"}])
 
-        expected = tmp_path / "test_part_0000.csv"
+        expected = tmp_path / "test.csv"
         assert expected.exists()
 
         with open(expected, newline="") as f:
@@ -903,8 +872,8 @@ class TestCsvStreamingWriterBasics:
         assert len(rows) == 1
         assert rows[0]["name"] == "Alice"
 
-    def test_close_returns_part_paths(self, tmp_path):
-        """close() returns a list of Path objects for written part files."""
+    def test_close_returns_paths(self, tmp_path):
+        """close() returns a list of Path objects for written files."""
         dest = str(tmp_path)
 
         writer = CsvStreamingWriter(
@@ -914,14 +883,17 @@ class TestCsvStreamingWriterBasics:
         paths = writer.close()
 
         assert len(paths) == 1
-        assert paths[0] == Path(tmp_path / "test_part_0000.csv")
+        assert paths[0] == Path(tmp_path / "test.csv")
 
     def test_multiple_batches_produce_multiple_parts(self, tmp_path):
-        """Exceeding batch_size causes multiple part files."""
+        """Exceeding batch_size causes multiple part files when consolidate=False."""
         dest = str(tmp_path)
 
         with CsvStreamingWriter(
-            destination=dest, entity_name="test", batch_size=2
+            destination=dest,
+            entity_name="test",
+            batch_size=2,
+            consolidate=False,
         ) as writer:
             writer.write_main_records([{"id": "1"}, {"id": "2"}])
             writer.write_main_records([{"id": "3"}])
@@ -940,6 +912,26 @@ class TestCsvStreamingWriterBasics:
         assert len(rows_0) == 2
         assert len(rows_1) == 1
 
+    def test_multiple_batches_consolidated(self, tmp_path):
+        """Multiple batches produce a single consolidated file by default."""
+        dest = str(tmp_path)
+
+        with CsvStreamingWriter(
+            destination=dest,
+            entity_name="test",
+            batch_size=2,
+        ) as writer:
+            writer.write_main_records([{"id": "1"}, {"id": "2"}])
+            writer.write_main_records([{"id": "3"}])
+
+        consolidated = tmp_path / "test.csv"
+        assert consolidated.exists()
+
+        with open(consolidated, newline="") as f:
+            rows = list(csv.DictReader(f))
+
+        assert len(rows) == 3
+
     def test_empty_write_produces_no_files(self, tmp_path):
         """Writing empty records does not produce any part files."""
         dest = str(tmp_path)
@@ -953,7 +945,7 @@ class TestCsvStreamingWriterBasics:
         assert len(csv_files) == 0
 
     def test_custom_delimiter(self, tmp_path):
-        """Part files use the configured delimiter."""
+        """Output files use the configured delimiter."""
         dest = str(tmp_path)
 
         with CsvStreamingWriter(
@@ -961,14 +953,14 @@ class TestCsvStreamingWriterBasics:
         ) as writer:
             writer.write_main_records([{"id": "1", "name": "Alice"}])
 
-        part_file = tmp_path / "test_part_0000.csv"
-        content = part_file.read_text()
+        output_file = tmp_path / "test.csv"
+        content = output_file.read_text()
 
         assert ";" in content
         assert content.count(";") > content.count(",")
 
     def test_no_header(self, tmp_path):
-        """Part files omit headers when include_header is False."""
+        """Output files omit headers when include_header is False."""
         dest = str(tmp_path)
 
         with CsvStreamingWriter(
@@ -976,16 +968,16 @@ class TestCsvStreamingWriterBasics:
         ) as writer:
             writer.write_main_records([{"id": "1", "name": "Alice"}])
 
-        part_file = tmp_path / "test_part_0000.csv"
-        content = part_file.read_text().strip()
+        output_file = tmp_path / "test.csv"
+        content = output_file.read_text().strip()
         lines = content.split("\n")
 
         # Only one line (data), no header
         assert len(lines) == 1
         assert "id" not in lines[0] or "1" in lines[0]
 
-    def test_child_records_produce_separate_part_files(self, tmp_path):
-        """Child records are written to part files named after the child table."""
+    def test_child_records_produce_separate_files(self, tmp_path):
+        """Child records are written to files named after the child table."""
         dest = str(tmp_path)
 
         with CsvStreamingWriter(
@@ -994,13 +986,13 @@ class TestCsvStreamingWriterBasics:
             writer.write_main_records([{"id": "1", "name": "Alice"}])
             writer.write_child_records("addresses", [{"parent_id": "1", "city": "NYC"}])
 
-        main_part = tmp_path / "parent_part_0000.csv"
-        child_part = tmp_path / "addresses_part_0000.csv"
+        main_file = tmp_path / "parent.csv"
+        child_file = tmp_path / "addresses.csv"
 
-        assert main_part.exists()
-        assert child_part.exists()
+        assert main_file.exists()
+        assert child_file.exists()
 
-        with open(child_part, newline="") as f:
+        with open(child_file, newline="") as f:
             rows = list(csv.DictReader(f))
 
         assert len(rows) == 1
@@ -1045,10 +1037,10 @@ class TestCsvStreamingWriterBasics:
 
         assert writer._closed is True
 
-        part_file = tmp_path / "test_part_0000.csv"
-        assert part_file.exists()
+        output_file = tmp_path / "test.csv"
+        assert output_file.exists()
 
-        with open(part_file, newline="") as f:
+        with open(output_file, newline="") as f:
             rows = list(csv.DictReader(f))
 
         assert len(rows) == 2
@@ -1074,7 +1066,10 @@ class TestCsvStreamingWriterExceptionCleanup:
         with patch.object(csv.DictWriter, "writerows", failing_writerows):
             with pytest.raises(OSError, match="simulated disk failure"):
                 with CsvStreamingWriter(
-                    destination=dest, entity_name="test", batch_size=2
+                    destination=dest,
+                    entity_name="test",
+                    batch_size=2,
+                    consolidate=False,
                 ) as writer:
                     # First batch flushes (call_count=1, succeeds)
                     writer.write_main_records(
@@ -1147,6 +1142,7 @@ class TestCsvCoercion:
                 entity_name="test",
                 batch_size=2,
                 coerce_schema=True,
+                consolidate=False,
             ) as writer:
                 writer.write_main_records(
                     [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]

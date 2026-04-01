@@ -1,7 +1,5 @@
 """Tests for base writer utility functions."""
 
-import math
-
 import pytest
 
 from transmog.writers.base import _normalize_special_floats, sanitize_filename

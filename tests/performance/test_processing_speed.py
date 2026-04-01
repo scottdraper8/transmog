@@ -21,8 +21,8 @@ class TestProcessingSpeedBenchmarks:
         "size,threshold,description",
         [
             (10, 1.0, "small"),
-            (1000, 10.0, "medium"),
-            (10000, 60.0, "large"),
+            (1000, 3.0, "medium"),
+            (10000, 12.0, "large"),
         ],
     )
     def test_dataset_performance_by_size(self, size, threshold, description):
@@ -103,7 +103,7 @@ class TestProcessingSpeedBenchmarks:
         assert len(result.tables) > 0  # Should have child tables
 
         # Complex nested structures take longer but should be reasonable
-        assert processing_time < 30.0
+        assert processing_time < 6.0
         print(f"Complex nested (100 records): {processing_time:.4f}s")
 
     def test_wide_dataset_performance(self):
@@ -129,7 +129,7 @@ class TestProcessingSpeedBenchmarks:
         assert len(result.main) == 1000
 
         # Wide datasets should still process efficiently
-        assert processing_time < 15.0
+        assert processing_time < 3.0
         print(f"Wide dataset (1000 records, 100+ fields): {processing_time:.4f}s")
 
     def test_array_heavy_performance(self):
@@ -162,7 +162,7 @@ class TestProcessingSpeedBenchmarks:
         assert len(result.tables) > 0
 
         # Array processing takes more time but should be reasonable
-        assert processing_time < 45.0
+        assert processing_time < 9.0
         print(f"Array-heavy dataset (500 records): {processing_time:.4f}s")
 
 
@@ -182,7 +182,7 @@ class TestFileProcessingPerformance:
         assert len(result.main) == 1000  # From large_json_file fixture
 
         # File processing should be efficient
-        assert processing_time < 15.0
+        assert processing_time < 3.0
         print(f"JSON file processing (1000 records): {processing_time:.4f}s")
 
     def test_streaming_performance(self):
@@ -214,7 +214,7 @@ class TestFileProcessingPerformance:
         assert len(result.main) == 2000
 
         # Streaming should be memory-efficient and reasonably fast
-        assert processing_time < 25.0
+        assert processing_time < 5.0
         print(f"Streaming processing (2000 records): {processing_time:.4f}s")
 
 
@@ -260,7 +260,7 @@ class TestPerformanceComparisons:
             assert "items" not in result.main[0], "SKIP mode should not include arrays"
 
         # Should complete within reasonable time
-        assert processing_time < 30.0
+        assert processing_time < 6.0
 
     def test_configuration_performance_impact(self):
         """Test performance impact of different configuration options."""

@@ -274,6 +274,45 @@ class TestFlattenFile:
             tm.flatten("nonexistent.csv")
 
 
+class TestFlattenWithIterator:
+    """Test flatten() with generator/iterator inputs."""
+
+    def test_flatten_generator_input(self):
+        """Test that flatten() accepts a generator and processes all records."""
+
+        def record_generator():
+            for i in range(10):
+                yield {"id": i, "name": f"Record {i}"}
+
+        result = tm.flatten(record_generator(), name="gen")
+
+        assert len(result.main) == 10
+        assert result.main[0]["name"] == "Record 0"
+        assert result.main[-1]["name"] == "Record 9"
+
+    def test_flatten_generator_with_nested_data(self):
+        """Test that flatten() handles generators yielding nested records."""
+
+        def nested_generator():
+            for i in range(5):
+                yield {
+                    "id": i,
+                    "info": {"city": f"City {i}", "country": "US"},
+                    "tags": [{"label": f"tag_{i}"}],
+                }
+
+        result = tm.flatten(nested_generator(), name="nested_gen")
+
+        assert len(result.main) == 5
+        assert "info_city" in result.main[0]
+        assert len(result.tables) > 0
+
+    def test_flatten_empty_generator(self):
+        """Test that flatten() handles an empty generator."""
+        result = tm.flatten(iter([]), name="empty_gen")
+        assert len(result.main) == 0
+
+
 class TestFlattenStream:
     """Test flatten_stream() function."""
 
@@ -367,6 +406,34 @@ class TestFlattenStream:
         assert isinstance(result, list)
         assert len(result) > 0
         assert all(Path(p).exists() for p in result)
+
+    def test_flatten_stream_consolidation_preserves_all_records(self, output_dir):
+        """Test that consolidate=True merges all batches into one file with all records."""
+        import csv
+
+        data = [{"id": i, "value": f"item_{i}"} for i in range(25)]
+
+        config = TransmogConfig(batch_size=5)
+        result = tm.flatten_stream(
+            data,
+            output_path=str(output_dir / "consolidated"),
+            name="items",
+            output_format="csv",
+            config=config,
+            consolidate=True,
+        )
+
+        # Should produce exactly one consolidated file for main table
+        csv_files = [p for p in result if str(p).endswith(".csv")]
+        main_files = [p for p in csv_files if "items" in str(p)]
+        assert len(main_files) == 1
+
+        # All 25 records must be present
+        with open(main_files[0], newline="") as f:
+            rows = list(csv.DictReader(f))
+        assert len(rows) == 25
+        ids = {row["id"] for row in rows}
+        assert ids == {str(i) for i in range(25)}
 
     def test_flatten_stream_invalid_format(self, simple_data, output_dir):
         """Test streaming with invalid output format."""

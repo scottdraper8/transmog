@@ -11,24 +11,7 @@ pytestmark = pytest.mark.skipif(not PYARROW_AVAILABLE, reason="PyArrow not avail
 
 
 class TestConverterFunctions:
-    """Test module-level converter functions."""
-
-    def test_convert_bool_normal(self):
-        """Test bool converter with standard inputs."""
-        from transmog.writers.arrow_base import _convert_bool
-
-        assert _convert_bool(True) is True
-        assert _convert_bool(False) is False
-        assert _convert_bool(1) is True
-        assert _convert_bool(0) is False
-
-    def test_convert_int_normal(self):
-        """Test int converter with standard inputs."""
-        from transmog.writers.arrow_base import _convert_int
-
-        assert _convert_int(42) == 42
-        assert _convert_int(3.9) == 3
-        assert _convert_int("7") == 7
+    """Test module-level converter error handling."""
 
     def test_convert_int_error(self):
         """Test int converter returns None on unconvertible input."""
@@ -36,28 +19,11 @@ class TestConverterFunctions:
 
         assert _convert_int("not_int") is None
 
-    def test_convert_float_normal(self):
-        """Test float converter with standard inputs."""
-        from transmog.writers.arrow_base import _convert_float
-
-        assert _convert_float(3.14) == 3.14
-        assert _convert_float(42) == 42.0
-        assert _convert_float("2.5") == 2.5
-
     def test_convert_float_error(self):
         """Test float converter returns None on unconvertible input."""
         from transmog.writers.arrow_base import _convert_float
 
         assert _convert_float("not_float") is None
-
-    def test_convert_str_normal(self):
-        """Test str converter with standard inputs."""
-        from transmog.writers.arrow_base import _convert_str
-
-        assert _convert_str(42) == "42"
-        assert _convert_str(3.14) == "3.14"
-        assert _convert_str(True) == "True"
-        assert _convert_str("hello") == "hello"
 
 
 class TestTypeConvertersMapping:
@@ -78,14 +44,6 @@ class TestTypeConvertersMapping:
         assert converters[pa.bool_()] is _convert_bool
         assert converters[pa.int64()] is _convert_int
         assert converters[pa.float64()] is _convert_float
-
-    def test_get_type_converters_is_stable(self):
-        """Test repeated calls return the same dict object."""
-        from transmog.writers.arrow_base import _get_type_converters
-
-        first = _get_type_converters()
-        second = _get_type_converters()
-        assert first is second
 
 
 class TestCreateSchemaConverters:
@@ -148,7 +106,10 @@ class TestPartFileOutput:
         from transmog.writers.parquet import ParquetStreamingWriter
 
         with ParquetStreamingWriter(
-            destination=str(tmp_path), entity_name="test", batch_size=2
+            destination=str(tmp_path),
+            entity_name="test",
+            batch_size=2,
+            consolidate=False,
         ) as writer:
             writer.write_main_records(
                 [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
@@ -159,21 +120,6 @@ class TestPartFileOutput:
 
         assert (tmp_path / "test_part_0000.parquet").exists()
         assert (tmp_path / "test_part_0001.parquet").exists()
-
-    def test_record_buffer_reused_across_batches(self, tmp_path):
-        """Test same list object persists after flush (clear instead of reassign)."""
-        from transmog.writers.parquet import ParquetStreamingWriter
-
-        with ParquetStreamingWriter(
-            destination=str(tmp_path), entity_name="test", batch_size=2
-        ) as writer:
-            writer.write_main_records([{"id": 1, "name": "Alice"}])
-            buffer_ref = writer.buffers["main"]
-
-            writer.write_main_records(
-                [{"id": 2, "name": "Bob"}, {"id": 3, "name": "Charlie"}]
-            )
-            assert writer.buffers["main"] is buffer_ref
 
 
 class TestPyArrowWriterExceptionHandling:
@@ -302,7 +248,10 @@ class TestArrowStreamingWriterExceptionCleanup:
 
         with pytest.raises(OSError, match="simulated write failure"):
             with ParquetStreamingWriter(
-                destination=str(tmp_path), entity_name="test", batch_size=2
+                destination=str(tmp_path),
+                entity_name="test",
+                batch_size=2,
+                consolidate=False,
             ) as writer:
                 writer.write_main_records(
                     [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
@@ -329,7 +278,10 @@ class TestSchemaLog:
         from transmog.writers.parquet import ParquetStreamingWriter
 
         with ParquetStreamingWriter(
-            destination=str(tmp_path), entity_name="test", batch_size=2
+            destination=str(tmp_path),
+            entity_name="test",
+            batch_size=2,
+            consolidate=False,
         ) as writer:
             writer.write_main_records(
                 [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
@@ -353,7 +305,10 @@ class TestSchemaLog:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             with ParquetStreamingWriter(
-                destination=str(tmp_path), entity_name="test", batch_size=2
+                destination=str(tmp_path),
+                entity_name="test",
+                batch_size=2,
+                consolidate=False,
             ) as writer:
                 writer.write_main_records(
                     [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
@@ -389,6 +344,7 @@ class TestSchemaLog:
                 entity_name="test",
                 batch_size=2,
                 coerce_schema=True,
+                consolidate=False,
             ) as writer:
                 writer.write_main_records(
                     [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]

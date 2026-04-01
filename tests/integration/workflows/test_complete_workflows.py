@@ -105,18 +105,16 @@ class TestEndToEndWorkflows:
         csv_files = list((output_dir / "streaming_csv").glob("**/*.csv"))
         assert len(csv_files) > 0
 
-        # Verify content by reading back all main CSV part files
+        # Verify content by reading back the consolidated main CSV file
         import csv
 
-        main_csv_parts = sorted(
-            f for f in csv_files if "users_part_" in f.name and "profile" not in f.name
+        main_csv = output_dir / "streaming_csv" / "users.csv"
+        assert main_csv.exists(), (
+            f"Expected consolidated file users.csv, found: {[f.name for f in csv_files]}"
         )
-        assert len(main_csv_parts) > 0
-        rows = []
-        for part in main_csv_parts:
-            with open(part, newline="") as f:
-                reader = csv.DictReader(f)
-                rows.extend(reader)
+        with open(main_csv, newline="") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
         assert len(rows) == 100
 
     def test_deterministic_id_consistency(self, array_data):

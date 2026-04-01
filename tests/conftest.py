@@ -139,19 +139,6 @@ def mixed_types_data() -> dict[str, Any]:
     }
 
 
-@pytest.fixture
-def problematic_data() -> list[dict[str, Any]]:
-    """Data that might cause processing issues."""
-    return [
-        {"id": 1, "name": "Valid Record"},
-        {"id": None, "name": "Null ID"},
-        {"name": "Missing ID"},
-        {"id": "", "name": "Empty ID"},
-        {"id": 2, "name": None},
-        {"id": 3, "name": ""},
-    ]
-
-
 # ---- File Fixtures ----
 
 

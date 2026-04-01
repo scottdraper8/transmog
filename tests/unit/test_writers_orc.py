@@ -1,8 +1,6 @@
 """Tests for ORC writer."""
 
 import io
-import os
-import tempfile
 
 import pytest
 
@@ -101,7 +99,7 @@ class TestOrcStreamingWriter:
     """Test ORC streaming writer functionality."""
 
     def test_write_main_records(self, tmp_path):
-        """Test writing main records produces a part file."""
+        """Test writing main records produces a consolidated file."""
         records = [
             {"id": 1, "name": "Alice"},
             {"id": 2, "name": "Bob"},
@@ -112,14 +110,14 @@ class TestOrcStreamingWriter:
         ) as writer:
             writer.write_main_records(records)
 
-        part_path = tmp_path / "users_part_0000.orc"
-        assert part_path.exists()
+        output_path = tmp_path / "users.orc"
+        assert output_path.exists()
 
-        table = orc.read_table(str(part_path))
+        table = orc.read_table(str(output_path))
         assert len(table) == 2
 
     def test_write_child_records(self, tmp_path):
-        """Test writing child records produces part files."""
+        """Test writing child records produces separate files."""
         main_records = [{"id": 1, "name": "Alice"}]
         child_records = [
             {"user_id": 1, "order_id": 101},
@@ -132,16 +130,19 @@ class TestOrcStreamingWriter:
             writer.write_main_records(main_records)
             writer.write_child_records("orders", child_records)
 
-        assert (tmp_path / "users_part_0000.orc").exists()
-        assert (tmp_path / "orders_part_0000.orc").exists()
+        assert (tmp_path / "users.orc").exists()
+        assert (tmp_path / "orders.orc").exists()
 
-        orders_table = orc.read_table(str(tmp_path / "orders_part_0000.orc"))
+        orders_table = orc.read_table(str(tmp_path / "orders.orc"))
         assert len(orders_table) == 2
 
     def test_buffering(self, tmp_path):
-        """Test that buffering produces multiple part files."""
+        """Test that buffering produces multiple part files with consolidate=False."""
         with OrcStreamingWriter(
-            destination=str(tmp_path), entity_name="data", batch_size=10
+            destination=str(tmp_path),
+            entity_name="data",
+            batch_size=10,
+            consolidate=False,
         ) as writer:
             for i in range(25):
                 writer.write_main_records([{"id": i, "value": i * 2}])
@@ -158,8 +159,25 @@ class TestOrcStreamingWriter:
         assert len(all_rows) == 25
         assert sorted(all_rows) == list(range(25))
 
+    def test_buffering_consolidated(self, tmp_path):
+        """Test that buffered data is consolidated into a single file."""
+        with OrcStreamingWriter(
+            destination=str(tmp_path),
+            entity_name="data",
+            batch_size=10,
+        ) as writer:
+            for i in range(25):
+                writer.write_main_records([{"id": i, "value": i * 2}])
+
+        consolidated = tmp_path / "data.orc"
+        assert consolidated.exists()
+
+        table = orc.read_table(str(consolidated))
+        assert len(table) == 25
+        assert sorted(table.column("id").to_pylist()) == list(range(25))
+
     def test_multiple_tables(self, tmp_path):
-        """Test writing multiple child tables produces part files."""
+        """Test writing multiple child tables produces separate files."""
         with OrcStreamingWriter(
             destination=str(tmp_path), entity_name="users"
         ) as writer:
@@ -167,27 +185,27 @@ class TestOrcStreamingWriter:
             writer.write_child_records("orders", [{"user_id": 1, "order_id": 101}])
             writer.write_child_records("addresses", [{"user_id": 1, "city": "NYC"}])
 
-        assert (tmp_path / "users_part_0000.orc").exists()
-        assert (tmp_path / "orders_part_0000.orc").exists()
-        assert (tmp_path / "addresses_part_0000.orc").exists()
+        assert (tmp_path / "users.orc").exists()
+        assert (tmp_path / "orders.orc").exists()
+        assert (tmp_path / "addresses.orc").exists()
 
     def test_safe_table_names(self, tmp_path):
-        """Test that table names are sanitized in part file names."""
+        """Test that table names are sanitized in file names."""
         with OrcStreamingWriter(
             destination=str(tmp_path), entity_name="users"
         ) as writer:
             writer.write_child_records("user/addresses", [{"id": 1}])
 
-        assert (tmp_path / "user_addresses_part_0000.orc").exists()
+        assert (tmp_path / "user_addresses.orc").exists()
 
-    def test_close_returns_part_paths(self, tmp_path):
-        """Test that close returns paths to part files."""
+    def test_close_returns_paths(self, tmp_path):
+        """Test that close returns paths to output files."""
         writer = OrcStreamingWriter(destination=str(tmp_path), entity_name="data")
         writer.write_main_records([{"id": 1}])
         paths = writer.close()
 
         assert len(paths) == 1
-        assert paths[0].name == "data_part_0000.orc"
+        assert paths[0].name == "data.orc"
         assert paths[0].exists()
 
     def test_close_idempotent(self, tmp_path):
@@ -197,7 +215,7 @@ class TestOrcStreamingWriter:
         writer.close()
         writer.close()  # Should not raise
 
-        assert (tmp_path / "data_part_0000.orc").exists()
+        assert (tmp_path / "data.orc").exists()
 
 
 def test_orc_not_available():

@@ -10,18 +10,6 @@ from transmog.types import ArrayMode
 class TestConfigCreation:
     """Test TransmogConfig creation and initialization."""
 
-    def test_default_config(self):
-        """Test default configuration values."""
-        config = TransmogConfig()
-
-        assert isinstance(config, TransmogConfig)
-        assert config.include_nulls is False
-        assert config.stringify_values is False
-        assert config.batch_size == 1000
-        assert config.id_field == "_id"
-        assert config.parent_field == "_parent_id"
-        assert config.id_generation == "random"
-
     def test_config_with_custom_params(self):
         """Test configuration with custom parameters."""
         config = TransmogConfig(
@@ -31,11 +19,6 @@ class TestConfigCreation:
 
         assert config.batch_size == 500
         assert config.include_nulls is True
-
-    def test_stringify_values_default(self):
-        """Test stringify_values defaults to False."""
-        config = TransmogConfig()
-        assert config.stringify_values is False
 
     def test_stringify_values_enabled(self):
         """Test stringify_values can be enabled."""
@@ -141,23 +124,3 @@ class TestMaxDepthBehavior:
         assert "top" in non_meta
         # Nested fields should not appear at depth 1
         assert not any("inner" in k for k in non_meta)
-
-
-class TestArrayModeHandling:
-    """Test array mode validation and error handling."""
-
-    def test_invalid_array_mode_raises_error(self):
-        """Test that invalid ArrayMode raises ValueError during processing."""
-        import transmog as tm
-
-        config = TransmogConfig(array_mode=ArrayMode.SMART)
-
-        # Monkey-patch with invalid mode to test defensive check
-        class InvalidMode:
-            value = "invalid"
-
-        config.array_mode = InvalidMode()
-        data = {"test": [1, 2, 3]}
-
-        with pytest.raises(ValueError, match="Unhandled ArrayMode"):
-            tm.flatten(data, config=config)

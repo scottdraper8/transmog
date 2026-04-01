@@ -6,11 +6,7 @@ memory optimization, and direct output to various formats.
 """
 
 import csv
-import glob
 import json
-import os
-import tempfile
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -25,8 +21,13 @@ from transmog.iterators import (
 from transmog.streaming import stream_process
 
 
-def _read_csv_parts(directory: Path, entity_name: str) -> list[dict[str, Any]]:
-    """Read all CSV part files and return combined records."""
+def _read_csv_output(directory: Path, entity_name: str) -> list[dict[str, Any]]:
+    """Read CSV output (consolidated or part files) and return combined records."""
+    consolidated = directory / f"{entity_name}.csv"
+    if consolidated.exists():
+        with open(consolidated) as f:
+            return list(csv.DictReader(f))
+
     parts = sorted(directory.glob(f"{entity_name}_part_*.csv"))
     records = []
     for part in parts:
@@ -58,7 +59,7 @@ class TestStreamProcessing:
         )
 
         assert output_dir.exists()
-        result = _read_csv_parts(output_dir, "users")
+        result = _read_csv_output(output_dir, "users")
         assert len(result) == 2
         assert result[0]["name"] == "Alice"
 
@@ -86,13 +87,10 @@ class TestStreamProcessing:
             output_destination=str(output_dir),
         )
 
-        main_parts = sorted(output_dir.glob("companies_part_*.csv"))
-        assert len(main_parts) >= 1
+        assert (output_dir / "companies.csv").exists()
+        assert (output_dir / "companies_employees.csv").exists()
 
-        child_parts = sorted(output_dir.glob("companies_employees_part_*.csv"))
-        assert len(child_parts) >= 1
-
-        employees = _read_csv_parts(output_dir, "companies_employees")
+        employees = _read_csv_output(output_dir, "companies_employees")
         assert len(employees) == 2
         assert employees[0]["name"] == "Alice"
 
@@ -114,7 +112,7 @@ class TestStreamProcessing:
             output_destination=str(output_dir),
         )
 
-        result = _read_csv_parts(output_dir, "items")
+        result = _read_csv_output(output_dir, "items")
         assert len(result) == 5
 
     def test_stream_process_csv_output(self, tmp_path):
@@ -135,7 +133,7 @@ class TestStreamProcessing:
             output_destination=str(output_dir),
         )
 
-        result = _read_csv_parts(output_dir, "scores")
+        result = _read_csv_output(output_dir, "scores")
         assert len(result) == 2
         assert any("Alice" in r.get("name", "") for r in result)
 
@@ -154,7 +152,7 @@ class TestStreamProcessing:
             output_destination=str(output_dir),
         )
 
-        result = _read_csv_parts(output_dir, "items")
+        result = _read_csv_output(output_dir, "items")
         assert len(result) == 50
 
     def test_stream_process_deterministic_ids(self, tmp_path):
@@ -175,7 +173,7 @@ class TestStreamProcessing:
             output_destination=str(output_dir),
         )
 
-        result = _read_csv_parts(output_dir, "users")
+        result = _read_csv_output(output_dir, "users")
         assert "user_id" in result[0]
 
     def test_stream_process_with_id_field(self, tmp_path):
@@ -196,7 +194,7 @@ class TestStreamProcessing:
             output_destination=str(output_dir),
         )
 
-        result = _read_csv_parts(output_dir, "users")
+        result = _read_csv_output(output_dir, "users")
         assert "_id" in result[0]
 
 
@@ -225,7 +223,7 @@ class TestStreamProcessFile:
             output_destination=str(output_dir),
         )
 
-        result = _read_csv_parts(output_dir, "users")
+        result = _read_csv_output(output_dir, "users")
         assert len(result) == 2
 
     def test_stream_process_jsonl_file(self, tmp_path):
@@ -247,7 +245,7 @@ class TestStreamProcessFile:
             output_destination=str(output_dir),
         )
 
-        result = _read_csv_parts(output_dir, "users")
+        result = _read_csv_output(output_dir, "users")
         assert len(result) == 2
 
     def test_stream_process_nonexistent_file(self):
@@ -274,7 +272,7 @@ class TestStreamingMemoryOptimization:
             output_destination=str(output_dir),
         )
 
-        result = _read_csv_parts(output_dir, "items")
+        result = _read_csv_output(output_dir, "items")
         assert len(result) == 100
 
     def test_streaming_with_small_batch_size(self, tmp_path):
@@ -292,7 +290,7 @@ class TestStreamingMemoryOptimization:
             output_destination=str(output_dir),
         )
 
-        result = _read_csv_parts(output_dir, "items")
+        result = _read_csv_output(output_dir, "items")
         assert len(result) == 20
 
 
@@ -318,8 +316,7 @@ class TestStreamingErrorHandling:
             output_destination=str(output_dir),
         )
 
-        parts = sorted(output_dir.glob("users_part_*.csv"))
-        assert len(parts) >= 1
+        assert (output_dir / "users.csv").exists()
 
     def test_streaming_with_invalid_output_format(self, tmp_path):
         """Test streaming with invalid output format."""
@@ -378,7 +375,7 @@ class TestStreamingWithComplexData:
             output_destination=str(output_dir),
         )
 
-        result = _read_csv_parts(output_dir, "nested")
+        result = _read_csv_output(output_dir, "nested")
         assert len(result) == 1
         flattened_keys = list(result[0].keys())
         assert any("level" in key for key in flattened_keys)
@@ -407,8 +404,7 @@ class TestStreamingWithComplexData:
             output_destination=str(output_dir),
         )
 
-        parts = sorted(output_dir.glob("mixed_part_*.csv"))
-        assert len(parts) >= 1
+        assert (output_dir / "mixed.csv").exists()
 
         all_csv_files = list(output_dir.glob("*.csv"))
         assert len(all_csv_files) >= 1
@@ -439,7 +435,7 @@ class TestStreamingWithComplexData:
             output_destination=str(output_dir),
         )
 
-        result = _read_csv_parts(output_dir, "users")
+        result = _read_csv_output(output_dir, "users")
         assert len(result) == 500
 
 
@@ -464,7 +460,7 @@ class TestStreamingOutputFormats:
             output_destination=str(output_dir),
         )
 
-        result = _read_csv_parts(output_dir, "scores")
+        result = _read_csv_output(output_dir, "scores")
         assert len(result) == 2
         assert result[0]["name"] == "Alice"
         assert result[1]["name"] == "Bob"
@@ -488,15 +484,14 @@ class TestStreamingOutputFormats:
             delimiter="\t",
         )
 
-        parts = sorted(output_dir.glob("users_part_*.csv"))
-        assert len(parts) >= 1
+        assert (output_dir / "users.csv").exists()
 
-        with open(parts[0]) as f:
+        with open(output_dir / "users.csv") as f:
             content = f.read()
         assert "\t" in content
 
     def test_streaming_to_parquet_format(self, tmp_path):
-        """Test streaming to Parquet format with part files."""
+        """Test streaming to Parquet format."""
         pytest.importorskip("pyarrow")
 
         data = [
@@ -515,13 +510,13 @@ class TestStreamingOutputFormats:
             output_destination=str(output_dir),
         )
 
-        parts = sorted(output_dir.glob("scores_part_*.parquet"))
-        assert len(parts) >= 1
-        assert parts[0].stat().st_size > 0
+        consolidated = output_dir / "scores.parquet"
+        assert consolidated.exists()
+        assert consolidated.stat().st_size > 0
 
         import pyarrow.parquet as pq
 
-        table = pq.read_table(str(parts[0]))
+        table = pq.read_table(str(consolidated))
         assert table.num_rows == 2
         assert "name" in table.schema.names
         assert "score" in table.schema.names
@@ -562,7 +557,7 @@ class TestStreamingEdgeCases:
             output_destination=str(output_dir),
         )
 
-        result = _read_csv_parts(output_dir, "single")
+        result = _read_csv_output(output_dir, "single")
         assert len(result) == 1
 
     def test_streaming_with_null_values(self, tmp_path):
@@ -583,7 +578,7 @@ class TestStreamingEdgeCases:
             output_destination=str(output_dir),
         )
 
-        result = _read_csv_parts(output_dir, "nulls")
+        result = _read_csv_output(output_dir, "nulls")
         assert len(result) == 2
 
 
@@ -616,14 +611,11 @@ class TestStreamProcessingAvro:
             output_destination=str(output_dir),
         )
 
-        parts = sorted(output_dir.glob("users_part_*.avro"))
-        assert len(parts) >= 1
+        consolidated = output_dir / "users.avro"
+        assert consolidated.exists()
 
-        all_records = []
-        for part in parts:
-            with open(part, "rb") as f:
-                reader = fastavro.reader(f)
-                all_records.extend(reader)
+        with open(consolidated, "rb") as f:
+            all_records = list(fastavro.reader(f))
 
         assert len(all_records) == 3
         names = {r["name"] for r in all_records}
