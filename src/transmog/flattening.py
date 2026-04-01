@@ -228,7 +228,7 @@ def _process_array_items(
                 path_components=[],
                 extract_time=_context.extract_time,
             )
-            flattened, item_arrays = flatten_json(
+            metadata_dict, item_arrays = flatten_json(
                 item,
                 config,
                 item_context,
@@ -236,7 +236,6 @@ def _process_array_items(
                 _parent_id=_parent_id,
                 _entity_name=_entity_name,
             )
-            metadata_dict = flattened
         else:
             # Simple primitive value - apply stringify if configured
             if (
@@ -385,11 +384,6 @@ def flatten_json(
 
                     for table_name, table_records in array_items.items():
                         arrays.setdefault(table_name, []).extend(table_records)
-            else:
-                raise ValueError(
-                    f"Unhandled ArrayMode: {config.array_mode}. "
-                    f"Valid modes: {[mode.value for mode in ArrayMode]}"
-                )
 
         else:
             if not is_null_like(value):
@@ -489,19 +483,7 @@ def _process_structure(
     if not data:
         return {}, {}
 
-    if config.array_mode == ArrayMode.SEPARATE:
-        collect_arrays = True
-    elif config.array_mode == ArrayMode.SMART:
-        collect_arrays = True
-    elif config.array_mode == ArrayMode.INLINE:
-        collect_arrays = False
-    elif config.array_mode == ArrayMode.SKIP:
-        collect_arrays = False
-    else:
-        raise ValueError(
-            f"Unhandled ArrayMode: {config.array_mode}. "
-            f"Valid modes: {[mode.value for mode in ArrayMode]}"
-        )
+    collect_arrays = config.array_mode in (ArrayMode.SEPARATE, ArrayMode.SMART)
 
     generated_id = generate_transmog_id(
         record=data,

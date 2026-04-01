@@ -44,6 +44,12 @@ else:
     JSON_DECODE_ERRORS = (json.JSONDecodeError,)
 
 
+def _require_file(file_path: str) -> None:
+    """Raise ValidationError if the file does not exist."""
+    if not os.path.exists(file_path):
+        raise ValidationError(f"File not found: {file_path}")
+
+
 def get_data_iterator(
     data: (
         dict[str, Any]
@@ -140,8 +146,7 @@ def get_json_data_iterator(
 
 def get_json_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
     """Iterate over records in a JSON file."""
-    if not os.path.exists(file_path):
-        raise ValidationError(f"File not found: {file_path}")
+    _require_file(file_path)
 
     try:
         parsed = _load_json_file(file_path)
@@ -173,8 +178,7 @@ def get_json_file_iterator_streaming(file_path: str) -> Iterator[dict[str, Any]]
             "Install with: pip install ijson"
         )
 
-    if not os.path.exists(file_path):
-        raise ValidationError(f"File not found: {file_path}")
+    _require_file(file_path)
 
     first_byte = _peek_first_byte(file_path)
 
@@ -233,8 +237,7 @@ def get_jsonl_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
     Returns:
         Iterator over data records
     """
-    if not os.path.exists(file_path):
-        raise ValidationError(f"File not found: {file_path}")
+    _require_file(file_path)
 
     try:
         with open(file_path, encoding="utf-8") as handle:
@@ -272,8 +275,7 @@ def get_json5_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
     Returns:
         Iterator over data records
     """
-    if not os.path.exists(file_path):
-        raise ValidationError(f"File not found: {file_path}")
+    _require_file(file_path)
 
     if _json5 is None:
         raise ValidationError(
@@ -300,8 +302,7 @@ def get_hjson_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
     Returns:
         Iterator over data records
     """
-    if not os.path.exists(file_path):
-        raise ValidationError(f"File not found: {file_path}")
+    _require_file(file_path)
 
     if _hjson is None:
         raise ValidationError(
