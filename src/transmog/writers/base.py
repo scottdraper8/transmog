@@ -107,8 +107,9 @@ class StreamingWriter(ABC):
         self,
         destination: str | None = None,
         entity_name: str = "entity",
-        batch_size: int = 10000,
+        batch_size: int = 5000,
         coerce_schema: bool = False,
+        consolidate: bool = True,
         **options: Any,
     ):
         """Initialize the streaming writer.
@@ -120,6 +121,7 @@ class StreamingWriter(ABC):
                 Typically set via TransmogConfig.batch_size and passed by the
                 streaming pipeline.
             coerce_schema: Coerce minority part files to majority schema at close
+            consolidate: Merge part files into a single file per table at close
             **options: Format-specific options
 
         Raises:
@@ -134,6 +136,7 @@ class StreamingWriter(ABC):
         self.entity_name = entity_name
         self.batch_size = batch_size
         self.coerce_schema = coerce_schema
+        self.consolidate = consolidate
         self.options = options
 
         self.base_dir: str | None = None
@@ -172,23 +175,49 @@ class StreamingWriter(ABC):
         ...
 
     @abstractmethod
-    def _schema_to_dict(self, schema: Any) -> dict:
-        """Serialize a format-specific schema to a JSON-friendly dict."""
-        ...
+    def _schema_fields(self, schema: Any) -> list[tuple[str, str]]:
+        """Extract (name, type_string) pairs from a format-specific schema.
 
-    @abstractmethod
-    def _compute_deviations(self, _base_schema: Any, _part_schema: Any) -> dict | None:
-        """Compute deviations between a base and part schema.
-
-        Returns:
-            Dict with 'structural' and/or 'type' keys, or None if identical.
+        Subclasses implement this to bridge format-specific schema objects
+        into the common representation used by deviation tracking.
         """
         ...
 
-    @abstractmethod
+    def _schema_to_dict(self, schema: Any) -> dict:
+        """Serialize a format-specific schema to a JSON-friendly dict."""
+        return {
+            "fields": [
+                {"name": name, "type": type_str}
+                for name, type_str in self._schema_fields(schema)
+            ]
+        }
+
+    def _compute_deviations(self, base_schema: Any, part_schema: Any) -> dict | None:
+        """Compute deviations between a base and part schema."""
+        base_fields = dict(self._schema_fields(base_schema))
+        part_fields = dict(self._schema_fields(part_schema))
+
+        added = sorted(name for name in part_fields if name not in base_fields)
+        removed = sorted(name for name in base_fields if name not in part_fields)
+        type_changes = {
+            name: {"base": base_fields[name], "part": part_fields[name]}
+            for name in base_fields
+            if name in part_fields and base_fields[name] != part_fields[name]
+        }
+
+        if not added and not removed and not type_changes:
+            return None
+
+        result: dict[str, Any] = {}
+        if added or removed:
+            result["structural"] = {"added": added, "removed": removed}
+        if type_changes:
+            result["type"] = type_changes
+        return result
+
     def _schema_fingerprint(self, schema: Any) -> tuple:
         """Create a hashable fingerprint from a schema for equality comparison."""
-        ...
+        return tuple(self._schema_fields(schema))
 
     @abstractmethod
     def _build_unified_schema(self, schemas: list[Any]) -> Any:
@@ -198,6 +227,19 @@ class StreamingWriter(ABC):
     @abstractmethod
     def _rewrite_part(self, file_path: str, target_schema: Any) -> None:
         """Rewrite a part file to match the target unified schema."""
+        ...
+
+    @abstractmethod
+    def _consolidate_parts(
+        self, output_path: str, part_files: list[str], schema: Any
+    ) -> None:
+        """Merge multiple part files into a single consolidated file.
+
+        Args:
+            output_path: Destination path for the consolidated file
+            part_files: Ordered list of part file paths to merge
+            schema: Unified schema for the consolidated output
+        """
         ...
 
     # --- Concrete part-file lifecycle methods ---
@@ -216,6 +258,49 @@ class StreamingWriter(ABC):
             safe_name = sanitize_filename(table_name)
             filename = f"{safe_name}_part_{part_num:04d}{extension}"
         return os.path.join(base_dir, filename)
+
+    def _get_consolidated_path(self, table_name: str) -> str:
+        """Get the file path for a consolidated single-file output."""
+        base_dir = self.base_dir
+        if base_dir is None:
+            raise ConfigurationError(
+                "Cannot get consolidated path without a destination directory."
+            )
+        extension = self._get_file_extension()
+        if table_name == "main":
+            filename = f"{self.entity_name}{extension}"
+        else:
+            safe_name = sanitize_filename(table_name)
+            filename = f"{safe_name}{extension}"
+        return os.path.join(base_dir, filename)
+
+    def _consolidate_all_tables(self) -> None:
+        """Merge all part files into a single file per table."""
+        base_dir = self.base_dir
+        if base_dir is None:
+            return
+
+        consolidated_paths: list[str] = []
+
+        for table_name, part_list in self._part_schemas.items():
+            if not part_list:
+                continue
+
+            part_files = [os.path.join(base_dir, basename) for basename, _ in part_list]
+            consolidated_path = self._get_consolidated_path(table_name)
+
+            if len(part_files) == 1:
+                os.rename(part_files[0], consolidated_path)
+            else:
+                schemas = [schema for _, schema in part_list]
+                unified_schema = self._build_unified_schema(schemas)
+                self._consolidate_parts(consolidated_path, part_files, unified_schema)
+                for part_file in part_files:
+                    os.remove(part_file)
+
+            consolidated_paths.append(consolidated_path)
+
+        self.all_part_paths = consolidated_paths
 
     def _log_schema(self, table_name: str, file_path: str, schema: Any) -> None:
         """Log schema for a part file, tracking deviations from the base."""
@@ -405,8 +490,9 @@ class StreamingWriter(ABC):
     def close(self) -> list[Path]:
         """Finalize output, flush buffered data, and clean up resources.
 
-        Writes remaining buffered records, emits the schema log, warns about
-        deviations, and optionally coerces minority part files.
+        Writes remaining buffered records, warns about schema deviations,
+        optionally coerces minority part files, and optionally consolidates
+        part files into a single file per table.
 
         Returns:
             List of file paths written, or empty list if no directory set.
@@ -433,7 +519,10 @@ class StreamingWriter(ABC):
                     )
                     self._coerce_part_files()
 
-            self._write_schema_log()
+            if self.consolidate:
+                self._consolidate_all_tables()
+            else:
+                self._write_schema_log()
 
         paths = [Path(p) for p in self.all_part_paths]
 

@@ -83,18 +83,14 @@ class OrcStreamingWriter(PyArrowStreamingWriter):
         """Write table using the ORC writer."""
         writer.write(table)
 
-    def _rewrite_part_with_schema(self, file_path: str, target_schema: Any) -> None:
+    def _read_part_table(self, file_path: str) -> Any:
+        """Read an ORC part file as a PyArrow Table."""
+        return orc.read_table(file_path)
+
+    def _rewrite_part(self, file_path: str, target_schema: Any) -> None:
         """Rewrite an ORC part file with a new target schema."""
         table = orc.read_table(file_path)
-
-        for field in target_schema:
-            if field.name not in table.column_names:
-                null_array = pa.nulls(len(table), type=field.type)
-                table = table.append_column(field, null_array)
-
-        table = table.select([f.name for f in target_schema])
-        table = table.cast(target_schema)
-
+        table = self._promote_table_to_schema(table, target_schema)
         orc.write_table(table, file_path, compression=self.compression)
 
 

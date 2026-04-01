@@ -9,15 +9,10 @@ try:
     import pyarrow.parquet as pq
 
     PARQUET_AVAILABLE = True
-    _PARQUET_READ_ERRORS: tuple[type[Exception], ...] = (
-        OSError,
-        pa.lib.ArrowException,
-    )
 except ImportError:
     pa = None
     pq = None
     PARQUET_AVAILABLE = False
-    _PARQUET_READ_ERRORS: tuple[type[Exception], ...] = (OSError,)  # type: ignore[no-redef]
 
 
 class ParquetWriter(PyArrowWriter):
@@ -90,20 +85,14 @@ class ParquetStreamingWriter(PyArrowStreamingWriter):
         """Write table using the Parquet writer."""
         writer.write_table(table)
 
-    def _rewrite_part_with_schema(self, file_path: str, target_schema: Any) -> None:
+    def _read_part_table(self, file_path: str) -> Any:
+        """Read a Parquet part file as a PyArrow Table."""
+        return pq.read_table(file_path)
+
+    def _rewrite_part(self, file_path: str, target_schema: Any) -> None:
         """Rewrite a Parquet part file with a new target schema."""
         table = pq.read_table(file_path)
-
-        # Add missing columns as null arrays
-        for field in target_schema:
-            if field.name not in table.column_names:
-                null_array = pa.nulls(len(table), type=field.type)
-                table = table.append_column(field, null_array)
-
-        # Reorder columns to match target schema, then cast types
-        table = table.select([f.name for f in target_schema])
-        table = table.cast(target_schema)
-
+        table = self._promote_table_to_schema(table, target_schema)
         pq.write_table(table, file_path, compression=self.compression)
 
 

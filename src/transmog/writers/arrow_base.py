@@ -204,7 +204,6 @@ class PyArrowStreamingWriter(StreamingWriter):
 
         self.compression = compression
         self.stringify_values = stringify_values
-        self._column_buffers: dict[str, dict[str, list[Any]]] = {}
 
     @abstractmethod
     def _get_format_name(self) -> str:
@@ -345,60 +344,57 @@ class PyArrowStreamingWriter(StreamingWriter):
 
         return schema
 
-    @staticmethod
-    def _schema_to_dict(schema: Any) -> dict:
-        """Serialize a PyArrow schema to a JSON-friendly dict."""
-        return {"fields": [{"name": f.name, "type": str(f.type)} for f in schema]}
-
-    @staticmethod
-    def _compute_deviations(base_schema: Any, part_schema: Any) -> dict | None:
-        """Compute schema deviations between a base and part schema."""
-        base_fields = {f.name: str(f.type) for f in base_schema}
-        part_fields = {f.name: str(f.type) for f in part_schema}
-
-        added = sorted(name for name in part_fields if name not in base_fields)
-        removed = sorted(name for name in base_fields if name not in part_fields)
-        type_changes = {
-            name: {"base": base_fields[name], "part": part_fields[name]}
-            for name in base_fields
-            if name in part_fields and base_fields[name] != part_fields[name]
-        }
-
-        if not added and not removed and not type_changes:
-            return None
-
-        result: dict[str, Any] = {}
-        if added or removed:
-            result["structural"] = {"added": added, "removed": removed}
-        if type_changes:
-            result["type"] = type_changes
-        return result
-
-    def _schema_fingerprint(self, schema: Any) -> tuple:
-        """Create a hashable fingerprint from a PyArrow schema."""
-        return tuple((f.name, str(f.type)) for f in schema)
+    def _schema_fields(self, schema: Any) -> list[tuple[str, str]]:
+        """Extract (name, type_string) pairs from a PyArrow schema."""
+        return [(f.name, str(f.type)) for f in schema]
 
     def _build_unified_schema(self, schemas: list[Any]) -> Any:
         """Build a unified PyArrow schema from all part schemas."""
         return pa.unify_schemas(schemas)
 
-    def _rewrite_part(self, file_path: str, target_schema: Any) -> None:
-        """Rewrite a part file with a new target schema.
+    def _promote_table_to_schema(self, table: Any, target_schema: Any) -> Any:
+        """Promote a table to match a target schema.
 
-        Delegates to subclass-specific read/rewrite methods.
+        Adds missing columns as null arrays, reorders to match the target,
+        and casts types.
         """
-        self._rewrite_part_with_schema(file_path, target_schema)
+        for field in target_schema:
+            if field.name not in table.column_names:
+                null_array = pa.nulls(len(table), type=field.type)
+                table = table.append_column(field, null_array)
+        table = table.select([f.name for f in target_schema])
+        return table.cast(target_schema)
 
     @abstractmethod
-    def _rewrite_part_with_schema(self, file_path: str, target_schema: Any) -> None:
+    def _rewrite_part(self, file_path: str, target_schema: Any) -> None:
         """Rewrite a part file with a target schema (format-specific)."""
         ...
 
+    @abstractmethod
+    def _read_part_table(self, file_path: str) -> Any:
+        """Read a part file and return a PyArrow Table (format-specific)."""
+        ...
+
+    def _consolidate_parts(
+        self, output_path: str, part_files: list[str], schema: Any
+    ) -> None:
+        """Merge multiple PyArrow part files into a single file.
+
+        Reads one part file at a time so peak memory is bounded by the
+        largest single part rather than the entire dataset.
+        """
+        writer = self._create_format_writer(output_path, schema)
+        for part_file in part_files:
+            table = self._read_part_table(part_file)
+            table = self._promote_table_to_schema(table, schema)
+            self._write_to_format_writer(writer, table)
+            del table
+        if hasattr(writer, "close"):
+            writer.close()
+
     def close(self) -> list[Path]:
-        """Finalize output, flush buffered data, and clear PyArrow caches."""
-        paths = super().close()
-        self._column_buffers.clear()
-        return paths
+        """Finalize output and flush buffered data."""
+        return super().close()
 
 
 __all__ = ["PyArrowWriter", "PyArrowStreamingWriter", "PYARROW_AVAILABLE"]

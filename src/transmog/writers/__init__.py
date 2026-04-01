@@ -86,18 +86,20 @@ def create_streaming_writer(
     format_name: str,
     destination: str | None = None,
     entity_name: str = "entity",
-    batch_size: int = 10000,
+    batch_size: int = 5000,
     coerce_schema: bool = False,
+    consolidate: bool = True,
     **kwargs: Any,
 ) -> StreamingWriter:
     """Create a streaming writer for the given format.
 
     Args:
         format_name: Format name (csv, parquet, orc, avro)
-        destination: Directory path to write part files to
+        destination: Directory path to write output files to
         entity_name: Name of the entity being processed
         batch_size: Number of records per batch before flushing to part file
         coerce_schema: Coerce minority part files to majority schema at close
+        consolidate: Merge part files into a single file per table at close
         **kwargs: Format-specific options
 
     Returns:
@@ -136,6 +138,7 @@ def create_streaming_writer(
         entity_name=entity_name,
         batch_size=batch_size,
         coerce_schema=coerce_schema,
+        consolidate=consolidate,
         **kwargs,
     )
 

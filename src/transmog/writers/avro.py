@@ -100,10 +100,7 @@ def _infer_avro_schema(
                 field_type = base_type
         else:
             type_list = sorted(types)
-            if has_null or "null" not in type_list:
-                field_type = ["null"] + type_list
-            else:
-                field_type = type_list
+            field_type = ["null"] + type_list
 
         fields.append({"name": field, "type": field_type})
 
@@ -136,7 +133,7 @@ def _coerce_value_to_schema(value: Any, field_type: Any) -> Any:
 
         for target_type in non_null_types:
             result = _try_coerce_to_type(normalized, target_type)
-            if result is not None or (result is None and target_type == "null"):
+            if result is not None:
                 return result
 
         return None
@@ -353,42 +350,9 @@ class AvroStreamingWriter(StreamingWriter):
         self._current_table_name = table_name
         super()._write_buffer(table_name)
 
-    @staticmethod
-    def _schema_to_dict(schema: Any) -> dict:
-        """Serialize an Avro schema to a JSON-friendly dict."""
-        return {
-            "fields": [
-                {"name": f["name"], "type": str(f["type"])} for f in schema["fields"]
-            ]
-        }
-
-    @staticmethod
-    def _compute_deviations(base_schema: Any, part_schema: Any) -> dict | None:
-        """Compute schema deviations between Avro schemas."""
-        base_fields = {f["name"]: str(f["type"]) for f in base_schema["fields"]}
-        part_fields = {f["name"]: str(f["type"]) for f in part_schema["fields"]}
-
-        added = sorted(name for name in part_fields if name not in base_fields)
-        removed = sorted(name for name in base_fields if name not in part_fields)
-        type_changes = {
-            name: {"base": base_fields[name], "part": part_fields[name]}
-            for name in base_fields
-            if name in part_fields and base_fields[name] != part_fields[name]
-        }
-
-        if not added and not removed and not type_changes:
-            return None
-
-        result: dict[str, Any] = {}
-        if added or removed:
-            result["structural"] = {"added": added, "removed": removed}
-        if type_changes:
-            result["type"] = type_changes
-        return result
-
-    def _schema_fingerprint(self, schema: Any) -> tuple:
-        """Create a hashable fingerprint from an Avro schema."""
-        return tuple((f["name"], str(f["type"])) for f in schema["fields"])
+    def _schema_fields(self, schema: Any) -> list[tuple[str, str]]:
+        """Extract (name, type_string) pairs from an Avro schema."""
+        return [(f["name"], str(f["type"])) for f in schema["fields"]]
 
     def _build_unified_schema(self, schemas: list[Any]) -> Any:
         """Build a unified Avro schema from all part schemas."""
@@ -413,6 +377,33 @@ class AvroStreamingWriter(StreamingWriter):
             target_fields.append({"name": name, "type": field_type})
 
         return {"type": "record", "name": record_name, "fields": target_fields}
+
+    def _consolidate_parts(
+        self, output_path: str, part_files: list[str], schema: Any
+    ) -> None:
+        """Merge multiple Avro part files into a single file.
+
+        Reads one part file at a time so peak memory is bounded by the
+        largest single part rather than the entire dataset.
+        """
+        from fastavro.write import Writer
+
+        parsed_schema = fastavro.parse_schema(schema)
+        with open(output_path, "wb") as out_f:
+            avro_out = Writer(
+                out_f,
+                parsed_schema,
+                codec=self.codec,
+                sync_interval=self.sync_interval,
+            )
+            for part_file in part_files:
+                with open(part_file, "rb") as in_f:
+                    for record in fastavro.reader(in_f):
+                        prepared = _prepare_record_for_schema(
+                            _normalize_record(record), schema
+                        )
+                        avro_out.write(prepared)
+            avro_out.flush()
 
     def _rewrite_part(self, file_path: str, target_schema: Any) -> None:
         """Rewrite an Avro part file with a target unified schema."""

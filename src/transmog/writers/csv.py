@@ -261,14 +261,15 @@ class CsvStreamingWriter(StreamingWriter):
 
         return field_names
 
-    @staticmethod
-    def _schema_to_dict(schema: Any) -> dict:
-        """Serialize a CSV schema (field name list) to a JSON-friendly dict."""
-        return {"fields": schema}
+    def _schema_fields(self, schema: Any) -> list[tuple[str, str]]:
+        """Extract (name, type_string) pairs from a CSV schema (field name list)."""
+        return [(name, "string") for name in schema]
 
-    @staticmethod
-    def _compute_deviations(base_schema: Any, part_schema: Any) -> dict | None:
-        """Compute structural deviations between field name lists."""
+    def _compute_deviations(self, base_schema: Any, part_schema: Any) -> dict | None:
+        """Compute structural deviations between field name lists.
+
+        Overrides the base to skip type comparison — CSV schemas have no types.
+        """
         base_set = set(base_schema)
         part_set = set(part_schema)
 
@@ -280,10 +281,6 @@ class CsvStreamingWriter(StreamingWriter):
 
         return {"structural": {"added": added, "removed": removed}}
 
-    def _schema_fingerprint(self, schema: Any) -> tuple:
-        """Create a hashable fingerprint from a field name list."""
-        return tuple(schema)
-
     def _build_unified_schema(self, schemas: list[Any]) -> Any:
         """Build a unified field name list from all part schemas."""
         unified: list[str] = []
@@ -294,6 +291,30 @@ class CsvStreamingWriter(StreamingWriter):
                     unified.append(f)
                     seen.add(f)
         return unified
+
+    def _consolidate_parts(
+        self, output_path: str, part_files: list[str], schema: Any
+    ) -> None:
+        """Merge multiple CSV part files into a single file."""
+        unified_fields: list[str] = schema
+
+        with open(output_path, "w", encoding="utf-8", newline="") as out:
+            writer = csv.DictWriter(
+                out,
+                fieldnames=unified_fields,
+                delimiter=self.delimiter,
+                quotechar=self.quotechar,
+            )
+            if self.include_header and unified_fields:
+                writer.writeheader()
+
+            for part_file in part_files:
+                with open(part_file, encoding="utf-8", newline="") as inp:
+                    reader = csv.DictReader(
+                        inp, delimiter=self.delimiter, quotechar=self.quotechar
+                    )
+                    for row in reader:
+                        writer.writerow({f: row.get(f, "") for f in unified_fields})
 
     def _rewrite_part(self, file_path: str, target_schema: Any) -> None:
         """Rewrite a CSV part file with a unified column set."""
