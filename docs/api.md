@@ -61,8 +61,8 @@ result = tm.flatten("data.hjson")
 ```
 
 **Supported File Formats:** JSON (`.json`), JSON Lines (`.jsonl`, `.ndjson`),
-JSON5 (`.json5`, requires `pip install json5`), HJSON (`.hjson`, requires
-`pip install hjson`). See [Working with Files](working-with-files) for details.
+JSON5 (`.json5`), HJSON (`.hjson`). All format dependencies are included in the
+default install. See [Working with Files](working-with-files) for details.
 
 ### flatten_stream()
 
@@ -76,6 +76,8 @@ flatten_stream(
     output_format: str = "csv",
     config: TransmogConfig | None = None,
     progress_callback: Callable[[int, int | None], None] | None = None,
+    consolidate: bool = True,
+    coerce_schema: bool = False,
     **format_options: Any,
 ) -> list[Path]
 ```
@@ -89,6 +91,10 @@ flatten_stream(
 - **config** (*TransmogConfig | None*, default=None): Configuration object.
 - **progress_callback** (*Callable[[int, int | None], None] | None*, default=None): Optional
   progress callback (same as `flatten()`).
+- **consolidate** (*bool*, default=True): Merge part files into a single file per table
+  at close time. Set to `False` to retain individual part files.
+- **coerce_schema** (*bool*, default=False): Coerce minority part files to the majority
+  schema at close time. Rewrites deviating parts with additional I/O.
 - **\*\*format_options**: Format-specific options.
 
 **Output Formats:**
@@ -100,28 +106,32 @@ flatten_stream(
 
 **Returns:**
 
-- **list[Path]**: List of `Path` objects for each part file written. Streaming
-  writers produce numbered part files (e.g., `data_part_0000.csv`,
-  `data_part_0001.csv`).
+- **list[Path]**: List of `Path` objects for each file written. With the default
+  `consolidate=True`, produces one file per table (e.g., `data.csv`). With
+  `consolidate=False`, produces numbered part files (e.g., `data_part_0000.csv`).
 
 **Examples:**
 
 ```python
-# Stream to CSV part files
+# Stream to CSV (consolidated by default)
 files = tm.flatten_stream(large_data, "output/", output_format="csv")
-# files: [PosixPath('output/data_part_0000.csv'), ...]
+# files: [PosixPath('output/data.csv'), ...]
 
-# Stream to Parquet part files
+# Stream to Parquet
 files = tm.flatten_stream(data, "output/", output_format="parquet")
+
+# Retain individual part files
+files = tm.flatten_stream(data, "output/", output_format="csv", consolidate=False)
+# files: [PosixPath('output/data_part_0000.csv'), ...]
 
 # Stream to ORC with configuration
 config = tm.TransmogConfig(batch_size=5000)
 files = tm.flatten_stream(data, "output/", output_format="orc", config=config)
 ```
 
-:::{note}
-When `config` is not provided, `flatten_stream()` uses `batch_size=100` (instead
-of the default 1000) for memory efficiency. Pass an explicit config to override.
+:::{seealso}
+See {doc}`configuration` for `batch_size` recommendations and other processing
+parameters.
 :::
 
 :::{seealso}
@@ -145,8 +155,7 @@ TransmogConfig(
     id_field: str = "_id",
     parent_field: str = "_parent_id",
     time_field: str | None = "_timestamp",
-    batch_size: int = 1000,
-    coerce_schema: bool = False,
+    batch_size: int = 5000,
 )
 ```
 

@@ -41,10 +41,14 @@ result.save("output/")
 result.save("output/products.csv")
 ```
 
-Streaming output (`flatten_stream`) produces numbered part files per table:
+Streaming output (`flatten_stream`) produces the same naming by default:
 
 ```python
 tm.flatten_stream(data, "output/", name="products", output_format="csv")
+# Creates: output/products.csv, output/products_reviews.csv
+
+# With consolidate=False, produces numbered part files instead:
+tm.flatten_stream(data, "output/", name="products", output_format="csv", consolidate=False)
 # Creates: output/products_part_0000.csv, output/products_reviews_part_0000.csv, ...
 ```
 
@@ -81,7 +85,7 @@ result.save(
 )
 ```
 
-Streaming CSV supports the same formatting options:
+Streaming CSV supports the same formatting options, plus `include_header`:
 
 ```python
 tm.flatten_stream(
@@ -93,20 +97,67 @@ tm.flatten_stream(
 )
 ```
 
+Set `include_header=False` to omit the header row from each output file. This
+is useful when appending to existing files or when headers are managed externally.
+
 ### Schema Drift Tracking
 
-Each batch flush produces a separate part file with its own column set. If
-columns differ across parts, a `_schema_log.json` file records the deviations
-and a `UserWarning` is emitted at close time distinguishing structural changes
-(added/removed columns) from the base schema.
+Internally, each batch flush produces a separate part file with its own column
+set. With the default `consolidate=True`, these are merged into a single file
+with all columns at close time.
 
-Enable `coerce_schema` to automatically unify columns across part files at close
-time:
+With `consolidate=False`, if columns differ across parts, a `_schema_log.json`
+file records the deviations and a `UserWarning` is emitted at close time.
+Pass `coerce_schema=True` to `flatten_stream()` to automatically unify columns
+across part files:
 
 ```python
-config = tm.TransmogConfig(coerce_schema=True)
-tm.flatten_stream(data, "output/", name="events", output_format="csv", config=config)
+tm.flatten_stream(
+    data, "output/", name="events", output_format="csv",
+    consolidate=False, coerce_schema=True,
+)
 # Part files missing columns are rewritten with null-filled columns
+```
+
+See {doc}`streaming` for details on `consolidate` and `coerce_schema`.
+
+#### _schema_log.json Format
+
+When `consolidate=False`, a `_schema_log.json` file is written alongside the
+part files. It contains a `tables` object keyed by table name, each with:
+
+- **`base_schema`**: The schema of the first part file, listing field names
+  and types.
+- **`parts`**: A list of entries per part file. Each entry has a `file` name
+  and a `deviations` object (`null` if the part matches the base schema).
+
+Deviations, when present, contain:
+
+- **`structural`**: `added` and `removed` field name lists (fields present in
+  the part but not the base, or vice versa).
+- **`type`**: A mapping of field names to `{"base": "...", "part": "..."}`
+  showing type mismatches.
+
+```json
+{
+  "tables": {
+    "events": {
+      "base_schema": {
+        "fields": [
+          {"name": "_id", "type": "string"},
+          {"name": "event_type", "type": "string"}
+        ]
+      },
+      "parts": [
+        {"file": "events_part_0000.csv", "deviations": null},
+        {"file": "events_part_0001.csv", "deviations": {
+          "structural": {"added": ["new_field"], "removed": []},
+          "type": {}
+        }}
+      ]
+    }
+  }
+}
 ```
 
 ## Parquet Output
@@ -152,7 +203,7 @@ result.save("output.avro", compression="xz")         # Via cramjam
 # compression="zstandard"  # Requires: pip install zstandard
 # compression="lz4"        # Requires: pip install lz4
 
-# Advanced: customize sync interval (bytes between sync markers)
+# Advanced: customize sync interval (bytes between sync markers, default: 16000)
 result.save("output.avro", compression="snappy", sync_interval=32000)
 ```
 
@@ -188,8 +239,9 @@ Schema inference behavior:
 - Nullable fields use Avro union types: `["null", "type"]`
 - NaN and Infinity float values are automatically converted to null
 - Mixed types in a field result in union types with multiple type options
-- Each streaming batch produces a separate part file with its own inferred schema
-- Schema deviations across parts are tracked in `_schema_log.json`
+- Streaming batches are consolidated into a single file per table by default
+- With `consolidate=False`, each batch produces a separate part file and schema
+  deviations are tracked in `_schema_log.json`
 
 ## Null Handling
 

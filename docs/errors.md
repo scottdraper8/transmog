@@ -119,13 +119,13 @@ except tm.MissingDependencyError as e:
 Install PyArrow: `pip install pyarrow`
 
 **"Missing dependency" when saving Avro:**
-Install fastavro and cramjam: `pip install fastavro cramjam`
+Install fastavro: `pip install fastavro`
 
 **Schema deviation warnings during streaming:**
 When using `flatten_stream()`, each batch produces its own part file with
 independently inferred schema. If schemas differ across parts, a `UserWarning`
-is emitted and details are written to `_schema_log.json`. Enable
-`coerce_schema=True` in `TransmogConfig` to automatically unify schemas across
+is emitted and details are written to `_schema_log.json`. Pass
+`coerce_schema=True` to `flatten_stream()` to automatically unify schemas across
 part files at close time.
 
 **ConfigurationError on invalid config:**

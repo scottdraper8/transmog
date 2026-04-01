@@ -21,8 +21,7 @@ config = tm.TransmogConfig(
     time_field="_timestamp",             # Field name for timestamps (None to disable)
 
     # Processing Control
-    batch_size=1000,                     # Records to process at once
-    coerce_schema=False,                 # Unify part file schemas at close
+    batch_size=5000,                     # Records to process at once
 )
 
 result = tm.flatten(data, config=config)
@@ -87,41 +86,35 @@ types. Eliminates type coercion errors in Parquet/ORC writers.
 ### batch_size
 
 **Type:** `int`
-**Default:** `1000`
+**Default:** `5000`
 
-Number of records to process in each batch. Affects memory usage and throughput.
+Number of records to process in each batch. Controls both memory usage during
+streaming and the size of intermediate part files before consolidation.
 
 ```python
-config = tm.TransmogConfig(batch_size=100)    # Small batches
+config = tm.TransmogConfig(batch_size=1000)   # Smaller batches
 config = tm.TransmogConfig(batch_size=10000)  # Large batches
 ```
+
+A warning is emitted for values below 500 (many intermediate part files) or
+above 100,000 (high memory usage).
 
 :::{tip}
 **Choosing batch_size**
 
-- **Small batches (100-500):** Use for memory-constrained environments or very
-  large records. `flatten_stream()` defaults to 100 for memory efficiency.
-- **Medium batches (1000-5000):** Default choice, balances memory and throughput.
+- **Small batches (500-2000):** Use for memory-constrained environments or very
+  large records.
+- **Medium batches (2000-10000):** Default range, balances memory and throughput.
 - **Large batches (10000+):** Use when memory is plentiful and throughput is
   critical. Reduces per-batch overhead.
 
 :::
 
-### coerce_schema
+## Streaming Parameters
 
-**Type:** `bool`
-**Default:** `False`
-
-When enabled, the streaming writer analyzes schema deviations across all part
-files at close time and rewrites minority part files to match a unified schema.
-Files missing fields get null-filled columns; type differences are widened.
-
-This incurs additional I/O proportional to the number of deviating part files.
-
-```python
-config = tm.TransmogConfig(coerce_schema=True)
-tm.flatten_stream(data, "output/", config=config, output_format="parquet")
-```
+The `consolidate` and `coerce_schema` options are passed directly to
+`flatten_stream()` rather than through `TransmogConfig`. See
+{doc}`streaming` for details and examples.
 
 ## Advanced Parameters
 
