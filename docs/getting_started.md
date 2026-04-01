@@ -9,8 +9,12 @@ preserving relationships between parent and child records.
 
 ```bash
 pip install transmog              # Full install (CSV, Parquet, ORC, Avro output)
-pip install transmog[minimal]     # CSV only (no pyarrow, fastavro, or cramjam)
 ```
+
+:::{tip}
+All output format dependencies (pyarrow, fastavro, cramjam) are included in the
+default install. No extras are required for full functionality.
+:::
 
 ## Quick Start
 
@@ -129,11 +133,8 @@ result = tm.flatten("data.jsonl", name="logs")
 result = tm.flatten("data.ndjson", name="logs")
 ```
 
-:::{important}
-JSON5 and HJSON formats require additional packages:
-
-- JSON5: `pip install json5`
-- HJSON: `pip install hjson`
+:::{note}
+JSON5 and HJSON support is included in the default install.
 :::
 
 ```python
@@ -172,6 +173,15 @@ Use `flatten_stream()` for datasets larger than available RAM. It processes
 data in batches and writes directly to disk, using significantly less memory
 than `flatten()`.
 :::
+
+### Performance
+
+JSON parsing uses [orjson](https://github.com/ijl/orjson) for faster
+deserialization. When streaming large `.json` array files via
+`flatten_stream()`, [ijson](https://github.com/ICRAR/ijson) provides
+constant-memory parsing so the entire file is not loaded at once.
+
+Both libraries are included in the default install and used automatically.
 
 ## Functions
 

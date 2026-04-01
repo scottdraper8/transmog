@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Simplified setup script that delegates environment management to Poetry."""
+"""Simplified setup script that delegates environment management to uv."""
 
 from __future__ import annotations
 
@@ -59,16 +59,16 @@ def run_command(
     return result
 
 
-def ensure_poetry() -> None:
-    """Verify that Poetry is available on PATH."""
-    poetry_path = shutil.which("poetry")
-    if poetry_path is None:
-        install_url = "https://python-poetry.org/docs/#installation"
-        print(f"❌ Poetry is required. Install via {install_url}")
+def ensure_uv() -> None:
+    """Verify that uv is available on PATH."""
+    uv_path = shutil.which("uv")
+    if uv_path is None:
+        install_url = "https://docs.astral.sh/uv/getting-started/installation/"
+        print(f"❌ uv is required. Install via {install_url}")
         sys.exit(1)
 
     result = subprocess.run(  # noqa: S603  # nosec B603
-        [poetry_path, "--version"],
+        [uv_path, "--version"],
         text=True,
         capture_output=True,
     )
@@ -79,27 +79,27 @@ def ensure_poetry() -> None:
 
 
 def install_dependencies() -> None:
-    """Install project and development dependencies via Poetry.
+    """Install project and development dependencies via uv.
 
-    Poetry resolves dependencies to the latest compatible versions
+    uv resolves dependencies to the latest compatible versions
     based on the version constraints specified in pyproject.toml.
     """
     run_command(
-        ["poetry", "install", "--extras", "dev"],
-        description="Installing dependencies with Poetry (including dev extras)",
+        ["uv", "sync", "--extra", "dev"],
+        description="Installing dependencies with uv (including dev extras)",
         check=True,
     )
 
 
 def install_pre_commit_hooks() -> None:
-    """Install Git hooks using the Poetry-managed environment."""
+    """Install Git hooks using the uv-managed environment."""
     run_command(
-        ["poetry", "run", "pre-commit", "install"],
+        ["uv", "run", "pre-commit", "install"],
         description="Installing pre-commit hook",
         check=True,
     )
     run_command(
-        ["poetry", "run", "pre-commit", "install", "--hook-type", "pre-push"],
+        ["uv", "run", "pre-commit", "install", "--hook-type", "pre-push"],
         description="Installing pre-push hook",
         check=True,
     )
@@ -115,14 +115,12 @@ def main() -> None:
     print("=" * 80)
 
     check_python_version()
-    ensure_poetry()
+    ensure_uv()
     install_dependencies()
     install_pre_commit_hooks()
 
     print("\nEnvironment ready.")
-    print("Activate the environment with `poetry env activate`.")
-    print("Alternatively, install `poetry-plugin-shell` and use `poetry shell`.")
-    print("Run individual commands without activation via `poetry run <command>`.")
+    print("Run commands via `uv run <command>`.")
     print("Pre-commit hooks have been installed and will run on future commits.")
 
 
