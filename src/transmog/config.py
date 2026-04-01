@@ -1,5 +1,6 @@
 """Configuration for Transmog processing."""
 
+import warnings
 from dataclasses import dataclass
 
 from transmog.exceptions import ConfigurationError
@@ -56,16 +57,12 @@ class TransmogConfig:
     """Field name for timestamps. Set to None to disable timestamp tracking."""
 
     # === Processing Control ===
-    batch_size: int = 1000
-    """Number of records to process at once for memory efficiency."""
+    batch_size: int = 5000
+    """Number of records to process per batch during streaming.
 
-    coerce_schema: bool = False
-    """Coerce part files to a unified schema at close time.
-
-    When enabled, the streaming writer analyzes schema deviations across all
-    part files at close time and rewrites minority part files to match the
-    majority schema. This incurs additional I/O proportional to the number
-    of deviating part files.
+    Controls memory usage during streaming and the size of intermediate
+    part files before consolidation. Larger values use more memory but
+    produce fewer intermediate files with better schema inference.
     """
 
     def __post_init__(self) -> None:
@@ -88,10 +85,20 @@ class TransmogConfig:
                 f"got {type(self.stringify_values).__name__}"
             )
 
-        if not isinstance(self.coerce_schema, bool):
-            raise ConfigurationError(
-                f"coerce_schema must be a boolean, "
-                f"got {type(self.coerce_schema).__name__}"
+        if self.batch_size < 500:
+            warnings.warn(
+                f"Small batch_size ({self.batch_size}) creates many intermediate "
+                f"part files; consider increasing for better I/O performance",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        if self.batch_size > 100_000:
+            warnings.warn(
+                f"Large batch_size ({self.batch_size}) may consume significant "
+                f"memory during streaming",
+                UserWarning,
+                stacklevel=2,
             )
 
         if isinstance(self.id_generation, str):

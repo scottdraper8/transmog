@@ -26,9 +26,10 @@ def stream_process(
     entity_name: str,
     output_format: str,
     output_destination: str | None = None,
-    extract_time: str | None = None,
     progress_callback: ProgressCallback | None = None,
     total_records: int | None = None,
+    consolidate: bool = True,
+    coerce_schema: bool = False,
     **format_options: Any,
 ) -> list[Path]:
     """Stream process data and write directly to output.
@@ -39,9 +40,10 @@ def stream_process(
         entity_name: Name of the entity being processed
         output_format: Output format ("csv", "parquet", "orc", "avro")
         output_destination: Directory path to write to
-        extract_time: Optional extraction timestamp
         progress_callback: Optional callable invoked after each batch flush
         total_records: Total input record count (None when unknown)
+        consolidate: Merge part files into a single file per table at close
+        coerce_schema: Coerce minority part files to majority schema at close
         **format_options: Format-specific options for the writer
 
     Returns:
@@ -56,7 +58,8 @@ def stream_process(
         destination=output_destination,
         entity_name=entity_name,
         batch_size=config.batch_size,
-        coerce_schema=config.coerce_schema,
+        coerce_schema=coerce_schema,
+        consolidate=consolidate,
         **writer_options,
     )
 
@@ -69,8 +72,7 @@ def stream_process(
     try:
         data_iterator = get_data_iterator(data, streaming=True)
         actual_batch_size = config.batch_size
-        timestamp = extract_time if extract_time else get_current_timestamp()
-        context = ProcessingContext(extract_time=timestamp)
+        context = ProcessingContext(extract_time=get_current_timestamp())
 
         def flush_batch(buffer: list[dict[str, Any]]) -> None:
             nonlocal batch_count, total_records_processed
