@@ -260,9 +260,9 @@ print(result.main[0])
 # {'name': 'Product', 'description': None, 'notes': None}
 ```
 
-## Integration Examples
+## Downstream examples
 
-### PostgreSQL
+CSV with consistent columns (for example, database `COPY` or spreadsheet import):
 
 ```python
 config = tm.TransmogConfig(include_nulls=True)
@@ -297,5 +297,5 @@ result = tm.flatten(data, name="transactions")
 result.save("data.parquet")
 
 import duckdb
-df = duckdb.connect().execute("SELECT * FROM 'data.parquet'").df()
+rel = duckdb.sql("SELECT * FROM 'data.parquet'")
 ```

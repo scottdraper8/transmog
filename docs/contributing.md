@@ -128,12 +128,12 @@ The codebase is organized into focused modules:
 - **`src/transmog/api.py`** - Public API (`flatten`, `flatten_stream`, `FlattenResult`)
 - **`src/transmog/config.py`** - Configuration dataclass
 - **`src/transmog/flattening.py`** - Core flattening, metadata, and array extraction logic
-- **`src/transmog/iterators.py`** - Input normalization for JSON and JSONL sources
+- **`src/transmog/iterators.py`** - Input normalization for JSON, JSONL, JSON5, and HJSON sources
 - **`src/transmog/streaming.py`** - Streaming pipeline orchestration
 - **`src/transmog/writers/`** - CSV, Parquet, ORC, and Avro writers (batch and streaming)
 - **`src/transmog/exceptions.py`** - Exception hierarchy
 - **`src/transmog/types.py`** - Shared enums and processing context
-- **`tests/`** - Unit, integration, and performance test suites
+- **`tests/`** - Unit and integration tests (default pytest ignores `tests/performance`)
 - **`scripts/`** - Maintenance utilities (setup, release automation, benchmarks)
 
 ## Testing
@@ -163,10 +163,9 @@ uv run pytest tests/integration/
 
 Documentation style guidelines:
 
-- Use passive voice
 - Avoid personal pronouns (you, we, our)
 - No temporal language (previously, new version)
-- Provide complete, runnable examples
+- Provide complete, runnable examples that match current API output
 
 ## Reporting Issues
 

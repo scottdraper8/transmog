@@ -58,7 +58,7 @@ Main table:
     'company': 'TechCorp',
     'location_city': 'San Francisco',
     'location_country': 'USA',
-    '_id': 'auto_generated_id',
+    '_id': '8b596e4b-8c20-413b-a503-3fe15fe766e1',
     '_timestamp': '2025-01-15 10:30:00.123456'
 }]
 ```
@@ -78,16 +78,16 @@ Employee table:
         'name': 'Alice',
         'role': 'Engineer',
         'salary': 95000,
-        '_parent_id': 'auto_generated_id',
-        '_id': 'auto_generated_id',
+        '_parent_id': '8b596e4b-8c20-413b-a503-3fe15fe766e1',
+        '_id': 'c1a2b3d4-e5f6-7890-abcd-ef1234567890',
         '_timestamp': '2025-01-15 10:30:00.123456'
     },
     {
         'name': 'Bob',
         'role': 'Designer',
         'salary': 75000,
-        '_parent_id': 'auto_generated_id',
-        '_id': 'auto_generated_id',
+        '_parent_id': '8b596e4b-8c20-413b-a503-3fe15fe766e1',
+        '_id': 'd2b3c4e5-f6a7-8901-bcde-f12345678901',
         '_timestamp': '2025-01-15 10:30:00.123456'
     }
 ]
@@ -103,8 +103,8 @@ result = tm.flatten(data)
 config = tm.TransmogConfig(include_nulls=True)
 result = tm.flatten(data, config=config)
 
-# Memory: small batches (100)
-config = tm.TransmogConfig(batch_size=100)
+# Smaller streaming batches (values below 500 emit a UserWarning)
+config = tm.TransmogConfig(batch_size=1000)
 result = tm.flatten(data, config=config)
 
 ```
@@ -122,15 +122,23 @@ Default configuration:
 
 ### Working with Files
 
-Process files directly:
+Process files directly. A string is treated as a **file path only if that
+path exists**. Otherwise it is parsed as a JSON string. A `pathlib.Path` that
+does not exist raises `ValidationError: File not found`.
 
 ```python
-# Process a JSON file
+from pathlib import Path
+
+# Process a JSON file (path must exist)
 result = tm.flatten("data.json", name="products")
+result = tm.flatten(Path("data.json"), name="products")
 
 # Process JSON Lines / NDJSON
 result = tm.flatten("data.jsonl", name="logs")
 result = tm.flatten("data.ndjson", name="logs")
+
+# Iterator / generator of records
+result = tm.flatten((row for row in records), name="events")
 ```
 
 :::{note}
@@ -171,7 +179,8 @@ tm.flatten_stream(
 :::{tip}
 Use `flatten_stream()` for datasets larger than available RAM. It processes
 data in batches and writes directly to disk, using significantly less memory
-than `flatten()`.
+than `flatten()`. Part files are merged into one file per table by default.
+Pass `consolidate=False` to keep numbered part files.
 :::
 
 ### Performance
@@ -183,63 +192,10 @@ constant-memory parsing so the entire file is not loaded at once.
 
 Both libraries are included in the default install and used automatically.
 
-## Functions
+## Next steps
 
-- `tm.flatten(data)` - Returns `FlattenResult` object with data in memory
-- `tm.flatten_stream(data, output_path)` - Writes directly to files
-
-## Configuration
-
-```python
-# Array handling
-config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
-
-# ID generation
-config = tm.TransmogConfig(id_generation="natural", id_field="product_id")
-config = tm.TransmogConfig(id_generation="hash")
-config = tm.TransmogConfig(id_generation=["user_id", "date"])
-```
-
-See [Array Handling](arrays.md) and [ID Management](ids.md) for details.
-
-## Results
-
-```python
-result = tm.flatten(data, name="products")
-
-# Access main table
-main_data = result.main
-
-# Access specific child table
-reviews = result.tables["products_reviews"]
-
-# Get all tables including main
-all_tables = result.all_tables
-
-# Table information
-print(f"Tables: {list(result.all_tables.keys())}")
-print(f"Main table records: {len(result.main)}")
-
-# Access main table records
-for record in result.main:
-    print(record)
-```
-
-## Error Handling
-
-Errors are raised as exceptions. See [Error Handling](errors.md) for details.
-
-## Reference
-
-```python
-result = tm.flatten(data, name="table_name")
-result = tm.flatten("input.json", name="table_name")
-tm.flatten_stream(data, "output/", name="table_name", output_format="parquet")
-
-result.save("output", output_format="csv")
-result.save("output.csv")
-
-main_table = result.main
-child_tables = result.tables
-all_tables = result.all_tables
-```
+- [Array Handling](arrays.md) — SMART, SEPARATE, INLINE, SKIP
+- [ID Management](ids.md) — random, natural, hash, composite keys
+- [Streaming](streaming.md) — `flatten_stream()`, `consolidate`, `coerce_schema`
+- [Error Handling](errors.md) — exception types and file-path vs JSON-string input
+- [API Reference](api.md) — full signatures

@@ -2,24 +2,50 @@
 
 Arrays are processed according to the `array_mode` configuration parameter.
 
+## Table Names
+
+Child tables are named `{entity}_{array_field}`. The entity is the `name`
+passed to `flatten()` or `flatten_stream()`. The array field is the key of
+the array being extracted, not the full nested path.
+
+```python
+result = tm.flatten(
+    {"name": "Laptop", "reviews": [{"rating": 5}]},
+    name="products",
+)
+# Child table: products_reviews
+```
+
+Nested arrays under extracted objects use the nested field name only:
+
+```python
+result = tm.flatten(
+    {"company": "TechCorp", "departments": [{"name": "Eng", "teams": [{"name": "FE"}]}]},
+    name="company",
+    config=tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE),
+)
+# Tables: company, company_departments, company_teams
+# not company_departments_teams
+```
+
 ## Array Modes
 
 ### SMART Mode (Default)
 
-Processes arrays based on content type:
+Processes arrays based on content type. Simple arrays (primitives only) stay
+on the parent row as native lists. Complex arrays (objects or nested
+structures) are extracted to a child table.
 
 ```python
 import transmog as tm
 
 data = {
-    "product": {
-        "name": "Laptop",
-        "tags": ["electronics", "computers"],  # Simple array - kept as native
-        "reviews": [  # Complex array - extracted to child table
-            {"rating": 5, "comment": "Excellent"},
-            {"rating": 4, "comment": "Good value"}
-        ]
-    }
+    "name": "Laptop",
+    "tags": ["electronics", "computers"],  # Simple array — kept as native
+    "reviews": [  # Complex array — extracted to child table
+        {"rating": 5, "comment": "Excellent"},
+        {"rating": 4, "comment": "Good value"}
+    ]
 }
 
 result = tm.flatten(data, name="products")
@@ -27,8 +53,8 @@ result = tm.flatten(data, name="products")
 print(result.main)
 # [
 #   {
-#     'product_name': 'Laptop',
-#     'product_tags': ['electronics', 'computers'],  # Native array
+#     'name': 'Laptop',
+#     'tags': ['electronics', 'computers'],
 #     '_id': '...',
 #     '_timestamp': '...'
 #   }
@@ -41,8 +67,8 @@ print(result.tables["products_reviews"])
 # ]
 ```
 
-Simple arrays contain only primitive values (strings, numbers, booleans,
-null). Complex arrays contain objects or nested structures.
+If an array mixes objects and primitives, the whole array is treated as
+complex and extracted to a child table.
 
 :::{tip}
 **When to use SMART mode**
@@ -54,15 +80,21 @@ complex nested data.
 
 ### SEPARATE Mode
 
-Extract all arrays into child tables:
+Extract all arrays into child tables. Primitive array items become rows with
+a `value` column:
 
 ```python
 config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
 result = tm.flatten(data, name="products", config=config)
 
-# All arrays become separate tables
-print(result.tables.keys())
+print(list(result.tables.keys()))
 # ['products_tags', 'products_reviews']
+
+print(result.tables["products_tags"])
+# [
+#   {'value': 'electronics', '_parent_id': '...', '_id': '...'},
+#   {'value': 'computers', '_parent_id': '...', '_id': '...'}
+# ]
 ```
 
 :::{tip}
@@ -87,9 +119,9 @@ result = tm.flatten(data, name="products", config=config)
 print(result.main)
 # [
 #   {
-#     'product_name': 'Laptop',
-#     'product_tags': '["electronics", "computers"]',
-#     'product_reviews': '[{"rating": 5, ...}]',
+#     'name': 'Laptop',
+#     'tags': '["electronics", "computers"]',
+#     'reviews': '[{"rating": 5, ...}]',
 #     '_id': '...'
 #   }
 # ]
@@ -116,7 +148,7 @@ result = tm.flatten(data, name="products", config=config)
 
 # Only scalar fields are included
 print(result.main)
-# [{'product_name': 'Laptop', '_id': '...'}]
+# [{'name': 'Laptop', '_id': '...'}]
 ```
 
 :::{tip}
@@ -150,9 +182,8 @@ data = {
 config = tm.TransmogConfig(array_mode=tm.ArrayMode.SEPARATE)
 result = tm.flatten(data, name="company", config=config)
 
-# Creates multi-level hierarchy
 print(list(result.all_tables.keys()))
-# ['company', 'company_departments', 'company_departments_teams']
+# ['company', 'company_departments', 'company_teams']
 ```
 
 Each level maintains parent-child relationships through `_parent_id` fields.

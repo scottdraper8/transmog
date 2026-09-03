@@ -62,7 +62,7 @@ result = tm.flatten("data.hjson")
 
 **Supported File Formats:** JSON (`.json`), JSON Lines (`.jsonl`, `.ndjson`),
 JSON5 (`.json5`), HJSON (`.hjson`). All format dependencies are included in the
-default install. See [Working with Files](working-with-files) for details.
+default install. See [Working with Files](getting_started.md#working-with-files) for details.
 
 ### flatten_stream()
 
@@ -95,14 +95,20 @@ flatten_stream(
   at close time. Set to `False` to retain individual part files.
 - **coerce_schema** (*bool*, default=False): Coerce minority part files to the majority
   schema at close time. Rewrites deviating parts with additional I/O.
-- **\*\*format_options**: Format-specific options.
+- **format_options**: Format-specific writer options:
+
+  - CSV: `delimiter`, `quotechar`, `quoting`, `escapechar`, `include_header`
+  - Parquet: `compression` (`"snappy"`, `"gzip"`, `"brotli"`, `None`)
+  - ORC: `compression` (`"zstd"`, `"snappy"`, `"lz4"`, `"zlib"`, `None`)
+  - Avro: `compression` (`"null"`, `"deflate"`, `"snappy"`, `"bzip2"`, `"xz"`);
+    `codec` is accepted as an alias. `sync_interval` (default 16000).
 
 **Output Formats:**
 
 - **"csv"**: CSV files
-- **"parquet"**: Parquet files (requires pyarrow)
-- **"orc"**: ORC files (requires pyarrow)
-- **"avro"**: Avro files (requires fastavro, cramjam)
+- **"parquet"**: Parquet files (pyarrow is a core dependency)
+- **"orc"**: ORC files (pyarrow is a core dependency)
+- **"avro"**: Avro files (fastavro and cramjam are core dependencies)
 
 **Returns:**
 
@@ -186,7 +192,7 @@ main_table = result.main
 
 ```python
 child_tables = result.tables
-reviews = result.tables["products_reviews"]
+reviews = result.tables["products_reviews"]  # name="products" and top-level reviews array
 ```
 
 **all_tables** (*dict[str, list[dict[str, Any]]]*): All tables including main.
@@ -214,9 +220,9 @@ save(
 - **path**: Output path (file or directory).
 - **output_format**: Output format ("csv", "parquet", "orc", "avro"). Auto-detected
   from extension if not specified. Defaults to "csv" when no extension is present.
-- **\*\*format_options**: Format-specific writer options (e.g., `delimiter`, `quoting`
-  for CSV; `compression` for Parquet; `codec` for Avro). See {doc}`outputs` for codec
-  details and optional dependency requirements.
+- **format_options**: Format-specific writer options (e.g., `delimiter`, `quoting`
+  for CSV; `compression` for Parquet/ORC/Avro). Avro also accepts `codec` as an
+  alias for `compression`. See {doc}`outputs` for codec details.
 
 **Returns:**
 
@@ -268,10 +274,10 @@ All exceptions inherit from `TransmogError`. Three are exported in the public AP
 | --------- | ----------- | ----------- |
 | `TransmogError` | `tm.TransmogError` | Base exception for all Transmog errors |
 | `ValidationError` | `tm.ValidationError` | Input data validation failures |
-| `MissingDependencyError` | `tm.MissingDependencyError` | Missing optional dependency (pyarrow, fastavro) |
+| `MissingDependencyError` | `tm.MissingDependencyError` | Writer dependency is not importable |
 
-`ConfigurationError` and `OutputError` exist internally but are not exported.
-Catch them via `TransmogError`.
+`ConfigurationError` and `OutputError` are not exported on `tm`. Import them
+from `transmog.exceptions` or catch `TransmogError`.
 
 See {doc}`errors` for usage examples, troubleshooting, and error handling patterns.
 

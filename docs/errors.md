@@ -29,37 +29,51 @@ except tm.ValidationError as e:
     print(f"Validation error: {e}")
 ```
 
+A `pathlib.Path` that does not exist raises `ValidationError: File not found`.
+A string is treated as a file path only if that path exists; otherwise it is
+parsed as JSON. `tm.flatten("data.json")` when the file is missing raises
+`ValidationError: Error parsing JSON data`, not file-not-found.
+
 ### MissingDependencyError
 
-Raised when an optional dependency is missing. Available as `tm.MissingDependencyError`.
+Raised when a writer dependency is not importable. Available as
+`tm.MissingDependencyError`. PyArrow and fastavro are included in the default
+install, so this is uncommon unless those packages were removed.
 
 ```python
 try:
     result.save("output.parquet")
 except tm.MissingDependencyError as e:
     print(f"Missing dependency: {e}")
-    print("Install with: pip install pyarrow")
 ```
 
 ### ConfigurationError
 
 Raised when `TransmogConfig` receives invalid parameters (e.g., `batch_size < 1`,
-invalid `id_generation` value). Not exported in the public API — catch using
-`TransmogError` as the base class.
+invalid `id_generation` value). Not exported on `tm`; import from
+`transmog.exceptions` or catch `TransmogError`.
+
+```python
+from transmog.exceptions import ConfigurationError
+
+try:
+    config = tm.TransmogConfig(batch_size=-1)
+except ConfigurationError as e:
+    print(f"Invalid config: {e}")
+```
 
 ### OutputError
 
-Raised when writing output files fails. Not exported in the public API — catch
-using `TransmogError` as the base class. Common triggers:
-
-- File permission errors or disk full during writes
-- Invalid codec or compression option
+Raised when writing output files fails (permissions, disk full, invalid
+compression). Not exported on `tm`; import from `transmog.exceptions` or catch
+`TransmogError`.
 
 ```python
+from transmog.exceptions import OutputError
+
 try:
     tm.flatten_stream(data, "output/", output_format="csv")
-except tm.TransmogError as e:
-    # OutputError is caught via the base class
+except (OutputError, tm.TransmogError) as e:
     print(f"Write failed: {e}")
 ```
 
@@ -87,7 +101,7 @@ data = {"name": "Product"}  # Missing 'id'
 
 try:
     result = tm.flatten(data, config=config)
-except tm.TransmogError as e:
+except tm.ValidationError as e:
     print(f"Error: {e}")
 ```
 
@@ -97,39 +111,20 @@ except tm.TransmogError as e:
 # File with invalid JSON on line 2
 try:
     result = tm.flatten("malformed.jsonl")
-except tm.TransmogError as e:
+except tm.ValidationError as e:
     print(f"Error processing file: {e}")
-```
-
-### Missing Optional Dependency
-
-```python
-try:
-    tm.flatten_stream(data, "output/", output_format="avro")
-except tm.MissingDependencyError as e:
-    print(f"Missing dependency: {e}")
-    print("Install with: pip install fastavro cramjam")
 ```
 
 ## Troubleshooting
 
-### Common Errors
-
-**"Missing dependency" when saving Parquet/ORC:**
-Install PyArrow: `pip install pyarrow`
-
-**"Missing dependency" when saving Avro:**
-Install fastavro: `pip install fastavro`
-
 **Schema deviation warnings during streaming:**
-When using `flatten_stream()`, each batch produces its own part file with
-independently inferred schema. If schemas differ across parts, a `UserWarning`
-is emitted and details are written to `_schema_log.json`. Pass
-`coerce_schema=True` to `flatten_stream()` to automatically unify schemas across
-part files at close time.
+When using `flatten_stream()`, each batch infers its own schema. If schemas
+differ across parts, a `UserWarning` is emitted and details are written to
+`_schema_log.json`. Pass `coerce_schema=True` to unify schemas at close time.
+See [Schema Drift Tracking](outputs.md#schema-drift-tracking).
 
 **ConfigurationError on invalid config:**
-Catch using `TransmogError` since `ConfigurationError` is not exported:
+Catch `ConfigurationError` from `transmog.exceptions`, or `TransmogError`:
 
 ```python
 try:
@@ -137,3 +132,8 @@ try:
 except tm.TransmogError as e:
     print(f"Invalid config: {e}")
 ```
+
+**Deep or circular structures:**
+`max_depth` (default 100) silently omits the entire subtree below that depth.
+Circular references do not raise; they unroll until `max_depth` is reached.
+There is no warning or log when truncation occurs.

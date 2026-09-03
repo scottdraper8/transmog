@@ -218,7 +218,8 @@ def flatten(
     into flat tables with preserved parent-child relationships.
 
     Args:
-        data: Input data - can be dict, list of dicts, file path, or JSON string
+        data: Input data - dict, list of dicts, file path, JSON string, bytes,
+            or an iterator/generator yielding dictionaries
         name: Base name for the flattened tables
         config: Optional configuration (uses defaults if not provided)
         progress_callback: Optional callable invoked after each batch flush with
@@ -325,7 +326,8 @@ def flatten_stream(
     part files.
 
     Args:
-        data: Input data - can be dict, list of dicts, file path, or JSON string
+        data: Input data - dict, list of dicts, file path, JSON string, bytes,
+            or an iterator/generator yielding dictionaries
         output_path: Directory path where output files will be written
         name: Base name for the flattened tables
         output_format: Output format ("csv", "parquet", "orc", "avro")

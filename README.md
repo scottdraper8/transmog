@@ -4,7 +4,7 @@
 
 [![Transmog Version](https://img.shields.io/badge/transmog-2.0.4-ff79c6?logo=github&logoColor=white&labelColor=6272a4)](https://github.com/scottdraper8/transmog/releases)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-ffb86c?logo=python&logoColor=white&labelColor=6272a4)](https://www.python.org/downloads/)
-[![Poetry](https://img.shields.io/badge/Poetry-1.0+-f1fa8c?logo=poetry&logoColor=282a36&labelColor=6272a4)](https://python-poetry.org/)
+[![uv](https://img.shields.io/badge/uv-astral-f1fa8c?logo=uv&logoColor=282a36&labelColor=6272a4)](https://docs.astral.sh/uv/)
 [![pre-commit](https://img.shields.io/badge/pre--commit-4.5+-50fa7b?logo=pre-commit&logoColor=282a36&labelColor=6272a4)](https://github.com/pre-commit/pre-commit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-8be9fd?logo=opensourceinitiative&logoColor=white&labelColor=6272a4)](LICENSE)
 
@@ -20,12 +20,11 @@ flat, tabular formats while preserving parent-child relationships.
 ## Installation
 
 ```bash
-# Full install (CSV, Parquet, ORC, Avro output)
 pip install transmog
-
-# CSV only (no pyarrow, fastavro, or cramjam)
-pip install transmog[minimal]
 ```
+
+CSV, Parquet, ORC, and Avro writers are included. There is no reduced extra
+for a CSV-only install.
 
 ## Quick Start
 
@@ -56,6 +55,9 @@ result.save("output.csv")      # Save to file
     tm.flatten_stream("large.jsonl", "output/", name="events", output_format="parquet")
     ```
 
+    `consolidate` and `coerce_schema` are arguments of `flatten_stream()`, not
+    `TransmogConfig`.
+
 ## Configuration
 
 ```python
@@ -75,8 +77,7 @@ config = tm.TransmogConfig(
 
     # Processing controls
     max_depth=100,                   # Maximum recursion depth
-    batch_size=1000,                 # Records per batch for streaming
-    coerce_schema=False,             # Unify part file schemas at close
+    batch_size=5000,                 # Records per batch for streaming
 )
 
 result = tm.flatten(data, config=config)

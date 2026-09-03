@@ -174,8 +174,8 @@ config = tm.TransmogConfig(time_field=None)  # Disable timestamps
 
 Maximum recursion depth for nested structures. The entire subtree below this
 depth is silently omitted — not just the field at that level, but all of its
-descendants. This is a safety guard; most JSON data is well under 100 levels
-deep.
+descendants. Circular references do not raise; they unroll until this limit.
+There is no warning or log when truncation occurs.
 
 :::{note}
 Adjust only if processing unusually deep structures or to intentionally

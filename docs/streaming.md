@@ -117,13 +117,13 @@ frequency depends on `batch_size`.
 ```python
 from tqdm import tqdm
 
-data = load_data()  # list of records
-bar = tqdm(total=len(data), unit="rec")
+records = [{"id": i} for i in range(1000)]
+bar = tqdm(total=len(records), unit="rec")
 
 def update_bar(processed, total):
     bar.update(processed - bar.n)
 
-result = tm.flatten(data, progress_callback=update_bar)
+result = tm.flatten(records, progress_callback=update_bar)
 bar.close()
 ```
 
@@ -132,7 +132,7 @@ bar.close()
 All file formats supported by `flatten()` work with `flatten_stream()`. JSONL
 files are processed line-by-line, making them ideal for streaming large datasets.
 Large `.json` array files are parsed with constant memory using ijson. See
-[Working with Files](working-with-files) for supported formats.
+[Working with Files](getting_started.md#working-with-files) for supported formats.
 
 ```python
 tm.flatten_stream("large_file.jsonl", "output/", output_format="parquet")

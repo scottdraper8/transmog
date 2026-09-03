@@ -11,8 +11,8 @@ from transmog.types import ArrayMode
 class TransmogConfig:
     """Configuration for Transmog processing with sensible defaults.
 
-    All parameters have sensible defaults that work for most use cases.
-    Use factory methods for common scenarios or customize parameters as needed.
+    All parameters have defaults that work for most use cases. Override
+    individual fields when constructing the dataclass.
     """
 
     # === Data Transformation ===
