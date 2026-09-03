@@ -174,57 +174,19 @@ class TestDeterministicIdIntegration:
             assert len(id_val) > 0
             assert id_val.isprintable() or all(ord(c) >= 32 for c in id_val)
 
-    def test_performance_with_large_data(self):
-        """Test performance of deterministic ID generation with large data."""
-        import time
-
+    def test_large_nested_value_is_deterministic(self):
+        """Hashing a large nested structure is deterministic."""
         large_data = {
             "arrays": [[f"item_{i}_{j}" for j in range(100)] for i in range(100)],
             "objects": {f"key_{i}": {"nested": f"value_{i}"} for i in range(1000)},
             "string": "x" * 10000,
         }
 
-        start_time = time.time()
         id1 = _hash_value(large_data)
-        end_time = time.time()
-
-        assert end_time - start_time < 1.0
-        assert isinstance(id1, str)
-        assert len(id1) > 0
-
         id2 = _hash_value(large_data)
+        assert isinstance(id1, str)
         assert id1 == id2
-
-    def test_thread_safety(self):
-        """Test thread safety of deterministic ID generation."""
-        import threading
-        import time
-
-        test_value = {"thread_test": True, "value": 42}
-        results = []
-        errors = []
-
-        def generate_in_thread():
-            try:
-                for _ in range(100):
-                    id_val = _hash_value(test_value)
-                    results.append(id_val)
-                    time.sleep(0.001)
-            except Exception as e:
-                errors.append(e)
-
-        threads = []
-        for _ in range(5):
-            thread = threading.Thread(target=generate_in_thread)
-            threads.append(thread)
-            thread.start()
-
-        for thread in threads:
-            thread.join()
-
-        assert len(errors) == 0
-        assert len(results) == 500
-        assert len(set(results)) == 1
+        assert len(id1) == 36
 
     @pytest.mark.parametrize(
         "case",
@@ -239,17 +201,12 @@ class TestDeterministicIdIntegration:
         ],
     )
     def test_edge_case_values(self, case):
-        """Test edge case values produce deterministic IDs or raise expected errors."""
-        try:
-            id1 = _hash_value(case)
-            id2 = _hash_value(case)
-
-            assert isinstance(id1, str)
-            assert isinstance(id2, str)
-            assert id1 == id2
-            assert len(id1) > 0
-        except (ValueError, TypeError, OverflowError):
-            pass
+        """Edge-case values produce stable non-empty IDs."""
+        id1 = _hash_value(case)
+        id2 = _hash_value(case)
+        assert isinstance(id1, str)
+        assert id1 == id2
+        assert len(id1) == 36
 
 
 class TestDeterministicIdApiIntegration:

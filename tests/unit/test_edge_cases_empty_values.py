@@ -379,10 +379,6 @@ class TestEmptyValuesCsvOutput:
 class TestEmptyValuesParquetOutput:
     """Test empty value handling in Parquet output."""
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("pyarrow", reason="PyArrow not available"),
-        reason="PyArrow required",
-    )
     def test_none_values_in_parquet(self):
         """Test that None values are properly represented in Parquet."""
         import pyarrow.parquet as pq
@@ -407,10 +403,6 @@ class TestEmptyValuesParquetOutput:
             assert values[1] is None
             assert values[2] == "also_present"
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("pyarrow", reason="PyArrow not available"),
-        reason="PyArrow required",
-    )
     def test_sparse_data_parquet_output(self):
         """Test sparse data in Parquet output."""
         import pyarrow.parquet as pq

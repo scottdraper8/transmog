@@ -13,6 +13,7 @@ import pytest
 import transmog as tm
 from transmog.config import TransmogConfig
 from transmog.flattening import is_null_like
+from transmog.writers.orc import ORC_AVAILABLE
 
 
 class TestIsNullLikeHelper:
@@ -268,10 +269,6 @@ class TestNanCsvOutput:
 class TestNanParquetOutput:
     """Test NaN handling in Parquet output."""
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("pyarrow", reason="PyArrow not available"),
-        reason="PyArrow required",
-    )
     def test_parquet_schema_inference_with_nan_only_column(self):
         """Test schema inference when column has only NaN values."""
         import pyarrow as pa
@@ -297,10 +294,6 @@ class TestNanParquetOutput:
             field = table.schema.field("all_nan")
             assert field.type == pa.float64()
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("pyarrow", reason="PyArrow not available"),
-        reason="PyArrow required",
-    )
     def test_parquet_mixed_nan_and_valid_floats(self):
         """Test Parquet output with mix of NaN and valid floats."""
         import pyarrow.parquet as pq
@@ -332,10 +325,7 @@ class TestNanParquetOutput:
 class TestNanOrcOutput:
     """Test NaN handling in ORC output."""
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("pyarrow.orc", reason="PyArrow ORC not available"),
-        reason="PyArrow ORC required",
-    )
+    @pytest.mark.skipif(not ORC_AVAILABLE, reason="PyArrow ORC not available")
     def test_orc_schema_inference_with_nan(self):
         """Test ORC schema inference with NaN values."""
         import pyarrow.orc as orc
@@ -378,10 +368,6 @@ class TestNanEndToEnd:
             # Verify file was created
             assert len(paths) >= 1
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("pyarrow", reason="PyArrow not available"),
-        reason="PyArrow required",
-    )
     def test_flatten_and_save_with_nan_parquet(self):
         """Test complete workflow: flatten data with NaN, save to Parquet."""
         data = {

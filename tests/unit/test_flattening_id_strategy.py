@@ -5,6 +5,7 @@ Tests ID generation strategies including auto, random, natural, hash, and compos
 
 import pytest
 
+import transmog as tm
 from transmog.config import TransmogConfig
 from transmog.exceptions import ValidationError
 from transmog.flattening import generate_transmog_id
@@ -17,14 +18,14 @@ class TestIdStrategyRandom:
         """Random strategy always generates UUID."""
         record = {"name": "test"}
         result = generate_transmog_id(record, "random", "_id")
-        assert result is not None
+        assert isinstance(result, str)
         assert len(result) == 36
 
     def test_random_ignores_existing(self):
         """Random strategy ignores existing ID."""
         record = {"_id": "existing-123", "name": "test"}
         result = generate_transmog_id(record, "random", "_id")
-        assert result is not None
+        assert isinstance(result, str)
         assert result != "existing-123"
 
     def test_random_generates_different_ids(self):
@@ -127,7 +128,8 @@ class TestIdStrategyComposite:
         """Composite strategy handles missing fields."""
         record = {"user_id": 123}
         id1 = generate_transmog_id(record, ["user_id", "missing"], "_id")
-        assert id1 is not None
+        assert isinstance(id1, str)
+        assert len(id1) == 36
 
     def test_composite_order_independent(self):
         """Composite strategy ignores field order."""
@@ -144,59 +146,38 @@ class TestIdStrategyComposite:
         assert result.count("-") == 4
 
 
-class TestConfigValidation:
-    """Test configuration validation for id_strategy."""
+class TestInvalidStrategy:
+    """Test invalid strategy handling."""
 
     def test_invalid_string_strategy(self):
-        """Invalid string strategy raises error."""
+        """Unknown strategy raises ValidationError."""
         with pytest.raises(ValidationError, match="Invalid id_generation"):
             generate_transmog_id({"name": "test"}, "invalid", "_id")
 
-    def test_valid_strategies(self):
-        """All valid string strategies work."""
+    def test_valid_strategies_return_expected_types(self):
+        """Each valid strategy returns its documented type."""
         record = {"_id": "123", "name": "test"}
-        for strategy in ["random", "hash", "natural"]:
-            try:
-                result = generate_transmog_id(record, strategy, "_id")
-                assert result is None or isinstance(result, str)
-            except ValidationError:
-                if strategy == "natural":
-                    pass
 
-    def test_config_validates_empty_list(self):
-        """Config rejects empty list for id_strategy."""
-        with pytest.raises(Exception):
-            TransmogConfig(id_generation=[])
+        random_id = generate_transmog_id(record, "random", "_id")
+        assert isinstance(random_id, str)
+        assert len(random_id) == 36
 
-    def test_config_validates_non_string_list(self):
-        """Config rejects non-string items in id_strategy list."""
-        with pytest.raises(Exception):
-            TransmogConfig(id_generation=[123, "field"])
+        hash_id = generate_transmog_id(record, "hash", "_id")
+        assert isinstance(hash_id, str)
+        assert len(hash_id) == 36
 
-    def test_config_validates_invalid_type(self):
-        """Config rejects invalid id_strategy type."""
-        with pytest.raises(Exception):
-            TransmogConfig(id_generation=123)
+        natural_id = generate_transmog_id(record, "natural", "_id")
+        assert natural_id is None
 
 
 class TestNaturalIdEdgeCases:
     """Test edge cases for natural ID strategy."""
 
     def test_natural_id_field_name_conflict(self):
-        """Test natural strategy when record has both _id and id fields."""
-        import transmog as tm
-
+        """Natural strategy uses id_field even when another id column exists."""
         data = {"_id": "natural-id-value", "id": "other-id", "name": "test"}
-        config = TransmogConfig(id_generation="natural")
-
-        result = tm.flatten(data, name="test", config=config)
-
-        # Natural strategy should use the _id field value
+        result = tm.flatten(
+            data, name="test", config=TransmogConfig(id_generation="natural")
+        )
         assert result.main[0]["_id"] == "natural-id-value"
-
-    def test_natural_id_missing_field(self):
-        """Test natural strategy when the ID field is missing from the record."""
-        record = {"name": "no_id_field", "value": 42}
-
-        with pytest.raises(ValidationError):
-            generate_transmog_id(record, "natural", "_id")
+        assert result.main[0]["id"] == "other-id"

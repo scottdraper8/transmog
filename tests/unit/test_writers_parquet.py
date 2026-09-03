@@ -134,9 +134,17 @@ class TestParquetWriter:
 class TestParquetWriterOptions:
     """Test ParquetWriter with various options."""
 
-    @pytest.mark.parametrize("compression", ["snappy", "gzip", "brotli", None])
-    def test_parquet_writer_compression(self, tmp_path, compression):
-        """Test Parquet writer with different compression options."""
+    @pytest.mark.parametrize(
+        "compression,expected",
+        [
+            ("snappy", "SNAPPY"),
+            ("gzip", "GZIP"),
+            ("brotli", "BROTLI"),
+            (None, "UNCOMPRESSED"),
+        ],
+    )
+    def test_parquet_writer_compression(self, tmp_path, compression, expected):
+        """Compression codec is written into Parquet metadata."""
         data = [
             {"id": "1", "name": "Alice", "data": "x" * 100},
             {"id": "2", "name": "Bob", "data": "y" * 100},
@@ -150,6 +158,8 @@ class TestParquetWriterOptions:
         table = pq.read_table(str(output_file))
         assert table.num_rows == 3
         assert table.column("name").to_pylist() == ["Alice", "Bob", "Charlie"]
+        metadata = pq.read_metadata(str(output_file))
+        assert metadata.row_group(0).column(0).compression == expected
 
 
 class TestParquetWriterErrorHandling:
@@ -169,13 +179,10 @@ class TestParquetWriterErrorHandling:
             writer.write(data, invalid_path)
 
     def test_parquet_writer_invalid_data_type(self, tmp_path):
-        """Test writing invalid data types."""
-        invalid_data = "not a list"
-        output_file = tmp_path / "invalid.parquet"
-
+        """Non-list data raises TypeError."""
         writer = ParquetWriter()
-        with pytest.raises((OutputError, TypeError, ValueError, AttributeError)):
-            writer.write(invalid_data, str(output_file))
+        with pytest.raises(TypeError, match="Expected list of records"):
+            writer.write("not a list", str(tmp_path / "invalid.parquet"))
 
     def test_parquet_writer_complex_nested_data(self, tmp_path):
         """Test writing complex nested data serializes dicts/lists to JSON strings."""
@@ -214,11 +221,15 @@ class TestParquetWriterIntegration:
         paths = result.save(str(output_path), output_format="parquet")
 
         assert isinstance(paths, dict)
-        for _table_name, path in paths.items():
-            assert Path(path).exists()
-            assert Path(path).suffix == ".parquet"
-            table = pq.read_table(path)
-            assert table.num_rows > 0
+        main_path = paths["company"]
+        table = pq.read_table(main_path)
+        assert table.num_rows == 1
+        assert "Test Company" in table.column("name").to_pylist()
+
+        employee_path = next(path for name, path in paths.items() if "employee" in name)
+        employees = pq.read_table(employee_path)
+        assert employees.num_rows == 2
+        assert employees.column("name").to_pylist() == ["Alice", "Bob"]
 
 
 class TestParquetWriterEdgeCases:

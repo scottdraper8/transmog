@@ -492,8 +492,6 @@ class TestStreamingOutputFormats:
 
     def test_streaming_to_parquet_format(self, tmp_path):
         """Test streaming to Parquet format."""
-        pytest.importorskip("pyarrow")
-
         data = [
             {"id": 1, "name": "Alice", "score": 95.5},
             {"id": 2, "name": "Bob", "score": 87.2},
@@ -585,10 +583,6 @@ class TestStreamingEdgeCases:
 class TestStreamProcessingAvro:
     """Test streaming processing with Avro format."""
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("fastavro", reason="fastavro not available"),
-        reason="fastavro required",
-    )
     def test_stream_to_avro(self, tmp_path):
         """Test streaming output to Avro format."""
         import fastavro

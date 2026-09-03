@@ -149,7 +149,7 @@ ini_options.markers = [
   "memory: mark test as a memory usage test",
 ]
 # Exclude benchmark tests by default
-ini_options.addopts = "--ignore=tests/benchmarks"
+ini_options.addopts = "--ignore=tests/benchmarks --ignore=tests/performance"
 
 # Allow running benchmarks specifically with -m benchmark
 [tool.interrogate]

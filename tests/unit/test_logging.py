@@ -4,6 +4,7 @@ import logging
 from collections.abc import Iterator
 
 import pytest
+
 import transmog as tm
 from transmog.config import TransmogConfig
 from transmog.flattening import process_record_batch
@@ -26,42 +27,16 @@ class TestFlattenLogging:
     """Verify flatten() emits INFO start/complete messages."""
 
     def test_flatten_logs_start_and_complete(self, caplog):
-        """Verify both start and complete INFO messages are emitted."""
-        with caplog.at_level(logging.DEBUG, logger="transmog"):
-            tm.flatten({"key": "value"}, name="test")
-
-        messages = [r.message for r in caplog.records if r.name == "transmog.api"]
-        start_msgs = [m for m in messages if "flatten started" in m]
-        complete_msgs = [m for m in messages if "flatten completed" in m]
-        assert len(start_msgs) == 1
-        assert len(complete_msgs) == 1
-
-    def test_flatten_logs_input_type(self, caplog):
-        """Verify input type appears in the start message."""
-        with caplog.at_level(logging.DEBUG, logger="transmog"):
-            tm.flatten({"key": "value"}, name="test")
-
-        messages = [r.message for r in caplog.records if r.name == "transmog.api"]
-        start_msg = next(m for m in messages if "flatten started" in m)
-        assert "input_type=dict" in start_msg
-
-    def test_flatten_logs_entity_name(self, caplog):
-        """Verify entity name appears in the start message."""
-        with caplog.at_level(logging.DEBUG, logger="transmog"):
-            tm.flatten({"key": "value"}, name="my_entity")
-
-        messages = [r.message for r in caplog.records if r.name == "transmog.api"]
-        start_msg = next(m for m in messages if "flatten started" in m)
-        assert "name=my_entity" in start_msg
-
-    def test_flatten_logs_record_counts(self, caplog):
-        """Verify record counts appear in the completion message."""
+        """Start and complete messages include name, input type, and counts."""
         data = [{"a": 1}, {"a": 2}, {"a": 3}]
         with caplog.at_level(logging.DEBUG, logger="transmog"):
-            tm.flatten(data, name="test")
+            tm.flatten(data, name="my_entity")
 
         messages = [r.message for r in caplog.records if r.name == "transmog.api"]
+        start_msg = next(m for m in messages if "flatten started" in m)
         complete_msg = next(m for m in messages if "flatten completed" in m)
+        assert "name=my_entity" in start_msg
+        assert "input_type=list" in start_msg
         assert "main_records=3" in complete_msg
         assert "child_tables=0" in complete_msg
 
@@ -70,23 +45,7 @@ class TestFlattenStreamLogging:
     """Verify flatten_stream() emits INFO start/complete messages."""
 
     def test_flatten_stream_logs_start_and_complete(self, caplog, tmp_path):
-        """Verify both start and complete INFO messages are emitted."""
-        with caplog.at_level(logging.DEBUG, logger="transmog"):
-            tm.flatten_stream(
-                [{"x": 1}],
-                str(tmp_path / "out"),
-                name="test",
-                output_format="csv",
-            )
-
-        messages = [r.message for r in caplog.records if r.name == "transmog.api"]
-        start_msgs = [m for m in messages if "flatten_stream started" in m]
-        complete_msgs = [m for m in messages if "flatten_stream completed" in m]
-        assert len(start_msgs) == 1
-        assert len(complete_msgs) == 1
-
-    def test_flatten_stream_logs_format(self, caplog, tmp_path):
-        """Verify output format appears in the start message."""
+        """Start and complete messages include format."""
         with caplog.at_level(logging.DEBUG, logger="transmog"):
             tm.flatten_stream(
                 [{"x": 1}],
@@ -97,7 +56,9 @@ class TestFlattenStreamLogging:
 
         messages = [r.message for r in caplog.records if r.name == "transmog.api"]
         start_msg = next(m for m in messages if "flatten_stream started" in m)
+        complete_msgs = [m for m in messages if "flatten_stream completed" in m]
         assert "format=csv" in start_msg
+        assert len(complete_msgs) == 1
 
 
 class TestStreamBatchLogging:
@@ -204,36 +165,3 @@ class TestDebugLevelLogging:
         messages = [r.message for r in caplog.records if r.name == "transmog.iterators"]
         detection_msgs = [m for m in messages if "string format detected" in m]
         assert len(detection_msgs) == 1
-
-
-class TestLoggerModuleNames:
-    """Verify each module's logger uses __name__."""
-
-    def test_api_logger_name(self, caplog):
-        """Verify transmog.api logger name appears in records."""
-        with caplog.at_level(logging.DEBUG, logger="transmog"):
-            tm.flatten({"a": 1}, name="test")
-
-        logger_names = {r.name for r in caplog.records}
-        assert "transmog.api" in logger_names
-
-    def test_streaming_logger_name(self, caplog, tmp_path):
-        """Verify transmog.streaming logger name appears in records."""
-        with caplog.at_level(logging.DEBUG, logger="transmog"):
-            tm.flatten_stream(
-                [{"a": 1}],
-                str(tmp_path / "out"),
-                name="test",
-                output_format="csv",
-            )
-
-        logger_names = {r.name for r in caplog.records}
-        assert "transmog.streaming" in logger_names
-
-    def test_flattening_logger_name(self, caplog):
-        """Verify transmog.flattening logger name appears in records."""
-        with caplog.at_level(logging.DEBUG, logger="transmog"):
-            tm.flatten({"a": 1}, name="test")
-
-        logger_names = {r.name for r in caplog.records}
-        assert "transmog.flattening" in logger_names

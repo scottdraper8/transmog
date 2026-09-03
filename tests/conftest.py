@@ -1,17 +1,11 @@
-"""
-Pytest configuration for Transmog tests.
+"""Pytest fixtures and helpers for Transmog tests."""
 
-This file contains fixtures and configuration for testing the Transmog package.
-All tests use real functionality without mocks.
-"""
-
+import csv
 import json
 from pathlib import Path
 from typing import Any
 
 import pytest
-
-import transmog as tm
 
 # ---- Test Data Fixtures ----
 
@@ -202,21 +196,30 @@ def temp_file(tmp_path) -> Path:
 # ---- Utility Functions ----
 
 
-def assert_valid_result(result: tm.FlattenResult) -> None:
-    """Assert that a FlattenResult is valid."""
-    assert isinstance(result, tm.FlattenResult)
-    assert hasattr(result, "main")
-    assert hasattr(result, "tables")
-    assert isinstance(result.main, list)
-    assert isinstance(result.tables, dict)
-
-
 def assert_files_created(paths: list[str]) -> None:
-    """Assert that all specified file paths exist."""
+    """Assert each path exists and contains data."""
     for path in paths:
-        assert Path(path).exists(), f"File not created: {path}"
+        file_path = Path(path)
+        assert file_path.exists(), f"File not created: {path}"
+        assert file_path.stat().st_size > 0, f"File is empty: {path}"
 
 
 def count_files_in_dir(directory: Path, pattern: str = "*") -> int:
     """Count files matching pattern in directory."""
     return len(list(directory.glob(pattern)))
+
+
+def read_csv_rows(path: str | Path) -> list[dict[str, str]]:
+    """Read a CSV file into a list of row dicts."""
+    with open(path, newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
+def output_file_for(paths: list[Path] | list[str], stem: str, suffix: str) -> Path:
+    """Return the unique output path whose name is `{stem}{suffix}`."""
+    suffix = suffix if suffix.startswith(".") else f".{suffix}"
+    matches = [Path(path) for path in paths if Path(path).name == f"{stem}{suffix}"]
+    assert len(matches) == 1, (
+        f"Expected one file named {stem}{suffix}, found {[p.name for p in matches]}"
+    )
+    return matches[0]

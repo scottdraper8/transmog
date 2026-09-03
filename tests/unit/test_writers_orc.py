@@ -4,11 +4,9 @@ import io
 
 import pytest
 
-from transmog.exceptions import MissingDependencyError, OutputError
 from transmog.writers.orc import ORC_AVAILABLE
 
 if ORC_AVAILABLE:
-    import pyarrow as pa
     import pyarrow.orc as orc
 
     from transmog.writers.orc import OrcStreamingWriter, OrcWriter
@@ -90,7 +88,7 @@ class TestOrcWriter:
         writer = OrcWriter()
         buffer = io.StringIO()
 
-        with pytest.raises((OutputError, TypeError)):
+        with pytest.raises(TypeError, match="binary file expected"):
             writer.write(data, buffer)
 
 
@@ -216,15 +214,3 @@ class TestOrcStreamingWriter:
         writer.close()  # Should not raise
 
         assert (tmp_path / "data.orc").exists()
-
-
-def test_orc_not_available():
-    """Test that appropriate error is raised when PyArrow is not available."""
-    if ORC_AVAILABLE:
-        pytest.skip("PyArrow is available")
-
-    with pytest.raises(MissingDependencyError):
-        from transmog.writers.orc import OrcWriter
-
-        writer = OrcWriter()
-        writer.write([{"id": 1}], "output.orc")

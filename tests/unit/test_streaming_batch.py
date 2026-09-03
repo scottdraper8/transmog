@@ -1,8 +1,4 @@
-"""
-Tests for batch processing functionality.
-
-Tests batch processing of records with different configurations and sizes.
-"""
+"""Tests that batch_size does not change flatten() results."""
 
 from typing import Any
 
@@ -10,11 +6,12 @@ import pytest
 
 import transmog as tm
 from transmog.config import TransmogConfig
-from transmog.flattening import process_record_batch
+
+from ..conftest import read_csv_rows
 
 
 class TestBatchProcessing:
-    """Test batch processing functionality."""
+    """Test that batching is an implementation detail of flatten()."""
 
     @pytest.fixture
     def sample_records(self) -> list[dict[str, Any]]:
@@ -27,10 +24,39 @@ class TestBatchProcessing:
             {"id": 5, "name": "Eve", "age": 32, "city": "Phoenix"},
         ]
 
-    @pytest.fixture
-    def nested_records(self) -> list[dict[str, Any]]:
-        """Nested records for batch processing tests."""
-        return [
+    def test_batch_processing_preserves_rows(self, sample_records):
+        """Every input row is present with original field values."""
+        result = tm.flatten(
+            sample_records, name="users", config=TransmogConfig(batch_size=3)
+        )
+
+        assert len(result.main) == len(sample_records)
+        for source, processed in zip(sample_records, result.main, strict=True):
+            assert processed["name"] == source["name"]
+            assert processed["age"] == source["age"]
+            assert processed["city"] == source["city"]
+
+    @pytest.mark.parametrize("batch_size", [1, 2, 5, 100])
+    def test_batch_size_does_not_affect_output(self, sample_records, batch_size):
+        """Output rows are identical regardless of batch size."""
+        baseline = tm.flatten(
+            sample_records, name="users", config=TransmogConfig(batch_size=5)
+        )
+        result = tm.flatten(
+            sample_records, name="users", config=TransmogConfig(batch_size=batch_size)
+        )
+
+        assert len(result.main) == len(baseline.main)
+        metadata = {"_id", "_parent_id", "_timestamp"}
+        for left, right in zip(baseline.main, result.main, strict=True):
+            for key, value in left.items():
+                if key in metadata:
+                    continue
+                assert right[key] == value
+
+    def test_batch_processing_with_arrays(self):
+        """Nested arrays are extracted even when batch_size is 1."""
+        records = [
             {
                 "id": 1,
                 "company": "TechCorp",
@@ -38,188 +64,38 @@ class TestBatchProcessing:
                     {"name": "Alice", "role": "Engineer"},
                     {"name": "Bob", "role": "Designer"},
                 ],
-                "location": {"city": "San Francisco", "state": "CA"},
             },
             {
                 "id": 2,
                 "company": "DataCorp",
                 "employees": [
                     {"name": "Charlie", "role": "Analyst"},
-                    {"name": "Diana", "role": "Manager"},
                 ],
-                "location": {"city": "Austin", "state": "TX"},
             },
         ]
+        result = tm.flatten(
+            records, name="companies", config=TransmogConfig(batch_size=1)
+        )
 
-    def test_batch_processing_basic(self, sample_records):
-        """Test basic batch processing functionality."""
-        # Create config with batch processing settings
-        config = TransmogConfig(batch_size=3)
-        result = tm.flatten(sample_records, name="users", config=config)
+        assert len(result.main) == 2
+        employee_tables = [name for name in result.tables if "employees" in name]
+        assert employee_tables
+        employees = result.tables[employee_tables[0]]
+        assert len(employees) == 3
+        assert {row["name"] for row in employees} == {"Alice", "Bob", "Charlie"}
 
-        assert len(result.main) == len(sample_records)
-
-        for i, record in enumerate(sample_records):
-            processed_record = result.main[i]
-            assert processed_record["name"] == record["name"]
-            assert processed_record["age"] == record["age"]
-            assert processed_record["city"] == record["city"]
-
-    @pytest.mark.parametrize("batch_size", [1, 2, 3, 5, 10])
-    def test_batch_size_does_not_affect_output(self, sample_records, batch_size):
-        """Test that output is identical regardless of batch size."""
-        config = TransmogConfig(batch_size=batch_size)
-        result = tm.flatten(sample_records, name="users", config=config)
-
-        assert len(result.main) == len(sample_records)
-        assert all("name" in record for record in result.main)
-
-    def test_batch_processing_with_arrays(self, nested_records):
-        """Test batch processing with nested arrays."""
-        config = TransmogConfig(batch_size=1)
-        result = tm.flatten(nested_records, name="companies", config=config)
-
-        # Should have main table and child tables for employees
-        assert len(result.main) == len(nested_records)
-        assert len(result.tables) > 0
-
-        # Check that employees were extracted to child tables
-        employee_tables = [name for name in result.tables.keys() if "employees" in name]
-        assert len(employee_tables) > 0
-
-    def test_batch_processing_deterministic_results(self, sample_records):
-        """Test that batch processing produces deterministic results."""
-        config = TransmogConfig(batch_size=2)
-
-        # Process the same data multiple times
-        result1 = tm.flatten(sample_records, name="users", config=config)
-        result2 = tm.flatten(sample_records, name="users", config=config)
-
-        # Results should be identical (excluding generated IDs)
-        assert len(result1.main) == len(result2.main)
-
-        metadata_fields = {
-            config.id_field,
-            config.parent_field,
-        }
-        if config.time_field:
-            metadata_fields.add(config.time_field)
-
-        for record1, record2 in zip(result1.main, result2.main, strict=True):
-            # Compare non-ID fields
-            for key in record1.keys():
-                if key in metadata_fields or key.startswith("__transmog"):
-                    continue
-                assert record1[key] == record2[key]
-
-
-class TestBatchProcessingIntegration:
-    """Test batch processing integration with other features."""
-
-    @pytest.fixture
-    def large_dataset(self) -> list[dict[str, Any]]:
-        """Large dataset for integration testing."""
-        return [
-            {
-                "id": i,
-                "name": f"User_{i}",
-                "data": {"value": i * 2, "category": f"cat_{i % 3}"},
-                "tags": [f"tag_{i}", f"tag_{i + 1}"],
-            }
-            for i in range(100)
+    def test_batch_processing_writes_csv(self, sample_records, tmp_path):
+        """Saving batched results writes the same rows to CSV."""
+        result = tm.flatten(
+            sample_records, name="users", config=TransmogConfig(batch_size=2)
+        )
+        saved = result.save(str(tmp_path / "users.csv"), output_format="csv")
+        paths = list(saved.values()) if isinstance(saved, dict) else saved
+        rows = read_csv_rows(paths[0])
+        assert [row["name"] for row in rows] == [
+            "Alice",
+            "Bob",
+            "Charlie",
+            "Diana",
+            "Eve",
         ]
-
-    def test_batch_processing_with_file_output(self, large_dataset, tmp_path):
-        """Test batch processing with file output."""
-        config = TransmogConfig(batch_size=20)
-
-        result = tm.flatten(large_dataset, name="users", config=config)
-
-        output_dir = tmp_path / "batch_output"
-        output_paths = result.save(str(output_dir), output_format="csv")
-
-        if isinstance(output_paths, dict):
-            saved_files = list(output_paths.values())
-        else:
-            saved_files = output_paths
-
-        assert len(saved_files) > 0
-        assert all(path.endswith(".csv") for path in saved_files)
-
-    def test_batch_size_does_not_affect_output_count(self, large_dataset):
-        """Test that different batch sizes produce identical record counts."""
-        config_small = TransmogConfig(batch_size=10)
-        result_small = tm.flatten(large_dataset, name="users", config=config_small)
-
-        config_large = TransmogConfig(batch_size=50)
-        result_large = tm.flatten(large_dataset, name="users", config=config_large)
-
-        assert len(result_small.main) == len(result_large.main)
-
-
-class TestBatchProcessingEdgeCases:
-    """Test edge cases in batch processing."""
-
-    def test_batch_processing_very_small_batches(self):
-        """Test batch processing with very small batch sizes."""
-        records = [{"id": i, "value": f"item_{i}"} for i in range(10)]
-
-        config = TransmogConfig(batch_size=1)
-
-        result = tm.flatten(records, name="items", config=config)
-
-        assert len(result.main) == len(records)
-
-    def test_batch_processing_very_large_batches(self):
-        """Test batch processing with very large batch sizes."""
-        records = [{"id": i, "value": f"item_{i}"} for i in range(10)]
-
-        # Batch size larger than dataset
-        config = TransmogConfig(batch_size=100)
-
-        result = tm.flatten(records, name="items", config=config)
-
-        assert len(result.main) == len(records)
-
-    def test_batch_processing_with_complex_nesting(self):
-        """Test batch processing with complex nested structures."""
-        complex_records = [
-            {
-                "id": i,
-                "level1": {
-                    "level2": {
-                        "level3": {
-                            "value": i,
-                            "items": [{"item": f"item_{j}"} for j in range(3)],
-                        }
-                    }
-                },
-            }
-            for i in range(5)
-        ]
-
-        config = TransmogConfig(batch_size=2)
-
-        result = tm.flatten(complex_records, name="complex", config=config)
-
-        assert len(result.main) == len(complex_records)
-        assert len(result.tables) > 0
-
-    def test_batch_processing_wide_nested_records(self):
-        """Test batch processing with wide records containing nested data."""
-        records = [
-            {
-                "id": i,
-                "data": {f"field_{j}": f"value_{i}_{j}" for j in range(50)},
-                "items": [{"value": f"item_{i}_{j}"} for j in range(5)],
-            }
-            for i in range(20)
-        ]
-
-        config = TransmogConfig(batch_size=5)
-        result = tm.flatten(records, name="wide_nested", config=config)
-
-        assert len(result.main) == 20
-        assert len(result.tables) > 0
-        # Verify nested fields were flattened
-        assert any("data_field_0" in r for r in result.main)

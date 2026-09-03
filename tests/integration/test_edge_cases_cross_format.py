@@ -12,6 +12,7 @@ import pytest
 
 import transmog as tm
 from transmog.config import TransmogConfig
+from transmog.writers.orc import ORC_AVAILABLE
 
 
 def _get_file_path(paths, extension):
@@ -57,10 +58,6 @@ class TestNullConsistencyAcrossFormats:
             assert rows[0]["name"] == "Alice"
             assert rows[0]["value"] == "100"
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("pyarrow", reason="PyArrow not available"),
-        reason="PyArrow required",
-    )
     def test_null_handling_parquet(self, data_with_nulls):
         """Test null handling in Parquet output."""
         import pyarrow.parquet as pq
@@ -83,10 +80,7 @@ class TestNullConsistencyAcrossFormats:
             assert values[1] is None  # Second record has None value
             assert names[2] is None  # Third record has None name
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("pyarrow.orc", reason="PyArrow ORC not available"),
-        reason="PyArrow ORC required",
-    )
+    @pytest.mark.skipif(not ORC_AVAILABLE, reason="PyArrow ORC not available")
     def test_null_handling_orc(self, data_with_nulls):
         """Test null handling in ORC output."""
         import pyarrow.orc as orc
@@ -109,10 +103,6 @@ class TestNullConsistencyAcrossFormats:
             assert values[1] is None  # Second record has None value
             assert names[2] is None  # Third record has None name
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("fastavro", reason="fastavro not available"),
-        reason="fastavro required",
-    )
     def test_null_handling_avro(self, data_with_nulls):
         """Test null handling in Avro output."""
         import fastavro
@@ -167,10 +157,6 @@ class TestSparseDataConsistency:
             assert "email" in fieldnames
             assert "phone" in fieldnames
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("pyarrow", reason="PyArrow not available"),
-        reason="PyArrow required",
-    )
     def test_sparse_data_parquet(self, sparse_data):
         """Test sparse data in Parquet output."""
         import pyarrow.parquet as pq
@@ -190,10 +176,6 @@ class TestSparseDataConsistency:
             assert "email" in schema_names
             assert "phone" in schema_names
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("fastavro", reason="fastavro not available"),
-        reason="fastavro required",
-    )
     def test_sparse_data_avro(self, sparse_data):
         """Test sparse data in Avro output."""
         import fastavro
@@ -258,10 +240,6 @@ class TestMixedTypesConsistency:
             assert rows[0]["int_val"] == "42"
             assert rows[0]["float_val"] == "3.14"
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("pyarrow", reason="PyArrow not available"),
-        reason="PyArrow required",
-    )
     def test_mixed_types_parquet(self, mixed_type_data):
         """Test mixed types in Parquet output."""
         import pyarrow as pa
@@ -281,10 +259,6 @@ class TestMixedTypesConsistency:
             assert schema.field("int_val").type == pa.int64()
             assert schema.field("float_val").type == pa.float64()
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("fastavro", reason="fastavro not available"),
-        reason="fastavro required",
-    )
     def test_mixed_types_avro(self, mixed_type_data):
         """Test mixed types in Avro output."""
         import fastavro
@@ -348,10 +322,6 @@ class TestEdgeCasesAllFormats:
             assert rows[0]["zero_float"] == "0.0"
             assert rows[0]["false_bool"] == "False"
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("pyarrow", reason="PyArrow not available"),
-        reason="PyArrow required",
-    )
     def test_zero_values_preserved_parquet(self, edge_case_data):
         """Test that zero values are preserved in Parquet."""
         import pyarrow.parquet as pq
@@ -380,8 +350,6 @@ class TestCompleteWorkflowConsistency:
 
     def test_same_data_all_formats(self):
         """Test that same data produces consistent results across formats."""
-        pytest.importorskip("pyarrow")
-
         data = {
             "id": 1,
             "name": "Test Entity",
@@ -498,10 +466,6 @@ class TestSpecialCharactersConsistency:
             assert rows[1]["unicode"] == "Ελληνικά"
             assert rows[2]["unicode"] == "العربية"
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("pyarrow", reason="PyArrow not available"),
-        reason="PyArrow required",
-    )
     def test_special_chars_parquet(self, special_char_data):
         """Test special characters in Parquet output."""
         import pyarrow.parquet as pq
@@ -519,10 +483,6 @@ class TestSpecialCharactersConsistency:
             assert "Ελληνικά" in unicode_vals
             assert "العربية" in unicode_vals
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("fastavro", reason="fastavro not available"),
-        reason="fastavro required",
-    )
     def test_special_chars_avro(self, special_char_data):
         """Test special characters in Avro output."""
         import fastavro
@@ -564,10 +524,6 @@ class TestStringifyAcrossFormats:
                 assert row["price"] == "19.99"
                 assert row["active"] == "True"
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("pyarrow", reason="PyArrow not available"),
-        reason="PyArrow required",
-    )
     def test_stringify_parquet_output(self):
         """Test stringify with Parquet output."""
         import pyarrow as pa
@@ -597,10 +553,7 @@ class TestStringifyAcrossFormats:
             assert price_col[0] == "19.99"
             assert active_col[0] == "True"
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("pyarrow.orc", reason="PyArrow ORC not available"),
-        reason="PyArrow ORC required",
-    )
+    @pytest.mark.skipif(not ORC_AVAILABLE, reason="PyArrow ORC not available")
     def test_stringify_orc_output(self):
         """Test stringify with ORC output."""
         import pyarrow as pa
@@ -622,10 +575,6 @@ class TestStringifyAcrossFormats:
                         f"Field {field.name} should be string"
                     )
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("fastavro", reason="fastavro not available"),
-        reason="fastavro required",
-    )
     def test_stringify_avro_output(self):
         """Test stringify with Avro output."""
         import fastavro

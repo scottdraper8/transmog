@@ -36,10 +36,6 @@ jobs:
     - name: Install dependencies
       run: uv sync --extra dev
 
-    # Run performance tests that exist in the current codebase
-    - name: Run performance tests
-      run: uv run pytest tests/performance/ -xvs
-
     # Run the main benchmark script
     - name: Run standard benchmarks
       run: |

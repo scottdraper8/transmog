@@ -209,8 +209,8 @@ class TestHierarchyIntegration:
         """Test that transmog.flatten uses hierarchy processing."""
         result = tm.flatten(complex_nested_data, name="hierarchy_test")
 
-        assert result is not None
         assert len(result.main) == 1
+        assert result.main[0]["name"] == "Complex Entity"
         assert len(result.tables) > 0
 
     def test_hierarchy_with_nested_paths(self, complex_nested_data):
@@ -225,8 +225,8 @@ class TestHierarchyIntegration:
         config = TransmogConfig(batch_size=100)
         result = tm.flatten(batch_data, name="stream_hierarchy", config=config)
 
-        assert result is not None
         assert len(result.main) == len(batch_data)
+        assert result.main[0]["name"] == "Record 1"
 
 
 class TestHierarchyEdgeCases:

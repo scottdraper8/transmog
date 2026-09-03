@@ -7,9 +7,9 @@ from pathlib import Path
 import pytest
 
 import transmog as tm
-from transmog.exceptions import OutputError, ValidationError
+from transmog.exceptions import OutputError
 
-from ..conftest import assert_files_created, count_files_in_dir
+from ..conftest import assert_files_created, count_files_in_dir, read_csv_rows
 
 
 class TestFlattenResultBasics:
@@ -61,8 +61,9 @@ class TestFlattenResultSaving:
         paths = simple_result.save(csv_file, output_format="csv")
 
         assert isinstance(paths, list)
-        assert len(paths) > 0
-        assert_files_created(paths)
+        rows = read_csv_rows(paths[0])
+        assert len(rows) == 1
+        assert rows[0]["name"] == "Test Entity"
 
     def test_save_csv_multiple_tables(self, complex_result, output_dir):
         """Test saving multiple tables to CSV directory."""
@@ -71,10 +72,10 @@ class TestFlattenResultSaving:
         assert isinstance(paths, dict)
         assert len(paths) > 1
         assert_files_created(list(paths.values()))
-
-        csv_output_dir = output_dir / "csv_output"
-        csv_files = count_files_in_dir(csv_output_dir, "*.csv")
-        assert csv_files > 0
+        main_rows = read_csv_rows(paths["company"])
+        assert main_rows[0]["name"] == "Company"
+        employee_key = next(name for name in paths if "employees" in name)
+        assert len(read_csv_rows(paths[employee_key])) == 2
 
     def test_save_parquet_format(self, complex_result, output_dir):
         """Test saving to Parquet format."""
@@ -102,7 +103,7 @@ class TestFlattenResultSaving:
 
     def test_save_invalid_format(self, simple_result, temp_file):
         """Test saving with invalid format."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Unsupported format"):
             simple_result.save(str(temp_file), output_format="invalid")
 
     def test_save_pathlib_path(self, simple_result, output_dir):
@@ -307,14 +308,13 @@ class TestFlattenResultSaveErrors:
 
             try:
                 readonly_dir.chmod(0o444)
-                readonly_file = readonly_dir / "output.csv"
-
-                with pytest.raises(
-                    (ValidationError, OutputError, PermissionError, OSError)
-                ):
-                    result.save(str(readonly_file))
             except (OSError, NotImplementedError):
-                pass
+                pytest.skip("Cannot change directory permissions on this platform")
+
+            readonly_file = readonly_dir / "output.csv"
+            try:
+                with pytest.raises((OutputError, PermissionError, OSError)):
+                    result.save(str(readonly_file))
             finally:
                 try:
                     readonly_dir.chmod(0o755)
@@ -330,7 +330,7 @@ class TestFlattenResultSaveErrors:
         data = {"id": 1, "name": "Test"}
         result = tm.flatten(data, name="test")
 
-        with pytest.raises((OutputError, ValidationError, OSError)):
+        with pytest.raises(OutputError):
             result.save("/nonexistent/directory/that/does/not/exist/output.csv")
 
     def test_result_save_with_child_tables(self):

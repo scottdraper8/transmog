@@ -12,7 +12,6 @@ import pytest
 
 from transmog.exceptions import ValidationError
 from transmog.iterators import (
-    IJSON_AVAILABLE,
     _detect_string_format,
     get_data_iterator,
     get_hjson_file_iterator,
@@ -22,20 +21,6 @@ from transmog.iterators import (
     get_jsonl_data_iterator,
     get_jsonl_file_iterator,
 )
-
-try:
-    import json5 as _json5  # noqa: F401
-
-    JSON5_AVAILABLE = True
-except ImportError:
-    JSON5_AVAILABLE = False
-
-try:
-    import hjson as _hjson  # noqa: F401
-
-    HJSON_AVAILABLE = True
-except ImportError:
-    HJSON_AVAILABLE = False
 
 # ============================================================================
 # Fixtures
@@ -141,8 +126,14 @@ class TestGetDataIterator:
 
     def test_iterate_unsupported_type(self):
         """Test iterating over unsupported data type."""
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError, match="Unsupported data type"):
             list(get_data_iterator(42))
+
+    def test_missing_path_object(self, tmp_path):
+        """A Path that does not exist raises File not found."""
+        missing = tmp_path / "missing.json"
+        with pytest.raises(ValidationError, match="File not found"):
+            list(get_data_iterator(missing))
 
 
 class TestJSONDataIterator:
@@ -403,7 +394,6 @@ class TestDetectStringFormat:
         assert _detect_string_format('  {"a":1}\n  {"b":2}') == "jsonl"
 
 
-@pytest.mark.skipif(not JSON5_AVAILABLE, reason="json5 not available")
 class TestJSON5FileIterator:
     """Test the JSON5 file iterator function."""
 
@@ -462,7 +452,6 @@ class TestJSON5FileIterator:
             list(get_json5_file_iterator("/path/that/does/not/exist.json5"))
 
 
-@pytest.mark.skipif(not HJSON_AVAILABLE, reason="hjson not available")
 class TestHJSONFileIterator:
     """Test the HJSON file iterator function."""
 
@@ -549,7 +538,6 @@ class TestFileExtensionRouting:
         assert records[0]["name"] == "Alice"
         assert records[1]["name"] == "Bob"
 
-    @pytest.mark.skipif(not JSON5_AVAILABLE, reason="json5 not available")
     def test_json5_extension_routing(self, temp_file):
         """Test .json5 file routes to JSON5 parser via get_data_iterator."""
         json5_data = """{
@@ -563,7 +551,6 @@ class TestFileExtensionRouting:
         assert records[0]["name"] == "Alice"
         assert records[0]["id"] == 1
 
-    @pytest.mark.skipif(not HJSON_AVAILABLE, reason="hjson not available")
     def test_hjson_extension_routing(self, temp_file):
         """Test .hjson file routes to HJSON parser via get_data_iterator."""
         hjson_data = """{
@@ -581,7 +568,6 @@ class TestFileExtensionRouting:
 class TestFormatSpecificFeatures:
     """Test format-specific features that distinguish each format."""
 
-    @pytest.mark.skipif(not JSON5_AVAILABLE, reason="json5 not available")
     def test_json5_allows_trailing_commas(self, temp_file):
         """Test JSON5 allows trailing commas (standard JSON does not)."""
         json5_data = '{"items": [1, 2, 3,], "name": "test",}'
@@ -590,7 +576,6 @@ class TestFormatSpecificFeatures:
         assert len(records) == 1
         assert records[0]["items"] == [1, 2, 3]
 
-    @pytest.mark.skipif(not JSON5_AVAILABLE, reason="json5 not available")
     def test_json5_allows_unquoted_keys(self, temp_file):
         """Test JSON5 allows unquoted object keys."""
         json5_data = '{firstName: "Alice", lastName: "Smith", age: 30}'
@@ -600,7 +585,6 @@ class TestFormatSpecificFeatures:
         assert records[0]["firstName"] == "Alice"
         assert records[0]["lastName"] == "Smith"
 
-    @pytest.mark.skipif(not JSON5_AVAILABLE, reason="json5 not available")
     def test_json5_allows_single_quotes(self, temp_file):
         """Test JSON5 allows single-quoted strings."""
         json5_data = "{'name': 'Alice', 'city': 'NYC'}"
@@ -609,7 +593,6 @@ class TestFormatSpecificFeatures:
         assert len(records) == 1
         assert records[0]["name"] == "Alice"
 
-    @pytest.mark.skipif(not JSON5_AVAILABLE, reason="json5 not available")
     def test_json5_allows_js_comments(self, temp_file):
         """Test JSON5 allows JavaScript-style comments."""
         json5_data = """{
@@ -624,7 +607,6 @@ class TestFormatSpecificFeatures:
         assert len(records) == 1
         assert records[0]["name"] == "Alice"
 
-    @pytest.mark.skipif(not HJSON_AVAILABLE, reason="hjson not available")
     def test_hjson_allows_hash_comments(self, temp_file):
         """Test HJSON allows hash comments (JSON5 does not)."""
         hjson_data = """{
@@ -639,7 +621,6 @@ class TestFormatSpecificFeatures:
         assert records[0]["name"] == "Alice"
         assert records[0]["age"] == 30
 
-    @pytest.mark.skipif(not HJSON_AVAILABLE, reason="hjson not available")
     def test_hjson_allows_unquoted_strings(self, temp_file):
         """Test HJSON allows completely unquoted string values."""
         hjson_data = """{
@@ -653,7 +634,6 @@ class TestFormatSpecificFeatures:
         assert records[0]["name"] == "Alice Smith"
         assert records[0]["city"] == "New York"
 
-    @pytest.mark.skipif(not HJSON_AVAILABLE, reason="hjson not available")
     def test_hjson_multiline_strings(self, temp_file):
         """Test HJSON multiline string syntax (not available in JSON5)."""
         hjson_data = """{
@@ -688,7 +668,6 @@ class TestFormatSpecificFeatures:
 class TestCrossFormatCompatibility:
     """Test that formats handle content from other formats appropriately."""
 
-    @pytest.mark.skipif(not JSON5_AVAILABLE, reason="json5 not available")
     def test_json5_file_with_standard_json_content(self, temp_file):
         """Test .json5 file can handle standard JSON content."""
         json_data = '{"name": "Alice", "age": 30}'
@@ -697,7 +676,6 @@ class TestCrossFormatCompatibility:
         assert len(records) == 1
         assert records[0]["name"] == "Alice"
 
-    @pytest.mark.skipif(not HJSON_AVAILABLE, reason="hjson not available")
     def test_hjson_file_with_standard_json_content(self, temp_file):
         """Test .hjson file can handle standard JSON content."""
         json_data = '{"name": "Alice", "age": 30}'
@@ -706,7 +684,6 @@ class TestCrossFormatCompatibility:
         assert len(records) == 1
         assert records[0]["name"] == "Alice"
 
-    @pytest.mark.skipif(not HJSON_AVAILABLE, reason="hjson not available")
     def test_hjson_file_with_json5_content(self, temp_file):
         """Test .hjson file can handle JSON5 content (hjson is superset)."""
         json5_data = """{
@@ -719,7 +696,6 @@ class TestCrossFormatCompatibility:
         assert len(records) == 1
         assert records[0]["name"] == "Alice"
 
-    @pytest.mark.skipif(not JSON5_AVAILABLE, reason="json5 not available")
     def test_json5_file_rejects_hjson_hash_comments(self, temp_file):
         """Test .json5 file rejects HJSON-specific hash comments."""
         hjson_data = """{
@@ -736,7 +712,6 @@ class TestCrossFormatCompatibility:
 # ============================================================================
 
 
-@pytest.mark.skipif(not IJSON_AVAILABLE, reason="ijson not available")
 class TestJsonFileIteratorStreaming:
     """Test streaming JSON file parsing via ijson."""
 
@@ -829,7 +804,6 @@ class TestJsonFileIteratorStreaming:
         assert records[0]["items"] == [1, 2, 3]
 
 
-@pytest.mark.skipif(not IJSON_AVAILABLE, reason="ijson not available")
 class TestGetDataIteratorStreaming:
     """Test streaming flag in get_data_iterator."""
 

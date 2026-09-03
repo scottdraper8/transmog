@@ -1005,25 +1005,6 @@ class TestCsvStreamingWriterBasics:
         with pytest.raises(ConfigurationError, match="directory path"):
             CsvStreamingWriter(destination=buffer, entity_name="test")
 
-    def test_writer_has_expected_attributes(self, tmp_path):
-        """Writer exposes buffers, part_counts, base_schemas, schema_log, all_part_paths."""
-        dest = str(tmp_path)
-        writer = CsvStreamingWriter(destination=dest, entity_name="test")
-
-        assert hasattr(writer, "buffers")
-        assert hasattr(writer, "part_counts")
-        assert hasattr(writer, "base_schemas")
-        assert hasattr(writer, "schema_log")
-        assert hasattr(writer, "all_part_paths")
-
-        assert isinstance(writer.buffers, dict)
-        assert isinstance(writer.part_counts, dict)
-        assert isinstance(writer.base_schemas, dict)
-        assert isinstance(writer.schema_log, dict)
-        assert isinstance(writer.all_part_paths, list)
-
-        writer.close()
-
     def test_context_manager_basic(self, tmp_path):
         """Context manager writes and closes cleanly."""
         dest = str(tmp_path)
@@ -1035,15 +1016,10 @@ class TestCsvStreamingWriterBasics:
                 [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
             )
 
-        assert writer._closed is True
-
         output_file = tmp_path / "test.csv"
-        assert output_file.exists()
-
-        with open(output_file, newline="") as f:
-            rows = list(csv.DictReader(f))
-
-        assert len(rows) == 2
+        with open(output_file, newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        assert [row["name"] for row in rows] == ["Alice", "Bob"]
 
 
 class TestCsvStreamingWriterExceptionCleanup:
@@ -1080,11 +1056,13 @@ class TestCsvStreamingWriterExceptionCleanup:
                         [{"id": "3", "name": "Charlie"}, {"id": "4", "name": "Dave"}]
                     )
 
-        # First part file was written before the failure
-        assert (tmp_path / "test_part_0000.csv").exists()
+        part_file = tmp_path / "test_part_0000.csv"
+        with open(part_file, newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        assert [row["name"] for row in rows] == ["Alice", "Bob"]
 
-    def test_close_after_exception_is_idempotent(self, tmp_path):
-        """Calling close() after context manager exit is safe and idempotent."""
+    def test_close_after_context_manager_is_idempotent(self, tmp_path):
+        """Calling close() after context manager exit does not rewrite output."""
         dest = str(tmp_path)
 
         with CsvStreamingWriter(
@@ -1092,14 +1070,16 @@ class TestCsvStreamingWriterExceptionCleanup:
         ) as writer:
             writer.write_main_records([{"id": "1", "name": "Alice"}])
 
-        assert writer._closed is True
-
-        # Second close is a no-op
+        output_file = tmp_path / "test.csv"
+        original_mtime = output_file.stat().st_mtime_ns
         writer.close()
-        assert writer._closed is True
+        assert output_file.stat().st_mtime_ns == original_mtime
+        with open(output_file, newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        assert [row["name"] for row in rows] == ["Alice"]
 
     def test_close_without_context_manager(self, tmp_path):
-        """Explicit close() works without context manager."""
+        """Explicit close() writes the file and a second close is a no-op."""
         dest = str(tmp_path)
 
         writer = CsvStreamingWriter(
@@ -1107,15 +1087,13 @@ class TestCsvStreamingWriterExceptionCleanup:
         )
         writer.write_main_records([{"id": "1", "name": "Alice"}])
 
-        assert not getattr(writer, "_closed", False)
-
         paths = writer.close()
-        assert writer._closed is True
         assert len(paths) == 1
+        with open(paths[0], newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        assert [row["name"] for row in rows] == ["Alice"]
 
-        # Idempotent: second close returns empty list
-        paths2 = writer.close()
-        assert paths2 == []
+        assert writer.close() == []
 
     def test_compression_raises_configuration_error(self):
         """Passing compression option raises ConfigurationError."""
