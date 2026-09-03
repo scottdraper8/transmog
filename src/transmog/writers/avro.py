@@ -281,6 +281,7 @@ class AvroStreamingWriter(StreamingWriter):
         entity_name: str = "entity",
         compression: str = "snappy",
         sync_interval: int = 16000,
+        codec: str | None = None,
         **options: Any,
     ) -> None:
         """Initialize the Avro streaming writer.
@@ -291,8 +292,11 @@ class AvroStreamingWriter(StreamingWriter):
             compression: Compression codec
                 (null, deflate, snappy, zstandard, lz4, bzip2, xz)
             sync_interval: Approximate size of sync blocks in bytes
+            codec: Deprecated alias for compression
             **options: Additional Avro writer options
         """
+        if codec is not None:
+            compression = codec
         if not AVRO_AVAILABLE:
             raise OutputError(
                 "fastavro is required for Avro streaming support. "

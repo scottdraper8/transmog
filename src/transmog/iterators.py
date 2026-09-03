@@ -81,6 +81,8 @@ def get_data_iterator(
 
     if isinstance(data, Path):
         data = str(data)
+        if not os.path.exists(data):
+            raise ValidationError(f"File not found: {data}")
 
     if isinstance(data, str) and os.path.exists(data):
         extension = os.path.splitext(data)[1].lower()

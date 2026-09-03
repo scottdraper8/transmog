@@ -129,8 +129,12 @@ class PyArrowWriter(DataWriter):
 
         Raises:
             MissingDependencyError: If PyArrow is not available
+            TypeError: If data is not a list of records
             OutputError: If writing fails
         """
+        if not isinstance(data, list):
+            raise TypeError(f"Expected list of records, got {type(data).__name__}")
+
         if pa is None:
             format_name = self._get_format_name()
             raise MissingDependencyError(

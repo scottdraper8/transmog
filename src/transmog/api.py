@@ -141,7 +141,12 @@ class FlattenResult:
         **format_options: Any,
     ) -> dict[str, str]:
         """Save all tables to a directory."""
-        base_path.mkdir(parents=True, exist_ok=True)
+        try:
+            base_path.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise OutputError(
+                f"Failed to create output directory '{base_path}': {exc}"
+            ) from exc
 
         writer = create_writer(output_format, **format_options)
         extension = ".csv" if output_format == "csv" else f".{output_format}"
@@ -173,7 +178,12 @@ class FlattenResult:
         **format_options: Any,
     ) -> list[str]:
         """Save single table to a file."""
-        file_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise OutputError(
+                f"Failed to create output directory '{file_path.parent}': {exc}"
+            ) from exc
 
         writer = create_writer(output_format, **format_options)
         written_path = writer.write(self.main, str(file_path))
