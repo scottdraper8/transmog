@@ -47,23 +47,24 @@ class ParquetStreamingWriter(PyArrowStreamingWriter):
 
     def __init__(
         self,
-        destination: str | BinaryIO | None = None,
+        destination: str | None = None,
         entity_name: str = "entity",
         compression: str = "snappy",
-        row_group_size: int = 10000,
         **options: Any,
     ) -> None:
         """Initialize the Parquet streaming writer.
 
         Args:
-            destination: Path or file-like object to write to
+            destination: Directory path to write part files to
             entity_name: Name of the entity for output files
             compression: Compression algorithm ("snappy", "gzip", etc.)
-            row_group_size: Number of records per row group
             **options: Additional options for PyArrow
         """
         super().__init__(
-            destination, entity_name, compression, row_group_size, **options
+            destination=destination,
+            entity_name=entity_name,
+            compression=compression,
+            **options,
         )
 
     def _get_format_name(self) -> str:
@@ -74,15 +75,25 @@ class ParquetStreamingWriter(PyArrowStreamingWriter):
         """Get the file extension."""
         return ".parquet"
 
-    def _create_writer(self, file_path: str, schema: Any) -> Any:
+    def _create_format_writer(self, file_path: str, schema: Any) -> Any:
         """Create the Parquet writer instance."""
         return pq.ParquetWriter(
             file_path, schema, compression=self.compression, **self.options
         )
 
-    def _write_to_writer(self, writer: Any, table: Any) -> None:
+    def _write_to_format_writer(self, writer: Any, table: Any) -> None:
         """Write table using the Parquet writer."""
         writer.write_table(table)
+
+    def _read_part_table(self, file_path: str) -> Any:
+        """Read a Parquet part file as a PyArrow Table."""
+        return pq.read_table(file_path)
+
+    def _rewrite_part(self, file_path: str, target_schema: Any) -> None:
+        """Rewrite a Parquet part file with a new target schema."""
+        table = pq.read_table(file_path)
+        table = self._promote_table_to_schema(table, target_schema)
+        pq.write_table(table, file_path, compression=self.compression)
 
 
 __all__ = ["ParquetWriter", "ParquetStreamingWriter", "PARQUET_AVAILABLE"]

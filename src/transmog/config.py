@@ -1,5 +1,6 @@
 """Configuration for Transmog processing."""
 
+import warnings
 from dataclasses import dataclass
 
 from transmog.exceptions import ConfigurationError
@@ -56,8 +57,13 @@ class TransmogConfig:
     """Field name for timestamps. Set to None to disable timestamp tracking."""
 
     # === Processing Control ===
-    batch_size: int = 1000
-    """Number of records to process at once for memory efficiency."""
+    batch_size: int = 5000
+    """Number of records to process per batch during streaming.
+
+    Controls memory usage during streaming and the size of intermediate
+    part files before consolidation. Larger values use more memory but
+    produce fewer intermediate files with better schema inference.
+    """
 
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
@@ -77,6 +83,22 @@ class TransmogConfig:
             raise ConfigurationError(
                 f"stringify_values must be a boolean, "
                 f"got {type(self.stringify_values).__name__}"
+            )
+
+        if self.batch_size < 500:
+            warnings.warn(
+                f"Small batch_size ({self.batch_size}) creates many intermediate "
+                f"part files; consider increasing for better I/O performance",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        if self.batch_size > 100_000:
+            warnings.warn(
+                f"Large batch_size ({self.batch_size}) may consume significant "
+                f"memory during streaming",
+                UserWarning,
+                stacklevel=2,
             )
 
         if isinstance(self.id_generation, str):

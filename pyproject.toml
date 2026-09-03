@@ -1,12 +1,14 @@
 [build-system]
-build-backend = "poetry.core.masonry.api"
-
-requires = [ "poetry>=1" ]
+build-backend = "setuptools.build_meta"
+requires = [ "setuptools>=61" ]
 
 [project]
 name = "transmog"
 version = "2.0.4"
-description = "A data transformation library for flattening complex nested structures into tabular formats while preserving hierarchical relationships"
+description = """\
+  A data transformation library for flattening complex nested structures into tabular formats while preserving \
+  hierarchical relationships\
+  """
 readme = "README.md"
 keywords = [
   "avro",
@@ -48,7 +50,6 @@ dependencies = [
   "pyarrow>=23",
   "typing-extensions>=4",
 ]
-
 optional-dependencies.dev = [
   "bandit>=1.9",
   # Documentation dependencies
@@ -67,7 +68,7 @@ optional-dependencies.dev = [
   "pytest-cov>=3",
   "ruff>=0.14",
   "safety>=2.3.5",
-  "sphinx>=7,<9",
+  "sphinx>=7",
   "sphinx-autobuild>=2021.3.14",
   "sphinx-autodoc-typehints>=1.24",
   "sphinx-copybutton>=0.5",
@@ -83,24 +84,20 @@ optional-dependencies.dev = [
   "types-pyyaml",
   "types-toml",
 ]
-
 optional-dependencies.minimal = [
   "hjson>=3.1",
   "json5>=0.13",
   "orjson>=3.11",
   "typing-extensions>=4",
 ]
-
 urls."Bug Tracker" = "https://github.com/scottdraper8/transmog/issues"
-urls."Documentation" = "https://scottdraper8.github.io/transmog/"
-urls."Homepage" = "https://github.com/scottdraper8/transmog"
+urls.Documentation = "https://scottdraper8.github.io/transmog/"
+urls.Homepage = "https://github.com/scottdraper8/transmog"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
-
-[tool.setuptools.packages.find]
-where = [ "src" ]
-include = [ "transmog*" ]
+packages.find.where = [ "src" ]
+packages.find.include = [ "transmog*" ]
 
 [tool.ruff]
 target-version = "py310"
@@ -109,7 +106,6 @@ format.indent-style = "space"
 format.quote-style = "double"
 format.line-ending = "auto"
 format.skip-magic-trailing-comma = false
-
 lint.select = [ "A", "B", "C4", "D", "E", "F", "I", "N", "S", "UP" ]
 lint.ignore = [ "D203", "D213" ]
 lint.per-file-ignores = { "tests/*" = [
@@ -142,15 +138,20 @@ lint.isort.section-order = [
 # Pydocstyle configuration
 lint.pydocstyle.convention = "google"
 
-[tool.pytest.ini_options]
-markers = [
+[tool.bandit]
+exclude_dirs = [ "tests", "examples" ]
+skips = [ "B101" ]
+target-version = "py310"
+
+[tool.pytest]
+ini_options.markers = [
   "benchmark: mark test as a performance benchmark",
   "memory: mark test as a memory usage test",
 ]
 # Exclude benchmark tests by default
-addopts = "--ignore=tests/benchmarks"
-# Allow running benchmarks specifically with -m benchmark
+ini_options.addopts = "--ignore=tests/benchmarks"
 
+# Allow running benchmarks specifically with -m benchmark
 [tool.interrogate]
 ignore-init-method = true
 ignore-init-module = true
@@ -165,11 +166,6 @@ exclude = [ "docs" ]
 verbose = 0
 quiet = false
 color = true
-
-[tool.bandit]
-exclude_dirs = [ "tests", "examples" ]
-skips = [ "B101" ]
-target-version = "py310"
 
 [tool.vulture]
 paths = [ "src/transmog", "tests" ]

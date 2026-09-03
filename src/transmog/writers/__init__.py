@@ -5,7 +5,7 @@ output formats (CSV, Parquet, ORC, Avro). Each format has both a standard writer
 and a streaming writer for memory-efficient processing.
 """
 
-from typing import Any, BinaryIO
+from typing import Any
 
 from transmog.exceptions import ConfigurationError, MissingDependencyError
 from transmog.writers.avro import (
@@ -84,16 +84,22 @@ def create_writer(format_name: str, **kwargs: Any) -> DataWriter:
 
 def create_streaming_writer(
     format_name: str,
-    destination: str | BinaryIO | None = None,
+    destination: str | None = None,
     entity_name: str = "entity",
+    batch_size: int = 5000,
+    coerce_schema: bool = False,
+    consolidate: bool = True,
     **kwargs: Any,
 ) -> StreamingWriter:
     """Create a streaming writer for the given format.
 
     Args:
         format_name: Format name (csv, parquet, orc, avro)
-        destination: File path or file-like object to write to
+        destination: Directory path to write output files to
         entity_name: Name of the entity being processed
+        batch_size: Number of records per batch before flushing to part file
+        coerce_schema: Coerce minority part files to majority schema at close
+        consolidate: Merge part files into a single file per table at close
         **kwargs: Format-specific options
 
     Returns:
@@ -127,7 +133,14 @@ def create_streaming_writer(
             f"Supported: {', '.join(STREAMING_FORMATS.keys())}"
         )
 
-    return writer_class(destination=destination, entity_name=entity_name, **kwargs)
+    return writer_class(
+        destination=destination,
+        entity_name=entity_name,
+        batch_size=batch_size,
+        coerce_schema=coerce_schema,
+        consolidate=consolidate,
+        **kwargs,
+    )
 
 
 __all__ = [

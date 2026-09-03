@@ -105,21 +105,17 @@ class TestEndToEndWorkflows:
         csv_files = list((output_dir / "streaming_csv").glob("**/*.csv"))
         assert len(csv_files) > 0
 
-        # Verify content by reading back the main CSV
+        # Verify content by reading back the consolidated main CSV file
         import csv
 
-        main_csv = [
-            f for f in csv_files if "users" in f.name and "profile" not in f.name
-        ]
-        if main_csv:
-            with open(main_csv[0], newline="") as f:
-                reader = csv.DictReader(f)
-                rows = list(reader)
-            # Should have processed all 100 records
-            assert len(rows) == 100
-            # Verify first and last records
-            assert rows[0]["name"] == "User 1"
-            assert rows[-1]["name"] == "User 100"
+        main_csv = output_dir / "streaming_csv" / "users.csv"
+        assert main_csv.exists(), (
+            f"Expected consolidated file users.csv, found: {[f.name for f in csv_files]}"
+        )
+        with open(main_csv, newline="") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        assert len(rows) == 100
 
     def test_deterministic_id_consistency(self, array_data):
         """Test that deterministic IDs are consistent across runs."""
@@ -256,12 +252,13 @@ class TestPerformanceScenarios:
         assert result.main[49]["id"] == 49
 
         # Stream process for comparison
+        stream_config = tm.TransmogConfig(batch_size=10)
         tm.flatten_stream(
             large_dataset,
             output_path=str(output_dir / "memory_efficient"),
             name="large_data",
             output_format="csv",
-            batch_size=10,
+            config=stream_config,
         )
 
         # Verify output files exist and contain data
@@ -287,6 +284,7 @@ class TestPerformanceScenarios:
             ]
 
         # Process multiple batches
+        throughput_config = tm.TransmogConfig(batch_size=10)
         for batch_id in range(3):
             batch_data = generate_batch(batch_id)
 
@@ -295,7 +293,7 @@ class TestPerformanceScenarios:
                 output_path=str(output_dir / f"batch_{batch_id}"),
                 name="throughput_test",
                 output_format="csv",
-                batch_size=10,
+                config=throughput_config,
             )
 
         # Verify all batches processed

@@ -21,7 +21,7 @@ config = tm.TransmogConfig(
     time_field="_timestamp",             # Field name for timestamps (None to disable)
 
     # Processing Control
-    batch_size=1000,                     # Records to process at once
+    batch_size=5000,                     # Records to process at once
 )
 
 result = tm.flatten(data, config=config)
@@ -86,25 +86,35 @@ types. Eliminates type coercion errors in Parquet/ORC writers.
 ### batch_size
 
 **Type:** `int`
-**Default:** `1000`
+**Default:** `5000`
 
-Number of records to process in each batch. Affects memory usage and throughput.
+Number of records to process in each batch. Controls both memory usage during
+streaming and the size of intermediate part files before consolidation.
 
 ```python
-config = tm.TransmogConfig(batch_size=100)    # Small batches
+config = tm.TransmogConfig(batch_size=1000)   # Smaller batches
 config = tm.TransmogConfig(batch_size=10000)  # Large batches
 ```
+
+A warning is emitted for values below 500 (many intermediate part files) or
+above 100,000 (high memory usage).
 
 :::{tip}
 **Choosing batch_size**
 
-- **Small batches (100-500):** Use for memory-constrained environments or very
-  large records. `flatten_stream()` defaults to 100 for memory efficiency.
-- **Medium batches (1000-5000):** Default choice, balances memory and throughput.
+- **Small batches (500-2000):** Use for memory-constrained environments or very
+  large records.
+- **Medium batches (2000-10000):** Default range, balances memory and throughput.
 - **Large batches (10000+):** Use when memory is plentiful and throughput is
   critical. Reduces per-batch overhead.
 
 :::
+
+## Streaming Parameters
+
+The `consolidate` and `coerce_schema` options are passed directly to
+`flatten_stream()` rather than through `TransmogConfig`. See
+{doc}`streaming` for details and examples.
 
 ## Advanced Parameters
 
@@ -207,15 +217,11 @@ DEBUG:transmog.writers.arrow_base:arrow schema created, fields=12, types={'name'
 DEBUG:transmog.writers.csv:csv schema created, table=main, fields=8
 ```
 
-**WARNING** — Schema drift and data issues:
+**WARNING** — Schema deviations and data issues:
 
-```text
-WARNING:transmog.writers.csv:csv schema drift detected, table=main, unexpected_fields=['new_col']
-```
-
-By default, schema drift raises an `OutputError`. To drop unexpected fields
-instead, pass `schema_drift="drop"` to `flatten_stream()`. See
-[Schema Drift](schema-drift) for details.
+Schema deviations across part files are emitted as `UserWarning` at close time,
+distinguishing structural changes (added/removed fields) from type changes.
+Details are also written to `_schema_log.json` in the output directory.
 
 ### Per-Module Loggers
 
@@ -234,7 +240,6 @@ logging.getLogger("transmog.iterators").setLevel(logging.DEBUG)
 ```
 
 :::{tip}
-Enable `DEBUG` on `transmog.writers.csv` when troubleshooting schema drift
-errors. The warning log shows exactly which unexpected fields triggered the
-error before the exception is raised.
+Enable `DEBUG` on `transmog.writers` when troubleshooting schema issues.
+Debug logs show schema inference details for each part file.
 :::

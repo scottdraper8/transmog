@@ -1,8 +1,6 @@
 """Tests for ORC writer."""
 
 import io
-import os
-import tempfile
 
 import pytest
 
@@ -101,7 +99,7 @@ class TestOrcStreamingWriter:
     """Test ORC streaming writer functionality."""
 
     def test_write_main_records(self, tmp_path):
-        """Test writing main records."""
+        """Test writing main records produces a consolidated file."""
         records = [
             {"id": 1, "name": "Alice"},
             {"id": 2, "name": "Bob"},
@@ -119,7 +117,7 @@ class TestOrcStreamingWriter:
         assert len(table) == 2
 
     def test_write_child_records(self, tmp_path):
-        """Test writing child records."""
+        """Test writing child records produces separate files."""
         main_records = [{"id": 1, "name": "Alice"}]
         child_records = [
             {"user_id": 1, "order_id": 101},
@@ -139,21 +137,47 @@ class TestOrcStreamingWriter:
         assert len(orders_table) == 2
 
     def test_buffering(self, tmp_path):
-        """Test that buffering works correctly."""
+        """Test that buffering produces multiple part files with consolidate=False."""
         with OrcStreamingWriter(
-            destination=str(tmp_path), entity_name="data", batch_size=10
+            destination=str(tmp_path),
+            entity_name="data",
+            batch_size=10,
+            consolidate=False,
         ) as writer:
             for i in range(25):
                 writer.write_main_records([{"id": i, "value": i * 2}])
 
-        output_path = tmp_path / "data.orc"
-        assert output_path.exists()
+        # 25 records with batch_size=10 produces 3 parts (10, 10, 5)
+        assert (tmp_path / "data_part_0000.orc").exists()
+        assert (tmp_path / "data_part_0001.orc").exists()
+        assert (tmp_path / "data_part_0002.orc").exists()
 
-        table = orc.read_table(str(output_path))
+        all_rows = []
+        for i in range(3):
+            table = orc.read_table(str(tmp_path / f"data_part_{i:04d}.orc"))
+            all_rows.extend(table.column("id").to_pylist())
+        assert len(all_rows) == 25
+        assert sorted(all_rows) == list(range(25))
+
+    def test_buffering_consolidated(self, tmp_path):
+        """Test that buffered data is consolidated into a single file."""
+        with OrcStreamingWriter(
+            destination=str(tmp_path),
+            entity_name="data",
+            batch_size=10,
+        ) as writer:
+            for i in range(25):
+                writer.write_main_records([{"id": i, "value": i * 2}])
+
+        consolidated = tmp_path / "data.orc"
+        assert consolidated.exists()
+
+        table = orc.read_table(str(consolidated))
         assert len(table) == 25
+        assert sorted(table.column("id").to_pylist()) == list(range(25))
 
     def test_multiple_tables(self, tmp_path):
-        """Test writing multiple child tables."""
+        """Test writing multiple child tables produces separate files."""
         with OrcStreamingWriter(
             destination=str(tmp_path), entity_name="users"
         ) as writer:
@@ -166,13 +190,23 @@ class TestOrcStreamingWriter:
         assert (tmp_path / "addresses.orc").exists()
 
     def test_safe_table_names(self, tmp_path):
-        """Test that table names are sanitized properly."""
+        """Test that table names are sanitized in file names."""
         with OrcStreamingWriter(
             destination=str(tmp_path), entity_name="users"
         ) as writer:
-            writer.write_child_records("user.addresses", [{"id": 1}])
+            writer.write_child_records("user/addresses", [{"id": 1}])
 
         assert (tmp_path / "user_addresses.orc").exists()
+
+    def test_close_returns_paths(self, tmp_path):
+        """Test that close returns paths to output files."""
+        writer = OrcStreamingWriter(destination=str(tmp_path), entity_name="data")
+        writer.write_main_records([{"id": 1}])
+        paths = writer.close()
+
+        assert len(paths) == 1
+        assert paths[0].name == "data.orc"
+        assert paths[0].exists()
 
     def test_close_idempotent(self, tmp_path):
         """Test that close can be called multiple times."""

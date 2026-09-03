@@ -9,32 +9,19 @@ how to set up a development environment and submit changes.
 
 - Python 3.10 or higher
 - Git
-- Poetry (for dependency management)
+- [uv](https://docs.astral.sh/uv/) (for dependency and environment management)
 
-### Installing Poetry
-
-Poetry manages project dependencies and virtual environments automatically.
-
-**Using pipx (recommended):**
+### Installing uv
 
 ```bash
-# Install pipx (if not already installed)
-brew install pipx  # macOS
-# For other systems, see: https://pipx.pypa.io/stable/installation/
+# macOS / Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Ensure pipx is on your PATH
-pipx ensurepath
-
-# Install Poetry via pipx
-pipx install poetry
-
-# Optional: Enable shell completions
-poetry help completions
+# Windows
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-**Alternative installation methods:**
-
-See the [Poetry installation guide](https://python-poetry.org/docs/) for other options.
+See the [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/) for other options.
 
 ## Development Setup
 
@@ -45,24 +32,27 @@ See the [Poetry installation guide](https://python-poetry.org/docs/) for other o
    cd transmog
    ```
 
-2. **Run the setup script**
+2. **Install dependencies**
 
    ```bash
-   python3 scripts/setup_dev.py
+   uv sync --extra dev
    ```
 
-   This script will:
+   This will create a virtual environment and install all dependencies
+   including development tools.
 
-   - Verify Python version compatibility (3.10+)
-   - Check for Poetry installation
-   - Install all dependencies via Poetry
-   - Set up pre-commit hooks
+3. **Install pre-commit hooks**
 
-3. **Verify the setup**
+   ```bash
+   uv run pre-commit install
+   uv run pre-commit install --hook-type pre-push
+   ```
 
-```bash
-poetry run pytest
-```
+4. **Verify the setup**
+
+   ```bash
+   uv run pytest
+   ```
 
 ## Making Changes
 
@@ -82,13 +72,13 @@ poetry run pytest
 
    ```bash
    # Run all tests
-   poetry run pytest
+   uv run pytest
 
    # Run with coverage
-   poetry run pytest --cov=transmog
+   uv run pytest --cov=transmog
 
    # Run specific tests
-   poetry run pytest tests/unit/test_specific.py
+   uv run pytest tests/unit/test_specific.py
    ```
 
 4. **Commit your changes**
@@ -110,14 +100,14 @@ Then open a pull request on GitHub with a description of your changes.
 
 ## Running Commands
 
-All commands should be run through Poetry to use the project's virtual environment:
+All commands should be run through uv to use the project's virtual environment:
 
 ```bash
 # Run tests
-poetry run pytest
+uv run pytest
 
-# Activate Poetry shell (optional - then commands don't need 'poetry run' prefix)
-poetry shell
+# Run any tool
+uv run ruff check src/
 ```
 
 ## Code Standards
@@ -154,14 +144,14 @@ The codebase is organized into focused modules:
 
 ```bash
 # Run all tests
-poetry run pytest
+uv run pytest
 
 # Run with coverage report
-poetry run pytest --cov=transmog --cov-report=html
+uv run pytest --cov=transmog --cov-report=html
 
 # Run specific test categories
-poetry run pytest tests/unit/
-poetry run pytest tests/integration/
+uv run pytest tests/unit/
+uv run pytest tests/integration/
 ```
 
 ## Documentation

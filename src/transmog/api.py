@@ -5,6 +5,7 @@ nested data structures into tabular formats.
 """
 
 import logging
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +19,7 @@ from transmog.iterators import get_data_iterator
 from transmog.streaming import stream_process
 from transmog.types import JsonDict, ProcessingContext, ProgressCallback
 from transmog.writers import create_writer
-from transmog.writers.base import _sanitize_filename
+from transmog.writers.base import sanitize_filename
 
 logger = logging.getLogger(__name__)
 
@@ -150,12 +151,12 @@ class FlattenResult:
             if not records:
                 continue
 
-            safe_name = _sanitize_filename(table_name)
+            safe_name = sanitize_filename(table_name)
             destination = base_path / f"{safe_name or 'table'}{extension}"
 
             try:
                 written_path = writer.write(records, str(destination))
-            except Exception as exc:
+            except (OSError, OutputError) as exc:
                 raise OutputError(
                     f"Failed to write {output_format.upper()} for table '{table_name}' "
                     f"to '{destination}': {exc}"
@@ -179,8 +180,24 @@ class FlattenResult:
         return [str(written_path)]
 
 
+def _count_records(data: Any) -> int | None:
+    """Return the number of input records when knowable, else None."""
+    if isinstance(data, dict):
+        return 1
+    if isinstance(data, list):
+        return len(data)
+    return None
+
+
 def flatten(
-    data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes,
+    data: (
+        dict[str, Any]
+        | list[dict[str, Any]]
+        | str
+        | Path
+        | bytes
+        | Iterator[dict[str, Any]]
+    ),
     name: str = "data",
     config: TransmogConfig | None = None,
     progress_callback: ProgressCallback | None = None,
@@ -220,25 +237,14 @@ def flatten(
     input_type = type(data).__name__
     logger.info("flatten started, name=%s, input_type=%s", name, input_type)
 
-    total_records: int | None = None
-    if isinstance(data, dict):
-        total_records = 1
-    elif isinstance(data, list):
-        total_records = len(data)
-
+    total_records = _count_records(data)
     result = FlattenResult(entity_name=name)
-
-    if isinstance(data, dict):
-        iterator = iter([data])
-    elif isinstance(data, list):
-        iterator = iter(data)
-    else:
-        iterator = get_data_iterator(data)
+    iterator = get_data_iterator(data)
 
     timestamp = get_current_timestamp()
     context = ProcessingContext(extract_time=timestamp)
     batch: list[JsonDict] = []
-    batch_size = max(1, config.batch_size)
+    batch_size = config.batch_size
     records_processed = 0
 
     def flush_batch() -> None:
@@ -282,12 +288,21 @@ def flatten(
 
 
 def flatten_stream(
-    data: dict[str, Any] | list[dict[str, Any]] | str | Path | bytes,
+    data: (
+        dict[str, Any]
+        | list[dict[str, Any]]
+        | str
+        | Path
+        | bytes
+        | Iterator[dict[str, Any]]
+    ),
     output_path: str | Path,
     name: str = "data",
     output_format: str = "csv",
     config: TransmogConfig | None = None,
     progress_callback: ProgressCallback | None = None,
+    consolidate: bool = True,
+    coerce_schema: bool = False,
     **format_options: Any,
 ) -> list[Path]:
     r"""Stream flatten data directly to files for memory-efficient processing.
@@ -295,29 +310,39 @@ def flatten_stream(
     This function processes data and writes directly to output files without
     keeping results in memory, making it ideal for very large datasets.
 
+    By default, intermediate part files are consolidated into a single file
+    per table at close time. Set ``consolidate=False`` to retain individual
+    part files.
+
     Args:
         data: Input data - can be dict, list of dicts, file path, or JSON string
         output_path: Directory path where output files will be written
         name: Base name for the flattened tables
         output_format: Output format ("csv", "parquet", "orc", "avro")
-        config: Optional configuration (optimized for memory if not provided)
+        config: Optional configuration (uses defaults if not provided)
         progress_callback: Optional callable invoked after each batch flush with
             (records_processed, total_records). total_records is None when input
             length is unknown (file paths, byte strings).
+        consolidate: Merge part files into a single file per table at close
+            time. When True (default), the output matches single-file-per-table
+            conventions expected by data lake consumers. Set to False to retain
+            individual part files with per-part schemas.
+        coerce_schema: Coerce minority part files to the majority schema at
+            close time. When enabled, the streaming writer rewrites part files
+            whose schemas deviate from the majority. This incurs additional
+            I/O proportional to the number of deviating parts.
         **format_options: Format-specific writer options:
 
             Parquet options:
                 - compression: str - Compression codec
                   ("snappy", "gzip", "brotli", None)
-                - row_group_size: int - Rows per row group (default: 10000)
 
             ORC options:
                 - compression: str - Compression codec
                   ("zstd", "snappy", "lz4", "zlib", None)
-                - batch_size: int - Rows per batch (default: 10000)
 
             Avro options:
-                - codec: str - Compression codec
+                - compression: str - Compression codec
                   ("null", "deflate", "snappy", "bzip2", "xz")
                   Note: snappy/bzip2/xz provided via cramjam (included by default)
                         zstandard/lz4 require separate packages (fastavro limitation)
@@ -330,35 +355,33 @@ def flatten_stream(
     Examples:
         >>> # Stream large dataset to CSV files
         >>> files = flatten_stream(large_data, "output/", output_format="csv")
-        >>> # files: [PosixPath('output/data.csv'), ...]
 
         >>> # Stream with custom config
-        >>> config = TransmogConfig(batch_size=100)
+        >>> config = TransmogConfig(batch_size=1000)
         >>> files = flatten_stream(data, "output/", config=config)
 
-        >>> # Stream to compressed Parquet with specific row group size
+        >>> # Stream to compressed Parquet
         >>> flatten_stream(data, "output/", output_format="parquet",
-        ...                compression="snappy", row_group_size=50000)
+        ...                compression="snappy")
 
-        >>> # Stream to compressed ORC with specific batch size
+        >>> # Stream to compressed ORC
         >>> flatten_stream(data, "output/", output_format="orc",
-        ...                compression="zstd", batch_size=50000)
+        ...                compression="zstd")
 
         >>> # Stream to Avro with snappy compression
         >>> flatten_stream(data, "output/", output_format="avro",
-        ...                codec="snappy")
+        ...                compression="snappy")
+
+        >>> # Retain individual part files (no consolidation)
+        >>> flatten_stream(data, "output/", consolidate=False)
     """
     if config is None:
-        config = TransmogConfig(batch_size=100)
+        config = TransmogConfig()
 
     output_path = Path(output_path)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    total_records: int | None = None
-    if isinstance(data, dict):
-        total_records = 1
-    elif isinstance(data, list):
-        total_records = len(data)
+    total_records = _count_records(data)
 
     logger.info(
         "flatten_stream started, name=%s, format=%s, output=%s",
@@ -375,6 +398,8 @@ def flatten_stream(
         output_destination=str(output_path),
         progress_callback=progress_callback,
         total_records=total_records,
+        consolidate=consolidate,
+        coerce_schema=coerce_schema,
         **format_options,
     )
 

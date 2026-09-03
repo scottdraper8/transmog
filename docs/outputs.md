@@ -33,12 +33,23 @@ result.save("output", output_format="avro")
 When results contain child tables, save to a directory:
 
 ```python
-# Save to directory (multiple tables)
+# Save to directory (multiple tables) — batch writer produces single files
 result.save("output/")
 # Creates: output/products.csv, output/products_reviews.csv
 
 # Single table to file
 result.save("output/products.csv")
+```
+
+Streaming output (`flatten_stream`) produces the same naming by default:
+
+```python
+tm.flatten_stream(data, "output/", name="products", output_format="csv")
+# Creates: output/products.csv, output/products_reviews.csv
+
+# With consolidate=False, produces numbered part files instead:
+tm.flatten_stream(data, "output/", name="products", output_format="csv", consolidate=False)
+# Creates: output/products_part_0000.csv, output/products_reviews_part_0000.csv, ...
 ```
 
 ## CSV Output
@@ -74,7 +85,7 @@ result.save(
 )
 ```
 
-Streaming CSV supports the same options plus `schema_drift`:
+Streaming CSV supports the same formatting options, plus `include_header`:
 
 ```python
 tm.flatten_stream(
@@ -83,37 +94,71 @@ tm.flatten_stream(
     delimiter="|",
     quotechar="'",
     include_header=True,       # Include column headers (default: True)
-    schema_drift="drop",       # Handle schema drift (default: "strict")
 )
 ```
 
-(schema-drift)=
+Set `include_header=False` to omit the header row from each output file. This
+is useful when appending to existing files or when headers are managed externally.
 
-### Schema Drift
+### Schema Drift Tracking
 
-When using `flatten_stream()` with CSV output, the column schema is locked after
-the first batch of records. By default, any subsequent batch containing fields
-not present in the original schema raises an `OutputError`.
+Internally, each batch flush produces a separate part file with its own column
+set. With the default `consolidate=True`, these are merged into a single file
+with all columns at close time.
 
-The `schema_drift` parameter controls this behavior:
-
-| Mode       | Behavior                                                               |
-|------------|------------------------------------------------------------------------|
-| `"strict"` | Raise `OutputError` on unexpected fields (default)                     |
-| `"drop"`   | Log a warning and drop unexpected fields; write remaining known fields |
+With `consolidate=False`, if columns differ across parts, a `_schema_log.json`
+file records the deviations and a `UserWarning` is emitted at close time.
+Pass `coerce_schema=True` to `flatten_stream()` to automatically unify columns
+across part files:
 
 ```python
-import transmog as tm
-
-# Drop unexpected fields instead of raising
-tm.flatten_stream(data, "output/", name="events", output_format="csv", schema_drift="drop")
+tm.flatten_stream(
+    data, "output/", name="events", output_format="csv",
+    consolidate=False, coerce_schema=True,
+)
+# Part files missing columns are rewritten with null-filled columns
 ```
 
-:::{note}
-An `"extend"` mode (rewriting headers to add new columns) is not supported.
-Streaming CSV headers are already emitted to the destination and cannot be
-rewritten for arbitrary outputs (stdout, binary streams, pipes).
-:::
+See {doc}`streaming` for details on `consolidate` and `coerce_schema`.
+
+#### _schema_log.json Format
+
+When `consolidate=False`, a `_schema_log.json` file is written alongside the
+part files. It contains a `tables` object keyed by table name, each with:
+
+- **`base_schema`**: The schema of the first part file, listing field names
+  and types.
+- **`parts`**: A list of entries per part file. Each entry has a `file` name
+  and a `deviations` object (`null` if the part matches the base schema).
+
+Deviations, when present, contain:
+
+- **`structural`**: `added` and `removed` field name lists (fields present in
+  the part but not the base, or vice versa).
+- **`type`**: A mapping of field names to `{"base": "...", "part": "..."}`
+  showing type mismatches.
+
+```json
+{
+  "tables": {
+    "events": {
+      "base_schema": {
+        "fields": [
+          {"name": "_id", "type": "string"},
+          {"name": "event_type", "type": "string"}
+        ]
+      },
+      "parts": [
+        {"file": "events_part_0000.csv", "deviations": null},
+        {"file": "events_part_0001.csv", "deviations": {
+          "structural": {"added": ["new_field"], "removed": []},
+          "type": {}
+        }}
+      ]
+    }
+  }
+}
+```
 
 ## Parquet Output
 
@@ -147,19 +192,19 @@ result.save("output.orc", compression="zlib")
 result = tm.flatten(data, name="products")
 result.save("output.avro")
 
-# Compression options (codec parameter)
-result.save("output.avro", codec="snappy")     # Default (via cramjam)
-result.save("output.avro", codec="deflate")    # Built-in compression
-result.save("output.avro", codec="null")       # No compression
-result.save("output.avro", codec="bzip2")      # Via cramjam
-result.save("output.avro", codec="xz")         # Via cramjam
+# Compression options
+result.save("output.avro", compression="snappy")     # Default (via cramjam)
+result.save("output.avro", compression="deflate")    # Built-in compression
+result.save("output.avro", compression="null")       # No compression
+result.save("output.avro", compression="bzip2")      # Via cramjam
+result.save("output.avro", compression="xz")         # Via cramjam
 
 # Additional codecs (require separate package installations):
-# codec="zstandard"  # Requires: pip install zstandard
-# codec="lz4"        # Requires: pip install lz4
+# compression="zstandard"  # Requires: pip install zstandard
+# compression="lz4"        # Requires: pip install lz4
 
-# Advanced: customize sync interval (bytes between sync markers)
-result.save("output.avro", codec="snappy", sync_interval=32000)
+# Advanced: customize sync interval (bytes between sync markers, default: 16000)
+result.save("output.avro", compression="snappy", sync_interval=32000)
 ```
 
 :::{note}
@@ -194,13 +239,9 @@ Schema inference behavior:
 - Nullable fields use Avro union types: `["null", "type"]`
 - NaN and Infinity float values are automatically converted to null
 - Mixed types in a field result in union types with multiple type options
-- Schema is locked after the first batch in streaming mode
-
-:::{warning}
-When using `flatten_stream()` with Avro output, the schema is determined from the
-first batch of records. If subsequent batches contain new fields not present in
-the first batch, a schema drift error will be raised.
-:::
+- Streaming batches are consolidated into a single file per table by default
+- With `consolidate=False`, each batch produces a separate part file and schema
+  deviations are tracked in `_schema_log.json`
 
 ## Null Handling
 
