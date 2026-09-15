@@ -20,7 +20,12 @@ class TransmogConfig:
     """Strategy for handling arrays: SMART (default), SEPARATE, INLINE, or SKIP."""
 
     include_nulls: bool = False
-    """Include null and empty values in output. False (default) skips them."""
+    """Include null and empty values in output. False (default) skips them.
+
+    When True, null-like values (None, empty string, NaN, Inf) are stored
+    as ``None``.  Empty strings do not retain their identity — ``""``
+    becomes ``None`` in the flattened output.
+    """
 
     stringify_values: bool = False
     """Convert all leaf values to strings after flattening.
