@@ -1,60 +1,136 @@
-Evaluate test quality and coverage to identify weak, redundant, or ineffective tests.
+Evaluate the test suite through the evidence architecture described in `tests/README.md`.
+
+Read `tests/README.md` fully before beginning. That document defines the
+paradigm, the claim-evidence tuple, the evidence channels, and the
+protocol rules that govern this suite.
 
 ## Task
 
-Analyze the test suite to assess test quality, identify tests that don't provide meaningful coverage,
-and ensure tests validate actual project logic rather than third-party behavior.
+Analyze the test suite as a **measurement apparatus**, not as a checklist
+of code paths exercised. The question is not "do tests exist" but "would
+the tests notice if behavior that matters were wrong?"
 
-### Analysis Areas
+### 1. Claim-evidence integrity
 
-1. **Test Utility and Logic Coverage**
+For each test (or a representative sample per directory), evaluate the
+claim-evidence tuple `C = (P, D, R, O, S, V)`:
 
-   - Verify tests are validating actual project logic, not third-party library behavior
-   - Identify tests that only exercise external dependencies without testing custom code paths
-   - Ensure tests cover meaningful edge cases and error conditions specific to the project
-   - Flag tests that validate obvious or trivial behavior
+- **P (Proposition):** Does the test name a specific behavioral claim, or
+  is it vague ("test_flatten_works", "test_basic_output")? Tests without
+  a clear **P** cannot be evaluated for strength.
+- **O (Oracle):** Does the assertion distinguish correct from incorrect
+  output? Flag assertions that almost any implementation would satisfy:
+  `isinstance(result, dict)`, `len(result) > 0`, `assert result`,
+  `assert paths`. These are the weak oracles the framework rejects.
+- **R (Reality):** If the claim concerns a real dependency (Parquet
+  encoding, Avro schema, CSV quoting), is that dependency in the
+  execution? A mocked writer cannot support an unqualified format claim.
+- **D (Domain):** Is the exercised input domain adequate for the claim?
+  A single hand-picked example cannot support "works for all configs."
+  Check whether the corpus or generators cover the relevant space.
 
-2. **Test Independence and Authenticity**
+### 2. Observation-verdict separation
 
-   - Identify over-mocked tests that don't exercise real code paths
-   - Flag tests using patches or mocks to work around actual implementation issues
-   - Ensure core functionality is tested with real objects, not mocked substitutes
-   - Identify tests that are "programmed to pass" through excessive mocking rather than validating logic
+- Are observations (what the code did) kept separate from verdicts (whether
+  that behavior is correct/intended)?
+- Flag tests that silently promote actuality to specification — e.g.,
+  golden values updated without a reviewed rationale.
+- Flag tests where a characterization snapshot is treated as normative
+  truth without any external justification.
 
-3. **Redundancy and Duplication**
+### 3. Evidence proportionality
 
-   - Find duplicate or near-duplicate tests that validate the same logic
-   - Identify tests that are variations of the same scenario without meaningful differences
-   - Flag tests that could be consolidated into parameterized test cases
-   - Detect tests that repeat the same assertions across multiple test functions
+- Does the scope of each test's conclusion match the scope of its evidence?
+- Flag tests that claim end-to-end guarantees from mocked or isolated
+  execution.
+- Flag tests that claim format fidelity from in-memory-only paths.
+- Also flag the reverse error: dismissing a strong local test (e.g., a
+  deterministic unit test of a pure function) for not being end-to-end.
 
-4. **Test Integrity**
+### 4. Sensitivity
 
-   - Verify tests actually fail when the code they test is broken
-   - Identify tests with brittle assertions that pass despite logic errors
-   - Flag tests that rely on implementation details rather than behavior
-   - Ensure tests validate outputs, not just that code runs without error
+- Would the tests care if the relevant behavior were wrong? This is the
+  second-order question.
+- Consult `tests/mutation_report.md` and `tests/mutation_report_writers.md`
+  for known sensitivity evidence.
+- Flag sensors whose assertions a trivial mutation would survive (e.g.,
+  swapping SMART and SEPARATE would not change the assertion).
+- Flag untested code paths where mutation has not been run and no oracle
+  exists.
 
-### Red Flags to Report
+### 5. Corpus integrity
 
-- Tests that only verify third-party library calls succeed (not project-specific logic)
-- Excessive mocking that prevents testing real integration between components
-- Tests with multiple patches/mocks that obscure what's actually being tested
-- Redundant test cases that validate identical scenarios
-- Tests that pass regardless of actual implementation (e.g., always-true assertions)
-- Tests that work around bugs with patches instead of fixing the underlying code
-- Tests for trivial getters/setters or pass-through functions
-- Tests that don't fail when the tested code is intentionally broken
-- Tests with unclear purpose or assertions that don't validate meaningful behavior
+- Run `scripts/audit_corpus.py` and report any missing type categories.
+- Flag any fixture that appears shaped to avoid a code bug rather than
+  to exercise the code. If the code fails on a legitimate input, the
+  fix belongs in the code, not the fixture.
+- Check that every corpus fixture is referenced by at least one
+  `@pytest.mark.claim` sensor. Orphan fixtures are dead weight.
 
-### Deliverables
+### 6. Scope boundary health
 
-Provide a report including:
+- Review the "Not claimed" section in `tests/README.md`. Are there
+  entries that now have sensors and should be removed?
+- Are there observable gaps not listed? If the evaluation discovers
+  an unobserved material behavior, add it.
+- Is any behavior silently treated as covered when it has no sensor
+  and is not listed as unclaimed?
 
-- List of weak or ineffective tests with specific file and test name references
-- Tests that are primarily validating third-party library behavior
-- Redundant test cases that could be consolidated
-- Tests relying on excessive mocking or patches
-- Recommendations for test improvements or removal
-- Suggestions for additional tests to cover gaps in core functionality
-- Impact assessment of proposed test changes
+### 7. Evidence channel balance
+
+- Is the suite over-reliant on a single channel (e.g., all
+  characterization, no differential or metamorphic)?
+- Are the channels complementary? Characterization pins exact tables;
+  differential compares paths; metamorphic asserts relations; property-
+  based explores generated inputs; mutation challenges oracles.
+- Flag areas where a channel is missing and would add genuine evidence
+  (not ceremony).
+
+### 8. Redundancy (evidentiary, not textual)
+
+Two tests that look similar can carry distinct fault-detection value.
+Two syntactically different tests can be behaviorally redundant.
+Redundancy is defined by independent evidence contribution, not by
+textual similarity.
+
+- Flag tests that are genuinely redundant: same input, same path, same
+  oracle, same sensitivity. Neither adds evidence the other lacks.
+- Do **not** flag tests as redundant merely because they test the same
+  function. Different inputs, configs, or oracles justify separate tests.
+
+### 9. Anti-patterns
+
+Flag these specific patterns with file and test name references:
+
+- `assert result` / `assert paths` / `assert len(x) > 0` as the
+  primary oracle on a behavioral claim (weak oracle).
+- Mocks that substitute away the dependency material to the claim
+  (circular evidence).
+- Tests that infer behavior from source, then assert the inference
+  (self-confirming analysis — protocol rule 1).
+- Fixtures or expected values that appear designed to avoid triggering
+  code defects rather than exposing them (corpus loophole).
+- Tests named for a behavioral property that only check execution
+  succeeds (e.g., "test_cross_format_consistency" that asserts
+  `len(paths) >= 1`).
+- Golden values updated without a reviewed rationale in the commit.
+
+## Deliverables
+
+Provide a structured report:
+
+1. **Claim-evidence audit:** Tests with missing or weak P, O, R, or D,
+   grouped by directory.
+2. **Sensitivity gaps:** Areas where mutations would likely survive,
+   referencing mutation reports where available.
+3. **Corpus health:** Output of `scripts/audit_corpus.py` plus any
+   loopholes or missing type coverage.
+4. **Scope boundary review:** Skipped tests to unskip, new boundaries
+   to add, gaps not represented.
+5. **Channel balance:** Which channels are strong, which are thin,
+   where adding evidence would have the highest return.
+6. **Redundancy:** Genuinely duplicated evidence (not textual similarity).
+7. **Anti-patterns:** Specific instances with file:line references.
+8. **Recommendations:** Ordered by expected evidence return, not by
+   ceremony. Each recommendation should name the claim it would
+   strengthen and the channel it would add to.
