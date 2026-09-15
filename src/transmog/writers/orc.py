@@ -2,17 +2,9 @@
 
 from typing import Any, BinaryIO, TextIO
 
+import pyarrow.orc as orc
+
 from transmog.writers.arrow_base import PyArrowStreamingWriter, PyArrowWriter
-
-try:
-    import pyarrow as pa
-    import pyarrow.orc as orc
-
-    ORC_AVAILABLE = True
-except ImportError:
-    pa = None
-    orc = None
-    ORC_AVAILABLE = False
 
 
 class OrcWriter(PyArrowWriter):
@@ -94,4 +86,4 @@ class OrcStreamingWriter(PyArrowStreamingWriter):
         orc.write_table(table, file_path, compression=self.compression)
 
 
-__all__ = ["OrcWriter", "OrcStreamingWriter", "ORC_AVAILABLE"]
+__all__ = ["OrcWriter", "OrcStreamingWriter"]

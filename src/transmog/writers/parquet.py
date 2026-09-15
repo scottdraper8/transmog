@@ -2,17 +2,9 @@
 
 from typing import Any, BinaryIO, TextIO
 
+import pyarrow.parquet as pq
+
 from transmog.writers.arrow_base import PyArrowStreamingWriter, PyArrowWriter
-
-try:
-    import pyarrow as pa
-    import pyarrow.parquet as pq
-
-    PARQUET_AVAILABLE = True
-except ImportError:
-    pa = None
-    pq = None
-    PARQUET_AVAILABLE = False
 
 
 class ParquetWriter(PyArrowWriter):
@@ -96,4 +88,4 @@ class ParquetStreamingWriter(PyArrowStreamingWriter):
         pq.write_table(table, file_path, compression=self.compression)
 
 
-__all__ = ["ParquetWriter", "ParquetStreamingWriter", "PARQUET_AVAILABLE"]
+__all__ = ["ParquetWriter", "ParquetStreamingWriter"]

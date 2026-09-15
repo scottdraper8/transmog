@@ -7,40 +7,25 @@ and a streaming writer for memory-efficient processing.
 
 from typing import Any
 
-from transmog.exceptions import ConfigurationError, MissingDependencyError
-from transmog.writers.avro import (
-    AVRO_AVAILABLE,
-    AvroStreamingWriter,
-    AvroWriter,
-)
+from transmog.exceptions import ConfigurationError
+from transmog.writers.avro import AvroStreamingWriter, AvroWriter
 from transmog.writers.base import DataWriter, StreamingWriter
 from transmog.writers.csv import CsvStreamingWriter, CsvWriter
-from transmog.writers.orc import (
-    ORC_AVAILABLE,
-    OrcStreamingWriter,
-    OrcWriter,
-)
-from transmog.writers.parquet import (
-    PARQUET_AVAILABLE,
-    ParquetStreamingWriter,
-    ParquetWriter,
-)
+from transmog.writers.orc import OrcStreamingWriter, OrcWriter
+from transmog.writers.parquet import ParquetStreamingWriter, ParquetWriter
 
-# Registry of available writer formats
-FORMATS: dict[str, type[DataWriter]] = {"csv": CsvWriter}
-STREAMING_FORMATS: dict[str, type[StreamingWriter]] = {"csv": CsvStreamingWriter}
-
-if PARQUET_AVAILABLE:
-    FORMATS["parquet"] = ParquetWriter
-    STREAMING_FORMATS["parquet"] = ParquetStreamingWriter
-
-if ORC_AVAILABLE:
-    FORMATS["orc"] = OrcWriter
-    STREAMING_FORMATS["orc"] = OrcStreamingWriter
-
-if AVRO_AVAILABLE:
-    FORMATS["avro"] = AvroWriter
-    STREAMING_FORMATS["avro"] = AvroStreamingWriter
+FORMATS: dict[str, type[DataWriter]] = {
+    "csv": CsvWriter,
+    "parquet": ParquetWriter,
+    "orc": OrcWriter,
+    "avro": AvroWriter,
+}
+STREAMING_FORMATS: dict[str, type[StreamingWriter]] = {
+    "csv": CsvStreamingWriter,
+    "parquet": ParquetStreamingWriter,
+    "orc": OrcStreamingWriter,
+    "avro": AvroStreamingWriter,
+}
 
 
 def create_writer(format_name: str, **kwargs: Any) -> DataWriter:
@@ -55,26 +40,11 @@ def create_writer(format_name: str, **kwargs: Any) -> DataWriter:
 
     Raises:
         ConfigurationError: If the format is not supported
-        MissingDependencyError: If a required dependency is missing
     """
     format_name = format_name.lower()
     writer_class = FORMATS.get(format_name)
 
     if not writer_class:
-        if format_name == "parquet" and not PARQUET_AVAILABLE:
-            raise MissingDependencyError(
-                "PyArrow is required for Parquet support. "
-                "Install with: pip install pyarrow"
-            )
-        if format_name == "orc" and not ORC_AVAILABLE:
-            raise MissingDependencyError(
-                "PyArrow is required for ORC support. Install with: pip install pyarrow"
-            )
-        if format_name == "avro" and not AVRO_AVAILABLE:
-            raise MissingDependencyError(
-                "fastavro is required for Avro support. "
-                "Install with: pip install fastavro"
-            )
         raise ConfigurationError(
             f"Unsupported format: {format_name}. Supported: {', '.join(FORMATS.keys())}"
         )
@@ -107,27 +77,11 @@ def create_streaming_writer(
 
     Raises:
         ConfigurationError: If the format is not supported
-        MissingDependencyError: If a required dependency is missing
     """
     format_name = format_name.lower()
     writer_class = STREAMING_FORMATS.get(format_name)
 
     if not writer_class:
-        if format_name == "parquet" and not PARQUET_AVAILABLE:
-            raise MissingDependencyError(
-                "PyArrow is required for Parquet streaming. "
-                "Install with: pip install pyarrow"
-            )
-        if format_name == "orc" and not ORC_AVAILABLE:
-            raise MissingDependencyError(
-                "PyArrow is required for ORC streaming. "
-                "Install with: pip install pyarrow"
-            )
-        if format_name == "avro" and not AVRO_AVAILABLE:
-            raise MissingDependencyError(
-                "fastavro is required for Avro streaming. "
-                "Install with: pip install fastavro"
-            )
         raise ConfigurationError(
             f"Unsupported format: {format_name}. "
             f"Supported: {', '.join(STREAMING_FORMATS.keys())}"

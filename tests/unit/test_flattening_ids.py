@@ -308,3 +308,20 @@ class TestDeterministicIdApiIntegration:
         assert table_name in child_tables
         parent_ids = {row["_parent_id"] for row in child_tables[table_name]}
         assert parent_ids == {"ORDER-123"}
+
+    def test_natural_child_missing_id_field_uses_underscore_id(self):
+        """Children lacking id_field get _id, not a fake value in id_field."""
+        data = {
+            "product_id": "PROD123",
+            "name": "Laptop",
+            "reviews": [{"rating": 5}, {"rating": 4}],
+        }
+        config = tm.TransmogConfig(id_generation="natural", id_field="product_id")
+        result = tm.flatten(data, name="products", config=config)
+        reviews = result.tables["products_reviews"]
+        assert len(reviews) == 2
+        for row in reviews:
+            assert "product_id" not in row
+            assert "_id" in row
+            assert len(row["_id"]) == 36
+            assert row["_parent_id"] == "PROD123"

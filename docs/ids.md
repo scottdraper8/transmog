@@ -41,7 +41,7 @@ print(result.main[0])
 # {'product_id': 'PROD123', 'name': 'Gaming Laptop'}
 
 print(result.tables["products_reviews"][0])
-# {..., '_parent_id': 'PROD123'}
+# {..., '_id': '...', '_parent_id': 'PROD123'}
 ```
 
 :::{important}
@@ -50,9 +50,9 @@ A missing, empty, or null ID field raises `ValidationError`.
 :::
 
 Child records use their own value for `id_field` when it is present. When it
-is missing, a UUID is generated and written into `id_field` (not `_id`). In
-the example above, reviews have `review_id` rather than `product_id`, so each
-review row gets a generated UUID in the `product_id` column.
+is missing, a UUID is written to `_id` and `id_field` is left absent. In the
+example above, reviews have `review_id` rather than `product_id`, so each
+review row gets a generated `_id` and no `product_id` column.
 
 ## Hash-Based IDs
 

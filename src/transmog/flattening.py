@@ -9,6 +9,7 @@ import json
 import logging
 import math
 import uuid
+import warnings
 from datetime import datetime, timezone
 from typing import Any
 
@@ -254,13 +255,19 @@ def _process_array_items(
                 config.id_generation == "natural"
                 and config.id_field not in metadata_dict
             ):
-                metadata_dict[config.id_field] = str(uuid.uuid4())
-            annotated = annotate_with_metadata(
-                metadata_dict,
-                config=config,
-                parent_id=_parent_id,
-                transmog_time=_context.extract_time,
-            )
+                metadata_dict["_id"] = str(uuid.uuid4())
+                if _parent_id is not None:
+                    metadata_dict[config.parent_field] = _parent_id
+                if config.time_field:
+                    metadata_dict[config.time_field] = _context.extract_time
+                annotated = metadata_dict
+            else:
+                annotated = annotate_with_metadata(
+                    metadata_dict,
+                    config=config,
+                    parent_id=_parent_id,
+                    transmog_time=_context.extract_time,
+                )
 
             # Determine table name using the actual field key
             sanitized_key = _sanitize_name(key)
@@ -308,6 +315,13 @@ def flatten_json(
     arrays: dict[str, list[dict[str, Any]]] = {}
 
     if _context.current_depth >= config.max_depth:
+        path = ".".join(_context.path_components) or "<root>"
+        warnings.warn(
+            f"max_depth={config.max_depth} reached at {path}; "
+            "remaining nested values omitted",
+            UserWarning,
+            stacklevel=2,
+        )
         return result, arrays
 
     for key, value in data.items():

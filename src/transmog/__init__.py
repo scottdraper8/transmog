@@ -19,7 +19,12 @@ import logging
 
 from transmog.api import FlattenResult, flatten, flatten_stream
 from transmog.config import TransmogConfig
-from transmog.exceptions import MissingDependencyError, TransmogError, ValidationError
+from transmog.exceptions import (
+    ConfigurationError,
+    OutputError,
+    TransmogError,
+    ValidationError,
+)
 from transmog.types import ArrayMode
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -34,6 +39,7 @@ __all__ = [
     "ArrayMode",
     "TransmogError",
     "ValidationError",
-    "MissingDependencyError",
+    "ConfigurationError",
+    "OutputError",
     "__version__",
 ]

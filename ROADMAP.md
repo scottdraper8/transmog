@@ -34,9 +34,9 @@ generation strategies.
 - **ID generation strategies** — random, natural, hash,
   and composite key modes handle real-world identity
   requirements.
-- **Optional dependency gating** —
-  `AVRO_AVAILABLE`, `ORC_AVAILABLE` flags with
-  `MissingDependencyError` for clean degradation.
+- **Required format writers** — CSV, Parquet, ORC, and
+  Avro are part of the default install. Missing packages
+  fail at import rather than behind an extras flag.
 
 ---
 
@@ -146,21 +146,6 @@ exceptions propagate.
 ---
 
 ## Testing
-
-### TEST-1: CSV injection prevention coverage
-
-`DONE` · Size: **S**
-
-`_sanitize_csv_value()` in `csv.py:20-53` exists but test
-coverage for bypass attempts (leading whitespace, Unicode
-formula characters) is minimal.
-
-**Proposed fix:** Add parameterized tests for known CSV
-injection patterns including edge cases.
-
-- Progress: Added 5 parametrized direct unit tests covering
-  dangerous chars, Unicode bypasses, whitespace, embedded
-  chars, and non-string passthrough.
 
 ### TEST-2: Streaming writer exception cleanup
 

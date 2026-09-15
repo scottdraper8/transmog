@@ -2,17 +2,12 @@
 
 import io
 
+import pyarrow.orc as orc
 import pytest
 
-from transmog.writers.orc import ORC_AVAILABLE
-
-if ORC_AVAILABLE:
-    import pyarrow.orc as orc
-
-    from transmog.writers.orc import OrcStreamingWriter, OrcWriter
+from transmog.writers.orc import OrcStreamingWriter, OrcWriter
 
 
-@pytest.mark.skipif(not ORC_AVAILABLE, reason="PyArrow not available")
 class TestOrcWriter:
     """Test ORC writer functionality."""
 
@@ -92,7 +87,6 @@ class TestOrcWriter:
             writer.write(data, buffer)
 
 
-@pytest.mark.skipif(not ORC_AVAILABLE, reason="PyArrow not available")
 class TestOrcStreamingWriter:
     """Test ORC streaming writer functionality."""
 

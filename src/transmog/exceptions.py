@@ -13,12 +13,6 @@ class ValidationError(TransmogError):
     pass
 
 
-class MissingDependencyError(TransmogError):
-    """Exception raised when an optional dependency is missing."""
-
-    pass
-
-
 class ConfigurationError(TransmogError):
     """Exception raised when there's a configuration error."""
 
@@ -34,7 +28,6 @@ class OutputError(TransmogError):
 __all__ = [
     "TransmogError",
     "ValidationError",
-    "MissingDependencyError",
     "ConfigurationError",
     "OutputError",
 ]

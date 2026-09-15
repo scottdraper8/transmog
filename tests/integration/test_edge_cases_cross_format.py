@@ -12,7 +12,6 @@ import pytest
 
 import transmog as tm
 from transmog.config import TransmogConfig
-from transmog.writers.orc import ORC_AVAILABLE
 
 
 def _get_file_path(paths, extension):
@@ -80,7 +79,6 @@ class TestNullConsistencyAcrossFormats:
             assert values[1] is None  # Second record has None value
             assert names[2] is None  # Third record has None name
 
-    @pytest.mark.skipif(not ORC_AVAILABLE, reason="PyArrow ORC not available")
     def test_null_handling_orc(self, data_with_nulls):
         """Test null handling in ORC output."""
         import pyarrow.orc as orc
@@ -553,7 +551,6 @@ class TestStringifyAcrossFormats:
             assert price_col[0] == "19.99"
             assert active_col[0] == "True"
 
-    @pytest.mark.skipif(not ORC_AVAILABLE, reason="PyArrow ORC not available")
     def test_stringify_orc_output(self):
         """Test stringify with ORC output."""
         import pyarrow as pa

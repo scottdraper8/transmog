@@ -129,6 +129,11 @@ class TestGetDataIterator:
         with pytest.raises(ValidationError, match="Unsupported data type"):
             list(get_data_iterator(42))
 
+    def test_missing_json_string_is_file_not_found(self):
+        """A missing *.json string is a missing file, not invalid JSON."""
+        with pytest.raises(ValidationError, match="File not found"):
+            list(get_data_iterator("does_not_exist_transmog_probe.json"))
+
     def test_missing_path_object(self, tmp_path):
         """A Path that does not exist raises File not found."""
         missing = tmp_path / "missing.json"

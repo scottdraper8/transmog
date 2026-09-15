@@ -8,20 +8,14 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, BinaryIO, TextIO
 
-from transmog.exceptions import MissingDependencyError, OutputError
+import pyarrow as pa
+
+from transmog.exceptions import OutputError
 from transmog.writers.base import DataWriter, StreamingWriter, _collect_field_names
 
 logger = logging.getLogger(__name__)
 
-try:
-    import pyarrow as pa
-
-    PYARROW_AVAILABLE = True
-    _ARROW_WRITE_ERRORS: tuple[type[Exception], ...] = (OSError, pa.lib.ArrowException)
-except ImportError:
-    pa = None
-    PYARROW_AVAILABLE = False
-    _ARROW_WRITE_ERRORS: tuple[type[Exception], ...] = (OSError,)  # type: ignore[no-redef]
+_ARROW_WRITE_ERRORS: tuple[type[Exception], ...] = (OSError, pa.lib.ArrowException)
 
 
 def _is_valid_float_for_inference(value: Any) -> bool:
@@ -128,19 +122,11 @@ class PyArrowWriter(DataWriter):
             Path to the written file or file-like object
 
         Raises:
-            MissingDependencyError: If PyArrow is not available
             TypeError: If data is not a list of records
             OutputError: If writing fails
         """
         if not isinstance(data, list):
             raise TypeError(f"Expected list of records, got {type(data).__name__}")
-
-        if pa is None:
-            format_name = self._get_format_name()
-            raise MissingDependencyError(
-                f"PyArrow is required for {format_name} support. "
-                "Install with: pip install pyarrow"
-            )
 
         try:
             compression_val = options.get("compression", self.compression)
@@ -198,13 +184,6 @@ class PyArrowStreamingWriter(StreamingWriter):
             **options: Additional options for PyArrow
         """
         super().__init__(destination, entity_name, **options)
-
-        if pa is None:
-            format_name = self._get_format_name()
-            raise MissingDependencyError(
-                f"PyArrow is required for {format_name} streaming support. "
-                "Install with: pip install pyarrow"
-            )
 
         self.compression = compression
         self.stringify_values = stringify_values
@@ -401,4 +380,4 @@ class PyArrowStreamingWriter(StreamingWriter):
         return super().close()
 
 
-__all__ = ["PyArrowWriter", "PyArrowStreamingWriter", "PYARROW_AVAILABLE"]
+__all__ = ["PyArrowWriter", "PyArrowStreamingWriter"]

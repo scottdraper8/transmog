@@ -142,9 +142,10 @@ class TestMaxDepthBehavior:
         """Shallower max_depth produces fewer flattened fields."""
         data = {"a": {"b": {"c": {"d": {"e": "deep_value"}}}}}
 
-        result_shallow = tm.flatten(
-            data, name="test", config=TransmogConfig(max_depth=2)
-        )
+        with pytest.warns(UserWarning, match="max_depth"):
+            result_shallow = tm.flatten(
+                data, name="test", config=TransmogConfig(max_depth=2)
+            )
         shallow_keys = {k for k in result_shallow.main[0] if not k.startswith("_")}
 
         result_deep = tm.flatten(
@@ -158,9 +159,24 @@ class TestMaxDepthBehavior:
         """max_depth=1 only includes top-level scalar fields."""
         data = {"top": "value", "nested": {"inner": "hidden"}}
 
-        result = tm.flatten(data, name="test", config=TransmogConfig(max_depth=1))
+        with pytest.warns(UserWarning, match="max_depth"):
+            result = tm.flatten(data, name="test", config=TransmogConfig(max_depth=1))
 
         main = result.main[0]
         non_meta = {k: v for k, v in main.items() if not k.startswith("_")}
         assert "top" in non_meta
         assert not any("inner" in k for k in non_meta)
+
+    def test_max_depth_emits_warning(self):
+        """Truncation at max_depth emits UserWarning naming the path."""
+        data = {"a": {"b": {"c": "deep"}}}
+        with pytest.warns(UserWarning, match="max_depth=1 reached at a"):
+            tm.flatten(data, name="test", config=TransmogConfig(max_depth=1))
+
+
+def test_public_api_exports_configuration_and_output_errors():
+    """ConfigurationError and OutputError are available on tm."""
+    assert tm.ConfigurationError is ConfigurationError
+    from transmog.exceptions import OutputError
+
+    assert tm.OutputError is OutputError

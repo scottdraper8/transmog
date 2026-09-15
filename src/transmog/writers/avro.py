@@ -3,6 +3,10 @@
 import pathlib
 from typing import Any, BinaryIO, TextIO
 
+import fastavro
+from fastavro import writer as avro_writer
+from fastavro.schema import SchemaParseException as _AvroSchemaError
+
 from transmog.exceptions import OutputError
 from transmog.writers.base import (
     DataWriter,
@@ -11,24 +15,13 @@ from transmog.writers.base import (
     _normalize_special_floats,
 )
 
-try:
-    import fastavro
-    from fastavro import writer as avro_writer
-    from fastavro.schema import SchemaParseException as _AvroSchemaError
-
-    AVRO_AVAILABLE = True
-    _AVRO_WRITE_ERRORS: tuple[type[Exception], ...] = (
-        OSError,
-        ValueError,
-        TypeError,
-        KeyError,
-        _AvroSchemaError,
-    )
-except ImportError:
-    fastavro = None  # type: ignore[assignment]
-    avro_writer = None  # type: ignore[assignment]
-    AVRO_AVAILABLE = False
-    _AVRO_WRITE_ERRORS: tuple[type[Exception], ...] = (OSError,)  # type: ignore[no-redef]
+_AVRO_WRITE_ERRORS: tuple[type[Exception], ...] = (
+    OSError,
+    ValueError,
+    TypeError,
+    KeyError,
+    _AvroSchemaError,
+)
 
 # Supported Avro compression codecs
 AVRO_CODECS = ("null", "deflate", "snappy", "zstandard", "lz4", "bzip2", "xz")
@@ -208,12 +201,6 @@ class AvroWriter(DataWriter):
         **options: Any,
     ) -> str | BinaryIO | TextIO:
         """Write data to an Avro file."""
-        if not AVRO_AVAILABLE:
-            raise OutputError(
-                "fastavro is required for Avro support. "
-                "Install with: pip install fastavro"
-            )
-
         try:
             codec = options.get("compression", options.get("codec", self.codec))
             sync_interval = options.get("sync_interval", self.sync_interval)
@@ -297,11 +284,6 @@ class AvroStreamingWriter(StreamingWriter):
         """
         if codec is not None:
             compression = codec
-        if not AVRO_AVAILABLE:
-            raise OutputError(
-                "fastavro is required for Avro streaming support. "
-                "Install with: pip install fastavro"
-            )
 
         super().__init__(destination, entity_name, **options)
 
@@ -429,4 +411,4 @@ class AvroStreamingWriter(StreamingWriter):
             )
 
 
-__all__ = ["AvroWriter", "AvroStreamingWriter", "AVRO_AVAILABLE"]
+__all__ = ["AvroWriter", "AvroStreamingWriter"]

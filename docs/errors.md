@@ -30,50 +30,31 @@ except tm.ValidationError as e:
 ```
 
 A `pathlib.Path` that does not exist raises `ValidationError: File not found`.
-A string is treated as a file path only if that path exists; otherwise it is
-parsed as JSON. `tm.flatten("data.json")` when the file is missing raises
-`ValidationError: Error parsing JSON data`, not file-not-found.
-
-### MissingDependencyError
-
-Raised when a writer dependency is not importable. Available as
-`tm.MissingDependencyError`. PyArrow and fastavro are included in the default
-install, so this is uncommon unless those packages were removed.
-
-```python
-try:
-    result.save("output.parquet")
-except tm.MissingDependencyError as e:
-    print(f"Missing dependency: {e}")
-```
+A string ending in a data-file extension (`.json`, `.jsonl`, `.ndjson`,
+`.json5`, `.hjson`) that is not an existing path also raises
+`ValidationError: File not found`. Other strings are parsed as JSON.
 
 ### ConfigurationError
 
 Raised when `TransmogConfig` receives invalid parameters (e.g., `batch_size < 1`,
-invalid `id_generation` value). Not exported on `tm`; import from
-`transmog.exceptions` or catch `TransmogError`.
+invalid `id_generation` value). Available as `tm.ConfigurationError`.
 
 ```python
-from transmog.exceptions import ConfigurationError
-
 try:
     config = tm.TransmogConfig(batch_size=-1)
-except ConfigurationError as e:
+except tm.ConfigurationError as e:
     print(f"Invalid config: {e}")
 ```
 
 ### OutputError
 
 Raised when writing output files fails (permissions, disk full, invalid
-compression). Not exported on `tm`; import from `transmog.exceptions` or catch
-`TransmogError`.
+compression). Available as `tm.OutputError`.
 
 ```python
-from transmog.exceptions import OutputError
-
 try:
     tm.flatten_stream(data, "output/", output_format="csv")
-except (OutputError, tm.TransmogError) as e:
+except tm.OutputError as e:
     print(f"Write failed: {e}")
 ```
 
@@ -124,16 +105,15 @@ differ across parts, a `UserWarning` is emitted and details are written to
 See [Schema Drift Tracking](outputs.md#schema-drift-tracking).
 
 **ConfigurationError on invalid config:**
-Catch `ConfigurationError` from `transmog.exceptions`, or `TransmogError`:
 
 ```python
 try:
     config = tm.TransmogConfig(batch_size=-1)
-except tm.TransmogError as e:
+except tm.ConfigurationError as e:
     print(f"Invalid config: {e}")
 ```
 
 **Deep or circular structures:**
-`max_depth` (default 100) silently omits the entire subtree below that depth.
-Circular references do not raise; they unroll until `max_depth` is reached.
-There is no warning or log when truncation occurs.
+`max_depth` (default 100) omits the entire subtree below that depth and emits
+a `UserWarning` naming the path where truncation occurred. Circular references
+do not raise; they unroll until `max_depth` is reached.

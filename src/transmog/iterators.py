@@ -44,10 +44,25 @@ else:
     JSON_DECODE_ERRORS = (json.JSONDecodeError,)
 
 
+_DATA_FILE_EXTENSIONS = frozenset({".json", ".jsonl", ".ndjson", ".json5", ".hjson"})
+
+
 def _require_file(file_path: str) -> None:
     """Raise ValidationError if the file does not exist."""
     if not os.path.exists(file_path):
         raise ValidationError(f"File not found: {file_path}")
+
+
+def _missing_data_file_path(value: str) -> bool:
+    """True if value looks like a data-file path that does not exist.
+
+    Distinguishes missing files from JSON text so ``flatten("data.json")``
+    raises file-not-found instead of a JSON parse error.
+    """
+    if "{" in value or "[" in value:
+        return False
+    extension = os.path.splitext(value.strip())[1].lower()
+    return extension in _DATA_FILE_EXTENSIONS
 
 
 def get_data_iterator(
@@ -96,6 +111,9 @@ def get_data_iterator(
         if streaming and IJSON_AVAILABLE:
             return get_json_file_iterator_streaming(data)
         return get_json_file_iterator(data)
+
+    if isinstance(data, str) and _missing_data_file_path(data):
+        raise ValidationError(f"File not found: {data}")
 
     if isinstance(data, (str, bytes)):
         text = data if isinstance(data, str) else data.decode("utf-8")

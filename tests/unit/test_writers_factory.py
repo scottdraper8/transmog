@@ -12,7 +12,6 @@ from transmog.writers import (
     create_streaming_writer,
     create_writer,
 )
-from transmog.writers.orc import ORC_AVAILABLE
 
 
 class TestCreateWriter:
@@ -148,7 +147,6 @@ class TestWriterFactoryIntegration:
         assert table.num_rows == 2
         assert table.column("name").to_pylist() == ["Test 1", "Test 2"]
 
-    @pytest.mark.skipif(not ORC_AVAILABLE, reason="PyArrow ORC not available")
     def test_orc_writer_writes_rows(self, tmp_path):
         """Factory-created ORC writer writes the given rows."""
         import pyarrow.orc as orc

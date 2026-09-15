@@ -13,7 +13,6 @@ import pytest
 import transmog as tm
 from transmog.config import TransmogConfig
 from transmog.flattening import is_null_like
-from transmog.writers.orc import ORC_AVAILABLE
 
 
 class TestIsNullLikeHelper:
@@ -325,7 +324,6 @@ class TestNanParquetOutput:
 class TestNanOrcOutput:
     """Test NaN handling in ORC output."""
 
-    @pytest.mark.skipif(not ORC_AVAILABLE, reason="PyArrow ORC not available")
     def test_orc_schema_inference_with_nan(self):
         """Test ORC schema inference with NaN values."""
         import pyarrow.orc as orc

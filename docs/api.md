@@ -268,16 +268,15 @@ for record in result.main:
 
 ## Error Classes
 
-All exceptions inherit from `TransmogError`. Three are exported in the public API:
+All exceptions inherit from `TransmogError`. The following are exported in the
+public API:
 
 | Exception | Available as | Description |
 | --------- | ----------- | ----------- |
 | `TransmogError` | `tm.TransmogError` | Base exception for all Transmog errors |
 | `ValidationError` | `tm.ValidationError` | Input data validation failures |
-| `MissingDependencyError` | `tm.MissingDependencyError` | Writer dependency is not importable |
-
-`ConfigurationError` and `OutputError` are not exported on `tm`. Import them
-from `transmog.exceptions` or catch `TransmogError`.
+| `ConfigurationError` | `tm.ConfigurationError` | Invalid `TransmogConfig` or writer options |
+| `OutputError` | `tm.OutputError` | Failure writing output files |
 
 See {doc}`errors` for usage examples, troubleshooting, and error handling patterns.
 
@@ -308,7 +307,8 @@ print(tm.__version__)
 print(tm.__all__)
 # ['flatten', 'flatten_stream', 'FlattenResult',
 #  'TransmogConfig', 'ArrayMode',
-#  'TransmogError', 'ValidationError', 'MissingDependencyError', '__version__']
+#  'TransmogError', 'ValidationError', 'ConfigurationError',
+#  'OutputError', '__version__']
 
 # All exported types are available directly
 result = tm.flatten(data)                    # Main function

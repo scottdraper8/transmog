@@ -173,9 +173,9 @@ config = tm.TransmogConfig(time_field=None)  # Disable timestamps
 **Default:** `100`
 
 Maximum recursion depth for nested structures. The entire subtree below this
-depth is silently omitted — not just the field at that level, but all of its
-descendants. Circular references do not raise; they unroll until this limit.
-There is no warning or log when truncation occurs.
+depth is omitted — not just the field at that level, but all of its
+descendants. A `UserWarning` is emitted with the path at which truncation
+occurred. Circular references do not raise; they unroll until this limit.
 
 :::{note}
 Adjust only if processing unusually deep structures or to intentionally

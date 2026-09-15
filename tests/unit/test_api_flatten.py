@@ -194,7 +194,8 @@ class TestFlattenEdgeCases:
         data["self"] = data
 
         config = TransmogConfig(max_depth=10)
-        result = tm.flatten(data, name="circular", config=config)
+        with pytest.warns(UserWarning, match="max_depth"):
+            result = tm.flatten(data, name="circular", config=config)
         assert isinstance(result, tm.FlattenResult)
         assert len(result.main) == 1
         assert result.main[0]["name"] == "test"
@@ -281,6 +282,11 @@ class TestFlattenFile:
         """A plain string is parsed as JSON, not as a file path."""
         with pytest.raises(ValidationError, match="Error parsing JSON data"):
             tm.flatten("nonexistent.csv", name="test")
+
+    def test_flatten_missing_json_string_is_file_not_found(self):
+        """A missing *.json string raises file-not-found, not a JSON parse error."""
+        with pytest.raises(ValidationError, match="File not found"):
+            tm.flatten("does_not_exist_transmog_probe.json", name="test")
 
 
 class TestFlattenWithIterator:

@@ -13,50 +13,11 @@ from transmog.writers.base import (
     _normalize_special_floats,
 )
 
-_DANGEROUS_CHARS = frozenset("=+-@|\t\r")
 
-
-def _sanitize_csv_value(value: Any) -> Any:
-    """Sanitize a value to prevent CSV injection attacks.
-
-    Prefixes potentially dangerous strings with a single quote to prevent
-    formula interpretation in spreadsheet applications. Handles both direct
-    injection and bypass attempts using leading whitespace.
-
-    Args:
-        value: The value to sanitize
-
-    Returns:
-        Sanitized value safe for CSV output
-    """
-    if not isinstance(value, str) or not value:
-        return value
-
-    first_char = value[0]
-
-    # Fast path: first char is not dangerous and not whitespace
-    if first_char not in _DANGEROUS_CHARS and not first_char.isspace():
-        return value
-
-    # First char is dangerous
-    if first_char in _DANGEROUS_CHARS:
-        return f"'{value}"
-
-    # First char is whitespace — check first non-whitespace char
-    stripped = value.lstrip()
-    if stripped and stripped[0] in _DANGEROUS_CHARS:
-        return f"'{value}"
-
-    return value
-
-
-def _sanitize_record(record: dict[str, Any]) -> dict[str, Any]:
-    """Sanitize all values in a record for CSV output.
-
-    Normalizes special float values (NaN, Inf) and prevents CSV injection.
-    """
+def _prepare_record(record: dict[str, Any]) -> dict[str, Any]:
+    """Normalize special float values (NaN, Inf) for CSV output."""
     return {
-        key: _sanitize_csv_value(_normalize_special_floats(value, null_replacement=""))
+        key: _normalize_special_floats(value, null_replacement="")
         for key, value in record.items()
     }
 
@@ -109,8 +70,8 @@ class CsvWriter(DataWriter):
             if not data:
                 return destination
 
-            sanitized_data = [_sanitize_record(record) for record in data]
-            field_names = _collect_field_names(sanitized_data)
+            prepared_data = [_prepare_record(record) for record in data]
+            field_names = _collect_field_names(prepared_data)
 
             if isinstance(destination, (str, pathlib.Path)):
                 path = pathlib.Path(destination)
@@ -119,7 +80,7 @@ class CsvWriter(DataWriter):
                 with open(path, "w", encoding="utf-8", newline="") as f:
                     self._write_csv_to_stream(
                         f,
-                        sanitized_data,
+                        prepared_data,
                         field_names,
                         use_header,
                         use_delimiter,
@@ -141,7 +102,7 @@ class CsvWriter(DataWriter):
                     )
                     self._write_csv_to_stream(
                         text_wrapper,
-                        sanitized_data,
+                        prepared_data,
                         field_names,
                         use_header,
                         use_delimiter,
@@ -155,7 +116,7 @@ class CsvWriter(DataWriter):
                     text_output = cast(TextIO, destination)
                     self._write_csv_to_stream(
                         text_output,
-                        sanitized_data,
+                        prepared_data,
                         field_names,
                         use_header,
                         use_delimiter,
@@ -245,8 +206,8 @@ class CsvStreamingWriter(StreamingWriter):
 
     def _write_part(self, file_path: str, records: list[dict[str, Any]]) -> Any:
         """Write records to a CSV part file and return the field names."""
-        sanitized_records = [_sanitize_record(record) for record in records]
-        field_names = _collect_field_names(sanitized_records)
+        prepared_records = [_prepare_record(record) for record in records]
+        field_names = _collect_field_names(prepared_records)
 
         with open(file_path, "w", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(
@@ -257,7 +218,7 @@ class CsvStreamingWriter(StreamingWriter):
             )
             if self.include_header and field_names:
                 writer.writeheader()
-            writer.writerows(sanitized_records)
+            writer.writerows(prepared_records)
 
         return field_names
 

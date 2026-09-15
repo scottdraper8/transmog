@@ -122,9 +122,10 @@ Default configuration:
 
 ### Working with Files
 
-Process files directly. A string is treated as a **file path only if that
-path exists**. Otherwise it is parsed as a JSON string. A `pathlib.Path` that
-does not exist raises `ValidationError: File not found`.
+Process files directly. A string is treated as a file path if that path
+exists, or if it has a data-file extension (`.json`, `.jsonl`, `.ndjson`,
+`.json5`, `.hjson`) even when the file is missing. Missing files raise
+`ValidationError: File not found`. Other strings are parsed as JSON.
 
 ```python
 from pathlib import Path
