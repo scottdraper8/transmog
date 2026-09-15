@@ -1,5 +1,6 @@
 """Avro format writers using fastavro."""
 
+import json
 import pathlib
 from typing import Any, BinaryIO, TextIO
 
@@ -101,11 +102,18 @@ def _infer_avro_schema(
 
 
 def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:
-    """Normalize a record for Avro output (NaN/Inf to None)."""
-    return {
-        key: _normalize_special_floats(value, null_replacement=None)
-        for key, value in record.items()
-    }
+    """Normalize a record for Avro output.
+
+    - NaN/Inf → None
+    - list → JSON string (parseable, cross-language)
+    """
+    prepared: dict[str, Any] = {}
+    for key, value in record.items():
+        if isinstance(value, list):
+            prepared[key] = json.dumps(value, ensure_ascii=False)
+        else:
+            prepared[key] = _normalize_special_floats(value, null_replacement=None)
+    return prepared
 
 
 def _coerce_value_to_schema(value: Any, field_type: Any) -> Any:
@@ -315,10 +323,11 @@ class AvroStreamingWriter(StreamingWriter):
         """Write records to an Avro part file and return the schema."""
         record_name = self._get_record_name(self._current_table_name)
 
-        schema = _infer_avro_schema(records, name=record_name)
+        normalized = [_normalize_record(r) for r in records]
+        schema = _infer_avro_schema(normalized, name=record_name)
         parsed_schema = fastavro.parse_schema(schema)
 
-        prepared_records = [_prepare_record_for_schema(r, schema) for r in records]
+        prepared_records = [_prepare_record_for_schema(r, schema) for r in normalized]
 
         with open(file_path, "wb") as f:
             avro_writer(

@@ -61,6 +61,26 @@ def _convert_str(value: Any) -> str | None:
         return None
 
 
+def _infer_list_type(sample: list) -> pa.DataType:
+    """Infer a PyArrow list type from a sample list value.
+
+    Examines the first non-None element to determine the element type.
+    Falls back to ``pa.list_(pa.string())`` when the list is empty or
+    contains only None values.
+    """
+    for item in sample:
+        if item is None:
+            continue
+        if isinstance(item, bool):
+            return pa.list_(pa.bool_())
+        if isinstance(item, int):
+            return pa.list_(pa.int64())
+        if isinstance(item, float):
+            return pa.list_(pa.float64())
+        return pa.list_(pa.string())
+    return pa.list_(pa.string())
+
+
 _TYPE_CONVERTERS: dict[Any, Callable] = {}
 
 
@@ -74,6 +94,11 @@ def _get_type_converters() -> dict[Any, Callable]:
         _TYPE_CONVERTERS[pa.int64()] = _convert_int
         _TYPE_CONVERTERS[pa.float64()] = _convert_float
     return _TYPE_CONVERTERS
+
+
+def _identity(value: Any) -> Any:
+    """Pass a value through unchanged (used for list-typed columns)."""
+    return value
 
 
 class PyArrowWriter(DataWriter):
@@ -273,11 +298,16 @@ class PyArrowStreamingWriter(StreamingWriter):
                 pa_type = pa.int64()
             elif isinstance(value, float):
                 pa_type = pa.float64()
+            elif isinstance(value, list):
+                pa_type = _infer_list_type(value)
             else:
                 pa_type = pa.string()
 
             fields.append(pa.field(key, pa_type))
-            converters[key] = type_converters.get(pa_type, _convert_str)
+            if isinstance(pa_type, pa.ListType):
+                converters[key] = _identity
+            else:
+                converters[key] = type_converters.get(pa_type, _convert_str)
 
         if logger.isEnabledFor(logging.DEBUG):
             types = {f.name: str(f.type) for f in fields}

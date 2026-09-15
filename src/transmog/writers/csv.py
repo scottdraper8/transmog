@@ -2,6 +2,7 @@
 
 import csv
 import io
+import json
 import pathlib
 from typing import Any, BinaryIO, TextIO, cast
 
@@ -15,11 +16,18 @@ from transmog.writers.base import (
 
 
 def _prepare_record(record: dict[str, Any]) -> dict[str, Any]:
-    """Normalize special float values (NaN, Inf) for CSV output."""
-    return {
-        key: _normalize_special_floats(value, null_replacement="")
-        for key, value in record.items()
-    }
+    """Normalize values for CSV output.
+
+    - NaN/Inf → empty string
+    - list → JSON string (parseable, cross-language)
+    """
+    prepared: dict[str, Any] = {}
+    for key, value in record.items():
+        if isinstance(value, list):
+            prepared[key] = json.dumps(value, ensure_ascii=False)
+        else:
+            prepared[key] = _normalize_special_floats(value, null_replacement="")
+    return prepared
 
 
 class CsvWriter(DataWriter):
