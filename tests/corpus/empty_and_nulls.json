@@ -1,0 +1,9 @@
+{
+  "name": "x",
+  "empty_dict": {},
+  "empty_list": [],
+  "null_field": null,
+  "empty_str": "",
+  "zero": 0,
+  "false_val": false
+}

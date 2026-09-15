@@ -1,0 +1,8 @@
+{
+  "_id": "parent-1",
+  "name": "P",
+  "kids": [
+    {"name": "c1"},
+    {"_id": "child-2", "name": "c2"}
+  ]
+}

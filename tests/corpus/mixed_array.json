@@ -1,0 +1,10 @@
+{
+  "name": "mixed",
+  "items": [
+    {"k": "obj"},
+    "str",
+    7,
+    null,
+    [1, 2]
+  ]
+}

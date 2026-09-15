@@ -36,7 +36,12 @@ class TestExtractArraysFunction:
         assert len(result) > 0
 
     def test_extract_arrays_with_parent_id(self, array_data):
-        """Test array extraction with parent ID."""
+        """Test array extraction preserves parent-child hierarchy.
+
+        Top-level arrays (employees, tags) parent to the passed-in parent_id.
+        Nested arrays (skills) parent to their intermediate record (employee),
+        not the root.
+        """
         parent_id = "test-parent-123"
         config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
         context = ProcessingContext(extract_time=str(datetime.now()))
@@ -52,15 +57,20 @@ class TestExtractArraysFunction:
 
         assert isinstance(result, dict)
 
-        # Check that direct child tables have the correct parent ID
-        direct_child_tables = [name for name in result.keys() if name.count("_") == 2]
-
-        for table_name in direct_child_tables:
-            records = result[table_name]
-            if records:
-                for record in records:
+        # Top-level arrays (employees, tags) parent to the root
+        top_level = ["test_entity_employees", "test_entity_tags"]
+        for table_name in top_level:
+            if table_name in result:
+                for record in result[table_name]:
                     assert config.parent_field in record
                     assert record[config.parent_field] == parent_id
+
+        # Nested arrays (skills) parent to their employee, not the root
+        if "test_entity_skills" in result:
+            employee_ids = {r["_id"] for r in result.get("test_entity_employees", [])}
+            for record in result["test_entity_skills"]:
+                assert config.parent_field in record
+                assert record[config.parent_field] in employee_ids
 
     def test_extract_arrays_with_options(self, array_data):
         """Test array extraction with configuration options."""
@@ -192,32 +202,38 @@ class TestArrayExtractionIntegration:
         assert len(result.tables) > 0
 
     def test_array_parent_child_relationships(self, array_data):
-        """Test parent-child relationships in extracted arrays."""
+        """Test parent-child relationships in extracted arrays.
+
+        Top-level arrays (employees, tags) parent to the main record.
+        Nested arrays (skills) parent to their intermediate employee record.
+        """
         config = TransmogConfig(array_mode=ArrayMode.SEPARATE)
         result = tm.flatten(array_data, name="relationship_test", config=config)
 
-        # Check main record has ID - the API uses _id not __transmog_id
         main_record = result.main[0]
         assert "_id" in main_record or "id" in main_record
-
-        # Get the main ID - could be natural ID or generated ID
         main_id = main_record.get("_id") or main_record.get("id")
         assert main_id is not None
 
-        # Check direct child tables reference parent
-        # Only check tables that are direct children of the main table
-        direct_child_tables = {}
-        for table_name, records in result.tables.items():
-            # Direct child tables have format: relationship_test_tablename
-            # Nested tables have format: relationship_test_parent_child
-            parts = table_name.split("_")
-            if len(parts) == 3:  # relationship + test + tablename
-                direct_child_tables[table_name] = records
-
-        for _table_name, records in direct_child_tables.items():
+        # Top-level children (employees, tags) reference the main record
+        top_tables = {
+            name: rows
+            for name, rows in result.tables.items()
+            if name in ("relationship_test_employees", "relationship_test_tags")
+        }
+        for _table_name, records in top_tables.items():
             for record in records:
                 assert "_parent_id" in record
                 assert record["_parent_id"] == main_id
+
+        # Nested children (skills) reference their employee, not the root
+        if "relationship_test_skills" in result.tables:
+            employee_ids = {
+                r["_id"] for r in result.tables.get("relationship_test_employees", [])
+            }
+            for record in result.tables["relationship_test_skills"]:
+                assert "_parent_id" in record
+                assert record["_parent_id"] in employee_ids
 
 
 class TestArrayExtractionEdgeCases:

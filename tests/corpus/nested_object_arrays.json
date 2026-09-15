@@ -1,0 +1,19 @@
+{
+  "id": 1,
+  "name": "Company",
+  "tags": ["tech", "startup", "ai"],
+  "employees": [
+    {
+      "id": 101,
+      "name": "Alice",
+      "role": "Engineer",
+      "skills": ["python", "sql", "docker"]
+    },
+    {
+      "id": 102,
+      "name": "Bob",
+      "role": "Designer",
+      "skills": ["figma", "photoshop"]
+    }
+  ]
+}

@@ -118,6 +118,11 @@ lint.per-file-ignores = { "tests/*" = [
   "S311",
   "B018",
   "C416",
+], "scripts/*" = [
+  "S603",
+  "S607",
+  "D103",
+  "E501",
 ] }
 lint.isort.combine-as-imports = true
 # Ruff isort configuration
@@ -133,7 +138,7 @@ lint.isort.section-order = [
 lint.pydocstyle.convention = "google"
 
 [tool.bandit]
-exclude_dirs = [ "tests", "examples" ]
+exclude_dirs = [ "tests", "examples", "scripts" ]
 skips = [ "B101" ]
 target-version = "py310"
 
@@ -141,6 +146,7 @@ target-version = "py310"
 ini_options.markers = [
   "benchmark: mark test as a performance benchmark",
   "memory: mark test as a memory usage test",
+  "claim: characterization claim id this test sensors",
 ]
 # Exclude benchmark tests by default
 ini_options.addopts = "--ignore=tests/benchmarks --ignore=tests/performance"
