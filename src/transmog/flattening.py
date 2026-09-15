@@ -26,8 +26,10 @@ TRANSMOG_NAMESPACE = uuid.UUID("a9b8c7d6-e5f4-1234-abcd-0123456789ab")
 def is_null_like(value: Any) -> bool:
     """Check if a value should be treated as null-like.
 
-    Null-like values include None, empty strings, NaN, and Infinity.
-    These are treated consistently for null handling purposes.
+    Null-like values: ``None``, empty string ``""``, ``NaN``, and
+    ``Infinity``.  When ``include_nulls=True``, these are stored as
+    ``None`` — the empty string does not retain its identity.  This
+    means ``""`` and ``None`` are indistinguishable in output.
 
     Args:
         value: Value to check
@@ -223,6 +225,27 @@ def _process_array_items(
             if not item:
                 continue
 
+            # Resolve this item's own ID before recursion so that nested
+            # arrays use the item as their parent, preserving intermediate
+            # hierarchy (e.g., skills parent to employee, not company).
+            item_id: str | None = None
+            if _collect_arrays:
+                try:
+                    generated = generate_transmog_id(
+                        item, config.id_generation, config.id_field
+                    )
+                except ValidationError:
+                    # Natural strategy on a child missing the ID field —
+                    # fall back to a generated UUID, same as the annotation
+                    # path below.
+                    generated = str(uuid.uuid4())
+                if generated is None and config.id_generation == "natural":
+                    item_id = item.get(config.id_field)
+                    if item_id is None:
+                        item_id = str(uuid.uuid4())
+                else:
+                    item_id = generated
+
             # Process complex item
             item_context = ProcessingContext(
                 current_depth=_context.current_depth + 1,
@@ -234,7 +257,7 @@ def _process_array_items(
                 config,
                 item_context,
                 _collect_arrays=True,
-                _parent_id=_parent_id,
+                _parent_id=item_id if _collect_arrays else _parent_id,
                 _entity_name=_entity_name,
             )
         else:
@@ -250,11 +273,37 @@ def _process_array_items(
             item_arrays = {}
 
         if _collect_arrays:
-            # Create child record
+            # Create child record.  For dict items the ID was pre-resolved
+            # above so that nested arrays could reference it as _parent_id.
+            # Re-use it here to keep the IDs consistent.
             if (
+                isinstance(item, dict)
+                and config.id_generation == "natural"
+                and config.id_field not in metadata_dict
+            ):
+                # Natural strategy, child missing the configured id_field:
+                # assign the pre-resolved fallback UUID under the hardcoded
+                # "_id" key (not config.id_field) so the child does not
+                # appear to have the natural field.
+                metadata_dict["_id"] = item_id
+                if _parent_id is not None:
+                    metadata_dict[config.parent_field] = _parent_id
+                if config.time_field:
+                    metadata_dict[config.time_field] = _context.extract_time
+                annotated = metadata_dict
+            elif isinstance(item, dict) and item_id is not None:
+                annotated = annotate_with_metadata(
+                    metadata_dict,
+                    config=config,
+                    parent_id=_parent_id,
+                    transmog_time=_context.extract_time,
+                    record_id=item_id,
+                )
+            elif (
                 config.id_generation == "natural"
                 and config.id_field not in metadata_dict
             ):
+                # Primitive value child under natural strategy
                 metadata_dict["_id"] = str(uuid.uuid4())
                 if _parent_id is not None:
                     metadata_dict[config.parent_field] = _parent_id
