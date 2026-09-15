@@ -6,6 +6,7 @@ import json
 import logging
 import os
 from collections.abc import Iterable, Iterator
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -178,11 +179,47 @@ def get_json_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
     yield from _iter_parsed_json(parsed)
 
 
+def _normalize_ijson_value(value: Any) -> Any:
+    """Convert ijson-native types to standard Python types.
+
+    ijson represents JSON numbers as ``decimal.Decimal``.  Every downstream
+    consumer (``json.dumps`` in hash IDs, writer type inference, metamorphic
+    comparisons) expects native ``int`` or ``float``.  Normalizing at the
+    iterator boundary keeps the rest of the codebase Decimal-unaware.
+
+    The JSON spec does not distinguish integer from float by value — only
+    by syntax (presence of ``.`` or ``e``).  ``json.load`` returns ``int``
+    for ``3`` and ``float`` for ``3.0``.  ijson returns ``Decimal('3')``
+    and ``Decimal('3.0')`` respectively but both compare equal to ``int(3)``.
+    To match ``json.load`` behaviour: if the Decimal's string contains a
+    dot or exponent, it is a float; otherwise an int.
+    """
+    if isinstance(value, Decimal):
+        text = str(value)
+        if "." in text or "E" in text or "e" in text:
+            return float(value)
+        return int(value)
+    if isinstance(value, dict):
+        return {k: _normalize_ijson_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_normalize_ijson_value(item) for item in value]
+    return value
+
+
+def _normalize_ijson_record(record: dict[str, Any]) -> dict[str, Any]:
+    """Normalize an entire record yielded by ijson."""
+    return {k: _normalize_ijson_value(v) for k, v in record.items()}
+
+
 def get_json_file_iterator_streaming(file_path: str) -> Iterator[dict[str, Any]]:
     """Iterate over records in a JSON file using streaming parsing.
 
     Uses ijson for constant-memory parsing of large JSON arrays.
     Single-object files fall back to standard loading.
+
+    ijson represents JSON floats as ``decimal.Decimal``. Records are
+    normalized to native Python types so downstream code (hash IDs,
+    json.dumps, writers) does not need Decimal-aware paths.
 
     Args:
         file_path: Path to the JSON file
@@ -220,7 +257,7 @@ def get_json_file_iterator_streaming(file_path: str) -> Iterator[dict[str, Any]]
                         f"Expected JSON object at index {index} in "
                         f"{file_path}, got {type(item).__name__}"
                     )
-                yield item
+                yield _normalize_ijson_record(item)
     except _ijson.common.IncompleteJSONError as exc:
         raise ValidationError(f"Invalid JSON in file {file_path}: {exc}") from exc
     except OSError as exc:
