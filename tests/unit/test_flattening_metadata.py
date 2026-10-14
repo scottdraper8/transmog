@@ -1,178 +1,70 @@
-"""Tests for metadata annotation, timestamp generation, and processing context."""
+"""Metadata overwrites, timestamp semantics, and context default isolation."""
 
-from datetime import datetime
+from datetime import datetime, timezone
+from uuid import UUID
 
 import pytest
 
 from transmog.config import TransmogConfig
-from transmog.flattening import (
-    annotate_with_metadata,
-    get_current_timestamp,
-)
+from transmog.flattening import annotate_with_metadata, get_current_timestamp
 from transmog.types import ProcessingContext
 
 
-class TestTimestampGeneration:
-    """Test timestamp generation functions."""
-
-    def test_get_current_timestamp(self):
-        """Test generating current timestamp."""
-        timestamp = get_current_timestamp()
-
-        assert isinstance(timestamp, str)
-        assert len(timestamp) > 0
-
-        try:
-            datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-        except ValueError:
-            pytest.fail("Timestamp is not in valid ISO format")
-
-    def test_timestamp_format_is_iso(self):
-        """Test that timestamps follow ISO format consistently."""
-        timestamps = [get_current_timestamp() for _ in range(5)]
-        for ts in timestamps:
-            assert isinstance(ts, str)
-            assert len(ts) > 10
-            # Should be parseable as ISO datetime
-            datetime.fromisoformat(ts.replace("Z", "+00:00"))
-
-    def test_timestamp_format(self):
-        """Test timestamp format consistency."""
-        timestamp = get_current_timestamp()
-
-        assert " " in timestamp
-        assert len(timestamp) > 10
+@pytest.mark.claim("C-METADATA-TIME")
+def test_timestamp_represents_current_utc_with_microseconds():
+    """P: the timestamp uses the documented UTC format and falls within the observation."""
+    before = datetime.now(timezone.utc)
+    timestamp = get_current_timestamp()
+    after = datetime.now(timezone.utc)
+    parsed = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S.%f").replace(
+        tzinfo=timezone.utc
+    )
+    assert before <= parsed <= after
+    assert parsed.strftime("%Y-%m-%d %H:%M:%S.%f") == timestamp
 
 
-class TestMetadataAnnotation:
-    """Test metadata annotation functions."""
-
-    def test_annotate_with_metadata_basic(self):
-        """Test basic metadata annotation."""
-        record = {"name": "test", "value": 42}
-        config = TransmogConfig()
-
-        annotated = annotate_with_metadata(record, config)
-
-        assert isinstance(annotated, dict)
-        assert "name" in annotated
-        assert "value" in annotated
-        assert annotated["name"] == "test"
-        assert annotated["value"] == 42
-        assert "_id" in annotated
-
-    def test_annotate_modifies_in_place(self):
-        """Test that annotation modifies record in place."""
-        record = {"name": "test", "value": 42}
-        config = TransmogConfig()
-
-        annotated = annotate_with_metadata(record, config)
-
-        assert annotated is record
-        assert "_id" in record
-
-    def test_annotate_with_parent_id(self):
-        """Test metadata annotation with parent ID."""
-        record = {"name": "child", "value": 42}
-        parent_id = "parent_123"
-        config = TransmogConfig()
-
-        annotated = annotate_with_metadata(record, config, parent_id=parent_id)
-
-        assert isinstance(annotated, dict)
-        assert "_parent_id" in annotated
-        assert annotated["_parent_id"] == parent_id
-
-    def test_annotate_with_timestamp(self):
-        """Test metadata annotation with timestamp."""
-        record = {"name": "test", "value": 42}
-        config = TransmogConfig()
-
-        timestamp = get_current_timestamp()
-        annotated = annotate_with_metadata(record, config, transmog_time=timestamp)
-
-        assert isinstance(annotated, dict)
-        assert "_timestamp" in annotated
-        timestamp_found = False
-        for key, value in annotated.items():
-            if ("time" in key.lower() or "timestamp" in key.lower()) and isinstance(
-                value, str
-            ):
-                timestamp_found = True
-                break
-        assert timestamp_found
-
-    def test_annotate_empty_record(self):
-        """Test annotating empty record."""
-        record = {}
-        config = TransmogConfig()
-
-        annotated = annotate_with_metadata(record, config)
-
-        assert isinstance(annotated, dict)
-        assert len(annotated) > 0
-
-    def test_annotate_record_with_existing_metadata(self):
-        """Test annotating record that already has metadata fields."""
-        record = {
-            "name": "test",
-            "_id": "existing_id",
-            "_timestamp": "existing_time",
-        }
-        config = TransmogConfig()
-
-        annotated = annotate_with_metadata(record, config)
-
-        assert isinstance(annotated, dict)
-        assert "name" in annotated
+@pytest.mark.claim("C-METADATA-ANNOTATION")
+@pytest.mark.parametrize(
+    "record", ({}, {"name": "test", "value": 42}, {"_id": "old", "_timestamp": "old"})
+)
+def test_explicit_metadata_overwrites_in_place(record):
+    """P: explicit metadata replaces existing fields without changing payload."""
+    original = dict(record)
+    config = TransmogConfig()
+    annotated = annotate_with_metadata(
+        record,
+        config,
+        parent_id="parent",
+        transmog_time="fixed-time",
+        record_id="fixed-id",
+    )
+    assert annotated is record
+    assert annotated == {
+        **original,
+        "_id": "fixed-id",
+        "_timestamp": "fixed-time",
+        "_parent_id": "parent",
+    }
 
 
-class TestProcessingContext:
-    """Test ProcessingContext functionality."""
+@pytest.mark.claim("C-METADATA-ANNOTATION")
+def test_random_annotation_has_fresh_uuid_and_disabled_timestamp():
+    """P: random metadata generates a UUID4 without inventing a disabled timestamp."""
+    config = TransmogConfig(time_field=None)
+    first = annotate_with_metadata({"name": "x"}, config)
+    second = annotate_with_metadata({"name": "x"}, config)
+    assert set(first) == set(second) == {"name", "_id"}
+    assert first["name"] == second["name"] == "x"
+    assert first["_id"] != second["_id"]
+    assert UUID(first["_id"]).version == UUID(second["_id"]).version == 4
 
-    def test_processing_context_defaults(self):
-        """Test ProcessingContext default values."""
-        context = ProcessingContext()
 
-        assert context.current_depth == 0
-        assert context.path_components == []
-        assert isinstance(context.extract_time, str)
-
-    def test_processing_context_descend(self):
-        """Test creating nested contexts."""
-        context = ProcessingContext(current_depth=1, path_components=["parent"])
-
-        child_context = ProcessingContext(
-            current_depth=context.current_depth + 1,
-            path_components=context.path_components + ["child"],
-            extract_time=context.extract_time,
-        )
-
-        assert child_context.current_depth == 2
-        assert child_context.path_components == ["parent", "child"]
-        assert child_context.extract_time == context.extract_time
-
-    def test_processing_context_descend_preserves_extract_time(self):
-        """Test that nested contexts preserve extract_time."""
-        context = ProcessingContext(extract_time="2023-01-01T12:00:00Z")
-
-        # Multiple levels of nesting
-        level1 = ProcessingContext(
-            current_depth=context.current_depth + 1,
-            path_components=context.path_components + ["level1"],
-            extract_time=context.extract_time,
-        )
-        level2 = ProcessingContext(
-            current_depth=level1.current_depth + 1,
-            path_components=level1.path_components + ["level2"],
-            extract_time=level1.extract_time,
-        )
-        level3 = ProcessingContext(
-            current_depth=level2.current_depth + 1,
-            path_components=level2.path_components + ["level3"],
-            extract_time=level2.extract_time,
-        )
-
-        assert level1.extract_time == "2023-01-01T12:00:00Z"
-        assert level2.extract_time == "2023-01-01T12:00:00Z"
-        assert level3.extract_time == "2023-01-01T12:00:00Z"
+@pytest.mark.claim("C-METADATA-CONTEXT")
+def test_context_defaults_are_independent():
+    """P: contexts do not share path state or invent a caller-supplied timestamp."""
+    first, second = ProcessingContext(), ProcessingContext()
+    assert first.current_depth == second.current_depth == 0
+    assert first.path_components == second.path_components == []
+    first.path_components.append("child")
+    assert second.path_components == []
+    assert first.extract_time == second.extract_time == ""

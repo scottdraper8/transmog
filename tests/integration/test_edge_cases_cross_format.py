@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 import transmog as tm
+from tests.helpers import decode_file, hash_config, payload
 from transmog.config import TransmogConfig
 
 
@@ -346,29 +347,32 @@ class TestEdgeCasesAllFormats:
 class TestCompleteWorkflowConsistency:
     """Test complete flatten -> save workflow consistency."""
 
-    def test_same_data_all_formats(self):
-        """Test that same data produces consistent results across formats."""
+    @pytest.mark.claim("C-WORKFLOW-FORMATS")
+    @pytest.mark.parametrize("output_format", ("csv", "parquet", "orc", "avro"))
+    def test_same_data_all_formats(self, tmp_path, output_format):
+        """P: every format preserves scalar payload and its declared list encoding."""
         data = {
             "id": 1,
             "name": "Test Entity",
             "metrics": {"score": 95.5, "count": 42},
             "tags": ["important", "verified"],
         }
-
-        result = tm.flatten(data, name="entity")
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Save to CSV (always available)
-            csv_paths = result.save(f"{tmpdir}/csv", output_format="csv")
-            assert len(csv_paths) >= 1
-
-            # Save to Parquet
-            pq_paths = result.save(f"{tmpdir}/parquet", output_format="parquet")
-            assert len(pq_paths) >= 1
-
-            # Save to ORC
-            orc_paths = result.save(f"{tmpdir}/orc", output_format="orc")
-            assert len(orc_paths) >= 1
+        result = tm.flatten(data, name="entity", config=hash_config())
+        path = tmp_path / f"entity.{output_format}"
+        result.save(path, output_format=output_format)
+        rows = [payload(row) for row in decode_file(path, output_format)]
+        expected = {
+            "id": 1,
+            "name": "Test Entity",
+            "metrics_score": 95.5,
+            "metrics_count": 42,
+            "tags": ["important", "verified"],
+        }
+        if output_format in ("csv", "avro"):
+            expected["tags"] = '["important", "verified"]'
+        if output_format == "csv":
+            expected = {key: str(value) for key, value in expected.items()}
+        assert rows == [expected]
 
     def test_batch_data_all_formats(self):
         """Test batch data produces consistent results across formats."""

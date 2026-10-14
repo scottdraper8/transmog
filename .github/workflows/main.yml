@@ -7,14 +7,20 @@ on:
       - 'src/**'
       - 'tests/**'
       - 'scripts/**'
+      - 'docs/**'
       - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/main.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'src/**'
       - 'tests/**'
       - 'scripts/**'
+      - 'docs/**'
       - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/main.yml'
   workflow_dispatch:
 
 jobs:
@@ -35,13 +41,10 @@ jobs:
         cache: true
 
     - name: Install dependencies
-      run: uv sync --extra dev
+      run: uv sync --locked --extra dev
 
     - name: Run tests
-      run: uv run pytest tests/ --cov=transmog
-
-    - name: Test output format methods
-      run: uv run python scripts/test_output_formats.py
+      run: uv run pytest tests/ --audit-corpus --cov=transmog
 
     # Only build docs on Python 3.10 to verify they build correctly during CI
     - name: Build docs

@@ -1,87 +1,104 @@
 # Evidence architecture
 
-This suite implements the evidence architecture from *Interrogating the
-Codebase* (September 2026). This document explains the concepts. It does
-not track the state of the evidence — the tests do that.
-
-## Central thesis
-
-> Whole-codebase behavioral comprehension is triangulation under bounded
-> evidence, not exhaustive documentation or a single testing technique.
-
 ## Four objects
 
-"What the code does" conflates four things. Collapsing them overstates
-what is known.
-
-| Object | What it is |
+| Object | Meaning |
 | --- | --- |
 | **Mechanism** | Implementation structures capable of producing effects. |
-| **Actuality** | What occurred under a specified (input, config, entry point, format). |
-| **Intent** | What docs and compatibility promises say. Fallible, can be stale. |
-| **Correctness** | Whether actuality satisfies a spec or domain judgment. Requires an oracle. |
+| **Actuality** | What occurred under recorded inputs, configuration, and environment. |
+| **Intent** | Requirements, compatibility promises, and documentation; these can be stale. |
+| **Correctness** | Whether behavior satisfies a justified oracle, not merely a previous output. |
 
-Reading source reveals mechanism. Running a test reveals actuality.
-Neither establishes correctness without an oracle.
+Source explains mechanisms; execution establishes sampled actuality.
+Neither alone establishes correctness. Differential disagreement is an
+anomaly, not automatic proof of which path is correct.
 
 ## Claim-evidence tuple
 
-Every sensor should be expressible as `C = (P, D, R, O, S, V)`:
+A sensor should be expressible as `C = (P, D, R, O, S, V)`:
 **P**roposition, exercised **D**omain, included **R**eality,
-**O**racle, **S**ensitivity evidence, pro**V**enance.
+**O**racle, **S**ensitivity evidence, and pro**V**enance.
 
-A mocked writer cannot support an unqualified format claim (R excludes
-the codec). Volume without an oracle cannot establish correctness (O is
-absent). A passing suite with unknown sensitivity can be untrustworthy
-(S unmeasured). The scope of a conclusion must not exceed the scope of
-the evidence.
+`@pytest.mark.claim` identifies a proposition; it does not certify a test.
+Collection requires a nonempty claim ID and proposition docstring in evidence
+channels and for all marked tests. This checks identification, not oracle strength.
+The input/generator defines D, the actual dependencies define R, and the
+assertions define O. Sensitivity is bounded by the faults actually injected.
+Mutation observations include revision, source/test/tool content digest,
+interpreter, platform, dependency versions, and failed sensor names.
 
 ## Protocol
 
-1. Run the probe, observe the output, then write the sensor. Do not
-   infer from source and assert the inference.
-2. If the claim concerns a real dependency, that dependency must be in
-   the execution. Do not mock writers to prove formats.
-3. If source, docs, and runtime disagree, the output is an unresolved
-   test, not a fluent explanation.
-4. Assertions must distinguish correct from incorrect output. No
-   `len > 0` or `isinstance` as the primary oracle on a behavioral
-   claim.
-5. Never reshape a corpus fixture to make a failing test pass. If the
-   code produces wrong output for a legitimate input, fix the code.
-6. Scope of conclusion must not exceed scope of evidence.
-7. Depth is risk-weighted. Unclaimed propositions are listed in the
-   "Not claimed" section of this document.
+1. Name the proposition and justify its oracle: a requirement, codec
+   constraint, explicit characterization, or independently defined relation.
+   Observe existing behavior before intentionally changing it. Do not infer
+   correctness from source and then assert that same inference.
+2. Include real dependencies when their semantics are material to the claim.
+   Fault injection is appropriate for error wrapping, not format fidelity.
+3. Preserve legitimate counterexamples. Fix defects at their source; do not
+   narrow a fixture/generator or accept new expected values just to pass.
+   Changing a characterization pin requires a reviewed compatibility rationale.
+4. Compare complete values, table sets, row occurrences, and exact ownership
+   when those are the claim. Checking only existence, types, counts, or
+   membership in any parent's IDs is insufficient for value/join fidelity.
+5. Test writer behavior directly when preprocessing would hide the fault.
+   Compare all decoded tables and parts; force multiple parts for schema drift.
+6. Keep observations separate from judgments. Unknown and unsupported remain
+   explicit. A passing smoke test does not establish a broader guarantee.
+7. Regenerate machine facts. Do not maintain status plans, survivor stories,
+   duplicated behavioral descriptions, or checked-in mutation reports.
+
+## Running the apparatus
+
+```bash
+uv sync --locked --extra dev
+uv run pytest tests/ --audit-corpus
+uv run python scripts/audit_corpus.py
+uv run python scripts/audit_mutations.py --output /tmp/transmog-mutations.json
+```
+
+The dev extra includes Hypothesis and dependencies for **every declared Avro
+codec**. Missing dependencies and codec failures must fail, not silently remove
+cases. Codec sensors assert metadata as well as decoded values.
+
+`--audit-corpus` is for complete-suite runs: it requires every corpus fixture
+to be loaded by an executed claim-marked sensor and checks required categories.
+Setup-only loads and skipped sensor bodies do not count. Executed loads do not
+certify that assertions use every value. The standalone inventory reports type
+presence, **not behavioral coverage**.
+Subset runs can omit the option.
+
+Mutation runs use disposable snapshots, never modify the checkout, and classify
+invalid/unapplied mutations, collection errors, and runner errors separately
+from killed/surviving mutants. Survivors require investigation; no score defines
+quality or gates merges. Reports are generated outside the checkout.
+
+## Channels
+
+| Location | Evidence |
+| --- | --- |
+| `corpus/`, `algebra/` | Checked-in inputs and exact characterization tables |
+| `relations/` | Differential paths, parser/writer fidelity, metamorphic relations |
+| `combinations/`, `covering.py` | Regenerated t=2/t=3 config × shape × batch interactions |
+| `properties/` | Generated scalar values, array operations, IDs, and exact hierarchy ownership |
+| `unit/` | Local contracts, failure boundaries, and audit-tool integrity |
+| `integration/` | Real codecs, metadata, and complete workflows |
+
+The covering model is explicit, not exhaustive. Heterogeneous columns remain
+in the model: Arrow codecs infer marked JSON storage automatically when native
+representation is impossible. Sensors check both the wire encoding and logical
+values; unmarked strings are not normalized. See `docs/outputs.md` for details.
 
 ## Not claimed
 
-These propositions have no sensors. They are named here so they are
-not silently treated as known.
-
 - Concurrent writers to one directory
-- Multi-GB inputs and memory bounds
-- Glue, Hive, Excel, DuckDB consumers
-- Multi-OS / multi-Python-version matrix
+- Multi-GB inputs or guaranteed peak memory bounds
+- Glue, Hive, Excel, or DuckDB consumer compatibility
+- Cross-platform/version guarantees from a single local run; CI's declared
+  matrix is not evidence until its executions are observed
+- General fidelity for arbitrary Python objects or numbers outside the codecs'
+  representable ranges
 
-## Directory
-
-```text
-tests/
-  README.md                    this document (paradigm, not state)
-  corpus/                      checked-in JSON inputs
-  helpers.py                   decode / payload / hash config
-  covering.py                  t=2 covering-array generator (regenerated)
-  mutation_report.md           generated: flattening sensitivity audit
-  mutation_report_writers.md   generated: writer sensitivity audit
-  algebra/                     exact-table sensors for the flattening product
-  relations/                   differential and metamorphic sensors
-  combinations/                pairwise config × shape covering
-  properties/                  Hypothesis structural invariants
-  unit/                        local propositions
-  integration/                 real codecs and workflows
-  performance/                 benchmarks
-```
-
-Mutation reports are generated by `scripts/mutate_*.py`, not
-hand-maintained. Corpus type coverage is checked by
-`scripts/audit_corpus.py`.
+These are limits on conclusions, not placeholder skipped tests. Known defects
+inside an exercised domain require fixes and regression sensors, not relocation
+to this section.

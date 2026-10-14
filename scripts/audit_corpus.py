@@ -1,169 +1,159 @@
 #!/usr/bin/env python3
-"""Audit the characterization corpus for type diversity and completeness.
+"""Inventory corpus value categories, not behavioral correctness or coverage.
 
-Checks that the corpus collectively exercises every JSON value type that
-the codebase may encounter. Reports gaps so they are addressed by adding
-fixtures, not by ignoring the missing type.
-
-This script does not gate merges. It produces a report for human review.
+The inventory inspects parsed values and numeric token syntax. Executed
+fixture-to-sensor links are audited separately by pytest --audit-corpus.
 """
 
 from __future__ import annotations
 
 import json
-import os
+import math
 from pathlib import Path
 from typing import Any
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "tests" / "corpus"
-
-# Minimum type coverage required across the full corpus.
 REQUIRED_TYPES = {
-    "null_scalar": "null as a scalar object value",
+    "null_scalar": "null as an object value",
     "null_in_array": "null as an array element",
     "bool_true": "boolean true",
     "bool_false": "boolean false",
     "int_positive": "positive integer",
     "int_zero": "integer zero",
-    "float_fractional": "fractional float (critical for ijson Decimal)",
+    "int_negative": "negative integer",
+    "number_float": "a floating-point token",
+    "float_fractional": "a finite non-integral float",
+    "float_exponent": "a float token containing an exponent",
+    "float_negative_zero": "negative floating-point zero",
     "string_ascii": "ASCII string",
-    "string_unicode": "non-ASCII / Unicode string",
+    "string_unicode": "Unicode string",
     "string_empty": "empty string",
     "array_empty": "empty array",
-    "array_primitive": "array of only primitives",
-    "array_object": "array of only objects",
-    "array_mixed": "array with mixed types (dict + primitive + null)",
+    "array_primitive": "array of scalar values",
+    "array_object": "array of objects",
+    "array_mixed": "array of different structural kinds",
+    "array_nested": "array containing arrays",
+    "array_all_null": "nonempty all-null array",
     "object_empty": "empty object",
-    "object_nested": "nested object (depth >= 2)",
+    "object_nested": "nested nonempty object",
     "records_sparse": "records with different key sets",
 }
 
 
 def _classify(value: Any, in_array: bool = False) -> set[str]:
-    """Return the type tags present in a value, recursively."""
-    tags: set[str] = set()
-
+    """Classify recursive value categories without conflating nested arrays."""
     if value is None:
-        if in_array:
-            tags.add("null_in_array")
-        else:
-            tags.add("null_scalar")
-        return tags
-
+        return {"null_in_array" if in_array else "null_scalar"}
     if isinstance(value, bool):
-        tags.add("bool_true" if value else "bool_false")
-        return tags
-
+        return {"bool_true" if value else "bool_false"}
     if isinstance(value, int):
-        if value > 0:
-            tags.add("int_positive")
-        elif value == 0:
-            tags.add("int_zero")
-        return tags
-
+        return {
+            "int_positive" if value > 0 else "int_negative" if value < 0 else "int_zero"
+        }
     if isinstance(value, float):
-        tags.add("float_fractional")
+        tags = {"number_float"}
+        if math.isfinite(value) and not value.is_integer():
+            tags.add("float_fractional")
+        if value == 0 and math.copysign(1, value) < 0:
+            tags.add("float_negative_zero")
         return tags
-
     if isinstance(value, str):
-        if not value:
-            tags.add("string_empty")
-        elif all(ord(c) < 128 for c in value):
-            tags.add("string_ascii")
-        else:
-            tags.add("string_unicode")
-        return tags
-
+        return {
+            "string_empty"
+            if not value
+            else "string_ascii"
+            if value.isascii()
+            else "string_unicode"
+        }
+    tags: set[str] = set()
     if isinstance(value, list):
         if not value:
-            tags.add("array_empty")
-        else:
-            has_dict = any(isinstance(item, dict) for item in value)
-            has_primitive = any(
-                not isinstance(item, (dict, list)) and item is not None
-                for item in value
-            )
-            has_null = any(item is None for item in value)
-
-            if has_dict and (has_primitive or has_null):
-                tags.add("array_mixed")
-            elif has_dict:
-                tags.add("array_object")
-            else:
-                tags.add("array_primitive")
-
-            for item in value:
-                tags |= _classify(item, in_array=True)
-        return tags
-
-    if isinstance(value, dict):
+            return {"array_empty"}
+        kinds = {
+            "object"
+            if isinstance(item, dict)
+            else "array"
+            if isinstance(item, list)
+            else "scalar"
+            for item in value
+        }
+        if len(kinds) > 1:
+            tags.add("array_mixed")
+        if "array" in kinds:
+            tags.add("array_nested")
+        if kinds == {"object"}:
+            tags.add("array_object")
+        if kinds == {"scalar"}:
+            tags.add("array_primitive")
+        if all(item is None for item in value):
+            tags.add("array_all_null")
+        for item in value:
+            tags.update(_classify(item, in_array=True))
+    elif isinstance(value, dict):
         if not value:
             tags.add("object_empty")
-        for v in value.values():
-            tags |= _classify(v)
-            if isinstance(v, dict) and v:
+        for item in value.values():
+            tags.update(_classify(item))
+            if isinstance(item, dict) and item:
                 tags.add("object_nested")
-        return tags
-
     return tags
 
 
 def _classify_fixture(data: Any) -> set[str]:
-    """Classify all types in a loaded JSON fixture."""
+    """Separate top-level record sequences from arrays inside records."""
+    if not isinstance(data, list):
+        return _classify(data)
     tags: set[str] = set()
-    if isinstance(data, list):
-        # Multi-record fixture — check for sparse keys
-        if len(data) >= 2:
-            key_sets = [set(r.keys()) for r in data if isinstance(r, dict)]
-            if len({frozenset(ks) for ks in key_sets}) > 1:
-                tags.add("records_sparse")
-        for item in data:
-            tags |= _classify(item)
-    else:
-        tags |= _classify(data)
+    key_sets = {frozenset(record) for record in data if isinstance(record, dict)}
+    if len(key_sets) > 1:
+        tags.add("records_sparse")
+    for record in data:
+        tags.update(_classify(record))
     return tags
 
 
+def _fixture_categories(path: Path) -> set[str]:
+    """Parse one fixture while retaining the numeric syntax category."""
+    syntax_tags: set[str] = set()
+
+    def parse_float(token: str) -> float:
+        if "e" in token.lower():
+            syntax_tags.add("float_exponent")
+        value = float(token)
+        if not math.isfinite(value):
+            raise ValueError(f"Non-finite JSON number in {path.name}: {token}")
+        return value
+
+    def reject_constant(token: str) -> Any:
+        raise ValueError(f"Non-JSON constant in {path.name}: {token}")
+
+    with path.open(encoding="utf-8") as handle:
+        data = json.load(
+            handle, parse_float=parse_float, parse_constant=reject_constant
+        )
+    return _classify_fixture(data) | syntax_tags
+
+
 def audit() -> tuple[dict[str, set[str]], set[str]]:
-    """Audit the corpus and return (fixture_tags, missing_types)."""
-    fixture_tags: dict[str, set[str]] = {}
-    all_tags: set[str] = set()
-
-    for name in sorted(os.listdir(CORPUS_DIR)):
-        if not name.endswith(".json"):
-            continue
-        with open(CORPUS_DIR / name, encoding="utf-8") as f:
-            data = json.load(f)
-        tags = _classify_fixture(data)
-        fixture_tags[name] = tags
-        all_tags |= tags
-
-    missing = set(REQUIRED_TYPES.keys()) - all_tags
-    return fixture_tags, missing
+    """Return each fixture's categories and categories absent from the corpus."""
+    fixtures = {
+        path.name: _fixture_categories(path)
+        for path in sorted(CORPUS_DIR.glob("*.json"))
+    }
+    present = set().union(*fixtures.values())
+    return fixtures, set(REQUIRED_TYPES) - present
 
 
 def main() -> int:
-    """Audit the corpus and print a coverage report."""
-    fixture_tags, missing = audit()
-
-    print("=== Corpus type audit ===\n")
-    for name, tags in fixture_tags.items():
-        tag_list = ", ".join(sorted(tags)) if tags else "(none)"
-        print(f"  {name}: {tag_list}")
-
-    print(
-        f"\n=== Coverage: {len(REQUIRED_TYPES) - len(missing)}/{len(REQUIRED_TYPES)} required types ===\n"
-    )
-
-    if missing:
-        print("MISSING types (add fixtures or justify omission):\n")
-        for tag in sorted(missing):
-            print(f"  ✗ {tag}: {REQUIRED_TYPES[tag]}")
-        print()
-        return 1
-
-    print("All required types covered.\n")
-    return 0
+    """Print inventory gaps without presenting type presence as correctness."""
+    fixtures, missing = audit()
+    for name, tags in fixtures.items():
+        print(f"{name}: {', '.join(sorted(tags))}")
+    covered = len(REQUIRED_TYPES) - len(missing)
+    print(f"\nCorpus categories present: {covered}/{len(REQUIRED_TYPES)}")
+    for tag in sorted(missing):
+        print(f"MISSING {tag}: {REQUIRED_TYPES[tag]}")
+    return int(bool(missing))
 
 
 if __name__ == "__main__":

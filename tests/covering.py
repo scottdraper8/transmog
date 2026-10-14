@@ -15,12 +15,15 @@ PARAMS: dict[str, list[Any]] = {
     "format": ["csv", "parquet", "orc", "avro"],
     "consolidate": [False, True],
     "coerce_schema": [False, True],
+    "batch_size": [1, 5000],
     "shape": [
         "scalar_nest",
         "simple_array",
         "object_array",
         "mixed_array",
         "sparse_records",
+        "nested_arrays",
+        "numeric_lists",
     ],
 }
 
@@ -30,6 +33,8 @@ SHAPE_CORPUS = {
     "object_array": "object_array.json",
     "mixed_array": "mixed_array.json",
     "sparse_records": "sparse_records.json",
+    "nested_arrays": "nested_object_arrays.json",
+    "numeric_lists": "writer_arrays.json",
 }
 
 
@@ -73,7 +78,11 @@ def greedy_covering(
     params: dict[str, list[Any]] | None = None, t: int = 2
 ) -> list[dict[str, Any]]:
     """Build a deterministic t-way covering array by greedy extension."""
-    params = params or PARAMS
+    params = PARAMS if params is None else params
+    if not 1 <= t <= len(params):
+        raise ValueError("strength must be between 1 and the parameter count")
+    if any(not values or len(set(values)) != len(values) for values in params.values()):
+        raise ValueError("parameter values must be nonempty and unique")
     keys = list(params)
     uncovered = _all_t_tuples(params, t)
     rows: list[dict[str, Any]] = []
@@ -117,12 +126,7 @@ def tuple_coverage(
     return covered, all_tuples - covered
 
 
-# Backward-compatible aliases
-greedy_t2 = greedy_covering
-pair_coverage = tuple_coverage
-
-
 if __name__ == "__main__":
     rows = covering_array()
-    covered, missing = pair_coverage(rows)
+    covered, missing = tuple_coverage(rows)
     print(f"rows={len(rows)} pairs_covered={len(covered)} missing={len(missing)}")

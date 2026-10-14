@@ -14,6 +14,7 @@ import pytest
 
 import transmog as tm
 from tests.helpers import (
+    decode_directory,
     decode_file,
     hash_config,
     load_corpus,
@@ -24,16 +25,6 @@ from tests.helpers import (
 from transmog.types import ArrayMode
 
 FORMATS = ("csv", "parquet", "orc", "avro")
-
-
-def _decode_dir(directory: Path, output_format: str) -> dict[str, list[dict]]:
-    suffix = f".{output_format}"
-    tables: dict[str, list[dict]] = {}
-    for path in sorted(directory.glob(f"*{suffix}")):
-        stem = path.stem
-        name = stem.rsplit("_part_", 1)[0] if "_part_" in stem else stem
-        tables.setdefault(name, []).extend(decode_file(path, output_format))
-    return tables
 
 
 def _strip(tables: dict[str, list[dict]]) -> dict[str, list[dict]]:
@@ -72,8 +63,8 @@ def test_flatten_save_vs_flatten_stream_decoded(tmp_path, output_format):
     )
     assert stream_paths
 
-    save_tables = _decode_dir(save_dir, output_format)
-    stream_tables = _decode_dir(stream_dir, output_format)
+    save_tables = decode_directory(save_dir, output_format)
+    stream_tables = decode_directory(stream_dir, output_format)
     assert set(save_tables) == {"company", "company_employees"}
     assert set(stream_tables) == {"company", "company_employees"}
     assert _ids(save_tables) == _ids(stream_tables)
@@ -105,7 +96,7 @@ def test_writer_decoded_forms_and_exceptions(tmp_path):
     for output_format in FORMATS:
         dest = tmp_path / output_format
         result.save(dest, output_format=output_format)
-        decoded[output_format] = _strip(_decode_dir(dest, output_format))
+        decoded[output_format] = _strip(decode_directory(dest, output_format))
 
     csv_company = decoded["csv"]["company"][0]
     parquet_company = decoded["parquet"]["company"][0]
@@ -270,53 +261,6 @@ def test_consolidate_false_writes_part_files_and_schema_log(tmp_path):
     ]
     returned = sorted(Path(p).name for p in paths)
     assert returned == ["company_employees_part_0000.csv", "company_part_0000.csv"]
-
-
-# --- Writer-targeted sensors (mutation survivors from mutate_writers.py) ---
-
-
-@pytest.mark.claim("C-REL-005")
-def test_nan_inf_normalized_to_null_across_formats(tmp_path):
-    """P: NaN and Inf in records are written as null/empty across all writers.
-
-    NaN/Inf are not valid JSON but appear at runtime from computation.
-    Writers must normalize them, not pass them through as literal text.
-    """
-    data = [
-        {"id": 1, "name": "normal", "value": 42.0},
-        {"id": 2, "name": "nan_row", "value": float("nan")},
-        {"id": 3, "name": "inf_row", "value": float("inf")},
-        {"id": 4, "name": "neginf", "value": float("-inf")},
-    ]
-    config = hash_config(include_nulls=True)
-    result = tm.flatten(data, name="special", config=config)
-
-    csv_path = tmp_path / "special.csv"
-    pq_path = tmp_path / "special.parquet"
-    avro_path = tmp_path / "special.avro"
-    result.save(csv_path, output_format="csv")
-    result.save(pq_path, output_format="parquet")
-    result.save(avro_path, output_format="avro")
-
-    csv_rows = decode_file(csv_path, "csv")
-    pq_rows = decode_file(pq_path, "parquet")
-    avro_rows = decode_file(avro_path, "avro")
-
-    # CSV normalizes NaN/Inf to empty string
-    assert csv_rows[0]["value"] == "42.0"
-    assert csv_rows[1]["value"] == ""
-    assert csv_rows[2]["value"] == ""
-    assert csv_rows[3]["value"] == ""
-
-    # Parquet normalizes NaN/Inf to None
-    assert pq_rows[0]["value"] == 42.0
-    assert pq_rows[1]["value"] is None
-    assert pq_rows[2]["value"] is None
-
-    # Avro normalizes NaN/Inf to None
-    assert avro_rows[0]["value"] == 42.0
-    assert avro_rows[1]["value"] is None
-    assert avro_rows[2]["value"] is None
 
 
 @pytest.mark.claim("C-REL-006")

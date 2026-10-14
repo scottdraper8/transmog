@@ -4,7 +4,7 @@ Continuity sensors, not a specification. If a pinned table changes, the
 test fails — that failure is the signal. The fix goes in the code or the
 pin is updated with a reviewed change, not silently.
 
-P and O are named on each test via the claim marker.
+Claim markers identify propositions; assertions define their oracles.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from tests.helpers import (
 from transmog.exceptions import ValidationError
 from transmog.types import ArrayMode
 
-# Observed hash IDs under id_generation="hash", time_field=None (V=07ccda4).
+# Hash-ID compatibility pins for timestamp-free corpus fixtures.
 ID_PRIMITIVE = "4038da2c-e57a-53f3-b969-a4226e9d6b01"
 ID_OBJECT = "3fa890d6-7c73-5c40-acc6-38e77dbecd65"
 ID_MIXED = "13b44abb-cada-5871-adab-16d72180bf81"
@@ -415,10 +415,21 @@ def test_separate_nested_arrays_parent_to_intermediate():
         {"value": "python"},
         {"value": "sql"},
     ]
-    employee_ids = {row["_id"] for row in result.tables["company_employees"]}
-    for row in result.tables["company_skills"]:
-        assert row["_parent_id"] in employee_ids
-        assert row["_parent_id"] != ID_NESTED  # Not the root
+    employee_ids = {
+        row["name"]: row["_id"] for row in result.tables["company_employees"]
+    }
+    assert {
+        row["value"]: row["_parent_id"] for row in result.tables["company_skills"]
+    } == {
+        "python": employee_ids["Alice"],
+        "sql": employee_ids["Alice"],
+        "docker": employee_ids["Alice"],
+        "figma": employee_ids["Bob"],
+        "photoshop": employee_ids["Bob"],
+    }
+    assert all(
+        row["_parent_id"] == ID_NESTED for row in result.tables["company_employees"]
+    )
 
 
 @pytest.mark.claim("C-ALG-002")

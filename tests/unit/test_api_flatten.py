@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 import transmog as tm
+from tests.helpers import payload
 from transmog import TransmogConfig
 from transmog.exceptions import ConfigurationError, ValidationError
 from transmog.types import ArrayMode
@@ -69,17 +70,17 @@ class TestFlattenBasic:
         assert len(result.main) == 1
         assert len(result.tables) > 0
 
-        dept_table = None
-        for table_name, table_data in result.tables.items():
-            if (
-                "departments" in table_name.lower()
-                and "teams" not in table_name.lower()
-            ):
-                dept_table = table_data
-                break
-
-        if dept_table:
-            assert len(dept_table) == 2
+        assert set(result.tables) == {
+            "entity_organization_departments",
+            "entity_teams",
+            "entity_members",
+        }
+        assert [
+            payload(row) for row in result.tables["entity_organization_departments"]
+        ] == [
+            {"id": "dept-1", "name": "Engineering"},
+            {"id": "dept-2", "name": "Sales"},
+        ]
 
 
 class TestFlattenConfiguration:
@@ -207,7 +208,10 @@ class TestFlattenEdgeCases:
 
         result = tm.flatten(data, name="large_array")
         assert len(result.main) == 1
-        assert len(result.tables) > 0
+        assert set(result.tables) == {"large_array_items"}
+        assert [
+            payload(row) for row in result.tables["large_array_items"]
+        ] == large_array
 
     def test_flatten_mixed_type_array(self):
         """Test flattening array with mixed types."""
@@ -224,7 +228,14 @@ class TestFlattenEdgeCases:
 
         result = tm.flatten(data, name="mixed")
         assert len(result.main) == 1
-        assert len(result.tables) >= 1
+        assert set(result.tables) == {"mixed_mixed_array"}
+        assert [payload(row) for row in result.tables["mixed_mixed_array"]] == [
+            {"type": "dict", "value": 1},
+            {"value": "string_value"},
+            {"value": 42},
+            {"value": True},
+            {"value": [1, 2, 3]},
+        ]
 
     def test_flatten_unicode_and_special_chars(self):
         """Test flattening data with unicode and special characters."""
@@ -448,7 +459,7 @@ class TestFlattenStream:
         assert not (output_dir / "parts" / "items.csv").exists()
 
     def test_flatten_stream_coerce_schema_unifies_parts(self, output_dir):
-        """coerce_schema=True rewrites minority parts onto the majority schema."""
+        """coerce_schema=True rewrites parts to the union of fields."""
         data = [{"id": i, "name": f"n{i}"} for i in range(4)] + [
             {"id": i, "name": f"n{i}", "extra": f"e{i}"} for i in range(4, 8)
         ]

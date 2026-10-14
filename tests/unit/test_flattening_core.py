@@ -136,21 +136,13 @@ class TestFlattenJsonEdgeCases:
 
         config = TransmogConfig()
 
-        # The function should either succeed with partial data or raise ValueError
-        try:
-            result, _ = flatten_json(data, config)
-            # If it succeeds, verify it returned valid data
-            assert isinstance(result, dict)
-            assert "name" in result
-            assert result["name"] == "test"
-        except ValueError as e:
-            # Circular reference detection is acceptable
-            assert "circular" in str(e).lower() or "recursion" in str(e).lower()
-        except RecursionError:
-            # RecursionError indicates the function doesn't handle circular refs
-            pytest.fail(
-                "Function should handle circular references without RecursionError"
-            )
+        with pytest.warns(UserWarning, match="max_depth=100 reached"):
+            result, arrays = flatten_json(data, config)
+        assert result == {
+            "_".join(["self"] * depth + ["name"]): "test"
+            for depth in range(config.max_depth)
+        }
+        assert arrays == {}
 
     def test_flatten_very_deep_nesting(self):
         """Test flattening very deeply nested objects."""
@@ -168,8 +160,8 @@ class TestFlattenJsonEdgeCases:
 
         result, _ = flatten_json(data, config)
 
-        assert isinstance(result, dict)
-        assert len(result) > 0
+        key = "_".join([*(f"level{index}" for index in range(20)), "value"])
+        assert result == {key: "deep"}
 
     def test_flatten_unicode_keys_and_values(self):
         """Test flattening with Unicode keys and values."""

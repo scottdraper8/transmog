@@ -7,6 +7,94 @@ from typing import Any
 
 import pytest
 
+from scripts.audit_corpus import audit
+from tests.helpers import ACTIVE_SENSOR, CORPUS_DIR, CORPUS_SENSORS
+
+EVIDENCE_CHANNELS = {"algebra", "combinations", "properties", "relations"}
+COMPLETED_SENSORS: set[str] = set()
+
+
+def pytest_sessionstart(session):
+    """Discard fixture-use evidence from any earlier in-process pytest session."""
+    CORPUS_SENSORS.clear()
+    COMPLETED_SENSORS.clear()
+
+
+def pytest_collection_modifyitems(items):
+    """Require sensor identification, not certify the strength of its oracle."""
+    for item in items:
+        marker = item.get_closest_marker("claim")
+        root = Path(__file__).resolve().parent
+        channel = (
+            item.path.relative_to(root).parts[0]
+            if item.path.is_relative_to(root)
+            else None
+        )
+        if marker is None and channel not in EVIDENCE_CHANNELS:
+            continue
+        doc = getattr(getattr(item, "obj", None), "__doc__", None)
+        if (
+            marker is None
+            or len(marker.args) != 1
+            or not isinstance(marker.args[0], str)
+            or not marker.args[0].strip()
+            or not doc
+            or not doc.strip()
+        ):
+            raise pytest.UsageError(
+                f"{item.nodeid}: evidence sensors require one nonempty claim ID and a proposition docstring"
+            )
+
+
+def pytest_runtest_logreport(report):
+    """Count actual test calls, not setup loads or skipped sensor bodies."""
+    if report.when == "call" and not report.skipped:
+        COMPLETED_SENSORS.add(report.nodeid)
+
+
+def pytest_addoption(parser):
+    """Enable actual corpus-use validation on a complete-suite run."""
+    parser.addoption(
+        "--audit-corpus",
+        action="store_true",
+        help="require every corpus fixture to run in a claim-marked sensor",
+    )
+
+
+@pytest.fixture(autouse=True)
+def active_evidence_sensor(request):
+    """Attach fixture loads to the currently executing marked sensor."""
+    sensor = request.node.nodeid if request.node.get_closest_marker("claim") else None
+    token = ACTIVE_SENSOR.set(sensor)
+    try:
+        yield
+    finally:
+        ACTIVE_SENSOR.reset(token)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Reject missing corpus categories or fixtures with no executed sensor."""
+    if not session.config.getoption("--audit-corpus"):
+        return
+    fixtures = {path.name for path in CORPUS_DIR.glob("*.json")}
+    exercised = {
+        name for name, sensors in CORPUS_SENSORS.items() if sensors & COMPLETED_SENSORS
+    }
+    unused = fixtures - exercised
+    _, missing = audit()
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    if reporter:
+        reporter.write_line(
+            f"Corpus: {len(fixtures) - len(unused)}/{len(fixtures)} fixtures loaded by claim sensors"
+        )
+        if missing:
+            reporter.write_line(f"Missing corpus categories: {sorted(missing)}")
+        if unused:
+            reporter.write_line(f"Unexercised corpus fixtures: {sorted(unused)}")
+    if (missing or unused) and session.exitstatus == pytest.ExitCode.OK:
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
 # ---- Test Data Fixtures ----
 
 
