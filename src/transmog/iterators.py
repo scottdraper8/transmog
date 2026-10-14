@@ -4,46 +4,35 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 from collections.abc import Iterable, Iterator
 from decimal import Decimal
+from importlib import import_module
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 from transmog.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
 
-try:
-    import orjson as _orjson  # type: ignore[import-untyped]
-except ImportError:
-    _orjson = None  # type: ignore[assignment]
 
-try:
-    import json5 as _json5  # type: ignore[import-untyped]
-except ImportError:
-    _json5 = None  # type: ignore[assignment]
+def _optional_parser(name: str) -> ModuleType | None:
+    """Load a parser while retaining explicit missing-dependency diagnostics."""
+    try:
+        return import_module(name)
+    except ModuleNotFoundError as exc:
+        if exc.name != name:
+            raise
+        return None
 
-try:
-    import hjson as _hjson  # type: ignore[import-untyped]
-except ImportError:
-    _hjson = None  # type: ignore[assignment]
 
-try:
-    import ijson as _ijson  # type: ignore[import-untyped]
-except ImportError:
-    _ijson = None  # type: ignore[assignment]
+_json5 = _optional_parser("json5")
+_hjson = _optional_parser("hjson")
+_ijson = _optional_parser("ijson")
 
 IJSON_AVAILABLE: bool = _ijson is not None
-
-if _orjson is not None:
-    JSON_DECODE_ERRORS: tuple[type[Exception], ...] = (
-        json.JSONDecodeError,
-        _orjson.JSONDecodeError,
-    )
-else:
-    JSON_DECODE_ERRORS = (json.JSONDecodeError,)
-
 
 _DATA_FILE_EXTENSIONS = frozenset({".json", ".jsonl", ".ndjson", ".json5", ".hjson"})
 
@@ -159,7 +148,7 @@ def get_json_data_iterator(
 
     try:
         parsed = _loads(payload)
-    except JSON_DECODE_ERRORS as exc:
+    except ValueError as exc:
         raise ValidationError(f"Error parsing JSON data: {exc}") from exc
 
     yield from _iter_parsed_json(parsed)
@@ -171,7 +160,7 @@ def get_json_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
 
     try:
         parsed = _load_json_file(file_path)
-    except JSON_DECODE_ERRORS as exc:
+    except ValueError as exc:
         raise ValidationError(f"Invalid JSON in file {file_path}: {exc}") from exc
     except OSError as exc:
         raise ValidationError(f"Error reading file {file_path}: {exc}") from exc
@@ -182,33 +171,23 @@ def get_json_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
 def _normalize_ijson_value(value: Any) -> Any:
     """Convert ijson-native types to standard Python types.
 
-    ijson represents JSON numbers as ``decimal.Decimal``.  Every downstream
-    consumer (``json.dumps`` in hash IDs, writer type inference, metamorphic
-    comparisons) expects native ``int`` or ``float``.  Normalizing at the
-    iterator boundary keeps the rest of the codebase Decimal-unaware.
-
-    The JSON spec does not distinguish integer from float by value — only
-    by syntax (presence of ``.`` or ``e``).  ``json.load`` returns ``int``
-    for ``3`` and ``float`` for ``3.0``.  ijson returns ``Decimal('3')``
-    and ``Decimal('3.0')`` respectively but both compare equal to ``int(3)``.
-    To match ``json.load`` behaviour: if the Decimal's string contains a
-    dot or exponent, it is a float; otherwise an int.
+    ijson emits integer tokens as native ints and fraction/exponent tokens
+    as Decimal. Every Decimal therefore corresponds to a float token,
+    even when its value is integral. Inspecting its string loses syntax
+    such as ``1e0`` and loses negative zero during integer conversion.
     """
     if isinstance(value, Decimal):
-        text = str(value)
-        if "." in text or "E" in text or "e" in text:
-            return float(value)
-        return int(value)
+        native = float(value)
+        if not math.isfinite(native):
+            raise ValidationError(
+                f"JSON number exceeds the finite float range: {value}"
+            )
+        return native
     if isinstance(value, dict):
         return {k: _normalize_ijson_value(v) for k, v in value.items()}
     if isinstance(value, list):
         return [_normalize_ijson_value(item) for item in value]
     return value
-
-
-def _normalize_ijson_record(record: dict[str, Any]) -> dict[str, Any]:
-    """Normalize an entire record yielded by ijson."""
-    return {k: _normalize_ijson_value(v) for k, v in record.items()}
 
 
 def get_json_file_iterator_streaming(file_path: str) -> Iterator[dict[str, Any]]:
@@ -257,7 +236,7 @@ def get_json_file_iterator_streaming(file_path: str) -> Iterator[dict[str, Any]]
                         f"Expected JSON object at index {index} in "
                         f"{file_path}, got {type(item).__name__}"
                     )
-                yield _normalize_ijson_record(item)
+                yield _normalize_ijson_value(item)
     except _ijson.common.IncompleteJSONError as exc:
         raise ValidationError(f"Invalid JSON in file {file_path}: {exc}") from exc
     except OSError as exc:
@@ -341,7 +320,8 @@ def get_json5_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
         )
 
     try:
-        parsed = _load_json5_file(file_path)
+        with open(file_path, encoding="utf-8") as handle:
+            parsed = _json5.load(handle)
     except ValueError as exc:
         raise ValidationError(f"Invalid JSON5 in file {file_path}: {exc}") from exc
     except OSError as exc:
@@ -368,7 +348,8 @@ def get_hjson_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
         )
 
     try:
-        parsed = _load_hjson_file(file_path)
+        with open(file_path, encoding="utf-8") as handle:
+            parsed = _hjson.load(handle)
     except ValueError as exc:
         raise ValidationError(f"Invalid HJSON in file {file_path}: {exc}") from exc
     except OSError as exc:
@@ -377,34 +358,34 @@ def get_hjson_file_iterator(file_path: str) -> Iterator[dict[str, Any]]:
     yield from _iter_parsed_json(parsed)
 
 
+def _finite_json_float(token: str) -> float:
+    """Reject float overflow instead of introducing non-finite JSON values."""
+    value = float(token)
+    if not math.isfinite(value):
+        raise ValueError(f"JSON number exceeds the finite float range: {token}")
+    return value
+
+
+def _reject_json_constant(token: str) -> Any:
+    """Reject constants outside the JSON grammar."""
+    raise ValueError(f"Non-JSON constant: {token}")
+
+
 def _loads(value: str | bytes) -> Any:
-    """Load JSON content using the fastest available parser."""
-    if _orjson is not None:
-        return _orjson.loads(value)
+    """Preserve native integers, including values beyond 64 bits."""
     if isinstance(value, bytes):
-        return json.loads(value.decode("utf-8"))
-    return json.loads(value)
+        value = value.decode("utf-8")
+    return json.loads(
+        value, parse_float=_finite_json_float, parse_constant=_reject_json_constant
+    )
 
 
 def _load_json_file(path: str) -> Any:
-    """Load JSON payload from disk."""
-    if _orjson is not None:
-        with open(path, "rb") as handle:
-            return _orjson.loads(handle.read())
+    """Load JSON using the same numeric policy as in-memory and JSONL input."""
     with open(path, encoding="utf-8") as handle:
-        return json.load(handle)
-
-
-def _load_json5_file(path: str) -> Any:
-    """Load JSON5 payload from disk."""
-    with open(path, encoding="utf-8") as handle:
-        return _json5.load(handle)
-
-
-def _load_hjson_file(path: str) -> Any:
-    """Load HJSON payload from disk."""
-    with open(path, encoding="utf-8") as handle:
-        return _hjson.load(handle)
+        return json.load(
+            handle, parse_float=_finite_json_float, parse_constant=_reject_json_constant
+        )
 
 
 def _iter_parsed_json(payload: Any) -> Iterator[dict[str, Any]]:
@@ -444,7 +425,7 @@ def _iter_jsonl_lines(lines: Iterable[str], source: str) -> Iterator[dict[str, A
 
         try:
             record = _loads(line)
-        except JSON_DECODE_ERRORS as exc:
+        except ValueError as exc:
             raise ValidationError(
                 f"Invalid JSON on line {index} in {source}: {exc}"
             ) from exc
@@ -473,7 +454,7 @@ def _detect_string_format(value: str) -> str:
         try:
             _loads(line)
             hits += 1
-        except JSON_DECODE_ERRORS:
+        except ValueError:
             pass
 
         checked += 1

@@ -1,0 +1,5 @@
+[
+  {"id": 0, "value": 1e0, "nested": {"values": [3.0, -0.0e1, 1.0e1]}},
+  {"id": -1, "value": -2.5e-3, "nested": {"values": [0, 2.5, null]}},
+  {"id": 2, "value": 9223372036854775807, "nested": {"values": [[1, 2], [3.5]]}}
+]

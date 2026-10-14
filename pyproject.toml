@@ -46,16 +46,18 @@ dependencies = [
   "hjson>=3.1",
   "ijson>=3.4",
   "json5>=0.13",
-  "orjson>=3.11",
   "pyarrow>=23",
   "typing-extensions>=4",
 ]
 optional-dependencies.dev = [
   "bandit>=1.9",
+  "defusedxml>=0.7",
   # Documentation dependencies
   "furo>=2024.8",
+  "hypothesis>=6.100",
   "interrogate>=1.7",
   "linkify-it-py>=2",
+  "lz4>=4.3",
   "memory-profiler>=0.60",
   "mypy>=1.19",
   "myst-parser>=4",
@@ -83,6 +85,7 @@ optional-dependencies.dev = [
   "sphinxcontrib-serializinghtml>=1",
   "types-pyyaml",
   "types-toml",
+  "zstandard>=0.23",
 ]
 urls."Bug Tracker" = "https://github.com/scottdraper8/transmog/issues"
 urls.Documentation = "https://scottdraper8.github.io/transmog/"
@@ -138,8 +141,10 @@ lint.isort.section-order = [
 lint.pydocstyle.convention = "google"
 
 [tool.bandit]
-exclude_dirs = [ "tests", "examples", "scripts" ]
-skips = [ "B101" ]
+exclude_dirs = [ "tests", "examples" ]
+# Fixed-argument subprocess runners do not use a shell. These presence-only
+# checks cannot distinguish them from commands built from untrusted input.
+skips = [ "B101", "B404", "B603" ]
 target-version = "py310"
 
 [tool.pytest]

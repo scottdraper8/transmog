@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess  # nosec B404 - Used in a controlled dev environment with appropriate safeguards
+import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -47,7 +47,7 @@ def run_command(
             sys.exit(1)
         resolved[0] = located
 
-    result = subprocess.run(  # noqa: S603  # nosec B603
+    result = subprocess.run(
         resolved,
         check=check,
         text=True,
@@ -67,7 +67,7 @@ def ensure_uv() -> None:
         print(f"❌ uv is required. Install via {install_url}")
         sys.exit(1)
 
-    result = subprocess.run(  # noqa: S603  # nosec B603
+    result = subprocess.run(
         [uv_path, "--version"],
         text=True,
         capture_output=True,

@@ -186,12 +186,14 @@ Pass `consolidate=False` to keep numbered part files.
 
 ### Performance
 
-JSON parsing uses [orjson](https://github.com/ijl/orjson) for faster
-deserialization. When streaming large `.json` array files via
-`flatten_stream()`, [ijson](https://github.com/ICRAR/ijson) provides
-constant-memory parsing so the entire file is not loaded at once.
+In-memory JSON and JSONL parsing use Python's JSON parser to preserve integer
+precision, including values beyond 64 bits. Non-JSON constants and overflowing
+float tokens are rejected rather than converted to null.
 
-Both libraries are included in the default install and used automatically.
+When streaming `.json` array files via `flatten_stream()`,
+[ijson](https://github.com/ICRAR/ijson) parses incrementally without loading
+the entire file. Its numeric values are normalized to the same native types.
+ijson is included in the default install and selected automatically.
 
 ## Next steps
 
