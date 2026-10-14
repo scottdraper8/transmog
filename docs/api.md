@@ -93,14 +93,15 @@ flatten_stream(
   progress callback (same as `flatten()`).
 - **consolidate** (*bool*, default=True): Merge part files into a single file per table
   at close time. Set to `False` to retain individual part files.
-- **coerce_schema** (*bool*, default=False): Coerce minority part files to the majority
-  schema at close time. Rewrites deviating parts with additional I/O.
+- **coerce_schema** (*bool*, default=False): Automatically unify fields, compatible
+  types, and encodings across parts at close time. Rewrites nonmatching parts
+  with additional I/O; no caller-supplied schema is required.
 - **format_options**: Format-specific writer options:
 
   - CSV: `delimiter`, `quotechar`, `quoting`, `escapechar`, `include_header`
   - Parquet: `compression` (`"snappy"`, `"gzip"`, `"brotli"`, `None`)
   - ORC: `compression` (`"zstd"`, `"snappy"`, `"lz4"`, `"zlib"`, `None`)
-  - Avro: `compression` (`"null"`, `"deflate"`, `"snappy"`, `"bzip2"`, `"xz"`);
+  - Avro: `compression` (`"null"`, `"deflate"`, `"snappy"`, `"zstandard"`, `"lz4"`, `"bzip2"`, `"xz"`);
     `codec` is accepted as an alias. `sync_interval` (default 16000).
 
 **Output Formats:**

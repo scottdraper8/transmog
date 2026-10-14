@@ -39,9 +39,9 @@ class ArrayMode(Enum):
 class ProcessingContext:
     """Runtime state during processing, separate from configuration.
 
-    Tracks depth, path components, and processing timestamp. The extract_time
-    is set once at context creation and preserved across all nested operations
-    to ensure consistent timestamping throughout a processing run.
+    Tracks depth, path components, and processing timestamp. The processing
+    root supplies extract_time and nested operations preserve it. The empty
+    default does not generate a timestamp independently.
     """
 
     current_depth: int = 0

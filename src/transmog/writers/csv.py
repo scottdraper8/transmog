@@ -24,7 +24,9 @@ def _prepare_record(record: dict[str, Any]) -> dict[str, Any]:
     prepared: dict[str, Any] = {}
     for key, value in record.items():
         if isinstance(value, list):
-            prepared[key] = json.dumps(value, ensure_ascii=False)
+            prepared[key] = json.dumps(
+                _normalize_special_floats(value), ensure_ascii=False, allow_nan=False
+            )
         else:
             prepared[key] = _normalize_special_floats(value, null_replacement="")
     return prepared

@@ -1,96 +1,38 @@
-"""Tests for PyArrow base writer converter functions and caching."""
+"""Native Arrow values, schema evolution, and write-failure boundaries."""
 
 from unittest.mock import patch
 
+import pyarrow as pa
 import pytest
 
-
-class TestConverterFunctions:
-    """Test module-level converter error handling."""
-
-    def test_convert_int_error(self):
-        """Test int converter returns None on unconvertible input."""
-        from transmog.writers.arrow_base import _convert_int
-
-        assert _convert_int("not_int") is None
-
-    def test_convert_float_error(self):
-        """Test float converter returns None on unconvertible input."""
-        from transmog.writers.arrow_base import _convert_float
-
-        assert _convert_float("not_float") is None
+from transmog.writers.arrow_base import _records_to_arrow_table
 
 
-class TestTypeConvertersMapping:
-    """Test lazy type-to-converter mapping."""
-
-    def test_get_type_converters_returns_expected_types(self):
-        """Test mapping contains bool, int64, and float64 entries."""
-        import pyarrow as pa
-
-        from transmog.writers.arrow_base import (
-            _convert_bool,
-            _convert_float,
-            _convert_int,
-            _get_type_converters,
-        )
-
-        converters = _get_type_converters()
-        assert converters[pa.bool_()] is _convert_bool
-        assert converters[pa.int64()] is _convert_int
-        assert converters[pa.float64()] is _convert_float
-
-
-class TestCreateSchemaConverters:
-    """Test that _create_schema returns correct converters."""
-
-    def test_mixed_types(self, tmp_path):
-        """Test schema and converters for bool, int, float, and string fields."""
-        import pyarrow as pa
-
-        from transmog.writers.arrow_base import (
-            _convert_bool,
-            _convert_float,
-            _convert_int,
-            _convert_str,
-        )
-        from transmog.writers.parquet import ParquetStreamingWriter
-
-        writer = ParquetStreamingWriter(destination=str(tmp_path), entity_name="test")
-        records = [
-            {"flag": True, "count": 5, "score": 3.14, "name": "Alice"},
+@pytest.mark.claim("C-ARROW-INFERENCE")
+def test_native_column_inference_preserves_values():
+    """P: inference scans complete columns, including nested and sparse values."""
+    records = [
+        {"flag": True, "count": 5, "score": 1, "values": [None]},
+        {"flag": False, "count": 8, "score": 3.14, "values": [2.5]},
+    ]
+    table = _records_to_arrow_table(records)
+    assert table.to_pylist() == records
+    assert table.schema == pa.schema(
+        [
+            ("flag", pa.bool_()),
+            ("count", pa.int64()),
+            ("score", pa.float64()),
+            ("values", pa.list_(pa.float64())),
         ]
-        schema, converters = writer._create_schema(records)
+    )
 
-        assert schema.field("flag").type == pa.bool_()
-        assert schema.field("count").type == pa.int64()
-        assert schema.field("score").type == pa.float64()
-        assert schema.field("name").type == pa.string()
 
-        assert converters["flag"] is _convert_bool
-        assert converters["count"] is _convert_int
-        assert converters["score"] is _convert_float
-        assert converters["name"] is _convert_str
-
-    def test_empty_records(self, tmp_path):
-        """Test empty records produce empty schema and converters."""
-        from transmog.writers.parquet import ParquetStreamingWriter
-
-        writer = ParquetStreamingWriter(destination=str(tmp_path), entity_name="test")
-        schema, converters = writer._create_schema([])
-        assert len(schema) == 0
-        assert converters == {}
-
-    def test_stringify_mode(self, tmp_path):
-        """Test stringify mode assigns str converter to all fields."""
-        from transmog.writers.arrow_base import _convert_str
-        from transmog.writers.parquet import ParquetStreamingWriter
-
-        writer = ParquetStreamingWriter(destination=str(tmp_path), entity_name="test")
-        records = [{"count": 5, "score": 3.14}]
-        schema, converters = writer._create_schema(records, stringify_mode=True)
-
-        assert all(converters[k] is _convert_str for k in converters)
+@pytest.mark.claim("C-ARROW-INFERENCE")
+def test_empty_records_have_empty_schema():
+    """P: empty input has no rows or fields."""
+    table = _records_to_arrow_table([])
+    assert table.to_pylist() == []
+    assert table.schema == pa.schema([])
 
 
 class TestPartFileOutput:
@@ -158,20 +100,16 @@ class TestPyArrowWriterExceptionHandling:
             with pytest.raises(OutputError, match="Failed to write Parquet file"):
                 writer.write(data, str(tmp_path / "test.parquet"))
 
-    def test_output_error_propagates_unwrapped(self):
+    def test_output_error_propagates_unwrapped(self, tmp_path):
         """Test that OutputError from text-mode stream is not double-wrapped."""
-        import io
-
         from transmog.exceptions import OutputError
         from transmog.writers.parquet import ParquetWriter
 
         data = [{"id": 1, "name": "Alice"}]
         writer = ParquetWriter()
-        text_stream = io.StringIO()
-        text_stream.mode = "w"  # type: ignore[attr-defined]
-
-        with pytest.raises(OutputError, match="requires binary streams"):
-            writer.write(data, text_stream)
+        with (tmp_path / "text.txt").open("w", encoding="utf-8") as text_stream:
+            with pytest.raises(OutputError, match="requires binary streams"):
+                writer.write(data, text_stream)
 
 
 class TestArrowStreamingWriterExceptionCleanup:
@@ -292,7 +230,7 @@ class TestSchemaLog:
         assert "extra" in parts[1]["deviations"]["structural"]["added"]
 
     def test_coercion_unifies_parquet_schemas(self, tmp_path):
-        """Test that coerce_schema rewrites minority part files."""
+        """Test that coerce_schema rewrites parts to the union of fields."""
         import json
         import warnings
 

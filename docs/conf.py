@@ -4,7 +4,7 @@ import datetime
 import os
 import sys
 
-# Add the project root directory to the path so we can import the package
+# Add the project root directory to the package import path.
 sys.path.insert(0, os.path.abspath(".."))
 
 # -- Project information -----------------------------------------------------
@@ -43,6 +43,7 @@ extensions = [
 ]
 
 # Configure MyST-Parser
+myst_heading_anchors = 6
 myst_enable_extensions = [
     "amsmath",  # LaTex math
     "attrs_inline",  # Attributes in HTML

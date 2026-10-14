@@ -2,6 +2,46 @@
 
 Supported formats: CSV, Parquet, ORC, and Avro.
 
+## Value and Schema Semantics
+
+- CSV writes scalar text and represents null as an empty field. List values
+  are JSON strings, with Unicode preserved.
+- Avro preserves scalar types, including numeric strings and booleans in
+  union fields. Lists and dictionaries are JSON strings. Schema consolidation
+  combines types from every part rather than selecting the first part's type.
+- Parquet and ORC retain native scalars and nested lists. Numeric columns and
+  list elements are promoted across all records and parts; fractional values
+  are not truncated to the first observed integer type. Missing fields become
+  null when schemas are unified.
+- No caller-supplied schema is required. Parquet/ORC automatically use JSON
+  text for a column whose values cannot share a native type, or whose numeric
+  promotion would lose precision. Empty objects and sparse object keys inside
+  containers also use JSON when a native struct would reject them or add keys.
+  The entire column is encoded, including
+  quotes around original strings, so `"1"`, `1`, and `true` remain distinct.
+  Null remains a native null. Compatible numbers can be promoted to floats.
+- Automatically encoded fields carry `transmog.encoding=json` in field
+  metadata in both Parquet and ORC. Consumers can inspect
+  `table.schema.field(name).metadata` and apply `json.loads` to non-null cells
+  with that marker. Unmarked strings must not be guessed to contain JSON.
+  The schema log annotates these fields as `string (json)`.
+- If consolidation or schema coercion encounters a later incompatible type,
+  earlier native parts are encoded too, without double-encoding existing JSON
+  parts. Uncoerced, unconsolidated parts can retain different local encodings;
+  each file's field metadata identifies its representation.
+- `coerce_schema=True` rewrites parts to the **union** of fields and compatible
+  types, not a majority schema. Uncoerced, unconsolidated parts retain their
+  local schemas.
+
+Flattening treats scalar NaN, Infinity, empty strings, and None as null-like.
+Direct writers are a different boundary: CSV/Avro normalize non-finite floats,
+including inside serialized containers; Arrow writers retain IEEE NaN/Infinity.
+Consequently a direct Arrow write does not claim the same normalization as a
+`flatten` workflow. CSV/Avro JSON strings use null for non-finite elements,
+never non-standard `NaN` or `Infinity` tokens. Automatic Arrow JSON fallback
+requires JSON-compatible values; non-finite floats in a heterogeneous column
+are not JSON values. Homogeneous native Arrow float columns retain IEEE values.
+
 ## Saving Results
 
 ### Auto-Detection
@@ -60,9 +100,9 @@ result.save("output.csv")
 ```
 
 :::{tip}
-For consistent CSV columns across all rows, use `include_nulls=True` in
-`TransmogConfig`. This ensures fields that are missing in some records appear
-as empty strings in the CSV output.
+CSV headers use the union of fields in the written table. Missing values
+appear as empty fields. `include_nulls=True` additionally preserves explicitly
+null-like source fields; it does not invent fields absent from every record.
 :::
 
 ```python

@@ -1,123 +1,158 @@
-"""Base classes for PyArrow-based writers (Parquet, ORC)."""
+"""Shared native Arrow inference and part-file schema promotion."""
 
-import logging
-import math
+import json
 import pathlib
 from abc import abstractmethod
-from collections.abc import Callable
-from pathlib import Path
 from typing import Any, BinaryIO, TextIO
 
 import pyarrow as pa
 
-from transmog.exceptions import OutputError
-from transmog.writers.base import DataWriter, StreamingWriter, _collect_field_names
+from transmog.exceptions import ConfigurationError, OutputError
+from transmog.writers.base import (
+    DataWriter,
+    StreamingWriter,
+    _collect_field_names,
+)
 
-logger = logging.getLogger(__name__)
+_ARROW_WRITE_ERRORS: tuple[type[Exception], ...] = (
+    OSError,
+    OverflowError,
+    pa.lib.ArrowException,
+)
+_NATIVE_TYPE_ERRORS = (
+    OverflowError,
+    pa.ArrowInvalid,
+    pa.ArrowTypeError,
+    pa.ArrowNotImplementedError,
+)
+_JSON_ENCODING = {b"transmog.encoding": b"json"}
 
-_ARROW_WRITE_ERRORS: tuple[type[Exception], ...] = (OSError, pa.lib.ArrowException)
+
+def _is_json_field(field: Any) -> bool:
+    """Recognize the explicit wire encoding, not the content of a string."""
+    return (field.metadata or {}).get(b"transmog.encoding") == b"json"
 
 
-def _is_valid_float_for_inference(value: Any) -> bool:
-    """Check if a float value is valid for type inference.
+def _json_field(field: Any) -> Any:
+    """Mark a whole-column JSON representation while retaining field metadata."""
+    return pa.field(
+        field.name,
+        pa.string(),
+        nullable=field.nullable,
+        metadata={**(field.metadata or {}), **_JSON_ENCODING},
+    )
 
-    NaN and Infinity values should not be used for type inference as they
-    don't represent typical float data patterns.
+
+def _json_array(values: list[Any]) -> Any:
+    """Encode JSON values unambiguously; native strings retain their quotes."""
+    try:
+        encoded = [
+            None
+            if value is None
+            else json.dumps(value, ensure_ascii=False, allow_nan=False)
+            for value in values
+        ]
+    except (TypeError, ValueError) as exc:
+        raise OutputError(f"Value cannot be represented as JSON: {exc}") from exc
+    return pa.array(encoded, type=pa.string())
+
+
+def _native_shape_is_lossless(value: Any, data_type: Any) -> bool:
+    """Preserve JSON value kinds and nested keys, allowing exact numeric promotion."""
+    if value is None:
+        return True
+    if isinstance(value, bool):
+        return bool(pa.types.is_boolean(data_type))
+    if isinstance(value, int):
+        return bool(pa.types.is_integer(data_type) or pa.types.is_floating(data_type))
+    if isinstance(value, float):
+        return bool(pa.types.is_floating(data_type))
+    if isinstance(value, str):
+        return bool(
+            pa.types.is_string(data_type) or pa.types.is_large_string(data_type)
+        )
+    if pa.types.is_struct(data_type):
+        return (
+            bool(data_type.num_fields)
+            and set(value) == set(data_type.names)
+            and all(
+                _native_shape_is_lossless(value[field.name], field.type)
+                for field in data_type
+            )
+        )
+    if pa.types.is_list(data_type):
+        return all(
+            _native_shape_is_lossless(item, data_type.value_type) for item in value
+        )
+    return True
+
+
+def _cast_native_column(column: Any, data_type: Any) -> Any:
+    """Cast safely, restoring null children encoded as storage-only strings."""
+    try:
+        return column.cast(data_type, safe=True)
+    except pa.ArrowNotImplementedError:
+        return pa.array(column.to_pylist()).cast(data_type, safe=True)
+
+
+def _records_to_arrow_table(records: list[dict[str, Any]]) -> Any:
+    """Infer complete columns, falling back to marked JSON without losing values."""
+    arrays, fields = [], []
+    for name in _collect_field_names(records):
+        values = [record.get(name) for record in records]
+        try:
+            array = pa.array(values)
+        except _NATIVE_TYPE_ERRORS:
+            array = None
+        if array is None or not all(
+            _native_shape_is_lossless(value, array.type) for value in values
+        ):
+            array = _json_array(values)
+            field = _json_field(pa.field(name, pa.string()))
+        else:
+            field = pa.field(name, array.type)
+        arrays.append(array)
+        fields.append(field)
+    return pa.table(arrays, schema=pa.schema(fields))
+
+
+def _storage_type(data_type: Any) -> Any:
+    """Replace unresolved null types for codecs such as ORC.
+
+    The logical part schema retains null types so a later numeric or nested
+    value can determine the unified type without a string-type conflict.
     """
-    if not isinstance(value, float):
-        return False
-    return not (math.isnan(value) or math.isinf(value))
+    if pa.types.is_null(data_type):
+        return pa.string()
+    if pa.types.is_list(data_type):
+        return pa.list_(_storage_type(data_type.value_type))
+    if pa.types.is_struct(data_type):
+        return pa.struct(
+            [field.with_type(_storage_type(field.type)) for field in data_type]
+        )
+    return data_type
 
 
-def _convert_bool(value: Any) -> bool | None:
-    """Convert a value to bool for Arrow column."""
-    try:
-        return bool(value)
-    except (ValueError, TypeError):
-        return None
-
-
-def _convert_int(value: Any) -> int | None:
-    """Convert a value to int for Arrow column."""
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        return None
-
-
-def _convert_float(value: Any) -> float | None:
-    """Convert a value to float for Arrow column."""
-    try:
-        return float(value)
-    except (ValueError, TypeError):
-        return None
-
-
-def _convert_str(value: Any) -> str | None:
-    """Convert a value to str for Arrow column."""
-    try:
-        return str(value)
-    except (ValueError, TypeError):
-        return None
-
-
-def _infer_list_type(sample: list) -> pa.DataType:
-    """Infer a PyArrow list type from a sample list value.
-
-    Examines the first non-None element to determine the element type.
-    Falls back to ``pa.list_(pa.string())`` when the list is empty or
-    contains only None values.
-    """
-    for item in sample:
-        if item is None:
-            continue
-        if isinstance(item, bool):
-            return pa.list_(pa.bool_())
-        if isinstance(item, int):
-            return pa.list_(pa.int64())
-        if isinstance(item, float):
-            return pa.list_(pa.float64())
-        return pa.list_(pa.string())
-    return pa.list_(pa.string())
-
-
-_TYPE_CONVERTERS: dict[Any, Callable] = {}
-
-
-def _get_type_converters() -> dict[Any, Callable]:
-    """Get the mapping of PyArrow types to converter functions.
-
-    Lazily initialized to avoid import-time dependency on PyArrow.
-    """
-    if not _TYPE_CONVERTERS and pa is not None:
-        _TYPE_CONVERTERS[pa.bool_()] = _convert_bool
-        _TYPE_CONVERTERS[pa.int64()] = _convert_int
-        _TYPE_CONVERTERS[pa.float64()] = _convert_float
-    return _TYPE_CONVERTERS
-
-
-def _identity(value: Any) -> Any:
-    """Pass a value through unchanged (used for list-typed columns)."""
-    return value
+def _storage_schema(schema: Any) -> Any:
+    """Return a writable schema while preserving field metadata and order."""
+    return pa.schema(
+        [field.with_type(_storage_type(field.type)) for field in schema],
+        metadata=schema.metadata,
+    )
 
 
 class PyArrowWriter(DataWriter):
     """Base writer for PyArrow-based formats (Parquet, ORC)."""
 
     def __init__(self, compression: str, **options: Any) -> None:
-        """Initialize the PyArrow writer.
-
-        Args:
-            compression: Compression format
-            **options: Additional writer options
-        """
+        """Initialize compression and format options."""
         self.compression = compression
         self.options = options
 
     @abstractmethod
     def _get_format_name(self) -> str:
         """Get the format name for error messages."""
-        pass
+        ...
 
     @abstractmethod
     def _write_table(
@@ -127,8 +162,8 @@ class PyArrowWriter(DataWriter):
         compression: str,
         **options: Any,
     ) -> None:
-        """Write a PyArrow table to destination."""
-        pass
+        """Write an Arrow table to the destination."""
+        ...
 
     def write(
         self,
@@ -136,278 +171,188 @@ class PyArrowWriter(DataWriter):
         destination: str | BinaryIO | TextIO,
         **options: Any,
     ) -> str | BinaryIO | TextIO:
-        """Write data to a file.
-
-        Args:
-            data: Data to write
-            destination: Path or file-like object to write to
-            **options: Format-specific options (compression, etc.)
-
-        Returns:
-            Path to the written file or file-like object
-
-        Raises:
-            TypeError: If data is not a list of records
-            OutputError: If writing fails
-        """
+        """Write inferred native or marked JSON columns without a supplied schema."""
         if not isinstance(data, list):
             raise TypeError(f"Expected list of records, got {type(data).__name__}")
-
+        if not data:
+            return destination
         try:
-            compression_val = options.get("compression", self.compression)
-
-            if not data:
-                return destination
-
-            field_names = _collect_field_names(data)
-
-            columns: dict[str, list[Any]] = {field: [] for field in field_names}
-            for record in data:
-                for field in field_names:
-                    columns[field].append(record.get(field))
-
-            table = pa.table(columns)
-
+            writer_options = {**self.options, **options}
+            compression = writer_options.pop("compression", self.compression)
+            table = _records_to_arrow_table(data)
+            table = table.cast(_storage_schema(table.schema))
             if isinstance(destination, (str, pathlib.Path)):
                 path = pathlib.Path(destination)
                 path.parent.mkdir(parents=True, exist_ok=True)
-                self._write_table(table, str(path), compression_val, **options)
+                self._write_table(table, str(path), compression, **writer_options)
                 return str(path) if isinstance(destination, str) else path
-            else:
-                mode = getattr(destination, "mode", "")
-                if mode and "b" not in mode:
-                    format_name = self._get_format_name()
-                    raise OutputError(
-                        f"{format_name} format requires binary streams, "
-                        "text streams not supported"
-                    )
-                self._write_table(table, destination, compression_val, **options)
-                return destination
+            mode = getattr(destination, "mode", "")
+            if mode and "b" not in mode:
+                raise OutputError(
+                    f"{self._get_format_name()} format requires binary streams, "
+                    "text streams not supported"
+                )
+            self._write_table(table, destination, compression, **writer_options)
+            return destination
         except _ARROW_WRITE_ERRORS as exc:
-            format_name = self._get_format_name()
-            raise OutputError(f"Failed to write {format_name} file: {exc}") from exc
+            raise OutputError(
+                f"Failed to write {self._get_format_name()} file: {exc}"
+            ) from exc
 
 
 class PyArrowStreamingWriter(StreamingWriter):
-    """Base streaming writer for PyArrow-based formats (Parquet, ORC)."""
+    """Base streaming writer using the same inference as batch output."""
 
     def __init__(
         self,
         destination: str | None = None,
         entity_name: str = "entity",
         compression: str = "snappy",
-        stringify_values: bool = False,
         **options: Any,
     ) -> None:
-        """Initialize the PyArrow streaming writer.
-
-        Args:
-            destination: Directory path to write part files to
-            entity_name: Name of the entity for output files
-            compression: Compression algorithm
-            stringify_values: If True, all fields are strings (skip type inference)
-            **options: Additional options for PyArrow
-        """
+        """Initialize the part-file writer and format options."""
         super().__init__(destination, entity_name, **options)
-
         self.compression = compression
-        self.stringify_values = stringify_values
 
     @abstractmethod
     def _get_format_name(self) -> str:
         """Get the format name."""
-        pass
-
-    @abstractmethod
-    def _get_file_extension(self) -> str:
-        """Get the file extension (e.g., '.parquet', '.orc')."""
-        pass
-
-    @abstractmethod
-    def _create_format_writer(self, file_path: str, schema: Any) -> Any:
-        """Create the format-specific writer instance."""
-        pass
-
-    @abstractmethod
-    def _write_to_format_writer(self, writer: Any, table: Any) -> None:
-        """Write table using the format-specific writer."""
-        pass
-
-    # --- Schema inference (PyArrow-specific) ---
-
-    def _create_schema(
-        self, records: list[dict[str, Any]], stringify_mode: bool = False
-    ) -> tuple[Any, dict[str, Callable]]:
-        """Create PyArrow schema and field converters from records.
-
-        Handles special float values (NaN, Inf) by skipping them during type
-        inference, as they don't represent typical data patterns.
-
-        Args:
-            records: Records to infer schema from
-            stringify_mode: If True, all fields are strings (skip type inference)
-
-        Returns:
-            Tuple of (PyArrow schema, dict mapping field names to converters)
-        """
-        if not records:
-            return pa.schema([]), {}
-
-        field_names = _collect_field_names(records)
-        type_converters = _get_type_converters()
-
-        if stringify_mode:
-            fields = [pa.field(key, pa.string()) for key in field_names]
-            converters = dict.fromkeys(field_names, _convert_str)
-            logger.debug(
-                "arrow schema created (stringify mode), fields=%d", len(fields)
-            )
-            return pa.schema(fields), converters
-
-        fields = []
-        converters = {}
-
-        for key in field_names:
-            value = None
-            found_float = False
-
-            for record in records:
-                if key not in record:
-                    continue
-
-                val = record[key]
-                if val is None:
-                    continue
-
-                if isinstance(val, float):
-                    found_float = True
-                    if _is_valid_float_for_inference(val):
-                        value = val
-                        break
-                else:
-                    value = val
-                    break
-
-            if value is None and found_float:
-                pa_type = pa.float64()
-            elif value is None:
-                pa_type = pa.string()
-            elif isinstance(value, bool):
-                pa_type = pa.bool_()
-            elif isinstance(value, int):
-                pa_type = pa.int64()
-            elif isinstance(value, float):
-                pa_type = pa.float64()
-            elif isinstance(value, list):
-                pa_type = _infer_list_type(value)
-            else:
-                pa_type = pa.string()
-
-            fields.append(pa.field(key, pa_type))
-            if isinstance(pa_type, pa.ListType):
-                converters[key] = _identity
-            else:
-                converters[key] = type_converters.get(pa_type, _convert_str)
-
-        if logger.isEnabledFor(logging.DEBUG):
-            types = {f.name: str(f.type) for f in fields}
-            logger.debug(
-                "arrow schema created, fields=%d, types=%s", len(fields), types
-            )
-        return pa.schema(fields), converters
-
-    def _records_to_table(
-        self,
-        records: list[dict[str, Any]],
-        schema: Any,
-        converters: dict[str, Callable],
-    ) -> Any:
-        """Convert records to PyArrow table using a provided schema."""
-        if not records:
-            return pa.table({})
-
-        columns: dict[str, list[Any]] = {field.name: [] for field in schema}
-
-        for record in records:
-            for field in schema:
-                field_name = field.name
-                value = record.get(field_name)
-
-                if value is None:
-                    columns[field_name].append(None)
-                else:
-                    columns[field_name].append(converters[field_name](value))
-
-        arrays = [pa.array(columns[field.name], type=field.type) for field in schema]
-        return pa.table(arrays, schema=schema)
-
-    # --- StreamingWriter abstract method implementations ---
-
-    def _write_part(self, file_path: str, records: list[dict[str, Any]]) -> Any:
-        """Write records to a PyArrow part file and return the schema."""
-        schema, converters = self._create_schema(
-            records, stringify_mode=self.stringify_values
-        )
-        table = self._records_to_table(records, schema, converters)
-
-        writer = self._create_format_writer(file_path, schema)
-        self._write_to_format_writer(writer, table)
-        if hasattr(writer, "close"):
-            writer.close()
-
-        return schema
-
-    def _schema_fields(self, schema: Any) -> list[tuple[str, str]]:
-        """Extract (name, type_string) pairs from a PyArrow schema."""
-        return [(f.name, str(f.type)) for f in schema]
-
-    def _build_unified_schema(self, schemas: list[Any]) -> Any:
-        """Build a unified PyArrow schema from all part schemas."""
-        return pa.unify_schemas(schemas)
-
-    def _promote_table_to_schema(self, table: Any, target_schema: Any) -> Any:
-        """Promote a table to match a target schema.
-
-        Adds missing columns as null arrays, reorders to match the target,
-        and casts types.
-        """
-        for field in target_schema:
-            if field.name not in table.column_names:
-                null_array = pa.nulls(len(table), type=field.type)
-                table = table.append_column(field, null_array)
-        table = table.select([f.name for f in target_schema])
-        return table.cast(target_schema)
-
-    @abstractmethod
-    def _rewrite_part(self, file_path: str, target_schema: Any) -> None:
-        """Rewrite a part file with a target schema (format-specific)."""
         ...
 
     @abstractmethod
+    def _create_format_writer(self, file_path: str, schema: Any) -> Any:
+        """Create the format-specific writer."""
+        ...
+
+    @abstractmethod
+    def _write_to_format_writer(self, writer: Any, table: Any) -> None:
+        """Write a table using the format-specific writer."""
+        ...
+
+    def _write_part(self, file_path: str, records: list[dict[str, Any]]) -> Any:
+        """Write a part, retaining its logical schema for future promotion."""
+        try:
+            table = _records_to_arrow_table(records)
+            schema = table.schema
+            table = table.cast(_storage_schema(schema))
+        except (OverflowError, pa.lib.ArrowException) as exc:
+            raise OutputError(
+                f"Invalid {self._get_format_name()} column values: {exc}"
+            ) from exc
+        writer = self._create_format_writer(file_path, table.schema)
+        try:
+            self._write_to_format_writer(writer, table)
+        finally:
+            writer.close()
+        return schema
+
+    def _schema_fields(self, schema: Any) -> list[tuple[str, str]]:
+        """Report physical types and encoding changes for deviation tracking."""
+        return [
+            (field.name, str(field.type) + (" (json)" if _is_json_field(field) else ""))
+            for field in _storage_schema(schema)
+        ]
+
+    def _build_unified_schema(self, schemas: list[Any]) -> Any:
+        """Infer each unified field, using JSON when native types cannot be merged."""
+        names = dict.fromkeys(field.name for schema in schemas for field in schema)
+        fields = []
+        for name in names:
+            candidates = [
+                schema.field(name) for schema in schemas if name in schema.names
+            ]
+            if any(_is_json_field(field) for field in candidates):
+                field = _json_field(candidates[0])
+            else:
+                try:
+                    merged = pa.unify_schemas(
+                        [pa.schema([candidate]) for candidate in candidates],
+                        promote_options="permissive",
+                    )
+                    field = merged.field(name)
+                except _NATIVE_TYPE_ERRORS:
+                    field = _json_field(candidates[0])
+            fields.append(field)
+        return pa.schema(fields)
+
+    def _unified_part_schema(self, table_name: str) -> Any:
+        """Check value-dependent casts before opening or rewriting final files.
+
+        Numeric types can be compatible while particular integers exceed the
+        exact range of a double. Such columns also need automatic JSON storage.
+        Only parts requiring native casts are read during this check.
+        """
+        schema = super()._unified_part_schema(table_name)
+        base_dir = self.base_dir
+        if base_dir is None:
+            raise ConfigurationError(
+                "Cannot resolve part values without a destination directory."
+            )
+        for filename, part_schema in self._part_schemas[table_name]:
+            candidates = [
+                field
+                for field in schema
+                if not _is_json_field(field)
+                and field.name in part_schema.names
+                and not pa.types.is_null(part_schema.field(field.name).type)
+                and field.type != part_schema.field(field.name).type
+            ]
+            if not candidates:
+                continue
+            table = self._read_part_table(str(pathlib.Path(base_dir) / filename))
+            for field in candidates:
+                column = table[field.name]
+                if not all(
+                    _native_shape_is_lossless(value, field.type)
+                    for value in column.to_pylist()
+                ):
+                    schema = schema.set(
+                        schema.get_field_index(field.name), _json_field(field)
+                    )
+                    continue
+                try:
+                    _cast_native_column(column, _storage_type(field.type))
+                except _NATIVE_TYPE_ERRORS:
+                    schema = schema.set(
+                        schema.get_field_index(field.name), _json_field(field)
+                    )
+        return schema
+
+    def _promote_table_to_schema(self, table: Any, target_schema: Any) -> Any:
+        """Fill fields, cast safely, and encode newly heterogeneous columns once."""
+        storage_schema = _storage_schema(target_schema)
+        columns = []
+        for field in storage_schema:
+            if field.name not in table.column_names or table[
+                field.name
+            ].null_count == len(table):
+                column = pa.nulls(len(table), type=field.type)
+            elif _is_json_field(field) and not _is_json_field(
+                table.schema.field(field.name)
+            ):
+                column = _json_array(table[field.name].to_pylist())
+            else:
+                column = _cast_native_column(table[field.name], field.type)
+            columns.append(column)
+        return pa.table(columns, schema=storage_schema)
+
+    @abstractmethod
     def _read_part_table(self, file_path: str) -> Any:
-        """Read a part file and return a PyArrow Table (format-specific)."""
+        """Read a part file as an Arrow table."""
         ...
 
     def _consolidate_parts(
         self, output_path: str, part_files: list[str], schema: Any
     ) -> None:
-        """Merge multiple PyArrow part files into a single file.
-
-        Reads one part file at a time so peak memory is bounded by the
-        largest single part rather than the entire dataset.
-        """
-        writer = self._create_format_writer(output_path, schema)
-        for part_file in part_files:
-            table = self._read_part_table(part_file)
-            table = self._promote_table_to_schema(table, schema)
-            self._write_to_format_writer(writer, table)
-            del table
-        if hasattr(writer, "close"):
+        """Merge parts using a promoted schema and one part in memory."""
+        writer = self._create_format_writer(output_path, _storage_schema(schema))
+        try:
+            for part_file in part_files:
+                table = self._read_part_table(part_file)
+                table = self._promote_table_to_schema(table, schema)
+                self._write_to_format_writer(writer, table)
+        finally:
             writer.close()
-
-    def close(self) -> list[Path]:
-        """Finalize output and flush buffered data."""
-        return super().close()
 
 
 __all__ = ["PyArrowWriter", "PyArrowStreamingWriter"]

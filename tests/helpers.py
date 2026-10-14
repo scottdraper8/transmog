@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import csv
 import json
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,8 @@ from transmog.types import ArrayMode
 CORPUS_DIR = Path(__file__).resolve().parent / "corpus"
 
 METADATA_FIELDS = ("_id", "_parent_id", "_timestamp")
+ACTIVE_SENSOR: ContextVar[str | None] = ContextVar("active_sensor", default=None)
+CORPUS_SENSORS: dict[str, set[str]] = {}
 
 
 def corpus_path(name: str) -> Path:
@@ -31,7 +34,11 @@ def corpus_path(name: str) -> Path:
 def load_corpus(name: str) -> Any:
     """Load a JSON corpus fixture."""
     with corpus_path(name).open(encoding="utf-8") as handle:
-        return json.load(handle)
+        data = json.load(handle)
+    sensor = ACTIVE_SENSOR.get()
+    if sensor is not None:
+        CORPUS_SENSORS.setdefault(name, set()).add(sensor)
+    return data
 
 
 def array_mode(value: str | ArrayMode) -> ArrayMode:
@@ -68,7 +75,7 @@ def payloads(
 
 def canonical_json(value: Any) -> str:
     """Stable JSON for sorting and comparison."""
-    return json.dumps(value, sort_keys=True, default=str, ensure_ascii=False)
+    return json.dumps(value, sort_keys=True, ensure_ascii=False)
 
 
 def sort_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -86,24 +93,6 @@ def tables_payload(
     for name, rows in sorted(result.tables.items()):
         out[name] = sort_records(payloads(rows))
     return out
-
-
-def parent_ids(result: tm.FlattenResult) -> dict[str, Any]:
-    """Linkage facts that do not depend on ID strategy values."""
-    if not result.main:
-        return {"main_count": 0, "children": {}}
-    main_id = result.main[0].get("_id")
-    children: dict[str, Any] = {}
-    for name, rows in sorted(result.tables.items()):
-        children[name] = {
-            "count": len(rows),
-            "all_parent_ids_match_main": all(
-                row.get("_parent_id") == main_id for row in rows
-            ),
-            "child_ids": [row.get("_id") for row in rows],
-            "parent_ids": [row.get("_parent_id") for row in rows],
-        }
-    return {"main_id": main_id, "main_count": len(result.main), "children": children}
 
 
 def flatten_corpus(
@@ -124,18 +113,29 @@ def decode_csv(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
-def decode_parquet(path: Path) -> list[dict[str, Any]]:
-    """Decode a Parquet file to a list of records."""
-    import pyarrow.parquet as pq
+def _arrow_rows(table: Any, logical: bool) -> list[dict[str, Any]]:
+    """Decode only explicitly marked JSON fields, never guess from string content."""
+    rows = table.to_pylist()
+    if logical:
+        for field in table.schema:
+            if (field.metadata or {}).get(b"transmog.encoding") == b"json":
+                for row in rows:
+                    if row[field.name] is not None:
+                        row[field.name] = json.loads(row[field.name])
+    return rows
 
-    return pq.read_table(path).to_pylist()
 
+def read_arrow_table(path: Path, output_format: str) -> Any:
+    """Read a physical table file without inferring directory partitions."""
+    if output_format == "parquet":
+        import pyarrow.parquet as pq
 
-def decode_orc(path: Path) -> list[dict[str, Any]]:
-    """Decode an ORC file to a list of records."""
-    import pyarrow.orc as orc
+        return pq.ParquetFile(path).read()
+    if output_format == "orc":
+        import pyarrow.orc as orc
 
-    return orc.read_table(path).to_pylist()
+        return orc.read_table(path)
+    raise ValueError(f"Not an Arrow format: {output_format}")
 
 
 def decode_avro(path: Path) -> list[dict[str, Any]]:
@@ -148,27 +148,30 @@ def decode_avro(path: Path) -> list[dict[str, Any]]:
 
 DECODERS = {
     "csv": decode_csv,
-    "parquet": decode_parquet,
-    "orc": decode_orc,
     "avro": decode_avro,
 }
 
 
-def decode_file(path: Path, output_format: str) -> list[dict[str, Any]]:
-    """Decode a written table file by format name."""
-    decoder = DECODERS[output_format]
-    return decoder(path)
+def decode_file(
+    path: Path, output_format: str, *, logical: bool = False
+) -> list[dict[str, Any]]:
+    """Decode a table; JSON wire decoding is opt-in and requires field metadata."""
+    if output_format in ("parquet", "orc"):
+        return _arrow_rows(read_arrow_table(path, output_format), logical)
+    return DECODERS[output_format](path)
 
 
-def files_by_stem(paths: list[Path] | list[str], suffix: str) -> dict[str, Path]:
-    """Map file stem to path for a given suffix."""
-    suffix = suffix if suffix.startswith(".") else f".{suffix}"
-    out: dict[str, Path] = {}
-    for raw in paths:
-        path = Path(raw)
-        if path.suffix == suffix:
-            out[path.stem] = path
-    return out
+def decode_directory(
+    directory: Path, output_format: str, *, logical: bool = False
+) -> dict[str, list[dict[str, Any]]]:
+    """Decode every table and numbered part in file order."""
+    tables: dict[str, list[dict[str, Any]]] = {}
+    for path in sorted(directory.glob(f"*.{output_format}")):
+        name = path.stem.rsplit("_part_", 1)[0]
+        tables.setdefault(name, []).extend(
+            decode_file(path, output_format, logical=logical)
+        )
+    return tables
 
 
 def save_paths_as_list(saved: list[str] | dict[str, str]) -> list[Path]:
@@ -176,33 +179,3 @@ def save_paths_as_list(saved: list[str] | dict[str, str]) -> list[Path]:
     if isinstance(saved, dict):
         return [Path(path) for path in saved.values()]
     return [Path(path) for path in saved]
-
-
-def logical_from_decoded(
-    rows: list[dict[str, Any]],
-    output_format: str,
-) -> list[dict[str, Any]]:
-    """Project decoded writer rows toward a format-independent logical record.
-
-    This is a comparison aid, not a claim that formats are identical.
-    Format-specific residues stay in the row; callers consult the exception
-    list rather than collapsing them.
-    """
-    projected: list[dict[str, Any]] = []
-    for row in rows:
-        item: dict[str, Any] = {}
-        for key, value in row.items():
-            if key in METADATA_FIELDS:
-                continue
-            item[key] = _logical_value(value, output_format)
-        projected.append(item)
-    return sort_records(projected)
-
-
-def _logical_value(value: Any, output_format: str) -> Any:
-    """Normalize a decoded cell for cross-format comparison notes."""
-    if output_format == "csv":
-        if value == "":
-            return None
-        return value
-    return value

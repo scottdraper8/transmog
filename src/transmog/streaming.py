@@ -43,16 +43,12 @@ def stream_process(
         progress_callback: Optional callable invoked after each batch flush
         total_records: Total input record count (None when unknown)
         consolidate: Merge part files into a single file per table at close
-        coerce_schema: Coerce minority part files to majority schema at close
+        coerce_schema: Unify fields and compatible types across parts at close
         **format_options: Format-specific options for the writer
 
     Returns:
         List of file paths written by the writer.
     """
-    writer_options = dict(format_options)
-    if config.stringify_values:
-        writer_options["stringify_values"] = True
-
     writer = create_streaming_writer(
         format_name=output_format,
         destination=output_destination,
@@ -60,7 +56,7 @@ def stream_process(
         batch_size=config.batch_size,
         coerce_schema=coerce_schema,
         consolidate=consolidate,
-        **writer_options,
+        **format_options,
     )
 
     logger.info("stream started, entity=%s, format=%s", entity_name, output_format)

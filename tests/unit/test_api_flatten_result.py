@@ -1,6 +1,5 @@
 """Tests for FlattenResult class and its methods."""
 
-import sys
 import tempfile
 from pathlib import Path
 
@@ -293,45 +292,26 @@ class TestFlattenResultEdgeCases:
 class TestFlattenResultSaveErrors:
     """Test error handling in save operations."""
 
-    @pytest.mark.skipif(
-        sys.platform == "win32",
-        reason="Windows file permissions work differently from Unix",
-    )
-    def test_result_save_permission_errors(self):
-        """Test save operations with permission errors."""
-        data = {"id": 1, "name": "Test"}
-        result = tm.flatten(data, name="test")
+    def test_result_save_permission_errors(self, tmp_path, monkeypatch):
+        """A permission failure at directory creation is wrapped as OutputError."""
+        result = tm.flatten({"id": 1, "name": "Test"}, name="test")
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            readonly_dir = Path(temp_dir) / "readonly"
-            readonly_dir.mkdir()
+        def deny_directory_creation(*_args, **_kwargs):
+            raise PermissionError("permission denied")
 
-            try:
-                readonly_dir.chmod(0o444)
-            except (OSError, NotImplementedError):
-                pytest.skip("Cannot change directory permissions on this platform")
+        with monkeypatch.context() as context:
+            context.setattr(Path, "mkdir", deny_directory_creation)
+            with pytest.raises(OutputError, match="Failed to create output directory"):
+                result.save(tmp_path / "output.csv")
+        assert not (tmp_path / "output.csv").exists()
 
-            readonly_file = readonly_dir / "output.csv"
-            try:
-                with pytest.raises((OutputError, PermissionError, OSError)):
-                    result.save(str(readonly_file))
-            finally:
-                try:
-                    readonly_dir.chmod(0o755)
-                except (OSError, NotImplementedError):
-                    pass
-
-    @pytest.mark.skipif(
-        sys.platform == "win32",
-        reason="Windows file permissions work differently from Unix",
-    )
-    def test_result_save_to_invalid_directory(self):
-        """Test save operations when directory is not writable."""
-        data = {"id": 1, "name": "Test"}
-        result = tm.flatten(data, name="test")
-
+    def test_result_save_to_invalid_directory(self, tmp_path):
+        """A file used as a parent directory fails without platform-specific paths."""
+        result = tm.flatten({"id": 1, "name": "Test"}, name="test")
+        blocker = tmp_path / "file"
+        blocker.write_text("not a directory", encoding="utf-8")
         with pytest.raises(OutputError):
-            result.save("/nonexistent/directory/that/does/not/exist/output.csv")
+            result.save(blocker / "output.csv")
 
     def test_result_save_with_child_tables(self):
         """Test saving result with child tables creates directory and all files."""

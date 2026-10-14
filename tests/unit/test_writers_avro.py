@@ -5,7 +5,6 @@ Tests Avro file writing functionality, schema inference, and edge cases.
 """
 
 import io
-import sys
 import tempfile
 import warnings
 from pathlib import Path
@@ -459,10 +458,9 @@ class TestAvroWriterSchemaInference:
         assert records[1]["value"] == "hello"
         assert records[1]["value"] is not None
 
-        # Numeric string gets coerced to the first matching type in union
-        # The schema will be ['null', 'long', 'string'] since all values can be strings
-        # "3.14" will match long as 3 or string as "3.14"
-        assert records[2]["value"] is not None
+        assert records[2]["value"] == "3.14"
+        assert type(records[0]["value"]) is int
+        assert type(records[2]["value"]) is str
 
         # Null should remain null
         assert records[3]["value"] is None
@@ -641,14 +639,12 @@ class TestAvroStreamingWriter:
 class TestAvroWriterErrorHandling:
     """Test AvroWriter error handling."""
 
-    @pytest.mark.skipif(
-        sys.platform == "win32",
-        reason="Windows allows creation of paths like /nonexistent/directory",
-    )
-    def test_avro_writer_invalid_path(self):
-        """Test writing to invalid path."""
+    def test_avro_writer_invalid_path(self, tmp_path):
+        """A file used as a parent directory raises an output error on every OS."""
         data = [{"id": "1", "name": "Alice"}]
-        invalid_path = "/nonexistent/directory/file.avro"
+        blocker = tmp_path / "file"
+        blocker.write_text("not a directory", encoding="utf-8")
+        invalid_path = str(blocker / "file.avro")
 
         writer = AvroWriter()
         with pytest.raises(OutputError):
@@ -1008,7 +1004,7 @@ class TestAvroCoercion:
     """Test schema coercion for Avro part files."""
 
     def test_coercion_unifies_avro_schemas(self, tmp_path):
-        """Test that coerce_schema rewrites minority Avro part files."""
+        """Test that coerce_schema rewrites Avro parts to the union of fields."""
         import json
 
         avro_dir = tmp_path / "avro_out"

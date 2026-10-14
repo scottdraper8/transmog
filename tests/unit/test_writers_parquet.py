@@ -4,7 +4,6 @@ Tests for Parquet writer in Transmog.
 Tests Parquet file writing functionality, formats, and edge cases.
 """
 
-import sys
 import tempfile
 from pathlib import Path
 
@@ -165,14 +164,12 @@ class TestParquetWriterOptions:
 class TestParquetWriterErrorHandling:
     """Test ParquetWriter error handling."""
 
-    @pytest.mark.skipif(
-        sys.platform == "win32",
-        reason="Windows allows creation of paths like /nonexistent/directory",
-    )
-    def test_parquet_writer_invalid_path(self):
-        """Test writing to invalid path."""
+    def test_parquet_writer_invalid_path(self, tmp_path):
+        """A file used as a parent directory raises an output error on every OS."""
         data = [{"id": "1", "name": "Alice"}]
-        invalid_path = "/nonexistent/directory/file.parquet"
+        blocker = tmp_path / "file"
+        blocker.write_text("not a directory", encoding="utf-8")
+        invalid_path = str(blocker / "file.parquet")
 
         writer = ParquetWriter()
         with pytest.raises(OutputError):

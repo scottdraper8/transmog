@@ -339,9 +339,9 @@ def flatten_stream(
             time. When True (default), the output matches single-file-per-table
             conventions expected by data lake consumers. Set to False to retain
             individual part files with per-part schemas.
-        coerce_schema: Coerce minority part files to the majority schema at
-            close time. When enabled, the streaming writer rewrites part files
-            whose schemas deviate from the majority. This incurs additional
+        coerce_schema: Unify fields and compatible types across all part files
+            at close time. When enabled, the streaming writer rewrites part files
+            whose schemas differ from the inferred union. This incurs additional
             I/O proportional to the number of deviating parts.
         **format_options: Format-specific writer options:
 
@@ -355,7 +355,7 @@ def flatten_stream(
 
             Avro options:
                 - compression: str - Compression codec
-                  ("null", "deflate", "snappy", "bzip2", "xz")
+                  ("null", "deflate", "snappy", "zstandard", "lz4", "bzip2", "xz")
                   Note: snappy/bzip2/xz provided via cramjam (included by default)
                         zstandard/lz4 require separate packages (fastavro limitation)
                 - sync_interval: int - Approximate sync block size in bytes

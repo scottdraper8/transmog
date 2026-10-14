@@ -83,7 +83,7 @@ class OrcStreamingWriter(PyArrowStreamingWriter):
         """Rewrite an ORC part file with a new target schema."""
         table = orc.read_table(file_path)
         table = self._promote_table_to_schema(table, target_schema)
-        orc.write_table(table, file_path, compression=self.compression)
+        orc.write_table(table, file_path, compression=self.compression, **self.options)
 
 
 __all__ = ["OrcWriter", "OrcStreamingWriter"]

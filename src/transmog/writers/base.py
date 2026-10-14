@@ -28,9 +28,15 @@ def _normalize_special_floats(value: Any, null_replacement: Any = None) -> Any:
     Returns:
         Normalized value (null_replacement for NaN/Inf, original value otherwise)
     """
-    if isinstance(value, float):
-        if math.isnan(value) or math.isinf(value):
-            return null_replacement
+    if isinstance(value, float) and not math.isfinite(value):
+        return null_replacement
+    if isinstance(value, list):
+        return [_normalize_special_floats(item, null_replacement) for item in value]
+    if isinstance(value, dict):
+        return {
+            key: _normalize_special_floats(item, null_replacement)
+            for key, item in value.items()
+        }
     return value
 
 
@@ -97,7 +103,7 @@ class StreamingWriter(ABC):
 
     Manages the part-file lifecycle: buffering records, flushing batches as
     numbered part files, tracking schema deviations across parts, and
-    optionally coercing minority part files to a unified schema at close time.
+    optionally rewriting part files to a unified schema at close time.
 
     Subclasses implement format-specific methods for writing parts, inferring
     schemas, and rewriting files during coercion.
@@ -120,7 +126,7 @@ class StreamingWriter(ABC):
             batch_size: Number of records per batch before flushing to part file.
                 Typically set via TransmogConfig.batch_size and passed by the
                 streaming pipeline.
-            coerce_schema: Coerce minority part files to majority schema at close
+            coerce_schema: Unify fields and compatible types across parts at close
             consolidate: Merge part files into a single file per table at close
             **options: Format-specific options
 
@@ -274,6 +280,12 @@ class StreamingWriter(ABC):
             filename = f"{safe_name}{extension}"
         return os.path.join(base_dir, filename)
 
+    def _unified_part_schema(self, table_name: str) -> Any:
+        """Resolve a table's target schema before coercion or consolidation."""
+        return self._build_unified_schema(
+            [schema for _, schema in self._part_schemas[table_name]]
+        )
+
     def _consolidate_all_tables(self) -> None:
         """Merge all part files into a single file per table."""
         base_dir = self.base_dir
@@ -292,8 +304,7 @@ class StreamingWriter(ABC):
             if len(part_files) == 1:
                 os.rename(part_files[0], consolidated_path)
             else:
-                schemas = [schema for _, schema in part_list]
-                unified_schema = self._build_unified_schema(schemas)
+                unified_schema = self._unified_part_schema(table_name)
                 self._consolidate_parts(consolidated_path, part_files, unified_schema)
                 for part_file in part_files:
                     os.remove(part_file)
@@ -379,7 +390,7 @@ class StreamingWriter(ABC):
             warnings.warn("\n".join(lines), UserWarning, stacklevel=2)
 
     def _coerce_part_files(self) -> None:
-        """Coerce minority part files to a unified schema.
+        """Rewrite nonmatching part files to the union of fields and types.
 
         Builds a unified schema from all parts, identifies files that don't
         match it, and rewrites them via the subclass _rewrite_part() method.
@@ -397,32 +408,34 @@ class StreamingWriter(ABC):
 
             part_schemas: dict[str, Any] = dict(self._part_schemas.get(table_name, []))
 
-            target_schema = self._build_unified_schema(list(part_schemas.values()))
+            target_schema = self._unified_part_schema(table_name)
             target_fp = self._schema_fingerprint(target_schema)
 
-            minority_files = [
+            rewrite_files = [
                 name
                 for name, schema in part_schemas.items()
                 if self._schema_fingerprint(schema) != target_fp
             ]
 
-            if not minority_files:
+            if not rewrite_files:
                 continue
 
             logger.info(
                 "coercing %d part files for table '%s' to unified schema",
-                len(minority_files),
+                len(rewrite_files),
                 table_name,
             )
 
-            for filename in minority_files:
+            for filename in rewrite_files:
                 file_path = os.path.join(base_dir, filename)
                 self._rewrite_part(file_path, target_schema)
-
                 for part_entry in log_data["parts"]:
                     if part_entry["file"] == filename:
                         part_entry["coerced_to"] = self._schema_to_dict(target_schema)
                         break
+            self._part_schemas[table_name] = [
+                (filename, target_schema) for filename in part_schemas
+            ]
 
     def _write_buffer(self, table_name: str) -> None:
         """Write buffered records as a new part file."""
@@ -491,7 +504,7 @@ class StreamingWriter(ABC):
         """Finalize output, flush buffered data, and clean up resources.
 
         Writes remaining buffered records, warns about schema deviations,
-        optionally coerces minority part files, and optionally consolidates
+        optionally unifies part schemas, and optionally consolidates
         part files into a single file per table.
 
         Returns:
@@ -514,7 +527,7 @@ class StreamingWriter(ABC):
                 )
                 if has_deviations:
                     logger.warning(
-                        "coerce_schema is enabled: minority part files will be "
+                        "coerce_schema is enabled: nonmatching part files will be "
                         "reread and rewritten, incurring additional I/O"
                     )
                     self._coerce_part_files()

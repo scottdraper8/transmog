@@ -1,0 +1,5 @@
+[
+  {"id": 1, "values": [1, 2.5], "matrix": [[1], [2.5]], "score": 1},
+  {"id": 2, "values": [null], "matrix": [[3]], "score": 2.5},
+  {"id": 3, "values": [3.75], "matrix": [[null]], "flag": false}
+]

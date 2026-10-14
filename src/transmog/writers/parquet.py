@@ -79,13 +79,13 @@ class ParquetStreamingWriter(PyArrowStreamingWriter):
 
     def _read_part_table(self, file_path: str) -> Any:
         """Read a Parquet part file as a PyArrow Table."""
-        return pq.read_table(file_path)
+        return pq.ParquetFile(file_path).read()
 
     def _rewrite_part(self, file_path: str, target_schema: Any) -> None:
         """Rewrite a Parquet part file with a new target schema."""
-        table = pq.read_table(file_path)
+        table = self._read_part_table(file_path)
         table = self._promote_table_to_schema(table, target_schema)
-        pq.write_table(table, file_path, compression=self.compression)
+        pq.write_table(table, file_path, compression=self.compression, **self.options)
 
 
 __all__ = ["ParquetWriter", "ParquetStreamingWriter"]

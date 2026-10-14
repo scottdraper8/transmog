@@ -18,6 +18,7 @@ from transmog.writers.base import (
 
 _AVRO_WRITE_ERRORS: tuple[type[Exception], ...] = (
     OSError,
+    OverflowError,
     ValueError,
     TypeError,
     KeyError,
@@ -101,73 +102,42 @@ def _infer_avro_schema(
     return {"type": "record", "name": name, "fields": fields}
 
 
-def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:
+def _normalize_record(record: object) -> dict[str, Any]:
     """Normalize a record for Avro output.
 
     - NaN/Inf → None
-    - list → JSON string (parseable, cross-language)
+    - list/dict → JSON string (parseable, cross-language)
     """
+    if not isinstance(record, dict):
+        raise OutputError(f"Expected an Avro record, got {type(record).__name__}")
     prepared: dict[str, Any] = {}
     for key, value in record.items():
-        if isinstance(value, list):
-            prepared[key] = json.dumps(value, ensure_ascii=False)
+        if isinstance(value, (list, dict)):
+            prepared[key] = json.dumps(
+                _normalize_special_floats(value), ensure_ascii=False, allow_nan=False
+            )
         else:
             prepared[key] = _normalize_special_floats(value, null_replacement=None)
     return prepared
 
 
 def _coerce_value_to_schema(value: Any, field_type: Any) -> Any:
-    """Coerce a value to match the expected Avro schema type.
+    """Preserve native values and select their exact Avro union branch.
 
-    For union types, attempts to match the value to each type in the union
-    in order, returning the first successful coercion.
+    Explicit branch labels prevent fastavro from choosing double before long
+    or interpreting a boolean as a number. Schema mismatches are errors, not
+    invitations to truncate numbers, parse numeric strings, or discard values.
     """
-    normalized = _normalize_special_floats(value, null_replacement=None)
-
-    if normalized is None:
-        return None
-
-    if isinstance(field_type, list):
-        non_null_types = [t for t in field_type if t != "null"]
-        if not non_null_types:
-            return None
-
-        for target_type in non_null_types:
-            result = _try_coerce_to_type(normalized, target_type)
-            if result is not None:
-                return result
-
-        return None
-    else:
-        return _try_coerce_to_type(normalized, field_type)
-
-
-def _try_coerce_to_type(value: Any, target_type: str) -> Any:
-    """Try to coerce a value to a specific Avro type."""
-    if target_type == "string":
-        return str(value)
-    elif target_type == "long":
-        try:
-            return int(value)
-        except (ValueError, TypeError):
-            return None
-    elif target_type == "double":
-        try:
-            return float(value)
-        except (ValueError, TypeError):
-            return None
-    elif target_type == "boolean":
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, str):
-            return value.lower() in ("true", "1", "yes")
-        return bool(value)
-    elif target_type == "bytes":
-        if isinstance(value, bytes):
-            return value
-        return str(value).encode("utf-8")
-
-    return value
+    normalized = _normalize_special_floats(value)
+    types = field_type if isinstance(field_type, list) else [field_type]
+    native_type = _python_type_to_avro(normalized)
+    if native_type not in types:
+        raise OutputError(
+            f"Value {normalized!r} of type {native_type} does not match {field_type}"
+        )
+    if normalized is None or not isinstance(field_type, list):
+        return normalized
+    return (native_type, normalized)
 
 
 def _prepare_record_for_schema(
@@ -175,8 +145,7 @@ def _prepare_record_for_schema(
 ) -> dict[str, Any]:
     """Prepare a record to match the Avro schema.
 
-    Ensures all schema fields are present and values are coerced to
-    the correct types.
+    Fills missing fields and validates native types without lossy coercion.
     """
     field_types = {f["name"]: f["type"] for f in schema["fields"]}
     prepared = {}
@@ -324,7 +293,7 @@ class AvroStreamingWriter(StreamingWriter):
         record_name = self._get_record_name(self._current_table_name)
 
         normalized = [_normalize_record(r) for r in records]
-        schema = _infer_avro_schema(normalized, name=record_name)
+        schema = _infer_avro_schema(records, name=record_name)
         parsed_schema = fastavro.parse_schema(schema)
 
         prepared_records = [_prepare_record_for_schema(r, schema) for r in normalized]
@@ -351,25 +320,18 @@ class AvroStreamingWriter(StreamingWriter):
 
     def _build_unified_schema(self, schemas: list[Any]) -> Any:
         """Build a unified Avro schema from all part schemas."""
-        all_field_names: list[str] = []
-        all_field_types: dict[str, Any] = {}
+        all_field_types: dict[str, set[str]] = {}
         for schema in schemas:
             for field in schema["fields"]:
-                if field["name"] not in all_field_types:
-                    all_field_names.append(field["name"])
-                    all_field_types[field["name"]] = field["type"]
+                types = field["type"]
+                types = types if isinstance(types, list) else [types]
+                all_field_types.setdefault(field["name"], set()).update(types)
 
-        # Use the first schema's record name
         record_name = schemas[0]["name"] if schemas else "Record"
-        target_fields = []
-        for name in all_field_names:
-            field_type = all_field_types[name]
-            if isinstance(field_type, list):
-                if "null" not in field_type:
-                    field_type = ["null"] + field_type
-            else:
-                field_type = ["null", field_type]
-            target_fields.append({"name": name, "type": field_type})
+        target_fields = [
+            {"name": name, "type": ["null", *sorted(types - {"null"})]}
+            for name, types in all_field_types.items()
+        ]
 
         return {"type": "record", "name": record_name, "fields": target_fields}
 

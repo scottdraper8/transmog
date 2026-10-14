@@ -68,7 +68,7 @@ def create_streaming_writer(
         destination: Directory path to write output files to
         entity_name: Name of the entity being processed
         batch_size: Number of records per batch before flushing to part file
-        coerce_schema: Coerce minority part files to majority schema at close
+        coerce_schema: Unify fields and compatible types across parts at close
         consolidate: Merge part files into a single file per table at close
         **kwargs: Format-specific options
 

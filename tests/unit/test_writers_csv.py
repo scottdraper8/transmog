@@ -5,7 +5,6 @@ Tests CSV output, formatting, and writer interface implementation.
 """
 
 import csv
-import sys
 import tempfile
 from io import StringIO
 from pathlib import Path
@@ -395,14 +394,12 @@ class TestCsvWriter:
         finally:
             Path(tmp_path).unlink(missing_ok=True)
 
-    @pytest.mark.skipif(
-        sys.platform == "win32",
-        reason="Windows allows creation of paths like /invalid/path",
-    )
-    def test_csv_writer_invalid_path(self, sample_data):
-        """Test CSV writer with invalid file path."""
+    def test_csv_writer_invalid_path(self, sample_data, tmp_path):
+        """A file used as a parent directory raises an output error on every OS."""
         writer = CsvWriter()
-        invalid_path = "/invalid/path/that/does/not/exist.csv"
+        blocker = tmp_path / "file"
+        blocker.write_text("not a directory", encoding="utf-8")
+        invalid_path = str(blocker / "file.csv")
 
         with pytest.raises(OutputError):
             writer.write(sample_data, invalid_path)
@@ -841,7 +838,7 @@ class TestCsvCoercion:
     """Test schema coercion for CSV part files."""
 
     def test_coercion_unifies_csv_columns(self, tmp_path):
-        """Test that coerce_schema rewrites minority CSV part files."""
+        """Test that coerce_schema rewrites CSV parts to the union of fields."""
         import json
         import warnings
 
